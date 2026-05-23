@@ -475,45 +475,96 @@ st.sidebar.markdown("[👑 區塊一：三大法人持股%](#section-1)")
 # 🏠 核心五大區塊
 # ==========================================
 # ==========================================
-# 🏠 區塊1：中長線 三大法人 持股比例 追蹤 (完整保留每日欄位版)
+# 🏠 區塊1：中長線 三大法人 持股比例 追蹤 (無敵防錯版)
 # ==========================================
 st.write("---")
 st.markdown("<div id='section-1'></div>", unsafe_allow_html=True)
 st.header("🏢 區塊1：中長線 三大法人 持股比例 追蹤")
 
-# 1. 解析 TXT 的函數 (確保編碼正確)
-def parse_special_txt(file_path):
-    # 使用 utf-8-sig 處理亂碼問題
-    df = pd.read_csv(file_path, sep='\t', encoding='utf-8-sig', skiprows=4)
-    # 清理欄位名稱
-    df.columns = [str(c).replace(" ", "").strip() for c in df.columns]
-    # 取出日期作為欄位名稱的一部分 (從檔名擷取)
-    date_label = os.path.basename(file_path)[:8]
-    df = df.rename(columns={"持股%": f"{date_label}持股%"})
-    return df[['股票代號', '股票名稱', f"{date_label}持股%"]]
+import re
 
-# 2. 獲取所有 TXT 檔案並進行合併
+def parse_special_txt(file_path):
+    parsed_data = []
+    # 1. 從檔名抓取日期 (例如 "20260521")
+    date_label = os.path.basename(file_path)[:8]
+    target_col = f"{date_label}持股%"
+    
+    try:
+        # 2. 強制使用 utf-8-sig 讀取，逐行掃描
+        with open(file_path, 'r', encoding='utf-8-sig', errors='ignore') as f:
+            for line in f:
+                line_str = line.strip()
+                # 依據 Tab 切割欄位
+                parts = line_str.split('\t')
+                
+                # 3. 判斷是否為真實資料行 (特徵: 第一欄是排名數字，總欄位至少有5個)
+                if len(parts) >= 5 and parts[0].isdigit():
+                    stock_str = parts[1].strip()  # 例如 "4916事欣科"
+                    
+                    # 4. 精準分離代號與名稱
+                    m = re.match(r'^(\d+)(.*)', stock_str)
+                    if m:
+                        stock_id = m.group(1)
+                        stock_name = m.group(2).strip()
+                    else:
+                        stock_id = stock_str
+                        stock_name = stock_str
+                    
+                    # 5. 抓取持股% (倒數第二個欄位)
+                    try:
+                        holding_pct = float(parts[-2])
+                    except ValueError:
+                        continue
+                        
+                    # 直接賦予絕對乾淨的欄位名稱
+                    parsed_data.append({
+                        '股票代號': stock_id,
+                        '股票名稱': stock_name,
+                        target_col: holding_pct
+                    })
+    except Exception as e:
+        st.error(f"讀取檔案失敗: {os.path.basename(file_path)}, 錯誤: {e}")
+        return pd.DataFrame()
+
+    df = pd.DataFrame(parsed_data)
+    
+    # 6. 安全防護：如果是空檔案，回傳帶有正確欄位名稱的空表
+    if df.empty:
+        return pd.DataFrame(columns=['股票代號', '股票名稱', target_col])
+        
+    return df[['股票代號', '股票名稱', target_col]]
+
+# ==========================================
+# 🔄 多日歷史資料合併邏輯
+# ==========================================
 txt_pattern = os.path.join(DATA_DIR, "*持股排名變化*.txt")
 all_txt_files = sorted(glob.glob(txt_pattern), reverse=True)
 
 if all_txt_files:
-    # 從最新檔案開始建立基礎 DataFrame
-    base_df = parse_special_txt(all_txt_files[0])
-    
-    # 逐一合併前幾天的資料 (例如合併最近 5 天)
-    for file_path in all_txt_files[1:5]:
+    final_df = None
+    # 取最近 5 天的資料進行合併
+    for file_path in all_txt_files[:5]:
         df_day = parse_special_txt(file_path)
-        base_df = pd.merge(base_df, df_day, on=['股票代號', '股票名稱'], how='outer')
-
-    # 3. 欄位處理
-    # 移除不需要的雜項欄位
-    df_to_show = base_df.drop(columns=["秘密3日斜率", "排序權重"], errors='ignore')
-    
-    # 將 DataFrame 的 NaN 補 0 或顯示為 "未進榜"
-    df_to_show = df_to_show.fillna("-")
-    
-    # 4. 最終渲染
-    st.dataframe(df_to_show, use_container_width=True)
+        
+        # 如果該天資料為空，則跳過
+        if df_day.empty:
+            continue
+            
+        if final_df is None:
+            final_df = df_day
+        else:
+            # 以代號與名稱作為基準，橫向合併每日持股比例
+            final_df = pd.merge(final_df, df_day, on=['股票代號', '股票名稱'], how='outer')
+            
+    # 顯示最終表格
+    if final_df is not None and not final_df.empty:
+        final_df = final_df.fillna("-")
+        # 讓 index 從 1 開始
+        final_df.index = range(1, len(final_df) + 1)
+        st.success(f"📊 已成功串聯 {len(all_txt_files[:5])} 個交易日的持股數據。")
+        st.dataframe(final_df, use_container_width=True)
+    else:
+        st.warning("⚠️ 讀取到的檔案皆無效或無資料，請檢查 TXT 內容。")
 else:
     st.write("⚠️ 目前暫無持股比例追蹤數據。")
 # ==========================================
