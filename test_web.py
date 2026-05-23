@@ -488,27 +488,7 @@ if not track_display_df.empty:
 # ==========================================
 st.write("---")
 st.header("🎯 區塊2-1：外資 5 日買超 佔成交量比 追蹤")
-# (此處讀取邏輯同前一版，以下為顯示與結構修正)
-if base_df is not None:
-    csv_display = base_df.fillna("未進榜").rename(columns={"代號": "股票代號", "名稱": "股票名稱"})
-    
-    # 增加當日買佔比欄位處理
-    csv_display['當日買佔比%'] = csv_display['股票代號'].map(latest_day_today_data).fillna(0)
-    
-    # 動態說明對照表
-    st.info("""
-    💡 **外資動態說明：**
-    * 🔥 **強延續**：今日佔比 > 近期均線，買盤加速
-    * ⚠️ **放緩(持續買進)**：仍買超，但力道弱於均線
-    * 🔄 **持平/量縮**：買進力道無明顯變化
-    * 📉 **調節洗盤**：微幅轉賣，尚屬健康整理
-    * 🚨 **劇烈倒貨**：短線強烈轉賣出
-    * ❌ **法人轉賣反轉**：趨勢翻空
-    """)
 
-    # 調整欄位順序
-    cols = ["股票代號", "股票名稱", "今日短動態", "當日買佔比%"] + [c for c in csv_display.columns if "買佔比%" in c and c != "當日買佔比%"]
-    csv_display = csv_display[cols]
 csv_pattern = os.path.join(DATA_DIR, "*外資買超佔成交比*.csv")
 all_csv_files = glob.glob(csv_pattern)
 
@@ -594,92 +574,104 @@ else:
         st.error("❌ 無法讀取外資買超數據，請檢查欄位名稱是否包含『5日』與『成交』關鍵字。")
 
 # ==========================================
-# 🎯 區塊2-2：投信 5 日買超 佔成交量比 追蹤 (穩定修復版)
+# ：多天期 5日 投信買賣佔成交量比軌跡追蹤 (CSV)
 # ==========================================
 st.write("---")
 st.header("🎯 區塊2-2：投信 5 日買超 佔成交量比 追蹤")
 
 csv_pattern_sitc = os.path.join(DATA_DIR, "*投信買超佔成交比*.csv")
-all_files_sitc = glob.glob(csv_pattern_sitc)
+all_csv_files_sitc = glob.glob(csv_pattern_sitc)
 
-if not all_files_sitc:
+if not all_csv_files_sitc:
     st.warning("⚠️ 找不到任何包含『投信買超佔成交比』的 CSV 檔案。")
 else:
-    all_files_sitc.sort(reverse=True)
-    target_files = all_files_sitc[:14]
-    base_df = None
-    latest_day_today_data_sitc = {}
-
-    for idx, f in enumerate(target_files):
-        try:
-            # 1. 強制以 utf-8-sig 讀取並清洗所有欄位名稱
-            df = pd.read_csv(f, encoding='utf-8-sig')
-            df.columns = [str(c).replace(" ", "").replace("\n", "").replace("\ufeff", "").strip() for c in df.columns]
+    all_csv_files_sitc.sort(reverse=True)
+    target_files_sitc = all_csv_files_sitc[:14]
+    
+    EXACT_TODAY_CANDIDATES = ['當日買進佔成交', '當日買賣超佔成交', '當日 買賣超 佔 成交']
+    EXACT_5DAY_CANDIDATES = ['5日買進佔成交', '5日買賣超佔成交', '5日 買賣超 佔 成交']
+    
+    latest_file_sitc = target_files_sitc[0]
+    latest_filename_sitc = os.path.basename(latest_file_sitc)
+    latest_mmdd_sitc = f"{latest_filename_sitc[4:6]}{latest_filename_sitc[6:8]}"
+    
+    try:
+        # 這裡修正為安全讀取
+        df_base_sitc = safe_read_csv(latest_file_sitc, dtype=str)
+        df_base_sitc = df_base_sitc.dropna(subset=['代號', '名稱'])
+        df_base_sitc = df_base_sitc[df_base_sitc['代號'].str.strip() != ""]
+        df_base_sitc = df_base_sitc.drop_duplicates(subset=['代號'])
+        
+        col_today_sitc = next((c for c in EXACT_TODAY_CANDIDATES if c in df_base_sitc.columns), None)
+        
+        df_master_sitc = pd.DataFrame({
+            '股票代號': df_base_sitc['代號'].astype(str).str.strip(),
+            '股票名稱': df_base_sitc['名稱'].astype(str).str.strip(),
+            '當日買佔比%': pd.to_numeric(df_base_sitc[col_today_sitc], errors='coerce')
+        })
+        df_master_sitc['_base_order'] = range(len(df_master_sitc))
+        
+        df_hist_sitc = df_master_sitc[['股票代號', '股票名稱']].copy()
+        
+        for file_path in target_files_sitc:
+            filename = os.path.basename(file_path)
+            date_label = f"{filename[4:6]}{filename[6:8]}" if filename[:8].isdigit() else filename[:8]
+            target_col = f"{date_label}買佔比%"
             
-            # 2. 確保代號/名稱存在
-            id_col = next((c for c in df.columns if '代號' in c), df.columns[0])
-            name_col = next((c for c in df.columns if '名稱' in c), df.columns[1])
-            df = df.rename(columns={id_col: '代號', name_col: '名稱'})
-            df['代號'] = df['代號'].astype(str).str.strip()
-            df['名稱'] = df['名稱'].astype(str).str.strip()
-            
-            d_label = extract_date_from_name(f)[-4:]
-            
-            # 3. 自動偵測欄位 (不再依賴死字串，只要包含關鍵字即可)
-            col_today = next((c for c in df.columns if '當日' in c and '買' in c and '成交' in c), None)
-            col_5d = next((c for c in df.columns if '5日' in c and '買' in c and '成交' in c), None)
-            
-            if idx == 0 and col_today:
-                latest_day_today_data_sitc = dict(zip(df['代號'], pd.to_numeric(df[col_today], errors='coerce')))
+            # 這裡修正為安全讀取
+            df_day = safe_read_csv(file_path, dtype=str)
+            col_5d = next((c for c in EXACT_5DAY_CANDIDATES if c in df_day.columns), None)
             
             if col_5d:
-                df_s = df[['代號', '名稱', col_5d]].copy()
-                df_s = df_s.rename(columns={col_5d: f"{d_label}買佔比%"})
-                if base_df is None:
-                    base_df = df_s
-                else:
-                    base_df = pd.merge(base_df, df_s, on=['代號', '名稱'], how='outer')
-        except Exception:
-            continue
+                df_temp = df_day[['代號', '名稱', col_5d]].copy()
+                df_temp.columns = ['股票代號', '股票名稱', target_col]
+                df_temp['股票代號'] = df_temp['股票代號'].astype(str).str.strip()
+                df_temp[target_col] = pd.to_numeric(df_temp[target_col], errors='coerce')
+                df_hist_sitc = pd.merge(df_hist_sitc, df_temp, on=['股票代號', '股票名稱'], how='outer')
 
-    if base_df is not None:
-        csv_display = base_df.fillna("未進榜").rename(columns={"代號": "股票代號", "名稱": "股票名稱"})
+        df_analysis_sitc = pd.merge(df_hist_sitc, df_master_sitc[['股票代號', '股票名稱', '當日買佔比%']], on=['股票代號', '股票名稱'], how='left')
         
-        # 4. 強健排序：改用最新日期數值排序，避開 _base_order 風險
-        latest_col_name = f"{extract_date_from_name(target_files[0])[-4:]}買佔比%"
-        if latest_col_name in csv_display.columns:
-            csv_display[latest_col_name] = pd.to_numeric(csv_display[latest_col_name].replace("未進榜", 0), errors='coerce').fillna(0)
-            csv_display = csv_display.sort_values(by=latest_col_name, ascending=False)
+        recent_3 = [f"{os.path.basename(f)[4:6]}{os.path.basename(f)[6:8]}買佔比%" for f in target_files_sitc[:3]]
+        prev_cols = [c for c in recent_3 if c != f"{latest_mmdd_sitc}買佔比%"]
+        df_analysis_sitc['baseline_3d'] = df_analysis_sitc[[c for c in recent_3 if c in df_analysis_sitc.columns]].mean(axis=1)
 
-        # 狀態判定
-        def evaluate_continuity(row):
-            today = latest_day_today_data_sitc.get(row['股票代號'], 0)
-            if pd.isna(today): return "⚪ 觀望"
-            if today > 0: return "🔥 強延續"
-            elif today < 0: return "📉 調節洗盤"
-            return "🔄 持平"
+        def evaluate(row):
+            today = row.get('當日買佔比%', None)
+            base = row.get('baseline_3d', None)
+            if pd.isna(today) or base is None or pd.isna(base): return "⚪ 觀望或無數據"
+            if not any(pd.notna(row.get(c, None)) for c in prev_cols) and today > 0: return "🆕 新進榜"
+            if today > base and today > 0: return "🔥 強延續"
+            elif 0 < today <= base: return "⚠️ 放緩 (持續買進)"
+            elif today == 0: return "⚪ 觀望持平 (量縮)"
+            elif today < 0:
+                if base <= 0: return "❌ 法人轉賣反轉"
+                return "🚨 劇烈倒貨 (籌碼洗盤)" if abs(today/base) >= 1.5 else "📉 調節洗盤 (尚屬健康)"
+            return "⚪ 觀望持平"
 
-        csv_display['今日短動態'] = csv_display.apply(evaluate_continuity, axis=1)
+        df_hist_sitc['今日短動態'] = df_analysis_sitc.apply(evaluate, axis=1)
         
-        # UI 與過濾
+        df_show_sitc = pd.merge(df_master_sitc, df_hist_sitc, on=['股票代號', '股票名稱'], how='left')
+        df_show_sitc = df_show_sitc.sort_values(by='_base_order')
+        
         st.write("🔧 **自訂標的顯示過濾：**")
         c1, c2 = st.columns(2)
-        show_etf = c1.checkbox("顯示 ETF", value=True, key="sitc_etf_final_v2")
-        show_bond = c2.checkbox("顯示 債券/債券ETF", value=True, key="sitc_bond_final_v2")
+        show_etf = c1.checkbox("顯示 ETF", value=True, key="sitc_etf")
+        show_bond = c2.checkbox("顯示 債券/債券ETF", value=True, key="sitc_bond")
         
-        mask = (csv_display['股票代號'].str.len() == 4)
-        if show_etf: mask |= ((csv_display['股票代號'].str.len() >= 5) & (~csv_display['股票代號'].str.endswith('B')))
-        if show_bond: mask |= csv_display['股票代號'].str.endswith('B')
-        csv_display = csv_display[mask]
+        mask = (df_show_sitc['股票代號'].str.len() == 4)
+        if show_etf: mask = mask | ((df_show_sitc['股票代號'].str.len() >= 5) & (~df_show_sitc['股票代號'].str.endswith('B')))
+        if show_bond: mask = mask | (df_show_sitc['股票代號'].str.endswith('B'))
+        df_show_sitc = df_show_sitc[mask]
         
-        history_cols = [c for c in csv_display.columns if "買佔比%" in c]
-        csv_display = csv_display[["股票代號", "股票名稱", "今日短動態"] + history_cols]
-        csv_display.index = range(1, len(csv_display) + 1)
+        base_cols = ['股票代號', '股票名稱', '今日短動態', '當日買佔比%']
+        df_show_sitc = df_show_sitc[base_cols + [c for c in df_show_sitc.columns if '買佔比%' in c and c != '當日買佔比%']]
+        df_show_sitc.index = range(1, len(df_show_sitc) + 1)
         
-        st.success(f"📊 已成功串聯交易日，追蹤共 {len(csv_display)} 檔。")
-        st.dataframe(csv_display, use_container_width=True)
-    else:
-        st.error("❌ 無法讀取投信買超數據，請確認 CSV 檔案內含有『5日』與『成交』欄位。")
+        st.success(f"📊 已成功串聯 {len(target_files_sitc)} 個交易日，追蹤 {len(df_show_sitc)} 檔曾進榜的短線熱門股：")
+        st.dataframe(df_show_sitc, use_container_width=True)
+        
+    except Exception as e:
+        st.error(f"❌ 處理投信程式時發生錯誤: {e}")
 
 # ==========================================
 # 🎯 區塊2-3：外資 5 日買超佔發行張數 追蹤 (穩定精確版)
