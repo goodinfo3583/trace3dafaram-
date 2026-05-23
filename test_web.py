@@ -477,23 +477,73 @@ st.sidebar.markdown("[👑 區塊一：三大法人持股%](#section-1)")
 # ==========================================
 # ⚙️ 修正後的 TXT 解析器 (區塊 1 使用)
 # ==========================================
+# ==========================================
+# ⚙️ 第一部分：定義函式 (放在最上方)
+# ==========================================
 def parse_special_txt(file_path):
     parsed_data = []
-    # 關鍵修正：將 'cp950' 改為 'utf-8-sig'，這才能確保 TXT 檔中的中文被正確讀取
-    # 如果您的檔案原始格式真的是 Big5，才用 'cp950'，但通常現代網頁抓下來的都是 UTF-8
+    # 這裡確保 TXT 讀取時使用 utf-8-sig
     with open(file_path, 'r', encoding='utf-8-sig', errors='ignore') as f:
         for line in f:
             line_str = line.strip()
+            # 這裡檢查您的邏輯是否正確 (TWSE/TPEx 是否真的存在於行中)
             if "TWSE" in line_str or "TPEx" in line_str:
-                # 使用 tab 分隔解析
                 parts = re.split(r'\t+', line_str)
-                # ... (您的後續解析邏輯保持不變) ...
+                # ... 確保您的解析邏輯正確對應 parts 的索引 ...
+                # 例如：parts[0]是代號, parts[1]是名稱
                 if len(parts) >= 4:
-                    # 這裡抓到的 parts[1] 與 parts[2] 就是中文名稱
-                    parsed_data.append({"代號": match.group(1), "名稱": match.group(2), "持股%": float(holding_pct)})
+                    parsed_data.append({
+                        "股票代號": parts[0], 
+                        "股票名稱": parts[1], 
+                        "持股%": float(parts[3])
+                    })
+    return pd.DataFrame(parsed_data)
+
+# ==========================================
+# 🏠 第二部分：UI 渲染 (放在函式定義之後)
+# ==========================================
+st.write("---")
+st.markdown("<div id='section-1'></div>", unsafe_allow_html=True)
+st.header("🏢 區塊1：中長線 三大法人 持股比例 追蹤")
+
+# 這裡假設 track_display_df 是在渲染前已經透過呼叫上述函式產生的
+if not track_display_df.empty: 
+    df_to_show = track_display_df.copy()
     
-    df = pd.DataFrame(parsed_data)
-    return df
+    # 移除秘密欄位
+    df_to_show = df_to_show.drop(columns=["秘密3日斜率", "排序權重"], errors='ignore')
+    
+    # 確保欄位名稱不重複
+    df_to_show = df_to_show.loc[:, ~df_to_show.columns.duplicated()]
+    
+    # 最終渲染
+    st.dataframe(df_to_show, use_container_width=True)
+else:
+    st.write("⚠️ 目前暫無持股比例追蹤數據。")
+# ==========================================
+# 🏠 區塊1：中長線 三大法人 持股比例 追蹤 (修正版)
+# ==========================================
+st.write("---")
+st.markdown("<div id='section-1'></div>", unsafe_allow_html=True)
+st.header("🏢 區塊1：中長線 三大法人 持股比例 追蹤")
+
+if not track_display_df.empty: 
+    # 直接複製 DataFrame
+    df_to_show = track_display_df.copy()
+    
+    # 清理：這裡不需要 encode/decode，因為亂碼通常在 read_csv 階段就固定了
+    # 我們只需要確認它是乾淨的 DataFrame
+    
+    # 移除秘密欄位
+    df_to_show = df_to_show.drop(columns=["秘密3日斜率", "排序權重"], errors='ignore')
+    
+    # 確保欄位名稱不重複 (這是最關鍵的一步)
+    df_to_show = df_to_show.loc[:, ~df_to_show.columns.duplicated()]
+    
+    # 最終渲染
+    st.dataframe(df_to_show, use_container_width=True)
+else:
+    st.write("⚠️ 目前暫無持股比例追蹤數據。")
 # ==========================================
 # 🎯 區塊2-1：外資 5 日買超 佔成交量比 追蹤 (穩定精確版)
 # ==========================================
