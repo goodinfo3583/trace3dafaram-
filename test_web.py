@@ -602,11 +602,11 @@ else:
 
     for idx, f in enumerate(target_files):
         try:
-            # 1. 強制以 utf-8-sig 讀取並清洗所有欄位名稱
+            # 1. 強制讀取並清洗欄位 (移除空格、換行、BOM)
             df = pd.read_csv(f, encoding='utf-8-sig')
             df.columns = [str(c).replace(" ", "").replace("\n", "").replace("\ufeff", "").strip() for c in df.columns]
             
-            # 2. 確保代號/名稱存在
+            # 2. 確保代號/名稱欄位存在並清理
             id_col = next((c for c in df.columns if '代號' in c), df.columns[0])
             name_col = next((c for c in df.columns if '名稱' in c), df.columns[1])
             df = df.rename(columns={id_col: '代號', name_col: '名稱'})
@@ -615,7 +615,7 @@ else:
             
             d_label = extract_date_from_name(f)[-4:]
             
-            # 3. 自動偵測欄位 (不再依賴死字串，只要包含關鍵字即可)
+            # 3. 自動偵測關鍵欄位 (只要包含關鍵字即可)
             col_today = next((c for c in df.columns if '當日' in c and '買' in c and '成交' in c), None)
             col_5d = next((c for c in df.columns if '5日' in c and '買' in c and '成交' in c), None)
             
@@ -635,35 +635,44 @@ else:
     if base_df is not None:
         csv_display = base_df.fillna("未進榜").rename(columns={"代號": "股票代號", "名稱": "股票名稱"})
         
-        # 4. 強健排序：改用最新日期數值排序，避開 _base_order 風險
+        # 4. 強健排序
         latest_col_name = f"{extract_date_from_name(target_files[0])[-4:]}買佔比%"
         if latest_col_name in csv_display.columns:
             csv_display[latest_col_name] = pd.to_numeric(csv_display[latest_col_name].replace("未進榜", 0), errors='coerce').fillna(0)
             csv_display = csv_display.sort_values(by=latest_col_name, ascending=False)
-
-        # 狀態判定
+            
+        # 5. 增加當日數據並判定動態
+        csv_display['當日買佔比%'] = csv_display['股票代號'].map(latest_day_today_data_sitc).fillna(0)
+        
         def evaluate_continuity(row):
             today = latest_day_today_data_sitc.get(row['股票代號'], 0)
+            base = pd.to_numeric(row.get(latest_col_name, 0), errors='coerce')
             if pd.isna(today): return "⚪ 觀望"
-            if today > 0: return "🔥 強延續"
-            elif today < 0: return "📉 調節洗盤"
+            if today > 0: return "🔥 強延續" if today > base else "⚠️ 放緩 (持續買進)"
+            elif today < 0: return "🚨 劇烈倒貨" if abs(today) > abs(base) else "📉 調節洗盤"
             return "🔄 持平"
 
         csv_display['今日短動態'] = csv_display.apply(evaluate_continuity, axis=1)
         
-        # UI 與過濾
+        # 動態說明
+        st.info("""
+        💡 **投信動態說明：** 🔥 強延續 (法人認養中) | ⚠️ 放緩 (買盤力道減弱) | 🔄 持平 | 📉 調節洗盤 (微幅調節) | 🚨 劇烈倒貨 (短線獲利了結)
+        """)
+        
+        # 篩選邏輯
         st.write("🔧 **自訂標的顯示過濾：**")
         c1, c2 = st.columns(2)
-        show_etf = c1.checkbox("顯示 ETF", value=True, key="sitc_etf_final_v2")
-        show_bond = c2.checkbox("顯示 債券/債券ETF", value=True, key="sitc_bond_final_v2")
+        show_etf = c1.checkbox("顯示 ETF", value=True, key="sitc_etf_v9")
+        show_bond = c2.checkbox("顯示 債券/債券ETF", value=True, key="sitc_bond_v9")
         
         mask = (csv_display['股票代號'].str.len() == 4)
         if show_etf: mask |= ((csv_display['股票代號'].str.len() >= 5) & (~csv_display['股票代號'].str.endswith('B')))
         if show_bond: mask |= csv_display['股票代號'].str.endswith('B')
         csv_display = csv_display[mask]
         
-        history_cols = [c for c in csv_display.columns if "買佔比%" in c]
-        csv_display = csv_display[["股票代號", "股票名稱", "今日短動態"] + history_cols]
+        # 欄位順序調整
+        cols = ["股票代號", "股票名稱", "今日短動態", "當日買佔比%"] + [c for c in csv_display.columns if "買佔比%" in c and c != "當日買佔比%"]
+        csv_display = csv_display[cols]
         csv_display.index = range(1, len(csv_display) + 1)
         
         st.success(f"📊 已成功串聯交易日，追蹤共 {len(csv_display)} 檔。")
