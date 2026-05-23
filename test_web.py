@@ -487,36 +487,57 @@ if not track_display_df.empty:
 # ：多天期 5日 投信買賣佔成交量比軌跡追蹤 (CSV)
 # ==========================================
 st.write("---")
-st.header("🎯 區塊2-1：外資 5 日買超 佔成交量比 追蹤")
+st.header("🎯 區塊2-2：投信 5 日買超 佔成交量比 追蹤")
 
-csv_pattern = os.path.join(DATA_DIR, "*外資買超佔成交比*.csv")
-all_csv_files = glob.glob(csv_pattern)
+csv_pattern_sitc = os.path.join(DATA_DIR, "*投信買超佔成交比*.csv")
+all_csv_files_sitc = glob.glob(csv_pattern_sitc)
 
-if not all_csv_files:
-    st.warning("⚠️ 找不到任何包含『外資買超佔成交比』的 CSV 檔案。")
+if not all_csv_files_sitc:
+    st.warning("⚠️ 找不到任何包含『投信買超佔成交比』的 CSV 檔案。")
 else:
-    all_csv_files.sort(reverse=True)
-    latest_file = all_csv_files[0]
+    all_csv_files_sitc.sort(reverse=True)
+    target_files_sitc = all_csv_files_sitc[:14]
+    
+    EXACT_TODAY_CANDIDATES = ['當日買進佔成交', '當日買賣超佔成交', '當日 買賣超 佔 成交']
+    EXACT_5DAY_CANDIDATES = ['5日買進佔成交', '5日買賣超佔成交', '5日 買賣超 佔 成交']
+    
+    latest_file_sitc = target_files_sitc[0]
+    latest_filename_sitc = os.path.basename(latest_file_sitc)
+    latest_mmdd_sitc = f"{latest_filename_sitc[4:6]}{latest_filename_sitc[6:8]}"
     
     try:
-        # 使用萬能讀取器
-        df_base_raw = safe_read_csv(latest_file, dtype=str)
-        # 清除欄位空格
-        df_base_raw.columns = [c.replace(" ", "").strip() for c in df_base_raw.columns]
+        # 這裡修正為安全讀取
+        df_base_sitc = safe_read_csv(latest_file_sitc, dtype=str)
+        df_base_sitc = df_base_sitc.dropna(subset=['代號', '名稱'])
+        df_base_sitc = df_base_sitc[df_base_sitc['代號'].str.strip() != ""]
+        df_base_sitc = df_base_sitc.drop_duplicates(subset=['代號'])
         
-        # 🔍 自動找關鍵欄位：不再指定死字串，只要包含關鍵字就好
-        col_today = next((c for c in df_base_raw.columns if '當日' in c and ('買進佔成交' in c or '買賣超佔成交' in c)), None)
+        col_today_sitc = next((c for c in EXACT_TODAY_CANDIDATES if c in df_base_sitc.columns), None)
         
-        if '代號' not in df_base_raw.columns or col_today is None:
-            # 偵錯用：顯示出它到底讀到了什麼欄位
-            st.error(f"❌ 找不到關鍵欄位。目前檔案 `{os.path.basename(latest_file)}` 的欄位有: {list(df_base_raw.columns)}")
-        else:
-            # 轉換數值
-            df_base_master = pd.DataFrame({
-                '股票代號': df_base_raw['代號'].astype(str).str.strip(),
-                '股票名稱': df_base_raw['名稱'].astype(str).str.strip(),
-                '當日買佔比%': pd.to_numeric(df_base_raw[col_today], errors='coerce')
-            })
+        df_master_sitc = pd.DataFrame({
+            '股票代號': df_base_sitc['代號'].astype(str).str.strip(),
+            '股票名稱': df_base_sitc['名稱'].astype(str).str.strip(),
+            '當日買佔比%': pd.to_numeric(df_base_sitc[col_today_sitc], errors='coerce')
+        })
+        df_master_sitc['_base_order'] = range(len(df_master_sitc))
+        
+        df_hist_sitc = df_master_sitc[['股票代號', '股票名稱']].copy()
+        
+        for file_path in target_files_sitc:
+            filename = os.path.basename(file_path)
+            date_label = f"{filename[4:6]}{filename[6:8]}" if filename[:8].isdigit() else filename[:8]
+            target_col = f"{date_label}買佔比%"
+            
+            # 這裡修正為安全讀取
+            df_day = safe_read_csv(file_path, dtype=str)
+            col_5d = next((c for c in EXACT_5DAY_CANDIDATES if c in df_day.columns), None)
+            
+            if col_5d:
+                df_temp = df_day[['代號', '名稱', col_5d]].copy()
+                df_temp.columns = ['股票代號', '股票名稱', target_col]
+                df_temp['股票代號'] = df_temp['股票代號'].astype(str).str.strip()
+                df_temp[target_col] = pd.to_numeric(df_temp[target_col], errors='coerce')
+                df_hist_sitc = pd.merge(df_hist_sitc, df_temp, on=['股票代號', '股票名稱'], how='outer')
 
         df_analysis_sitc = pd.merge(df_hist_sitc, df_master_sitc[['股票代號', '股票名稱', '當日買佔比%']], on=['股票代號', '股票名稱'], how='left')
         
