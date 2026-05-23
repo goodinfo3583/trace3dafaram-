@@ -19,7 +19,7 @@ st.markdown("""
 st.write("")
 st.write("📊 系統已將指標全數展開：中長線法人持股% ｜ 短線外資投信買佔比 ｜ 短線外資投信買佔發行 (已內建 3 日突發加速衝刺追蹤機制)")
 
-DATA_DIR = os.path.join(BASE_DIR, "Goodinfo_Rankings")
+DATA_DIR = os.path.join(os.path.dirname(__file__), "Goodinfo_Rankings")
 
 def extract_date_from_name(filepath):
     filename = os.path.basename(filepath)
