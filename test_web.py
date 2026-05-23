@@ -475,51 +475,63 @@ st.sidebar.markdown("[👑 區塊一：三大法人持股%](#section-1)")
 # 🏠 核心五大區塊
 # ==========================================
 # ==========================================
-# ⚙️ 修正後的 TXT 解析器 (區塊 1 使用)
-# ==========================================
-# ==========================================
-# ⚙️ 第一部分：定義函式 (放在最上方)
+# ⚙️ 第一部分：定義 TXT 解析函式 (請放置在程式碼最上方)
 # ==========================================
 def parse_special_txt(file_path):
     parsed_data = []
-    # 這裡確保 TXT 讀取時使用 utf-8-sig
+    # 強制使用 utf-8-sig 以正確讀取中文
     with open(file_path, 'r', encoding='utf-8-sig', errors='ignore') as f:
         for line in f:
             line_str = line.strip()
-            # 這裡檢查您的邏輯是否正確 (TWSE/TPEx 是否真的存在於行中)
-            if "TWSE" in line_str or "TPEx" in line_str:
-                parts = re.split(r'\t+', line_str)
-                # ... 確保您的解析邏輯正確對應 parts 的索引 ...
-                # 例如：parts[0]是代號, parts[1]是名稱
+            # 根據檔案內容，股票資料行通常以數字開頭
+            # 使用正規表達式匹配：代號(數字) + 空白 + 名稱(文字)
+            match = re.match(r'^(\d+)\s+([^\t\s]+)', line_str)
+            
+            if match:
+                stock_id = match.group(1)
+                stock_name = match.group(2)
+                
+                # 根據 snippet，持股% 和 ΔChange 是最後兩個欄位
+                parts = line_str.split('\t')
                 if len(parts) >= 4:
-                    parsed_data.append({
-                        "股票代號": parts[0], 
-                        "股票名稱": parts[1], 
-                        "持股%": float(parts[3])
-                    })
+                    try:
+                        # 處理持股% 與 ΔChange
+                        holding_pct = float(parts[-2])
+                        change = float(parts[-1])
+                        parsed_data.append({
+                            "股票代號": stock_id,
+                            "股票名稱": stock_name,
+                            "持股%": holding_pct,
+                            "ΔChange": change
+                        })
+                    except ValueError:
+                        continue
     return pd.DataFrame(parsed_data)
 
 # ==========================================
-# 🏠 第二部分：UI 渲染 (放在函式定義之後)
+# 🏠 第二部分：區塊 1 UI 渲染 (請放置在對應位置)
 # ==========================================
 st.write("---")
 st.markdown("<div id='section-1'></div>", unsafe_allow_html=True)
 st.header("🏢 區塊1：中長線 三大法人 持股比例 追蹤")
 
-# 這裡假設 track_display_df 是在渲染前已經透過呼叫上述函式產生的
-if not track_display_df.empty: 
+# 假設您已經定義了 TXT 的路徑變數，例如 TXT_FILE_PATH
+# 請確保在渲染前先呼叫解析函數：
+# track_display_df = parse_special_txt(TXT_FILE_PATH)
+
+if 'track_display_df' in locals() and not track_display_df.empty: 
     df_to_show = track_display_df.copy()
     
-    # 移除秘密欄位
+    # 移除不需要的欄位
     df_to_show = df_to_show.drop(columns=["秘密3日斜率", "排序權重"], errors='ignore')
     
     # 確保欄位名稱不重複
     df_to_show = df_to_show.loc[:, ~df_to_show.columns.duplicated()]
     
-    # 最終渲染
+    # 渲染表格
     st.dataframe(df_to_show, use_container_width=True)
 else:
-    st.write("⚠️ 目前暫無持股比例追蹤數據。")
+    st.write("⚠️ 目前暫無持股比例追蹤數據，請檢查檔案路徑。")
 # ==========================================
 # 🏠 區塊1：中長線 三大法人 持股比例 追蹤 (修正版)
 # ==========================================
