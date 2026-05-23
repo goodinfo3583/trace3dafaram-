@@ -27,10 +27,11 @@ def extract_date_from_name(filepath):
     return date_match.group(1) if date_match else "00000000"
 
 # ==========================================
-# ⚙️ 萬能解析與讀取核心層
+# ⚙️ 萬能解析與讀取核心層 (全面升級雙軌編碼相容)
 # ==========================================
 def parse_special_txt(file_path):
     parsed_data = []
+    # 這裡已經是正確的 cp950
     with open(file_path, 'r', encoding='cp950', errors='ignore') as f:
         for line in f:
             line_str = line.strip()
@@ -47,6 +48,13 @@ def parse_special_txt(file_path):
     if not df.empty: df = df.drop_duplicates(subset=['代號'], keep='first')
     return df
 
+# 🔧 專門處理 Goodinfo CSV 雙軌編碼的讀取器
+def safe_read_csv(file_path, **kwargs):
+    try:
+        return pd.read_csv(file_path, encoding='cp950', **kwargs)
+    except:
+        return pd.read_csv(file_path, encoding='utf-8-sig', **kwargs)
+
 def load_csv_trajectory(pattern_str, column_suffix_name):
     csv_pattern = os.path.join(DATA_DIR, pattern_str)
     all_files = glob.glob(csv_pattern)
@@ -58,7 +66,8 @@ def load_csv_trajectory(pattern_str, column_suffix_name):
             date_label = extract_date_from_name(file_path)
             date_labels.append(date_label)
             try:
-                df_day = pd.read_csv(file_path, encoding='utf-8-sig')
+                # 這裡修正為安全讀取
+                df_day = safe_read_csv(file_path)
                 df_day['代號'] = df_day['代號'].astype(str).str.strip()
                 df_day['名稱'] = df_day['名稱'].astype(str).str.strip()
                 matched_cols = [c for c in df_day.columns if any(k in c for k in ['5', '佔', '買超', '賣出', '日', '週', '比', '連續'])]
@@ -88,7 +97,6 @@ def load_csv_trajectory(pattern_str, column_suffix_name):
 # ==========================================
 # ⚡ 數據預先同步載入層
 # ==========================================
-# 1. 讀取三大法人持股 TXT
 txt_pattern = os.path.join(DATA_DIR, "*持股排名變化*.txt")
 all_txt_files = glob.glob(txt_pattern)
 track_display_df, txt_date_labels = pd.DataFrame(), []
@@ -116,7 +124,7 @@ if all_txt_files:
         track_display_df = track_display_df[["股票代號", "股票名稱", "籌碼趨勢", "秘密3日斜率"] + safe_txt_cols]
         track_display_df["排序權重"] = track_display_df["籌碼趨勢"].map({"📈 上升": 1, "🆕 新進榜": 2, "🔄 趨緩": 3, "觀察中": 4, "❌ 掉出榜": 5, "⏳ 天數錯位": 6})
         track_display_df = track_display_df.sort_values(by="排序權重")
-#  加載 CSV 表格軌跡 (並存全部展開)
+
 csv_foreign_deal, _ = load_csv_trajectory("*外資買超佔成交比*.csv", "外資買佔比(%)")
 csv_it_deal, _ = load_csv_trajectory("*投信買超佔成交比*.csv", "投信買佔比(%)")
 csv_foreign_stock, _ = load_csv_trajectory("*外資買超佔發行張數*.csv", "外資買佔發行(%)")
@@ -144,26 +152,22 @@ latest_fo_wk = get_latest_only(csv_foreign_ln_wk, fo_wk_dates, "外資連買週"
 st.markdown("## 🏆 頂級核心：選股偵測池")
 st.write("🔥 **戰術策略說明**：以長線 TXT 檔案為絕對基底，放寬偵測：今日數據對比前1天、前2天或前3天只要有實質增加（含突破未進榜斷層）即鎖定！短線不再強迫四大表全數交集，只要短線 4 大指標任一命中，即列入黃金名單！")
 
-# 確保所有核心短線多空 CSV 與長線 TXT 皆有讀取到資料
 if (not track_display_df.empty and not csv_foreign_deal.empty and not csv_foreign_stock.empty 
     and not csv_it_deal.empty and not csv_it_stock.empty and not csv_foreign_sell.empty and not csv_it_sell.empty):
     
     import glob, os
     import numpy as np
 
-    # 🌟 💡 1. 股票代號型態安全鎖：強制清洗並統一轉字串
     def align_stock_id_type(df, target_col):
         if df.empty: return df
         df = df.copy()
         df[target_col] = df[target_col].astype(str).str.strip()
         return df
 
-    # 現場資料清洗
     clean_track = align_stock_id_type(track_display_df, "股票代號")
     clean_f_sell = align_stock_id_type(csv_foreign_sell, "股票代號")
     clean_i_sell = align_stock_id_type(csv_it_sell, "股票代號")
     
-    # 🌟 💡 2. 核心大改版：長線基底計算
     try:
         chart_cols = [c for c in clean_track.columns if "持股%" in c]
         if len(chart_cols) >= 4:
@@ -192,14 +196,14 @@ if (not track_display_df.empty and not csv_foreign_deal.empty and not csv_foreig
         base_pool = clean_track[clean_track["籌碼趨勢"].isin(["📈 上升", "🆕 新進榜"])].copy()
         base_pool["長線戰略狀態"] = base_pool["籌碼趨勢"]
 
-    # 🌟 💡 3. 完美同步 2-1~2-4 的動態數值擷取引擎
     def fetch_latest_dynamic(pattern, mode="ratio"):
         files = glob.glob(os.path.join(DATA_DIR, pattern))
         if not files: return pd.DataFrame(columns=["股票代號", "動態"])
         latest_file = sorted(files, key=lambda x: os.path.basename(x), reverse=True)[0]
         
         try:
-            df = pd.read_csv(latest_file, encoding='utf-8-sig', dtype=str)
+            # 這裡修正為安全讀取
+            df = safe_read_csv(latest_file, dtype=str)
             df.columns = [str(c).replace(" ", "").strip() for c in df.columns]
             id_col = next((c for c in df.columns if c in ['代號', '股票代號', '證券代號']), None)
             if not id_col: return pd.DataFrame(columns=["股票代號", "動態"])
@@ -216,13 +220,13 @@ if (not track_display_df.empty and not csv_foreign_deal.empty and not csv_foreig
                 t, f = r['t'], r['f']
                 if pd.isna(t): return "未進榜"
                 
-                if mode == "ratio":  # 2-1, 2-2 佔比模式
+                if mode == "ratio":  
                     if t > 0 and (pd.isna(f) or f == 0): return f"🆕 新進榜 (+{t}%)"
                     if t > f and t > 0: return f"🔥 強延續 (+{t}%)"
                     if 0 < t <= f: return f"⚠️ 放緩 (+{t}%)"
                     if t < 0: return f"🚨 轉賣 ({t}%)"
                     return "💤 觀望"
-                else:                # 2-3, 2-4 張數模式
+                else:                
                     if t > 0 and (pd.isna(f) or f == 0): return f"🆕 突擊卡位 (+{t}%)"
                     if t > 0: return f"🔥 持續加碼 (+{t}%)"
                     if t < 0: return f"🚨 轉賣反轉 ({t}%)"
@@ -233,19 +237,16 @@ if (not track_display_df.empty and not csv_foreign_deal.empty and not csv_foreig
         except: 
             return pd.DataFrame(columns=["股票代號", "動態"])
 
-    # 即時讀取 4 大檔案最新動態
     dyn_f_deal = fetch_latest_dynamic("*外資買超佔成交比*.csv", mode="ratio").rename(columns={"動態": "外資買比動態"})
     dyn_f_stock = fetch_latest_dynamic("*外資買超佔發行張數*.csv", mode="stock").rename(columns={"動態": "外資發行動態"})
     dyn_i_deal = fetch_latest_dynamic("*投信買超佔成交比*.csv", mode="ratio").rename(columns={"動態": "投信買比動態"})
     dyn_i_stock = fetch_latest_dynamic("*投信買超佔發行張數*.csv", mode="stock").rename(columns={"動態": "投信發行動態"})
 
-    # 進行串接 (how="left" 保證基底標的全部留存)
     m = pd.merge(base_pool[["股票代號", "股票名稱", "長線戰略狀態", "秘密3日斜率"]], dyn_f_deal, on="股票代號", how="left").fillna("未進榜")
     m = pd.merge(m, dyn_f_stock, on="股票代號", how="left").fillna("未進榜")
     m = pd.merge(m, dyn_i_deal, on="股票代號", how="left").fillna("未進榜")
     m = pd.merge(m, dyn_i_stock, on="股票代號", how="left").fillna("未進榜")
 
-    # 賣盤與連買天數保持原邏輯安全提取
     def extract_dyn_col(df, new_col_name):
         if df.empty: return pd.DataFrame(columns=["股票代號", new_col_name])
         target_col = "今日短動態" if "今日短動態" in df.columns else "動態"
@@ -268,9 +269,7 @@ if (not track_display_df.empty and not csv_foreign_deal.empty and not csv_foreig
     v_f_d = get_latest_val(csv_foreign_ln_day, "外資連買日")
     v_f_w = get_latest_val(csv_foreign_ln_wk, "外資連買週")
 
-    # 🌟 💡 4. 關鍵戰術篩選器：只要 4 表有任一有效動態，就留下！
     def is_active(series):
-        # 排除所有代表「無動作」的字眼
         inactive_words = ["未進榜", "觀望", "💤", "⚪", "⏳", "觀察中"]
         pattern = "|".join(inactive_words)
         return ~series.str.contains(pattern, na=False)
@@ -286,7 +285,6 @@ if (not track_display_df.empty and not csv_foreign_deal.empty and not csv_foreig
     if not elite_filtered.empty:
         idx = elite_filtered.index
         
-        # 🌟 計分系統升級：模糊特徵捕捉法 (兼容數值與字串)
         p1 = elite_filtered["外資買比動態"].str.contains("🔥|🆕|⚠️", na=False).astype(int)
         p2 = elite_filtered["外資發行動態"].str.contains("🔥|🆕|⚠️", na=False).astype(int)
         p3 = elite_filtered["投信買比動態"].str.contains("🔥|🆕|⚠️", na=False).astype(int)
@@ -296,7 +294,6 @@ if (not track_display_df.empty and not csv_foreign_deal.empty and not csv_foreig
         p7 = (v_f_d.loc[idx] > 0).astype(int)
         p8 = (v_f_w.loc[idx] > 0).astype(int)
         
-        # 扣分捕捉：包含警訊符號，或是賣盤檔案中有加碼動作
         m1 = elite_filtered["外資賣比動態"].str.contains("🚨|❌|🚀|劇烈", na=False).astype(int)
         m2 = elite_filtered["投信賣比動態"].str.contains("🚨|❌|🚀|劇烈", na=False).astype(int)
         m3 = elite_filtered["外資買比動態"].str.contains("🚨|❌", na=False).astype(int)
@@ -325,7 +322,6 @@ if (not track_display_df.empty and not csv_foreign_deal.empty and not csv_foreig
             "外資買佔比", "外資買佔發行", "投信買佔比", "投信買佔發行"
         ]
         
-        # 將索引從 1 開始
         view_elite_df.index = range(1, len(view_elite_df) + 1)
         
         st.success(f"🎯 戰情雷達：經『長線1~3日回推加碼』與『短線4表任一命中機制』交叉篩選，目前共追蹤到 **{len(view_elite_df)}** 檔潛在黑馬股！")
@@ -336,7 +332,7 @@ else:
     st.error("❌ 頂級核心多空矩陣運算失敗，請確認資料夾中的外資/投信 CSV 檔案是否完整。")
 
 # ==========================================
-# 🔍 個股籌碼快搜 (診斷區) - 已還原摺線圖與斜率指標
+# 🔍 個股籌碼快搜 (診斷區)
 # ==========================================
 st.write("---")
 st.markdown("<div id='section-search'></div>", unsafe_allow_html=True)
@@ -344,12 +340,9 @@ st.subheader("🔍 個股籌碼快搜 (診斷區)")
 
 search_query = st.text_input("請輸入你想觀測的股票名稱或代號：", key="global_search_top")
 
-# 💡 1. 初始化所有搜尋變數，徹底防止 NameError
 q_txt = q_f_deal = q_i_deal = q_f_stock = q_i_stock = pd.DataFrame()
 
 if search_query and not track_display_df.empty:
-    
-    # 2. 執行核心搜尋
     q_txt = track_display_df[track_display_df['股票名稱'].str.contains(search_query, na=False) | track_display_df['股票代號'].str.contains(search_query, na=False)]
     
     try:
@@ -364,16 +357,13 @@ if search_query and not track_display_df.empty:
     except Exception as e:
         st.error(f"資料篩選過程發生錯誤: {e}")
 
-    # 3. 輸出結果與還原功能
     if q_txt.empty:
         st.warning(f"⚠️ 系統中找不到與 '{search_query}' 相關的資料。")
     else:
         st.write(f"### 🎯 綜合診斷標的：{search_query}")
         st.write("📋 **1. 中長線三大法人持股變化軌跡：**")
-        # 排除隱藏欄位後顯示
         st.dataframe(q_txt.drop(columns=["秘密3日斜率"], errors='ignore'), use_container_width=True)
         
-        # 💡 4. 【還原】四大斜率指標 (多週期油門加速探針)
         try:
             chart_cols = [c for c in q_txt.columns if "持股%" in c]
             if chart_cols:
@@ -393,9 +383,7 @@ if search_query and not track_display_df.empty:
                 st.write("📊 **三大法人持股多週期油門加速探針：**")
                 st.dataframe(slope_df, use_container_width=True)
                 
-                # 💡 5. 【還原】21日折線圖 (全景軌跡)
                 chart_cols_21 = chart_cols[:21]
-                # 將欄位名稱簡化為日期，並翻轉順序以符合時間軸（左舊右新）
                 t_ser = pd.Series(
                     pd.to_numeric(q_txt.iloc[0][chart_cols_21].values, errors='coerce'), 
                     index=[c.split(' ')[0] for c in chart_cols_21]
@@ -411,7 +399,6 @@ if search_query and not track_display_df.empty:
         st.markdown("##### 🚀 核心主力短線進攻與鎖籌指標")
         c1, c2 = st.columns(2)
         
-        # 💡 6. 修正後的標準 if-else，徹底移除程式碼亂碼 (DeltaGenerator)
         with c1:
             st.write("📊 **外資買佔比軌跡：**")
             if not q_f_deal.empty:
@@ -440,13 +427,13 @@ if search_query and not track_display_df.empty:
 
 elif search_query:
     st.info("請輸入代號或名稱開始診斷個股籌碼...")
+
 # ==========================================
-# 🧭 側邊欄導航 (雙指標總經風向球完全體)
+# 🧭 側邊欄導航
 # ==========================================
 st.sidebar.header("⚡ 籌碼超級篩選器")
 filter_trend = st.sidebar.selectbox("三大法人持股趨勢過濾：", ["全部顯示", "🔥 僅顯示『上升+新進榜』", "📈 僅顯示上升", "🆕 僅顯示新進榜"])
 
-# 🌟 升級點：雙按鈕並聯，打造大盤風向球專區
 st.sidebar.markdown("---")
 st.sidebar.subheader("📊 大盤總體經濟指標")
 
@@ -465,10 +452,7 @@ with c_btn2:
     )
 st.sidebar.markdown("---")
 st.sidebar.header("📍 戰情室快速導航跳轉")
-st.sidebar.markdown("""
-[👑 區塊一：三大法人持股%](#section-1)
-
-""")
+st.sidebar.markdown("[👑 區塊一：三大法人持股%](#section-1)")
 
 # ==========================================
 # 🏠 核心五大區塊
@@ -477,35 +461,33 @@ st.write("---")
 st.markdown("<div id='section-1'></div>", unsafe_allow_html=True)
 st.header("🏢 區塊1：中長線 三大法人 持股比例 追蹤")
 if not track_display_df.empty: st.dataframe(track_display_df.drop(columns=["秘密3日斜率"]), use_container_width=True)
+
 # ==========================================
 # ：多天期 5日 外資買賣佔成交量比軌跡追蹤 (CSV)
 # ==========================================
 st.write("---")
 st.header("🎯 區塊2-1：外資 5 日買超 佔成交量比 追蹤")
 
-# 1. 檔名搜尋採用模糊比對，精確鎖定外資檔案
 csv_pattern = os.path.join(DATA_DIR, "*外資買超佔成交比*.csv")
 all_csv_files = glob.glob(csv_pattern)
 
 if not all_csv_files:
     st.warning("⚠️ 找不到任何包含『外資買超佔成交比』的 CSV 檔案，請檢查路徑或檔名。")
 else:
-    # 將外資檔案依「由新到舊」排序
     all_csv_files.sort(reverse=True)
     target_files = all_csv_files[:14]
     
-    # 精確欄位比對清單
     EXACT_TODAY_CANDIDATES = ['當日買進佔成交', '當日買賣超佔成交', '當日 買賣超 佔 成交']
     EXACT_5DAY_CANDIDATES = ['5日買進佔成交', '5日買賣超佔成交', '5日 買賣超 佔 成交']
     
-    # 2. 提取最新一天 (0522) 作為基準主表
     latest_file = target_files[0]
     latest_filename = os.path.basename(latest_file)
     latest_date_str = latest_filename[:8]  
     latest_mmdd = f"{latest_date_str[4:6]}{latest_date_str[6:8]}" 
     
     try:
-        df_base_raw = pd.read_csv(latest_file, dtype=str)
+        # 這裡修正為安全讀取
+        df_base_raw = safe_read_csv(latest_file, dtype=str)
         
         col_today_exact = None
         for candidate in EXACT_TODAY_CANDIDATES:
@@ -527,10 +509,8 @@ else:
             })
             
             df_base_master['_base_order'] = range(len(df_base_master))
-            
             df_history_combined = df_base_master[['股票代號', '股票名稱']].copy()
             
-            # 3. 完整跑完所有 target_files，橫向新增歷史各日資料
             for file_path in target_files:
                 filename = os.path.basename(file_path)
                 date_raw = filename[:8] 
@@ -538,7 +518,8 @@ else:
                 target_grid_col = f"{date_label}買佔比%"
                 
                 try:
-                    df_day = pd.read_csv(file_path, dtype=str)
+                    # 這裡修正為安全讀取
+                    df_day = safe_read_csv(file_path, dtype=str)
                     col_5day_exact = None
                     for candidate in EXACT_5DAY_CANDIDATES:
                         if candidate in df_day.columns:
@@ -561,9 +542,6 @@ else:
                 except Exception:
                     pass
 
-            # ==========================================
-            # 🧠 延續性狀態分析
-            # ==========================================
             latest_5d_col = f"{latest_mmdd}買佔比%"
             df_analysis = pd.merge(
                 df_history_combined, 
@@ -602,9 +580,6 @@ else:
 
             df_history_combined['今日短動態'] = df_analysis.apply(evaluate_continuity, axis=1)
 
-            # ==========================================
-            # 🛠️ 數據與篩選
-            # ==========================================
             df_display = pd.merge(df_base_master, df_history_combined, on=['股票代號', '股票名稱'], how='left')
             df_display = df_display.sort_values(by='_base_order', ascending=True)
             
@@ -622,7 +597,6 @@ else:
             if show_bond: mask = mask | is_bond
             df_display = df_display[mask]
             
-            # 重新排列順序並將 Index 轉為 1 開始
             base_cols = ['股票代號', '股票名稱', '今日短動態', '當日買佔比%']
             history_cols = [c for c in df_display.columns if '買佔比%' in c and c != '當日買佔比%']
             df_display = df_display[base_cols + history_cols]
@@ -641,7 +615,6 @@ else:
 st.write("---")
 st.header("🎯 區塊2-2：投信 5 日買超 佔成交量比 追蹤")
 
-# 1. 檔名搜尋採用模糊比對，精確鎖定投信檔案
 csv_pattern_sitc = os.path.join(DATA_DIR, "*投信買超佔成交比*.csv")
 all_csv_files_sitc = glob.glob(csv_pattern_sitc)
 
@@ -659,12 +632,12 @@ else:
     latest_mmdd_sitc = f"{latest_filename_sitc[4:6]}{latest_filename_sitc[6:8]}"
     
     try:
-        df_base_sitc = pd.read_csv(latest_file_sitc, dtype=str)
+        # 這裡修正為安全讀取
+        df_base_sitc = safe_read_csv(latest_file_sitc, dtype=str)
         df_base_sitc = df_base_sitc.dropna(subset=['代號', '名稱'])
         df_base_sitc = df_base_sitc[df_base_sitc['代號'].str.strip() != ""]
         df_base_sitc = df_base_sitc.drop_duplicates(subset=['代號'])
         
-        # 尋找欄位
         col_today_sitc = next((c for c in EXACT_TODAY_CANDIDATES if c in df_base_sitc.columns), None)
         
         df_master_sitc = pd.DataFrame({
@@ -676,13 +649,13 @@ else:
         
         df_hist_sitc = df_master_sitc[['股票代號', '股票名稱']].copy()
         
-        # 循環讀取歷史資料
         for file_path in target_files_sitc:
             filename = os.path.basename(file_path)
             date_label = f"{filename[4:6]}{filename[6:8]}" if filename[:8].isdigit() else filename[:8]
             target_col = f"{date_label}買佔比%"
             
-            df_day = pd.read_csv(file_path, dtype=str)
+            # 這裡修正為安全讀取
+            df_day = safe_read_csv(file_path, dtype=str)
             col_5d = next((c for c in EXACT_5DAY_CANDIDATES if c in df_day.columns), None)
             
             if col_5d:
@@ -692,10 +665,8 @@ else:
                 df_temp[target_col] = pd.to_numeric(df_temp[target_col], errors='coerce')
                 df_hist_sitc = pd.merge(df_hist_sitc, df_temp, on=['股票代號', '股票名稱'], how='outer')
 
-        # 延續性分析
         df_analysis_sitc = pd.merge(df_hist_sitc, df_master_sitc[['股票代號', '股票名稱', '當日買佔比%']], on=['股票代號', '股票名稱'], how='left')
         
-        # 近3日平均
         recent_3 = [f"{os.path.basename(f)[4:6]}{os.path.basename(f)[6:8]}買佔比%" for f in target_files_sitc[:3]]
         prev_cols = [c for c in recent_3 if c != f"{latest_mmdd_sitc}買佔比%"]
         df_analysis_sitc['baseline_3d'] = df_analysis_sitc[[c for c in recent_3 if c in df_analysis_sitc.columns]].mean(axis=1)
@@ -715,7 +686,6 @@ else:
 
         df_hist_sitc['今日短動態'] = df_analysis_sitc.apply(evaluate, axis=1)
         
-        # 呈現設定
         df_show_sitc = pd.merge(df_master_sitc, df_hist_sitc, on=['股票代號', '股票名稱'], how='left')
         df_show_sitc = df_show_sitc.sort_values(by='_base_order')
         
@@ -724,19 +694,16 @@ else:
         show_etf = c1.checkbox("顯示 ETF", value=True, key="sitc_etf")
         show_bond = c2.checkbox("顯示 債券/債券ETF", value=True, key="sitc_bond")
         
-        # 篩選遮罩
         mask = (df_show_sitc['股票代號'].str.len() == 4)
         if show_etf: mask = mask | ((df_show_sitc['股票代號'].str.len() >= 5) & (~df_show_sitc['股票代號'].str.endswith('B')))
         if show_bond: mask = mask | (df_show_sitc['股票代號'].str.endswith('B'))
         df_show_sitc = df_show_sitc[mask]
         
-        # 欄位順序與 Index
         base_cols = ['股票代號', '股票名稱', '今日短動態', '當日買佔比%']
         df_show_sitc = df_show_sitc[base_cols + [c for c in df_show_sitc.columns if '買佔比%' in c and c != '當日買佔比%']]
         df_show_sitc.index = range(1, len(df_show_sitc) + 1)
         
         st.success(f"📊 已成功串聯 {len(target_files_sitc)} 個交易日，追蹤 {len(df_show_sitc)} 檔曾進榜的短線熱門股：")
-        st.markdown("💡 **動態說明：** 🆕 新進榜：強勢空降。🔥 強延續：買盤動能加速。⚠️ 放緩 (持續買進)：買超力道低於近期均線。📉 調節洗盤：微幅轉賣調節  🚨 劇烈倒貨：強烈轉賣 ❌ 法人轉賣反轉：趨勢翻空。")
         st.dataframe(df_show_sitc, use_container_width=True)
         
     except Exception as e:
@@ -756,7 +723,8 @@ if all_csv_files:
     
     for idx, f in enumerate(sorted_files):
         try:
-            df = pd.read_csv(f, encoding='utf-8-sig')
+            # 這裡修正為安全讀取
+            df = safe_read_csv(f)
             df.columns = [str(c).replace(" ", "").strip() for c in df.columns]
             df = df.rename(columns={'代號':'代號', '名稱':'名稱', '股票代號':'代號', '股票名稱':'名稱'}) 
             df['代號'] = df['代號'].astype(str).str.replace(" ", "").str.strip()
@@ -784,10 +752,8 @@ if all_csv_files:
         import numpy as np
         
         csv_display = base_df.copy()
-        
         csv_display = csv_display.sort_values(by='_base_order', ascending=True, na_position='last')
         csv_display = csv_display.fillna("未進榜").rename(columns={"代號": "股票代號", "名稱": "股票名稱"})
-        
         latest_5d_col = f"{date_labels[0]}外資買發張數%"
         
         def judge_today_alert(row):
@@ -814,9 +780,6 @@ if all_csv_files:
         show_etf = c1.checkbox("顯示 ETF", value=True, key="foreign_etf_v8")
         show_bond = c2.checkbox("顯示 債券/債券ETF", value=True, key="foreign_bond_v8")
         
-        # ==========================================
-        # 🚀 實戰升級：進階動態篩選與力道排序
-        # ==========================================
         sort_filter_option = st.selectbox(
             "🎯 進階動態篩選與排序：",
             [
@@ -833,10 +796,8 @@ if all_csv_files:
         if show_bond: mask |= csv_display['股票代號'].str.endswith('B')
         csv_display = csv_display[mask]
         
-        # 提取真實數值用於排序
         csv_display['_today_val'] = csv_display['股票代號'].map(latest_day_today_data).fillna(-999)
         
-        # 依據使用者選擇進行過濾與排序
         if "今日持續加碼" in sort_filter_option:
             csv_display = csv_display[csv_display['今日短動態'].str.contains("今日持續加碼", na=False)]
             csv_display = csv_display.sort_values(by='_today_val', ascending=False)
@@ -845,19 +806,15 @@ if all_csv_files:
             csv_display = csv_display.sort_values(by='_today_val', ascending=False)
         elif "今日轉賣反轉" in sort_filter_option:
             csv_display = csv_display[csv_display['今日短動態'].str.contains("今日轉賣反轉", na=False)]
-            # 賣超是負數，由重到輕代表數值越小越前面 (ascending=True)
             csv_display = csv_display.sort_values(by='_today_val', ascending=True)
 
-        # 整理欄位
         fixed_cols = ["股票代號", "股票名稱", "今日短動態"]
         history_cols = [f"{c}外資買發張數%" for c in sorted(list(set(date_labels)), reverse=True) if f"{c}外資買發張數%" in csv_display.columns]
         csv_display = csv_display[fixed_cols + history_cols]
-        
         csv_display.index = range(1, len(csv_display) + 1)
         
         st.success(f"📊 已成功串聯 {len(date_labels)} 個交易日，符合條件追蹤共 {len(csv_display)} 檔：")
         st.dataframe(csv_display, use_container_width=True)
-
 
 # ==========================================
 # 🎯 區塊2-4：投信 5 日買超佔發行張數 追蹤
@@ -873,7 +830,8 @@ if all_files_sitc:
     
     for idx, f in enumerate(sorted_files):
         try:
-            df = pd.read_csv(f, encoding='utf-8-sig')
+            # 這裡修正為安全讀取
+            df = safe_read_csv(f)
             df.columns = [str(c).replace(" ", "").strip() for c in df.columns]
             df = df.rename(columns={'代號':'代號', '名稱':'名稱', '股票代號':'代號', '股票名稱':'名稱'}) 
             df['代號'] = df['代號'].astype(str).str.replace(" ", "").str.strip()
@@ -901,10 +859,8 @@ if all_files_sitc:
         import numpy as np
         
         csv_display = base_df.copy()
-        
         csv_display = csv_display.sort_values(by='_base_order', ascending=True, na_position='last')
         csv_display = csv_display.fillna("未進榜").rename(columns={"代號": "股票代號", "名稱": "股票名稱"})
-        
         latest_5d_col = f"{date_labels[0]}投信買發張數%"
         
         def judge_today_alert_sitc(row):
@@ -931,9 +887,6 @@ if all_files_sitc:
         show_etf = c1.checkbox("顯示 ETF", value=True, key="sitc_etf_v8")
         show_bond = c2.checkbox("顯示 債券/債券ETF", value=True, key="sitc_bond_v8")
         
-        # ==========================================
-        # 🚀 實戰升級：進階動態篩選與力道排序
-        # ==========================================
         sort_filter_option_sitc = st.selectbox(
             "🎯 進階動態篩選與排序：",
             [
@@ -950,10 +903,8 @@ if all_files_sitc:
         if show_bond: mask |= csv_display['股票代號'].str.endswith('B')
         csv_display = csv_display[mask]
         
-        # 提取真實數值用於排序
         csv_display['_today_val'] = csv_display['股票代號'].map(latest_day_today_data_sitc).fillna(-999)
         
-        # 依據使用者選擇進行過濾與排序
         if "今日持續加碼" in sort_filter_option_sitc:
             csv_display = csv_display[csv_display['今日短動態'].str.contains("今日持續加碼", na=False)]
             csv_display = csv_display.sort_values(by='_today_val', ascending=False)
@@ -967,19 +918,18 @@ if all_files_sitc:
         fixed_cols = ["股票代號", "股票名稱", "今日短動態"]
         history_cols = [f"{c}投信買發張數%" for c in sorted(list(set(date_labels)), reverse=True) if f"{c}投信買發張數%" in csv_display.columns]
         csv_display = csv_display[fixed_cols + history_cols]
-        
         csv_display.index = range(1, len(csv_display) + 1)
         
         st.success(f"📊 已成功串聯 {len(date_labels)} 個交易日，符合條件追蹤共 {len(csv_display)} 檔：")
         st.dataframe(csv_display, use_container_width=True)
+
 # ==========================================
-# 📅 區塊六：外資與投信連續買超 (日/週全景戰情室 - 全量解禁完全體)
+# 📅 區塊六：外資與投信連續買超 (日/週全景戰情室)
 # ==========================================
 st.write("---")
 st.markdown("<div id='section-wk'></div>", unsafe_allow_html=True)
 st.header("📅 區塊3：連續買超戰情室")
 
-# 在核心單日/單週大板塊下方，展示動態標籤說明文字
 st.info("""
 💡 **狀態動態評估依據（籌碼認養密度分級說明）：**
 * 連買 **10以上天 / 週** 🔥 **波段認養** (長線鎖籌，趨勢保護力極強)
@@ -1006,7 +956,8 @@ def read_live_ln_report(file_keyword, strict_type, exact_field_name, prefix_keyw
     date_str = extract_date_from_name(latest_file) 
     
     try:
-        df = pd.read_csv(latest_file, encoding='utf-8-sig')
+        # 這裡修正為安全讀取
+        df = safe_read_csv(latest_file)
         df.columns = df.columns.astype(str).str.replace('\n', '').str.replace(' ', '').str.strip()
         
         col_id = [c for c in df.columns if '代號' in c or '股票' in c]
@@ -1022,8 +973,6 @@ def read_live_ln_report(file_keyword, strict_type, exact_field_name, prefix_keyw
             target_data_col = matched_cols[0] if matched_cols else df.columns[2]
             
         df[target_data_col] = pd.to_numeric(df[target_data_col], errors='coerce').fillna(0)
-        
-        # 🌟 核心修正：拿掉尾端的 .head(20)，只要是大於 0（正在買超狀態）的公司全數釋出！
         df_sorted = df[df[target_data_col] > 0].sort_values(by=target_data_col, ascending=False)
         
         if df_sorted.empty:
@@ -1034,12 +983,9 @@ def read_live_ln_report(file_keyword, strict_type, exact_field_name, prefix_keyw
         output_df["股票名稱"] = df_sorted[c_name].astype(str).str.strip()
         
         def get_status_tag(val):
-            if val >= 10:
-                return "🔥 波段認養"
-            elif val >= 5:
-                return "⚡ 買盤點火"
-            else:
-                return "🆕 試單觀察"
+            if val >= 10: return "🔥 波段認養"
+            elif val >= 5: return "⚡ 買盤點火"
+            else: return "🆕 試單觀察"
                 
         output_df["狀態動態"] = df_sorted[target_data_col].apply(get_status_tag)
         output_df[col_label] = df_sorted[target_data_col].astype(int)
@@ -1047,23 +993,17 @@ def read_live_ln_report(file_keyword, strict_type, exact_field_name, prefix_keyw
         real_pct_trade = [c for c in df_sorted.columns if prefix_keyword in c and "佔成交" in c]
         real_pct_issue = [c for c in df_sorted.columns if prefix_keyword in c and "佔發行量" in c]
         
-        if real_pct_trade:
-            output_df["佔成交(%)"] = pd.to_numeric(df_sorted[real_pct_trade[0]], errors='coerce').fillna(0.0)
-        else:
-            output_df["佔成交(%)"] = 0.0
+        if real_pct_trade: output_df["佔成交(%)"] = pd.to_numeric(df_sorted[real_pct_trade[0]], errors='coerce').fillna(0.0)
+        else: output_df["佔成交(%)"] = 0.0
             
-        if real_pct_issue:
-            output_df["佔發行量(%)"] = pd.to_numeric(df_sorted[real_pct_issue[0]], errors='coerce').fillna(0.0)
-        else:
-            output_df["佔發行量(%)"] = 0.0
+        if real_pct_issue: output_df["佔發行量(%)"] = pd.to_numeric(df_sorted[real_pct_issue[0]], errors='coerce').fillna(0.0)
+        else: output_df["佔發行量(%)"] = 0.0
             
-        # 名次序號從 1 開始順著實際資料量一路排下去
         output_df.index = range(1, len(output_df) + 1)
             
         return output_df, date_str
 
     except Exception as e:
-        # 🌟 補上結構對齊的安全防護罩，根除 SyntaxError 錯誤
         return pd.DataFrame(), f"解讀失敗: {str(e)}"
 
 # ========================================================
@@ -1131,6 +1071,7 @@ with c_wk2:
         st.dataframe(live_it_wk, use_container_width=True)
     else:
         st.write("無資料")
+
 # ==========================================
 # 📊 【蜂蜜計數器】本站累計觀測人次統計
 # ==========================================
