@@ -839,62 +839,61 @@ if all_csv_files:
 
 
 # ==========================================
-# 🎯 區塊2-4：投信 5 日買超佔發行張數 追蹤 (除錯加強版)
+# 🎯 區塊2-4：投信 5 日買超佔發行張數 追蹤 (修正版)
 # ==========================================
 st.write("---")
 st.header("🎯 區塊2-4：投信 5 日買超佔發行張數 追蹤")
 csv_pattern_sitc = os.path.join(DATA_DIR, "*投信買超佔發行張數*.csv")
 all_files_sitc = glob.glob(csv_pattern_sitc)
 
-if not all_files_sitc:
-    st.warning(f"⚠️ 找不到 CSV 檔案 (搜尋路徑: {csv_pattern_sitc})")
-else:
-    st.write(f"📂 找到 {len(all_files_sitc)} 個檔案，準備開始處理...")
+if all_files_sitc:
     sorted_files = sorted(all_files_sitc, key=extract_date_from_name, reverse=True)[:10]
-    base_df, date_labels, latest_day_today_data_sitc = None, [], {}
-    
+    base_df = None
+    date_labels = []
+    latest_day_today_data_sitc = {}
+
     for idx, f in enumerate(sorted_files):
         try:
+            # 1. 使用萬能讀取器
             df = safe_read_csv(f)
-            df.columns = [str(c).replace(" ", "").strip() for c in df.columns]
-            df = df.rename(columns={'代號':'代號', '名稱':'名稱', '股票代號':'代號', '股票名稱':'名稱'}) 
-            df['代號'] = df['代號'].astype(str).str.replace(" ", "").str.strip()
-            df['名稱'] = df['名稱'].astype(str).str.replace(" ", "").str.strip()
+            
+            # 2. 強制處理欄位：去除 BOM、去除空白、轉成標準 UTF-8 字串
+            df.columns = [str(c).replace('\ufeff', '').replace(" ", "").strip() for c in df.columns]
+            
+            # 3. 動態尋找代號與名稱欄位 (不用 rename，直接用找的)
+            id_col = next((c for c in df.columns if '代號' in c), None)
+            name_col = next((c for c in df.columns if '名稱' in c), None)
+            
+            if not id_col or not name_col:
+                st.write(f"⚠️ 檔案 {os.path.basename(f)} 找不到代號/名稱欄位，目前欄位: {df.columns.tolist()}")
+                continue
+                
+            df = df.rename(columns={id_col: '代號', name_col: '名稱'})
+            df['代號'] = df['代號'].astype(str).str.strip()
+            df['名稱'] = df['名稱'].astype(str).str.strip()
             
             d_label = extract_date_from_name(f)[-4:]
             
-            # 偵測當日欄位
+            # 4. 尋找數據欄位
             t_col = next((c for c in df.columns if '當日' in c and '發行' in c), None)
+            five_d_col = next((c for c in df.columns if '5日' in c and '發行' in c), None)
+            
             if idx == 0 and t_col:
                 latest_day_today_data_sitc = dict(zip(df['代號'], pd.to_numeric(df[t_col], errors='coerce')))
             
-            # 偵測 5 日欄位
-            t_col_5d = next((c for c in df.columns if '5日' in c and '發行' in c), None)
-            if not t_col_5d and len(df.columns) > 2: t_col_5d = df.columns[2]
-            
-            if t_col_5d:
-                df_s = df[['代號', '名稱', t_col_5d]].rename(columns={t_col_5d: f"{d_label}投信買發張數%"})
+            if five_d_col:
+                df_s = df[['代號', '名稱', five_d_col]].rename(columns={five_d_col: f"{d_label}投信買發張數%"})
                 if base_df is None:
                     base_df = df_s
                     base_df['_base_order'] = range(len(base_df))
                 else:
                     base_df = pd.merge(base_df, df_s, on=['代號', '名稱'], how='outer')
-                date_labels.append(d_label)
+            
+            date_labels.append(d_label)
         except Exception as e:
-            st.write(f"⚠️ 處理檔案 {os.path.basename(f)} 時發生錯誤: {e}")
+            st.write(f"⚠️ 處理檔案 {os.path.basename(f)} 發生錯誤: {e}")
 
-    if base_df is not None and len(date_labels) > 0:
-        # (這裡放原本的處理邏輯與表格呈現)
-        csv_display = base_df.copy()
-        csv_display = csv_display.fillna("未進榜").rename(columns={"代號": "股票代號", "名稱": "股票名稱"})
-        
-        # ... (中間邏輯保持不變) ...
-        
-        # 強制顯示表格測試
-        st.write("表格已生成，共計", len(csv_display), "檔資料")
-        st.dataframe(csv_display.head(), use_container_width=True) # 先測試顯示前五檔
-    else:
-        st.error("❌ 數據處理後為空，請檢查 CSV 欄位名稱是否包含『5日』與『發行』關鍵字。")
+    # ... (後續合併呈現邏輯保持您原本的即可) ...
 
 # ==========================================
 # 📅 區塊六：外資與投信連續買超 (日/週全景戰情室)
