@@ -475,13 +475,16 @@ st.sidebar.markdown("[👑 區塊一：三大法人持股%](#section-1)")
 # 🏠 核心五大區塊
 # ==========================================
 # ==========================================
-# 🏠 區塊1：中長線 三大法人 持股比例 追蹤 (無敵防錯版)
+# 🏠 區塊1：中長線 三大法人 持股比例 追蹤 (去除重複標的版)
 # ==========================================
 st.write("---")
 st.markdown("<div id='section-1'></div>", unsafe_allow_html=True)
 st.header("🏢 區塊1：中長線 三大法人 持股比例 追蹤")
 
 import re
+import os
+import glob
+import pandas as pd
 
 def parse_special_txt(file_path):
     parsed_data = []
@@ -497,9 +500,9 @@ def parse_special_txt(file_path):
                 # 依據 Tab 切割欄位
                 parts = line_str.split('\t')
                 
-                # 3. 判斷是否為真實資料行 (特徵: 第一欄是排名數字，總欄位至少有5個)
+                # 3. 判斷是否為真實資料行
                 if len(parts) >= 5 and parts[0].isdigit():
-                    stock_str = parts[1].strip()  # 例如 "4916事欣科"
+                    stock_str = parts[1].strip()  
                     
                     # 4. 精準分離代號與名稱
                     m = re.match(r'^(\d+)(.*)', stock_str)
@@ -510,13 +513,12 @@ def parse_special_txt(file_path):
                         stock_id = stock_str
                         stock_name = stock_str
                     
-                    # 5. 抓取持股% (倒數第二個欄位)
+                    # 5. 抓取持股% 
                     try:
                         holding_pct = float(parts[-2])
                     except ValueError:
                         continue
                         
-                    # 直接賦予絕對乾淨的欄位名稱
                     parsed_data.append({
                         '股票代號': stock_id,
                         '股票名稱': stock_name,
@@ -528,9 +530,12 @@ def parse_special_txt(file_path):
 
     df = pd.DataFrame(parsed_data)
     
-    # 6. 安全防護：如果是空檔案，回傳帶有正確欄位名稱的空表
+    # 6. 安全防護：如果是空檔案，回傳帶有正確欄位的空表
     if df.empty:
         return pd.DataFrame(columns=['股票代號', '股票名稱', target_col])
+        
+    # 🔥 關鍵修正：去除同一個檔案中，因為(5日/20日/60日)不同區塊造成的重複標的
+    df = df.drop_duplicates(subset=['股票代號'], keep='first')
         
     return df[['股票代號', '股票名稱', target_col]]
 
@@ -542,25 +547,27 @@ all_txt_files = sorted(glob.glob(txt_pattern), reverse=True)
 
 if all_txt_files:
     final_df = None
-    # 取最近 5 天的資料進行合併
+    # 取最近 5 天的資料進行合併 (天數可依需求修改)
     for file_path in all_txt_files[:5]:
         df_day = parse_special_txt(file_path)
         
-        # 如果該天資料為空，則跳過
         if df_day.empty:
             continue
             
         if final_df is None:
             final_df = df_day
         else:
-            # 以代號與名稱作為基準，橫向合併每日持股比例
+            # 合併每日持股比例
             final_df = pd.merge(final_df, df_day, on=['股票代號', '股票名稱'], how='outer')
             
     # 顯示最終表格
     if final_df is not None and not final_df.empty:
+        # 將空缺的數值填上 "-"
         final_df = final_df.fillna("-")
+        
         # 讓 index 從 1 開始
         final_df.index = range(1, len(final_df) + 1)
+        
         st.success(f"📊 已成功串聯 {len(all_txt_files[:5])} 個交易日的持股數據。")
         st.dataframe(final_df, use_container_width=True)
     else:
