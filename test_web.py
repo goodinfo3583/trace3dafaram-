@@ -839,16 +839,14 @@ if all_csv_files:
 
 
 # ==========================================
-# 🎯 區塊2-4：投信 5 日買超佔發行張數 追蹤 (穩定修復版)
+# 🎯 區塊2-4：投信 5 日買超佔發行張數 追蹤 (最終修復版)
 # ==========================================
 st.write("---")
-st.header("🎯 區塊2-4：投信 5 日買超佔發行張數 追蹤")
+st.header("🎯 區塊2-4：投信 5 日買超佔發行 張數 追蹤")
 csv_pattern_sitc = os.path.join(DATA_DIR, "*投信買超佔發行張數*.csv")
 all_files_sitc = glob.glob(csv_pattern_sitc)
 
-if not all_files_sitc:
-    st.warning("⚠️ 找不到投信買超佔發行張數相關的 CSV 檔案。")
-else:
+if all_files_sitc:
     sorted_files = sorted(all_files_sitc, key=extract_date_from_name, reverse=True)[:10]
     base_df = None
     date_labels = []
@@ -856,32 +854,33 @@ else:
 
     for idx, f in enumerate(sorted_files):
         try:
-            # 1. 安全讀取與清洗 BOM
+            # 讀取並強制清洗所有欄位名稱 (移除空格與 BOM)
             df = safe_read_csv(f)
-            df.columns = [str(c).replace('\ufeff', '').replace(" ", "").strip() for c in df.columns]
+            df.columns = [str(c).replace(" ", "").replace("\ufeff", "").strip() for c in df.columns]
             
-            # 2. 自動識別代號與名稱欄位
-            id_col = next((c for c in df.columns if '代號' in c), None)
-            name_col = next((c for c in df.columns if '名稱' in c), None)
+            # 使用 CSV 內真實存在的欄位名稱進行對應
+            # 根據您的檔案內容，欄位名稱為：'5日買賣超佔發行張數'
+            col_today = '當日買賣超佔發行張數'
+            col_5d = '5日買賣超佔發行張數'
             
-            if not id_col or not name_col:
+            # 檢查代號與名稱欄位是否存在
+            if '代號' not in df.columns or '名稱' not in df.columns:
                 continue
                 
-            df = df.rename(columns={id_col: '代號', name_col: '名稱'})
             df['代號'] = df['代號'].astype(str).str.strip()
             df['名稱'] = df['名稱'].astype(str).str.strip()
             
             d_label = extract_date_from_name(f)[-4:]
             
-            # 3. 尋找當日與 5 日指標欄位
-            t_col_today = next((c for c in df.columns if '當日' in c and '發行' in c), None)
-            t_col_5d = next((c for c in df.columns if '5日' in c and '發行' in c), None)
+            # 記錄當日數據
+            if idx == 0 and col_today in df.columns:
+                latest_day_today_data_sitc = dict(zip(df['代號'], pd.to_numeric(df[col_today], errors='coerce')))
             
-            if idx == 0 and t_col_today:
-                latest_day_today_data_sitc = dict(zip(df['代號'], pd.to_numeric(df[t_col_today], errors='coerce')))
-            
-            if t_col_5d:
-                df_s = df[['代號', '名稱', t_col_5d]].rename(columns={t_col_5d: f"{d_label}投信買發張數%"})
+            # 記錄 5 日數據
+            if col_5d in df.columns:
+                df_s = df[['代號', '名稱', col_5d]].copy()
+                df_s = df_s.rename(columns={col_5d: f"{d_label}投信買發張數%"})
+                
                 if base_df is None:
                     base_df = df_s
                     base_df['_base_order'] = range(len(base_df))
@@ -893,9 +892,8 @@ else:
             continue
 
     if base_df is not None and len(date_labels) > 0:
-        csv_display = base_df.copy()
-        csv_display = csv_display.sort_values(by='_base_order', ascending=True, na_position='last')
-        csv_display = csv_display.fillna("未進榜").rename(columns={"代號": "股票代號", "名稱": "股票名稱"})
+        csv_display = base_df.copy().fillna("未進榜").rename(columns={"代號": "股票代號", "名稱": "股票名稱"})
+        csv_display = csv_display.sort_values(by='_base_order', ascending=True)
         
         latest_5d_col = f"{date_labels[0]}投信買發張數%"
         
@@ -903,43 +901,37 @@ else:
         def judge_today_alert_sitc(row):
             stock_id = row['股票代號']
             val_5d = row.get(latest_5d_col, "未進榜")
-            val_today = latest_day_today_data_sitc.get(stock_id, np.nan)
+            val_today = latest_day_today_data_sitc.get(stock_id, 0)
             
-            if pd.isna(val_5d) or val_5d == "未進榜":
-                if not pd.isna(val_today) and val_today > 0:
-                    return f"🆕 今日突擊卡位 (+{val_today}%)"
-                return "💤 籌碼沉澱中"
+            if val_5d == "未進榜":
+                return f"🆕 今日突擊卡位 (+{val_today}%)" if val_today > 0 else "💤 籌碼沉澱中"
             
-            if not pd.isna(val_today):
-                if val_today < 0: return f"🚨 今日轉賣反轉 ({val_today}%)"
-                elif val_today > 0: return f"🔥 今日持續加碼 (+{val_today}%)"
-                else: return "🔄 今日量縮持平 (0.0%)"
-            return "⏳ 歷史留存數據"
+            if val_today < 0: return f"🚨 今日轉賣反轉 ({val_today}%)"
+            elif val_today > 0: return f"🔥 今日持續加碼 (+{val_today}%)"
+            return "🔄 今日量縮持平"
 
         csv_display['今日短動態'] = csv_display.apply(judge_today_alert_sitc, axis=1)
         
-        # UI 過濾選項
+        # UI 與過濾
         st.write("🔧 **自訂標的顯示過濾：**")
         c1, c2 = st.columns(2)
-        show_etf = c1.checkbox("顯示 ETF", value=True, key="sitc_etf_v9")
-        show_bond = c2.checkbox("顯示 債券/債券ETF", value=True, key="sitc_bond_v9")
+        show_etf = c1.checkbox("顯示 ETF", value=True, key="sitc_etf_final")
+        show_bond = c2.checkbox("顯示 債券/債券ETF", value=True, key="sitc_bond_final")
         
-        # 篩選邏輯
         mask = (csv_display['股票代號'].str.len() == 4)
         if show_etf: mask |= ((csv_display['股票代號'].str.len() >= 5) & (~csv_display['股票代號'].str.endswith('B')))
         if show_bond: mask |= csv_display['股票代號'].str.endswith('B')
         csv_display = csv_display[mask]
         
-        # 排序與顯示
-        fixed_cols = ["股票代號", "股票名稱", "今日短動態"]
-        history_cols = [f"{c}投信買發張數%" for c in sorted(list(set(date_labels)), reverse=True) if f"{c}投信買發張數%" in csv_display.columns]
-        csv_display = csv_display[fixed_cols + history_cols]
+        # 顯示
+        history_cols = [c for c in csv_display.columns if "投信買發張數%" in c]
+        csv_display = csv_display[["股票代號", "股票名稱", "今日短動態"] + history_cols]
         csv_display.index = range(1, len(csv_display) + 1)
         
-        st.success(f"📊 已成功串聯 {len(date_labels)} 個交易日，追蹤共 {len(csv_display)} 檔：")
+        st.success(f"📊 已成功串聯 {len(date_labels)} 個交易日。")
         st.dataframe(csv_display, use_container_width=True)
     else:
-        st.error("❌ 無法讀取投信買超佔發行張數數據，請檢查 CSV 欄位名稱是否包含『5日』與『發行』關鍵字。")
+        st.error("❌ 無法讀取投信數據，請檢查檔案名稱是否正確。")
 
 # ==========================================
 # 📅 區塊六：外資與投信連續買超 (日/週全景戰情室)
