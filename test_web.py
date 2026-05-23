@@ -475,7 +475,7 @@ st.sidebar.markdown("[👑 區塊一：三大法人持股%](#section-1)")
 # 🏠 核心五大區塊
 # ==========================================
 # ==========================================
-# 🏠 區塊1：中長線 三大法人 持股比例 追蹤 (30日追蹤版)
+# 🏠 區塊1：中長線 三大法人 持股比例 追蹤 (多榜單色彩強化版)
 # ==========================================
 st.write("---")
 st.markdown("<div id='section-1'></div>", unsafe_allow_html=True)
@@ -486,23 +486,28 @@ import os
 import glob
 import pandas as pd
 
-def parse_special_txt(file_path):
+# 1. 強化版讀取函式：自動偵測所屬榜單 (5日/20日/60日/120日)
+def parse_special_txt(file_path, is_latest=False):
     parsed_data = []
-    # 擷取檔名中的日期 (前8個字元)
     date_label = os.path.basename(file_path)[:8]
     target_col = f"{date_label}持股%"
+    current_section = "5日" # 預設起始區塊
     
     try:
         with open(file_path, 'r', encoding='utf-8-sig', errors='ignore') as f:
             for line in f:
                 line_str = line.strip()
-                parts = line_str.split('\t')
                 
-                # 判斷是否為真實資料行 (第一欄為數字排名)
+                # 動態偵測當前讀取到了哪一個榜單區塊
+                if "排名(5日)" in line_str: current_section = "5日"
+                elif "排名(20日)" in line_str: current_section = "20日"
+                elif "排名(60日)" in line_str: current_section = "60日"
+                elif "排名(120日)" in line_str: current_section = "120日"
+                
+                parts = line_str.split('\t')
                 if len(parts) >= 5 and parts[0].isdigit():
                     stock_str = parts[1].strip()  
                     
-                    # 精準分離代號與名稱
                     m = re.match(r'^(\d+)(.*)', stock_str)
                     if m:
                         stock_id = m.group(1)
@@ -519,31 +524,43 @@ def parse_special_txt(file_path):
                     parsed_data.append({
                         '股票代號': stock_id,
                         '股票名稱': stock_name,
-                        target_col: holding_pct
+                        target_col: holding_pct,
+                        '上榜區塊': current_section
                     })
     except Exception as e:
         return pd.DataFrame()
 
     df = pd.DataFrame(parsed_data)
-    
     if df.empty:
-        return pd.DataFrame(columns=['股票代號', '股票名稱', target_col])
+        return pd.DataFrame()
         
-    # 去除同一個檔案中，因不同天期區塊重複出現的標的
-    df = df.drop_duplicates(subset=['股票代號'], keep='first')
-    return df[['股票代號', '股票名稱', target_col]]
+    # 將同一支股票在不同區塊的紀錄合併 (例如同時有 5日, 20日)
+    def agg_sections(x):
+        sections = set(x)
+        order = ['5日', '20日', '60日', '120日']
+        return ",".join([s for s in order if s in sections])
+        
+    df_agg = df.groupby(['股票代號', '股票名稱', target_col])['上榜區塊'].agg(agg_sections).reset_index()
+    
+    # 歷史資料不需要追蹤區塊標籤，只保留最新一天的標籤
+    if not is_latest:
+        df_agg = df_agg.drop(columns=['上榜區塊'])
+        
+    return df_agg
 
 # ==========================================
-# 🔄 多日歷史資料合併與邏輯運算 (拉長至 30 天)
+# 🔄 多日歷史資料合併與邏輯運算
 # ==========================================
 txt_pattern = os.path.join(DATA_DIR, "*持股排名變化*.txt")
 all_txt_files = sorted(glob.glob(txt_pattern), reverse=True)
 
 if all_txt_files:
     final_df = None
-    # 🔥 修正點 2：取最近 30 天的資料進行橫向合併
-    for file_path in all_txt_files[:30]:
-        df_day = parse_special_txt(file_path)
+    
+    # 取最近 30 天的資料進行合併
+    for i, file_path in enumerate(all_txt_files[:30]):
+        # 只有第 0 筆 (最新日期) 才會提取多榜單標籤
+        df_day = parse_special_txt(file_path, is_latest=(i==0))
         if df_day.empty: 
             continue
             
@@ -553,74 +570,96 @@ if all_txt_files:
             final_df = pd.merge(final_df, df_day, on=['股票代號', '股票名稱'], how='outer')
             
     if final_df is not None and not final_df.empty:
-        # 取得所有的日期欄位 (已依照最新到最舊由左至右排列)
         date_cols = [c for c in final_df.columns if '持股%' in c]
         
-        # 填補缺失值為 0 以便進行趨勢運算
         for c in date_cols:
             final_df[c] = pd.to_numeric(final_df[c], errors='coerce').fillna(0)
             
-        # 最新動態判定邏輯 (與前一日比對)
+        # 建立視覺化標籤與權重
+        def generate_tags(sections):
+            if pd.isna(sections) or not sections: return ""
+            tags = []
+            if '5日' in sections: tags.append('🔴5日')
+            if '20日' in sections: tags.append('🟡20日')
+            if '60日' in sections: tags.append('🟢60日')
+            if '120日' in sections: tags.append('🔵120日')
+            return " ".join(tags)
+            
+        # 處理如果標的只在歷史出現，最新日沒出現的空值情況
+        if '上榜區塊' not in final_df.columns:
+            final_df['上榜區塊'] = ""
+            
+        final_df['今日上榜'] = final_df['上榜區塊'].apply(generate_tags)
+        final_df['上榜數量'] = final_df['上榜區塊'].apply(lambda x: len(str(x).split(',')) if pd.notna(x) and x else 0)
+            
+        # 最新動態判定邏輯
         def evaluate_trend(row):
-            if len(date_cols) < 2: 
-                return "⚪ 資料不足"
-            
-            v0 = row[date_cols[0]]  # 最新日數據
-            v1 = row[date_cols[1]]  # 前一日數據
-            
-            diff1 = v0 - v1  # 今日增減幅度
-            
+            if len(date_cols) < 2: return "⚪ 資料不足"
+            v0 = row[date_cols[0]]  
+            v1 = row[date_cols[1]]  
+            diff1 = v0 - v1  
             if diff1 > 0:
                 if len(date_cols) >= 3:
-                    v2 = row[date_cols[2]]  # 前二日數據
-                    diff2 = v1 - v2  # 昨日增減幅度
-                    if diff1 < diff2:
-                        return "⚠️ 減緩"
+                    v2 = row[date_cols[2]]
+                    diff2 = v1 - v2
+                    if diff1 < diff2: return "⚠️ 趨緩"
                 return "📈 上升"
-            elif diff1 < 0:
-                return "📉 下降"
-            else:
-                return "🔄 持平"
+            elif diff1 < 0: return "📉 下降"
+            else: return "🔄 持平"
                 
         final_df['最新動態'] = final_df.apply(evaluate_trend, axis=1)
         
-        # 重新整理欄位順序
-        cols = ['股票代號', '股票名稱', '最新動態'] + date_cols
+        # 🔥 排序邏輯修正：最新日期的名單置頂 (先比上榜數量多寡，再比持股比例)
+        if date_cols:
+            final_df = final_df.sort_values(by=['上榜數量', date_cols[0]], ascending=[False, False])
+            
+        # 整理欄位顯示順序
+        cols = ['股票代號', '股票名稱', '今日上榜', '最新動態'] + date_cols
         final_df = final_df[cols]
         
-        # 將最新日期的持股比例從大到小排序 (最高者置頂顯示)
-        if date_cols:
-            final_df = final_df.sort_values(by=date_cols[0], ascending=False)
-        
         # ==========================================
-        # 🔧 UI 顯示與自訂篩選器 (修正點 1：移除車用篩選)
+        # 🔧 UI 顯示與底色渲染
         # ==========================================
         st.write("🔧 **自訂標的顯示過濾：**")
         c1, c2 = st.columns(2)
-        show_etf = c1.checkbox("顯示 ETF", value=True, key="blk1_etf_v30")
-        show_bond = c2.checkbox("顯示 債券/債券ETF", value=True, key="blk1_bond_v30")
+        show_etf = c1.checkbox("顯示 ETF", value=True, key="blk1_etf_color")
+        show_bond = c2.checkbox("顯示 債券/債券ETF", value=True, key="blk1_bond_color")
         
-        # 建立篩選遮罩
         is_bond = final_df['股票代號'].str.endswith('B')
         is_etf = (final_df['股票代號'].str.len() >= 5) & (~is_bond)
         is_stock = final_df['股票代號'].str.len() == 4
         
         mask = is_stock
-        if show_etf: 
-            mask |= is_etf
-        if show_bond: 
-            mask |= is_bond
+        if show_etf: mask |= is_etf
+        if show_bond: mask |= is_bond
             
         filtered_df = final_df[mask].copy()
         
-        # 美化表格：將數值 0 的欄位轉換為 "-"，避免畫面密密麻麻干擾閱讀
+        # 紀錄原始的上榜數量供上色使用 (因已從 filtered_df 中篩出，需另外抓取)
+        color_ref = final_df[['股票代號', '上榜數量']].set_index('股票代號').to_dict()['上榜數量']
+        
+        # 將數值 0 的欄位轉換為 "-" 讓表格整齊
         for c in date_cols:
-            filtered_df[c] = filtered_df[c].apply(lambda x: round(x, 2) if x != 0 else "-")
+            filtered_df[c] = filtered_df[c].apply(lambda x: f"{x:.2f}" if x != 0 else "-")
             
         filtered_df.index = range(1, len(filtered_df) + 1)
         
-        st.success(f"📊 已成功串聯最近 {len(date_cols)} 個交易日的持股數據，並依據最新持股率排序：")
-        st.dataframe(filtered_df, use_container_width=True)
+        # 🎨 Pandas Styler: 依據上榜數量給予不同底色
+        def highlight_row(row):
+            cnt = color_ref.get(row['股票代號'], 0)
+            # 使用 RGBA 透明色，確保在深色/淺色模式下都能清楚閱讀文字
+            if cnt == 4: bg = 'background-color: rgba(255, 0, 0, 0.15)'   # 四色共振: 淺紅
+            elif cnt == 3: bg = 'background-color: rgba(255, 165, 0, 0.15)' # 三色共振: 淺橘
+            elif cnt == 2: bg = 'background-color: rgba(0, 128, 0, 0.15)'   # 雙色共振: 淺綠
+            elif cnt == 1: bg = 'background-color: rgba(0, 0, 255, 0.1)'    # 單一榜單: 淺藍
+            else: bg = ''                                                   # 昨日以前的歷史標的
+            return [bg] * len(row)
+
+        styled_df = filtered_df.style.apply(highlight_row, axis=1)
+        
+        st.info("💡 **多榜單共振說明：** 背景顏色越暖 (紅/橘)，代表同時出現於越多天期的熱門榜單中，籌碼集中度極高。")
+        st.success(f"📊 已成功串聯 {len(date_cols)} 個交易日的數據 (排序優先級：今日上榜榜單數 > 今日持股%)：")
+        st.dataframe(styled_df, use_container_width=True)
     else:
         st.warning("⚠️ 讀取到的檔案皆無效或無資料，請檢查 TXT 內容。")
 else:
