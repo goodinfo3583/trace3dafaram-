@@ -475,7 +475,7 @@ st.sidebar.markdown("[👑 區塊一：三大法人持股%](#section-1)")
 # 🏠 核心五大區塊
 # ==========================================
 # ==========================================
-# 🏠 區塊1：中長線 三大法人 持股比例 追蹤 (進階篩選與動態版)
+# 🏠 區塊1：中長線 三大法人 持股比例 追蹤 (30日追蹤版)
 # ==========================================
 st.write("---")
 st.markdown("<div id='section-1'></div>", unsafe_allow_html=True)
@@ -486,17 +486,9 @@ import os
 import glob
 import pandas as pd
 
-# 🚗 定義車用概念股清單 (您可依據您的觀察名單自行增減代號)
-CAR_STOCKS = [
-    '1319', '1521', '1522', '1524', '1525', '1533', '1536', '1568',
-    '2105', '2201', '2204', '2206', '2207', '2227', '2228', '2231',
-    '2233', '2243', '2360', '2497', '3346', '3552', '3665', '4522',
-    '4551', '5243', '6215', '6279', '6284', '8255'
-]
-
 def parse_special_txt(file_path):
     parsed_data = []
-    # 擷取檔名中的日期
+    # 擷取檔名中的日期 (前8個字元)
     date_label = os.path.basename(file_path)[:8]
     target_col = f"{date_label}持股%"
     
@@ -506,7 +498,7 @@ def parse_special_txt(file_path):
                 line_str = line.strip()
                 parts = line_str.split('\t')
                 
-                # 判斷是否為真實資料行 (特徵: 第一欄是數字排名)
+                # 判斷是否為真實資料行 (第一欄為數字排名)
                 if len(parts) >= 5 and parts[0].isdigit():
                     stock_str = parts[1].strip()  
                     
@@ -537,22 +529,23 @@ def parse_special_txt(file_path):
     if df.empty:
         return pd.DataFrame(columns=['股票代號', '股票名稱', target_col])
         
-    # 去除同一份檔案中因不同天期區塊造成的重複標的
+    # 去除同一個檔案中，因不同天期區塊重複出現的標的
     df = df.drop_duplicates(subset=['股票代號'], keep='first')
     return df[['股票代號', '股票名稱', target_col]]
 
 # ==========================================
-# 🔄 多日歷史資料合併與邏輯運算
+# 🔄 多日歷史資料合併與邏輯運算 (拉長至 30 天)
 # ==========================================
 txt_pattern = os.path.join(DATA_DIR, "*持股排名變化*.txt")
 all_txt_files = sorted(glob.glob(txt_pattern), reverse=True)
 
 if all_txt_files:
     final_df = None
-    # 取最近 5 天的資料進行合併
-    for file_path in all_txt_files[:5]:
+    # 🔥 修正點 2：取最近 30 天的資料進行橫向合併
+    for file_path in all_txt_files[:30]:
         df_day = parse_special_txt(file_path)
-        if df_day.empty: continue
+        if df_day.empty: 
+            continue
             
         if final_df is None:
             final_df = df_day
@@ -560,29 +553,27 @@ if all_txt_files:
             final_df = pd.merge(final_df, df_day, on=['股票代號', '股票名稱'], how='outer')
             
     if final_df is not None and not final_df.empty:
-        # 取得所有的日期欄位 (已依照最新到最舊排列)
+        # 取得所有的日期欄位 (已依照最新到最舊由左至右排列)
         date_cols = [c for c in final_df.columns if '持股%' in c]
         
-        # 填補缺失值為 0 以便進行數學運算
+        # 填補缺失值為 0 以便進行趨勢運算
         for c in date_cols:
             final_df[c] = pd.to_numeric(final_df[c], errors='coerce').fillna(0)
             
-        # 💡 新增「最新動態」邏輯判定
+        # 最新動態判定邏輯 (與前一日比對)
         def evaluate_trend(row):
-            if len(date_cols) < 2: return "⚪ 資料不足"
+            if len(date_cols) < 2: 
+                return "⚪ 資料不足"
             
-            # 取出最近三天的數據 (T, T-1, T-2)
-            v0 = row[date_cols[0]] # 最新日
-            v1 = row[date_cols[1]] # 前一日
+            v0 = row[date_cols[0]]  # 最新日數據
+            v1 = row[date_cols[1]]  # 前一日數據
             
-            diff1 = v0 - v1 # 今日增減幅度
+            diff1 = v0 - v1  # 今日增減幅度
             
             if diff1 > 0:
                 if len(date_cols) >= 3:
-                    v2 = row[date_cols[2]] # 前二日
-                    diff2 = v1 - v2 # 昨日增減幅度
-                    
-                    # 如果今日增幅 < 昨日增幅，判定為減緩
+                    v2 = row[date_cols[2]]  # 前二日數據
+                    diff2 = v1 - v2  # 昨日增減幅度
                     if diff1 < diff2:
                         return "⚠️ 減緩"
                 return "📈 上升"
@@ -593,45 +584,42 @@ if all_txt_files:
                 
         final_df['最新動態'] = final_df.apply(evaluate_trend, axis=1)
         
-        # 整理欄位顯示順序
+        # 重新整理欄位順序
         cols = ['股票代號', '股票名稱', '最新動態'] + date_cols
         final_df = final_df[cols]
         
-        # 🔥 將最新日期的持股比例從大到小排序 (最高的置頂)
+        # 將最新日期的持股比例從大到小排序 (最高者置頂顯示)
         if date_cols:
             final_df = final_df.sort_values(by=date_cols[0], ascending=False)
         
         # ==========================================
-        # 🔧 UI 顯示與自訂篩選器
+        # 🔧 UI 顯示與自訂篩選器 (修正點 1：移除車用篩選)
         # ==========================================
         st.write("🔧 **自訂標的顯示過濾：**")
-        c1, c2, c3 = st.columns(3)
-        show_etf = c1.checkbox("顯示 ETF", value=True, key="blk1_etf")
-        show_bond = c2.checkbox("顯示 債券/債券ETF", value=True, key="blk1_bond")
-        only_car = c3.checkbox("🚗 僅顯示車用概念股", value=False, key="blk1_car")
+        c1, c2 = st.columns(2)
+        show_etf = c1.checkbox("顯示 ETF", value=True, key="blk1_etf_v30")
+        show_bond = c2.checkbox("顯示 債券/債券ETF", value=True, key="blk1_bond_v30")
         
         # 建立篩選遮罩
         is_bond = final_df['股票代號'].str.endswith('B')
         is_etf = (final_df['股票代號'].str.len() >= 5) & (~is_bond)
         is_stock = final_df['股票代號'].str.len() == 4
         
-        if only_car:
-            # 若勾選車用，無視其他選項，強制只顯示車用清單內的標的
-            mask = final_df['股票代號'].isin(CAR_STOCKS)
-        else:
-            mask = is_stock
-            if show_etf: mask |= is_etf
-            if show_bond: mask |= is_bond
+        mask = is_stock
+        if show_etf: 
+            mask |= is_etf
+        if show_bond: 
+            mask |= is_bond
             
         filtered_df = final_df[mask].copy()
         
-        # 顯示美化：將 0 轉為 "-" 讓表格看起來不那麼雜亂
+        # 美化表格：將數值 0 的欄位轉換為 "-"，避免畫面密密麻麻干擾閱讀
         for c in date_cols:
             filtered_df[c] = filtered_df[c].apply(lambda x: round(x, 2) if x != 0 else "-")
             
         filtered_df.index = range(1, len(filtered_df) + 1)
         
-        st.success(f"📊 已成功串聯 {len(date_cols)} 個交易日的數據，並依據最新持股率排序：")
+        st.success(f"📊 已成功串聯最近 {len(date_cols)} 個交易日的持股數據，並依據最新持股率排序：")
         st.dataframe(filtered_df, use_container_width=True)
     else:
         st.warning("⚠️ 讀取到的檔案皆無效或無資料，請檢查 TXT 內容。")
