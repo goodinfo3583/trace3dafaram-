@@ -31,7 +31,7 @@ def extract_date_from_name(filepath):
 # ==========================================
 def parse_special_txt(file_path):
     parsed_data = []
-    with open(file_path, "r", encoding="utf-8") as f:
+    with open(file_path, 'r', encoding='cp950', errors='ignore') as f:
         for line in f:
             line_str = line.strip()
             if "TWSE" in line_str or "TPEx" in line_str:
