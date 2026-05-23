@@ -484,7 +484,7 @@ if not track_display_df.empty:
     st.dataframe(df_to_show, use_container_width=True)
 
 # ==========================================
-# ：多天期 5日 外資買賣佔成交量比軌跡追蹤 (CSV)
+# ：多天期 5日 投信買賣佔成交量比軌跡追蹤 (CSV)
 # ==========================================
 st.write("---")
 st.header("🎯 區塊2-1：外資 5 日買超 佔成交量比 追蹤")
@@ -493,198 +493,30 @@ csv_pattern = os.path.join(DATA_DIR, "*外資買超佔成交比*.csv")
 all_csv_files = glob.glob(csv_pattern)
 
 if not all_csv_files:
-    st.warning("⚠️ 找不到任何包含『外資買超佔成交比』的 CSV 檔案，請檢查路徑或檔名。")
+    st.warning("⚠️ 找不到任何包含『外資買超佔成交比』的 CSV 檔案。")
 else:
     all_csv_files.sort(reverse=True)
-    target_files = all_csv_files[:14]
-    
-    EXACT_TODAY_CANDIDATES = ['當日買進佔成交', '當日買賣超佔成交', '當日 買賣超 佔 成交']
-    EXACT_5DAY_CANDIDATES = ['5日買進佔成交', '5日買賣超佔成交', '5日 買賣超 佔 成交']
-    
-    latest_file = target_files[0]
-    latest_filename = os.path.basename(latest_file)
-    latest_date_str = latest_filename[:8]  
-    latest_mmdd = f"{latest_date_str[4:6]}{latest_date_str[6:8]}" 
+    latest_file = all_csv_files[0]
     
     try:
-        # 這裡修正為安全讀取
+        # 使用萬能讀取器
         df_base_raw = safe_read_csv(latest_file, dtype=str)
+        # 清除欄位空格
+        df_base_raw.columns = [c.replace(" ", "").strip() for c in df_base_raw.columns]
         
-        col_today_exact = None
-        for candidate in EXACT_TODAY_CANDIDATES:
-            if candidate in df_base_raw.columns:
-                col_today_exact = candidate
-                break
-                
-        if '代號' not in df_base_raw.columns or '名稱' not in df_base_raw.columns or col_today_exact is None:
-            st.error(f"❌ 最新基準檔案 `{latest_filename}` 缺少指定必要欄位。")
+        # 🔍 自動找關鍵欄位：不再指定死字串，只要包含關鍵字就好
+        col_today = next((c for c in df_base_raw.columns if '當日' in c and ('買進佔成交' in c or '買賣超佔成交' in c)), None)
+        
+        if '代號' not in df_base_raw.columns or col_today is None:
+            # 偵錯用：顯示出它到底讀到了什麼欄位
+            st.error(f"❌ 找不到關鍵欄位。目前檔案 `{os.path.basename(latest_file)}` 的欄位有: {list(df_base_raw.columns)}")
         else:
-            df_base_raw = df_base_raw.dropna(subset=['代號', '名稱'])
-            df_base_raw = df_base_raw[df_base_raw['代號'].str.strip() != ""]
-            df_base_raw = df_base_raw.drop_duplicates(subset=['代號'])
-            
+            # 轉換數值
             df_base_master = pd.DataFrame({
                 '股票代號': df_base_raw['代號'].astype(str).str.strip(),
                 '股票名稱': df_base_raw['名稱'].astype(str).str.strip(),
-                '當日買佔比%': pd.to_numeric(df_base_raw[col_today_exact], errors='coerce')
+                '當日買佔比%': pd.to_numeric(df_base_raw[col_today], errors='coerce')
             })
-            
-            df_base_master['_base_order'] = range(len(df_base_master))
-            df_history_combined = df_base_master[['股票代號', '股票名稱']].copy()
-            
-            for file_path in target_files:
-                filename = os.path.basename(file_path)
-                date_raw = filename[:8] 
-                date_label = f"{date_raw[4:6]}{date_raw[6:8]}" if date_raw.isdigit() else date_raw
-                target_grid_col = f"{date_label}買佔比%"
-                
-                try:
-                    # 這裡修正為安全讀取
-                    df_day = safe_read_csv(file_path, dtype=str)
-                    col_5day_exact = None
-                    for candidate in EXACT_5DAY_CANDIDATES:
-                        if candidate in df_day.columns:
-                            col_5day_exact = candidate
-                            break
-                    
-                    if '代號' in df_day.columns and col_5day_exact is not None:
-                        df_day_subset = df_day[['代號', '名稱', col_5day_exact]].copy()
-                        df_day_subset = df_day_subset.dropna(subset=['代號', '名稱'])
-                        df_day_subset['代號'] = df_day_subset['代號'].astype(str).str.strip()
-                        df_day_subset['名稱'] = df_day_subset['名稱'].astype(str).str.strip()
-                        df_day_subset = df_day_subset[df_day_subset['代號'] != ""]
-                        df_day_subset = df_day_subset.drop_duplicates(subset=['代號'])
-                        
-                        df_day_subset[target_grid_col] = pd.to_numeric(df_day_subset[col_5day_exact], errors='coerce')
-                        df_day_subset = df_day_subset[['代號', '名稱', target_grid_col]]
-                        df_day_subset.columns = ['股票代號', '股票名稱', target_grid_col]
-                        
-                        df_history_combined = pd.merge(df_history_combined, df_day_subset, on=['股票代號', '股票名稱'], how='outer')
-                except Exception:
-                    pass
-
-            latest_5d_col = f"{latest_mmdd}買佔比%"
-            df_analysis = pd.merge(
-                df_history_combined, 
-                df_base_master[['股票代號', '股票名稱', '當日買佔比%']], 
-                on=['股票代號', '股票名稱'], 
-                how='left'
-            )
-
-            recent_3_cols = []
-            for f_path in target_files[:3]:
-                d_raw = os.path.basename(f_path)[:8]
-                if len(d_raw) == 8 and d_raw.isdigit():
-                    col_name = f"{d_raw[4:6]}{d_raw[6:8]}買佔比%"
-                    if col_name in df_analysis.columns:
-                        recent_3_cols.append(col_name)
-
-            prev_cols = [c for c in recent_3_cols if c != latest_5d_col]
-            df_analysis['baseline_3d'] = df_analysis[recent_3_cols].mean(axis=1) if recent_3_cols else None
-
-            def evaluate_continuity(row):
-                today = row.get('當日買佔比%', None)
-                base_3d = row.get('baseline_3d', None)
-                if pd.isna(today) or base_3d is None or pd.isna(base_3d): return "⚪ 觀望或無數據"
-                
-                has_past_data = any(pd.notna(row.get(c, None)) for c in prev_cols)
-                if not has_past_data and today > 0: return "🆕 新進榜"
-                
-                if today > base_3d and today > 0: return "🔥 強延續"
-                elif 0 < today <= base_3d: return "⚠️ 放緩 (持續買進)"
-                elif today == 0: return "⚪ 觀望持平 (量縮)"
-                elif today < 0:
-                    if base_3d <= 0: return "❌ 法人轉賣反轉"
-                    ratio = abs(today / base_3d)
-                    return "🚨 劇烈倒貨 (籌碼洗盤)" if ratio >= 1.5 else "📉 調節洗盤 (尚屬健康)"
-                return "⚪ 觀望持平"
-
-            df_history_combined['今日短動態'] = df_analysis.apply(evaluate_continuity, axis=1)
-
-            df_display = pd.merge(df_base_master, df_history_combined, on=['股票代號', '股票名稱'], how='left')
-            df_display = df_display.sort_values(by='_base_order', ascending=True)
-            
-            st.write("🔧 **自訂標的顯示過濾：**")
-            c1, c2 = st.columns(2)
-            show_etf = c1.checkbox("顯示 ETF", value=True)
-            show_bond = c2.checkbox("顯示 債券/債券ETF", value=True)
-            
-            is_bond = df_display['股票代號'].str.endswith('B')
-            is_etf = (df_display['股票代號'].str.len() >= 5) & (~is_bond)
-            is_stock = df_display['股票代號'].str.len() == 4
-            
-            mask = is_stock
-            if show_etf: mask = mask | is_etf
-            if show_bond: mask = mask | is_bond
-            df_display = df_display[mask]
-            
-            base_cols = ['股票代號', '股票名稱', '今日短動態', '當日買佔比%']
-            history_cols = [c for c in df_display.columns if '買佔比%' in c and c != '當日買佔比%']
-            df_display = df_display[base_cols + history_cols]
-            df_display.index = range(1, len(df_display) + 1)
-            
-            st.success(f"📊 已成功串聯 {len(target_files)} 個交易日，追蹤 {len(df_display)} 檔曾進榜的短線熱門股：")
-            st.markdown("💡 **動態說明：** 🆕 新進榜：強勢空降。🔥 強延續：買盤動能加速。⚠️ 放緩 (持續買進)：買超力道低於近期均線。📉 調節洗盤：微幅轉賣調節。🚨 劇烈倒貨：強烈轉賣。❌ 法人轉賣反轉：趨勢翻空。")
-            st.dataframe(df_display, use_container_width=True)
-
-    except Exception as e:
-        st.error(f"❌ 處理主程式時發生錯誤: {e}")
-
-# ==========================================
-# ：多天期 5日 投信買賣佔成交量比軌跡追蹤 (CSV)
-# ==========================================
-st.write("---")
-st.header("🎯 區塊2-2：投信 5 日買超 佔成交量比 追蹤")
-
-csv_pattern_sitc = os.path.join(DATA_DIR, "*投信買超佔成交比*.csv")
-all_csv_files_sitc = glob.glob(csv_pattern_sitc)
-
-if not all_csv_files_sitc:
-    st.warning("⚠️ 找不到任何包含『投信買超佔成交比』的 CSV 檔案。")
-else:
-    all_csv_files_sitc.sort(reverse=True)
-    target_files_sitc = all_csv_files_sitc[:14]
-    
-    EXACT_TODAY_CANDIDATES = ['當日買進佔成交', '當日買賣超佔成交', '當日 買賣超 佔 成交']
-    EXACT_5DAY_CANDIDATES = ['5日買進佔成交', '5日買賣超佔成交', '5日 買賣超 佔 成交']
-    
-    latest_file_sitc = target_files_sitc[0]
-    latest_filename_sitc = os.path.basename(latest_file_sitc)
-    latest_mmdd_sitc = f"{latest_filename_sitc[4:6]}{latest_filename_sitc[6:8]}"
-    
-    try:
-        # 這裡修正為安全讀取
-        df_base_sitc = safe_read_csv(latest_file_sitc, dtype=str)
-        df_base_sitc = df_base_sitc.dropna(subset=['代號', '名稱'])
-        df_base_sitc = df_base_sitc[df_base_sitc['代號'].str.strip() != ""]
-        df_base_sitc = df_base_sitc.drop_duplicates(subset=['代號'])
-        
-        col_today_sitc = next((c for c in EXACT_TODAY_CANDIDATES if c in df_base_sitc.columns), None)
-        
-        df_master_sitc = pd.DataFrame({
-            '股票代號': df_base_sitc['代號'].astype(str).str.strip(),
-            '股票名稱': df_base_sitc['名稱'].astype(str).str.strip(),
-            '當日買佔比%': pd.to_numeric(df_base_sitc[col_today_sitc], errors='coerce')
-        })
-        df_master_sitc['_base_order'] = range(len(df_master_sitc))
-        
-        df_hist_sitc = df_master_sitc[['股票代號', '股票名稱']].copy()
-        
-        for file_path in target_files_sitc:
-            filename = os.path.basename(file_path)
-            date_label = f"{filename[4:6]}{filename[6:8]}" if filename[:8].isdigit() else filename[:8]
-            target_col = f"{date_label}買佔比%"
-            
-            # 這裡修正為安全讀取
-            df_day = safe_read_csv(file_path, dtype=str)
-            col_5d = next((c for c in EXACT_5DAY_CANDIDATES if c in df_day.columns), None)
-            
-            if col_5d:
-                df_temp = df_day[['代號', '名稱', col_5d]].copy()
-                df_temp.columns = ['股票代號', '股票名稱', target_col]
-                df_temp['股票代號'] = df_temp['股票代號'].astype(str).str.strip()
-                df_temp[target_col] = pd.to_numeric(df_temp[target_col], errors='coerce')
-                df_hist_sitc = pd.merge(df_hist_sitc, df_temp, on=['股票代號', '股票名稱'], how='outer')
 
         df_analysis_sitc = pd.merge(df_hist_sitc, df_master_sitc[['股票代號', '股票名稱', '當日買佔比%']], on=['股票代號', '股票名稱'], how='left')
         
