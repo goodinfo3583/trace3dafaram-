@@ -96,11 +96,12 @@ def load_csv_trajectory(pattern_str, column_suffix_name):
     return display_df, date_labels
 
 # ==========================================
-# ⚡ 數據預先同步載入層
+# ⚡ 數據預先同步載入層 (優化版)
 # ==========================================
 txt_pattern = os.path.join(DATA_DIR, "*持股排名變化*.txt")
 all_txt_files = glob.glob(txt_pattern)
 track_display_df, txt_date_labels = pd.DataFrame(), []
+
 if all_txt_files:
     sorted_txt_files = sorted(all_txt_files, key=extract_date_from_name, reverse=True)
     base_track_df = None
@@ -110,42 +111,57 @@ if all_txt_files:
         df_day = parse_special_txt(file_path)
         if not df_day.empty:
             df_day = df_day.rename(columns={"持股%": f"{date_label} 持股%"})
-            base_track_df = df_day if base_track_df is None else pd.merge(base_track_df, df_day, on=['代號', '名稱'], how='outer')
+            # 合併後立刻檢查並處理欄位重複問題
+            if base_track_df is None:
+                base_track_df = df_day
+            else:
+                base_track_df = pd.merge(base_track_df, df_day, on=['代號', '名稱'], how='outer')
+                base_track_df = base_track_df.loc[:, ~base_track_df.columns.duplicated()]
+
     if base_track_df is not None and len(txt_date_labels) >= 2:
         col_latest = f"{txt_date_labels[0]} 持股%"
         col_previous = f"{txt_date_labels[1]} 持股%"
+        
         if col_latest in base_track_df.columns and col_previous in base_track_df.columns:
-            base_track_df['籌碼趨勢'] = base_track_df.apply(lambda r: "🆕 新進榜" if not pd.isna(r[col_latest]) and pd.isna(r[col_previous]) else ("❌ 掉出榜" if pd.isna(r[col_latest]) and not pd.isna(r[col_previous]) else ("📈 上升" if not pd.isna(r[col_latest]) and not pd.isna(r[col_previous]) and float(r[col_latest]) - float(r[col_previous]) > 0 else ("📉 下降" if not pd.isna(r[col_latest]) and not pd.isna(r[col_previous]) and float(r[col_latest]) - float(r[col_previous]) < 0 else "🔄 趨緩"))), axis=1)
-        else: base_track_df['籌碼趨勢'] = "⏳ 天數錯位"
+            # 增加 float 轉換保護，避免 NaN 導致運算異常
+            def calc_trend(r):
+                v_l = pd.to_numeric(r[col_latest], errors='coerce')
+                v_p = pd.to_numeric(r[col_previous], errors='coerce')
+                if pd.isna(v_l) and pd.isna(v_p): return "觀察中"
+                if not pd.isna(v_l) and pd.isna(v_p): return "🆕 新進榜"
+                if pd.isna(v_l) and not pd.isna(v_p): return "❌ 掉出榜"
+                if v_l > v_p: return "📈 上升"
+                if v_l < v_p: return "📉 下降"
+                return "🔄 趨緩"
+            
+            base_track_df['籌碼趨勢'] = base_track_df.apply(calc_trend, axis=1)
+        else:
+            base_track_df['籌碼趨勢'] = "⏳ 天數錯位"
+            
         idx_3d = min(2, len(txt_date_labels) - 1)
         col_3d = f"{txt_date_labels[idx_3d]} 持股%"
-        base_track_df['秘密3日斜率'] = (pd.to_numeric(base_track_df[col_latest], errors='coerce').fillna(0) - pd.to_numeric(base_track_df[col_3d], errors='coerce').fillna(0)).round(2)
+        base_track_df['秘密3日斜率'] = (pd.to_numeric(base_track_df[col_latest], errors='coerce').fillna(0) - pd.to_numeric(base_track_df.get(col_3d, 0), errors='coerce').fillna(0)).round(2)
+        
         track_display_df = base_track_df.fillna("未進榜").rename(columns={"代號": "股票代號", "名稱": "股票名稱"})
         safe_txt_cols = [f"{d} 持股%" for d in txt_date_labels if f"{d} 持股%" in track_display_df.columns]
         track_display_df = track_display_df[["股票代號", "股票名稱", "籌碼趨勢", "秘密3日斜率"] + safe_txt_cols]
         track_display_df["排序權重"] = track_display_df["籌碼趨勢"].map({"📈 上升": 1, "🆕 新進榜": 2, "🔄 趨緩": 3, "觀察中": 4, "❌ 掉出榜": 5, "⏳ 天數錯位": 6})
         track_display_df = track_display_df.sort_values(by="排序權重")
 
-csv_foreign_deal, _ = load_csv_trajectory("*外資買超佔成交比*.csv", "外資買佔比(%)")
-csv_it_deal, _ = load_csv_trajectory("*投信買超佔成交比*.csv", "投信買佔比(%)")
-csv_foreign_stock, _ = load_csv_trajectory("*外資買超佔發行張數*.csv", "外資買佔發行(%)")
-csv_it_stock, _ = load_csv_trajectory("*投信買超佔發行張數*.csv", "投信買佔發行(%)")
-csv_foreign_sell, _ = load_csv_trajectory("*外資賣出佔成交比*.csv", "外資賣佔比(%)")
-csv_it_sell, _ = load_csv_trajectory("*投信賣出佔成交比*.csv", "投信賣佔比(%)")
-csv_it_ln_day, _ = load_csv_trajectory("*投信連續買超(日)*.csv", "投信連買日")
-csv_it_ln_wk, it_wk_dates = load_csv_trajectory("*投信連續買超(週)*.csv", "投信連買週")
-csv_foreign_ln_day, _ = load_csv_trajectory("*外資連續買超(日)*.csv", "外資連買日")
-csv_foreign_ln_wk, fo_wk_dates = load_csv_trajectory("*外資連續買超(週)*.csv", "外資連買週")
-
-def get_latest_only(df, date_labels, col_suffix):
-    if df.empty or not date_labels: return pd.DataFrame()
-    latest_col = f"{date_labels[0]}_{col_suffix}"
-    cols_to_keep = ["股票代號", "股票名稱", "動態"]
-    if latest_col in df.columns: cols_to_keep.append(latest_col)
-    return df[cols_to_keep]
-
-latest_it_wk = get_latest_only(csv_it_ln_wk, it_wk_dates, "投信連買週")
-latest_fo_wk = get_latest_only(csv_foreign_ln_wk, fo_wk_dates, "外資連買週")
+# 後面 CSV 載入部分建議加上 try-except 以防單一檔案失敗導致整個網頁掛掉
+try:
+    csv_foreign_deal, _ = load_csv_trajectory("*外資買超佔成交比*.csv", "外資買佔比(%)")
+    csv_it_deal, _ = load_csv_trajectory("*投信買超佔成交比*.csv", "投信買佔比(%)")
+    csv_foreign_stock, _ = load_csv_trajectory("*外資買超佔發行張數*.csv", "外資買佔發行(%)")
+    csv_it_stock, _ = load_csv_trajectory("*投信買超佔發行張數*.csv", "投信買佔發行(%)")
+    csv_foreign_sell, _ = load_csv_trajectory("*外資賣出佔成交比*.csv", "外資賣佔比(%)")
+    csv_it_sell, _ = load_csv_trajectory("*投信賣出佔成交比*.csv", "投信賣佔比(%)")
+    csv_it_ln_day, _ = load_csv_trajectory("*投信連續買超(日)*.csv", "投信連買日")
+    csv_it_ln_wk, it_wk_dates = load_csv_trajectory("*投信連續買超(週)*.csv", "投信連買週")
+    csv_foreign_ln_day, _ = load_csv_trajectory("*外資連續買超(日)*.csv", "外資連買日")
+    csv_foreign_ln_wk, fo_wk_dates = load_csv_trajectory("*外資連續買超(週)*.csv", "外資連買週")
+except Exception as e:
+    st.error(f"CSV 載入發生錯誤: {e}")
 
 # ==========================================
 # 👑 頂級核心：【三大法人多空評分 + 3日短線飆速置頂爆發榜】
