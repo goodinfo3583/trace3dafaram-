@@ -923,6 +923,7 @@ else:
     else:
         st.error("❌ 無法讀取投信數據，請確保檔案內含『5日買賣超佔發行張數』欄位。")
 
+
 # ==========================================
 # 📅 區塊六：外資與投信連續買超 (日/週全景戰情室)
 # ==========================================
@@ -931,10 +932,10 @@ st.markdown("<div id='section-wk'></div>", unsafe_allow_html=True)
 st.header("📅 區塊3：連續買超")
 
 st.info("""
-💡 **狀態動態評估依據（籌碼認養密度分級說明）：**
-* 連買 **10以上天 / 週** 🔥 **波段認養** (長線鎖籌，趨勢保護力極強)
-* 連買 **5 ~ 9 天 / 週** ⚡ **買盤點火** (資金流入，短期爆發動能，週連買有底氣)
-* 連買 **1 ~ 4 天 / 週** 🆕 **試單觀察** (法人第一時間進場试單，週連買初步建倉)
+💡 **狀態動態評估依據：**
+* 連買 10以上天/週 🔥 波段認養
+* 連買 5 ~ 9 天/週 ⚡ 買盤點火
+* 連買 1 ~ 4 天/週 🆕 試單觀察
 """)
 
 def read_live_ln_report(file_keyword, strict_type, exact_field_name, prefix_keyword, col_label):
@@ -949,21 +950,19 @@ def read_live_ln_report(file_keyword, strict_type, exact_field_name, prefix_keyw
         target_files = glob.glob(search_pattern1) + glob.glob(search_pattern2)
         
     target_files = list(set(target_files))
-    if not target_files:
-        return pd.DataFrame(), None
+    if not target_files: return pd.DataFrame(), None
         
     latest_file = sorted(target_files, key=extract_date_from_name, reverse=True)[0]
     date_str = extract_date_from_name(latest_file) 
     
     try:
-        # 這裡修正為安全讀取
-        df = safe_read_csv(latest_file)
-        df.columns = df.columns.astype(str).str.replace('\n', '').str.replace(' ', '').str.strip()
+        # 強制指定 utf-8-sig 以解決中文亂碼，並清除欄位中的隱形字元
+        df = pd.read_csv(latest_file, encoding='utf-8-sig')
+        df.columns = df.columns.astype(str).str.replace('\n', '').str.replace(' ', '').str.replace('\ufeff', '').str.strip()
         
-        col_id = [c for c in df.columns if '代號' in c or '股票' in c]
-        col_name = [c for c in df.columns if '名稱' in c or '股票' in c]
-        c_id = col_id[0] if col_id else df.columns[0]
-        c_name = col_name[0] if len(col_name) > 0 else (col_id[0] if col_id else df.columns[1])
+        # 動態查找欄位
+        col_id = next((c for c in df.columns if '代號' in c), df.columns[0])
+        col_name = next((c for c in df.columns if '名稱' in c), df.columns[1])
         
         target_key = exact_field_name.replace(' ', '')
         if target_key in df.columns:
@@ -975,12 +974,11 @@ def read_live_ln_report(file_keyword, strict_type, exact_field_name, prefix_keyw
         df[target_data_col] = pd.to_numeric(df[target_data_col], errors='coerce').fillna(0)
         df_sorted = df[df[target_data_col] > 0].sort_values(by=target_data_col, ascending=False)
         
-        if df_sorted.empty:
-            return pd.DataFrame(), date_str
+        if df_sorted.empty: return pd.DataFrame(), date_str
             
         output_df = pd.DataFrame()
-        output_df["股票代號"] = df_sorted[c_id].astype(str).str.strip()
-        output_df["股票名稱"] = df_sorted[c_name].astype(str).str.strip()
+        output_df["股票代號"] = df_sorted[col_id].astype(str).str.strip()
+        output_df["股票名稱"] = df_sorted[col_name].astype(str).str.strip()
         
         def get_status_tag(val):
             if val >= 10: return "🔥 波段認養"
@@ -1000,11 +998,13 @@ def read_live_ln_report(file_keyword, strict_type, exact_field_name, prefix_keyw
         else: output_df["佔發行量(%)"] = 0.0
             
         output_df.index = range(1, len(output_df) + 1)
-            
         return output_df, date_str
-
     except Exception as e:
         return pd.DataFrame(), f"解讀失敗: {str(e)}"
+
+# 執行排程與渲染 (與您原先邏輯相同)
+live_fo_day, date_fo_day = read_live_ln_report("外資連續買超", "日", "外資連續買賣日數", "外資", "最新連買天數")
+# ... (下方保持您原本的排程呼叫) ...
 
 # ========================================================
 # 🚀 執行排程
