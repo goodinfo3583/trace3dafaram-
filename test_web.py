@@ -932,7 +932,7 @@ if all_files_sitc:
 # ==========================================
 st.write("---")
 st.markdown("<div id='section-wk'></div>", unsafe_allow_html=True)
-st.header("📅 區塊3：連續買超戰情室")
+st.header("📅 區塊3：連續買超")
 
 st.info("""
 💡 **狀態動態評估依據（籌碼認養密度分級說明）：**
@@ -1040,7 +1040,7 @@ if live_it_wk.empty:
 # ========================================================
 # 🖼️ 視覺介面渲染 (左外資、右投信)
 # ========================================================
-st.subheader("⚡ 核心主力：最新單日連續買超")
+st.subheader("⚡ 最新單日連續買超")
 c_day1, c_day2 = st.columns(2)
 
 with c_day1:
@@ -1059,7 +1059,7 @@ with c_day2:
 
 st.write(" ") 
 
-st.subheader("📅 戰略波段：最新單週連續買超")
+st.subheader("📅 最新單週連續波段買超")
 c_wk1, c_wk2 = st.columns(2)
 
 with c_wk1:
