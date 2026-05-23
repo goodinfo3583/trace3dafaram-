@@ -31,7 +31,7 @@ def extract_date_from_name(filepath):
 # ==========================================
 def parse_special_txt(file_path):
     parsed_data = []
-    # 這裡已經是正確的 cp950
+    # 使用 cp950 讀取 txt，並忽略解碼錯誤
     with open(file_path, 'r', encoding='cp950', errors='ignore') as f:
         for line in f:
             line_str = line.strip()
@@ -51,9 +51,10 @@ def parse_special_txt(file_path):
 # 🔧 專門處理 Goodinfo CSV 雙軌編碼的讀取器
 def safe_read_csv(file_path, **kwargs):
     try:
-        return safe_read_csv(file_path, encoding='cp950', encoding_errors='ignore', **kwargs)
+        # 正確寫法：在這裡呼叫 pandas 的 read_csv，而不是呼叫自己
+        return pd.read_csv(file_path, encoding='cp950', encoding_errors='ignore', **kwargs)
     except:
-        return safe_read_csv(file_path, encoding='utf-8-sig', encoding_errors='ignore', **kwargs)
+        return pd.read_csv(file_path, encoding='utf-8-sig', encoding_errors='ignore', **kwargs)
 
 def load_csv_trajectory(pattern_str, column_suffix_name):
     csv_pattern = os.path.join(DATA_DIR, pattern_str)
@@ -66,7 +67,7 @@ def load_csv_trajectory(pattern_str, column_suffix_name):
             date_label = extract_date_from_name(file_path)
             date_labels.append(date_label)
             try:
-                # 這裡修正為安全讀取
+                # 這裡呼叫修正後的 safe_read_csv
                 df_day = safe_read_csv(file_path)
                 df_day['代號'] = df_day['代號'].astype(str).str.strip()
                 df_day['名稱'] = df_day['名稱'].astype(str).str.strip()
