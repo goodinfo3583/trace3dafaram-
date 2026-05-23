@@ -51,9 +51,9 @@ def parse_special_txt(file_path):
 # 🔧 專門處理 Goodinfo CSV 雙軌編碼的讀取器
 def safe_read_csv(file_path, **kwargs):
     try:
-        return pd.read_csv(file_path, encoding='cp950', **kwargs)
+        return safe_read_csv(file_path, encoding='cp950', **kwargs)
     except:
-        return pd.read_csv(file_path, encoding='utf-8-sig', **kwargs)
+        return safe_read_csv(file_path, encoding='utf-8-sig', **kwargs)
 
 def load_csv_trajectory(pattern_str, column_suffix_name):
     csv_pattern = os.path.join(DATA_DIR, pattern_str)
