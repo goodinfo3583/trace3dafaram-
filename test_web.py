@@ -460,7 +460,11 @@ st.sidebar.markdown("[👑 區塊一：三大法人持股%](#section-1)")
 st.write("---")
 st.markdown("<div id='section-1'></div>", unsafe_allow_html=True)
 st.header("🏢 區塊1：中長線 三大法人 持股比例 追蹤")
-if not track_display_df.empty: st.dataframe(track_display_df.drop(columns=["秘密3日斜率"]), use_container_width=True)
+if not track_display_df.empty: 
+    # 確保只留下不重複的欄位
+    df_to_show = track_display_df.drop(columns=["秘密3日斜率"], errors='ignore')
+    df_to_show = df_to_show.loc[:, ~df_to_show.columns.duplicated()]
+    st.dataframe(df_to_show, use_container_width=True)
 
 # ==========================================
 # ：多天期 5日 外資買賣佔成交量比軌跡追蹤 (CSV)
