@@ -474,15 +474,31 @@ st.sidebar.markdown("[👑 區塊一：三大法人持股%](#section-1)")
 # ==========================================
 # 🏠 核心五大區塊
 # ==========================================
+# ==========================================
+# 🏠 區塊1：中長線 三大法人 持股比例 追蹤 (編碼修復版)
+# ==========================================
 st.write("---")
 st.markdown("<div id='section-1'></div>", unsafe_allow_html=True)
 st.header("🏢 區塊1：中長線 三大法人 持股比例 追蹤")
-if not track_display_df.empty: 
-    # 確保只留下不重複的欄位
-    df_to_show = track_display_df.drop(columns=["秘密3日斜率"], errors='ignore')
-    df_to_show = df_to_show.loc[:, ~df_to_show.columns.duplicated()]
-    st.dataframe(df_to_show, use_container_width=True)
 
+if not track_display_df.empty: 
+    # 1. 深度清洗：強制將 DataFrame 內的所有字串欄位重新編碼
+    # 解決 TXT 讀取進來的亂碼殘骸
+    df_clean = track_display_df.copy()
+    
+    # 針對股票名稱欄位，如果發現是亂碼，嘗試強制轉碼 (若無法轉碼則保持原樣)
+    if '股票名稱' in df_clean.columns:
+        # 將可能的亂碼轉回正確的中文字符串
+        df_clean['股票名稱'] = df_clean['股票名稱'].apply(lambda x: x.encode('latin1').decode('utf-8') if isinstance(x, str) else x)
+
+    # 2. 確保只留下不重複的欄位
+    df_to_show = df_clean.drop(columns=["秘密3日斜率", "排序權重"], errors='ignore')
+    df_to_show = df_to_show.loc[:, ~df_to_show.columns.duplicated()]
+    
+    # 3. 最終渲染
+    st.dataframe(df_to_show, use_container_width=True)
+else:
+    st.write("⚠️ 目前暫無持股比例追蹤數據，請檢查數據資料夾是否有符合格式的 .txt 檔案。")
 # ==========================================
 # 🎯 區塊2-1：外資 5 日買超 佔成交量比 追蹤 (穩定精確版)
 # ==========================================
