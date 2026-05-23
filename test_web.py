@@ -488,7 +488,27 @@ if not track_display_df.empty:
 # ==========================================
 st.write("---")
 st.header("🎯 區塊2-1：外資 5 日買超 佔成交量比 追蹤")
+# (此處讀取邏輯同前一版，以下為顯示與結構修正)
+if base_df is not None:
+    csv_display = base_df.fillna("未進榜").rename(columns={"代號": "股票代號", "名稱": "股票名稱"})
+    
+    # 增加當日買佔比欄位處理
+    csv_display['當日買佔比%'] = csv_display['股票代號'].map(latest_day_today_data).fillna(0)
+    
+    # 動態說明對照表
+    st.info("""
+    💡 **外資動態說明：**
+    * 🔥 **強延續**：今日佔比 > 近期均線，買盤加速
+    * ⚠️ **放緩(持續買進)**：仍買超，但力道弱於均線
+    * 🔄 **持平/量縮**：買進力道無明顯變化
+    * 📉 **調節洗盤**：微幅轉賣，尚屬健康整理
+    * 🚨 **劇烈倒貨**：短線強烈轉賣出
+    * ❌ **法人轉賣反轉**：趨勢翻空
+    """)
 
+    # 調整欄位順序
+    cols = ["股票代號", "股票名稱", "今日短動態", "當日買佔比%"] + [c for c in csv_display.columns if "買佔比%" in c and c != "當日買佔比%"]
+    csv_display = csv_display[cols]
 csv_pattern = os.path.join(DATA_DIR, "*外資買超佔成交比*.csv")
 all_csv_files = glob.glob(csv_pattern)
 
