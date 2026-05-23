@@ -475,65 +475,44 @@ st.sidebar.markdown("[👑 區塊一：三大法人持股%](#section-1)")
 # 🏠 核心五大區塊
 # ==========================================
 # ==========================================
-# 🏠 區塊1：中長線 三大法人 持股比例 追蹤 (最終修復版)
+# 🏠 區塊1：中長線 三大法人 持股比例 追蹤 (完整保留每日欄位版)
 # ==========================================
 st.write("---")
 st.markdown("<div id='section-1'></div>", unsafe_allow_html=True)
 st.header("🏢 區塊1：中長線 三大法人 持股比例 追蹤")
 
-# 建議將解析邏輯放在這裡，確保讀取時的編碼絕對正確
-def get_clean_track_df():
-    # 這裡請替換為您實際的 TXT 檔案路徑
-    file_path = os.path.join(DATA_DIR, "20260521-5日.20日.60日.持股排名變化.txt")
-    
-    # 強制使用 utf-8-sig 讀取，這能解決絕大多數中文字亂碼問題
-    try:
-        # 使用 pandas 的 read_csv 處理結構化 TXT (假設以 \t 分隔)
-        df = pd.read_csv(file_path, sep='\t', encoding='utf-8-sig', skiprows=4)
-        
-        # 清洗欄位名稱
-        df.columns = [str(c).replace(" ", "").strip() for c in df.columns]
-        
-        # 移除重複欄位
-        df = df.loc[:, ~df.columns.duplicated()]
-        
-        # 移除秘密與權重欄位
-        df = df.drop(columns=["秘密3日斜率", "排序權重"], errors='ignore')
-        
-        return df
-    except Exception as e:
-        st.error(f"❌ 區塊1 讀取失敗: {e}")
-        return pd.DataFrame()
+# 1. 解析 TXT 的函數 (確保編碼正確)
+def parse_special_txt(file_path):
+    # 使用 utf-8-sig 處理亂碼問題
+    df = pd.read_csv(file_path, sep='\t', encoding='utf-8-sig', skiprows=4)
+    # 清理欄位名稱
+    df.columns = [str(c).replace(" ", "").strip() for c in df.columns]
+    # 取出日期作為欄位名稱的一部分 (從檔名擷取)
+    date_label = os.path.basename(file_path)[:8]
+    df = df.rename(columns={"持股%": f"{date_label}持股%"})
+    return df[['股票代號', '股票名稱', f"{date_label}持股%"]]
 
-# 渲染區塊
-track_display_df = get_clean_track_df()
+# 2. 獲取所有 TXT 檔案並進行合併
+txt_pattern = os.path.join(DATA_DIR, "*持股排名變化*.txt")
+all_txt_files = sorted(glob.glob(txt_pattern), reverse=True)
 
-if not track_display_df.empty: 
-    # 最終渲染
-    st.dataframe(track_display_df, use_container_width=True)
-else:
-    st.write("⚠️ 目前暫無持股比例追蹤數據，請確保檔案已正確上傳至 Data 資料夾。")
-# ==========================================
-# 🏠 區塊1：中長線 三大法人 持股比例 追蹤 (修正版)
-# ==========================================
-st.write("---")
-st.markdown("<div id='section-1'></div>", unsafe_allow_html=True)
-st.header("🏢 區塊1：中長線 三大法人 持股比例 追蹤")
+if all_txt_files:
+    # 從最新檔案開始建立基礎 DataFrame
+    base_df = parse_special_txt(all_txt_files[0])
+    
+    # 逐一合併前幾天的資料 (例如合併最近 5 天)
+    for file_path in all_txt_files[1:5]:
+        df_day = parse_special_txt(file_path)
+        base_df = pd.merge(base_df, df_day, on=['股票代號', '股票名稱'], how='outer')
 
-if not track_display_df.empty: 
-    # 直接複製 DataFrame
-    df_to_show = track_display_df.copy()
+    # 3. 欄位處理
+    # 移除不需要的雜項欄位
+    df_to_show = base_df.drop(columns=["秘密3日斜率", "排序權重"], errors='ignore')
     
-    # 清理：這裡不需要 encode/decode，因為亂碼通常在 read_csv 階段就固定了
-    # 我們只需要確認它是乾淨的 DataFrame
+    # 將 DataFrame 的 NaN 補 0 或顯示為 "未進榜"
+    df_to_show = df_to_show.fillna("-")
     
-    # 移除秘密欄位
-    df_to_show = df_to_show.drop(columns=["秘密3日斜率", "排序權重"], errors='ignore')
-    
-    # 確保欄位名稱不重複 (這是最關鍵的一步)
-    df_to_show = df_to_show.loc[:, ~df_to_show.columns.duplicated()]
-    
-    # 最終渲染
+    # 4. 最終渲染
     st.dataframe(df_to_show, use_container_width=True)
 else:
     st.write("⚠️ 目前暫無持股比例追蹤數據。")
