@@ -12,7 +12,7 @@ st.set_page_config(page_title="台股籌碼五大核心矩陣儀表板", layout=
 st.markdown("""
 <div style='text-align: center; background-color: #FFFDF0; padding: 20px; border-radius: 15px; border: 2px dashed #FFB700;'>
     <h1 style='color: #DDA400; margin-bottom: 5px;'>🐝 祝阿東順利畢業 - 每天都是美好的一天 🍯</h1>
-    <p style='color: #665220; font-size: 16px; font-weight: bold;'>🌾 論文衝刺必勝 ｜ 蜂蜜香氣滿滿 ｜ 短線 3 日加速起漲雷達</p>
+    <p style='color: #665220; font-size: 16px; font-weight: bold;'>🌾 論文衝刺必勝 ｜ 香氣滿滿 ｜ 短線 3 日加速起漲雷達</p>
 </div>
 """, unsafe_allow_html=True)
 
@@ -1076,6 +1076,11 @@ with c_wk2:
 # 📊 【蜂蜜計數器】本站累計觀測人次統計
 # ==========================================
 st.write("---")
+
+# 🌟 新增防護罩：如果伺服器上沒有這個資料夾，就自動建立一個，避免當機
+if not os.path.exists(DATA_DIR):
+    os.makedirs(DATA_DIR)
+
 counter_file = os.path.join(DATA_DIR, "counter.txt")
 if not os.path.exists(counter_file):
     with open(counter_file, "w") as f: f.write("1")
