@@ -1196,49 +1196,68 @@ with c_wk2:
 
 
 # ==========================================
-# 📅 區塊 4-1：融資增減幅度 (5日累計)
+# 📅 區塊 4-1：融資增減動向 (5日累計)
 # ==========================================
 st.write("---")
 st.markdown("<div id='section-4-1'></div>", unsafe_allow_html=True)
 st.header("📅 區塊 4-1：融資減少動向 (5日累計)")
 
 def read_margin_data():
-    # 🔥 絕對無敵掃描：完全不依賴 DATA_DIR，直接從專案「根目錄」全面搜尋
-    # 使用 "**/*融資減少*.csv" 可以在所有子資料夾中尋找
-    files = glob.glob("**/*融資減少*.csv", recursive=True)
+    found_files = []
+    all_csvs_debug = [] # 用來收集所有csv以便除錯
     
-    if not files:
-        return pd.DataFrame(), "無檔案"
+    # 🔥 終極暴力掃描：親自走遍所有資料夾，絕對不漏！
+    for root, dirs, files in os.walk(os.getcwd()):
+        # 排除隱藏資料夾與虛擬環境，加快速度
+        if '.git' in root or 'venv' in root:
+            continue
+            
+        for file in files:
+            if file.endswith(".csv"):
+                all_csvs_debug.append(file)
+                # 只要檔名有這四個字就抓起來
+                if "融資減少" in file:
+                    found_files.append(os.path.join(root, file))
     
-    # 取得最新檔案 (不管檔名是寫張數還是幅度，都會抓最新的)
-    latest_file = sorted(files, key=os.path.getmtime, reverse=True)[0]
+    if not found_files:
+        # 找不到的話，把除錯清單一起回傳
+        return pd.DataFrame(), "無檔案", all_csvs_debug
+    
+    # 取得最新檔案
+    latest_file = sorted(found_files, key=os.path.getmtime, reverse=True)[0]
     
     try:
-        # 使用我們之前定義的強硬讀取法 (Robust Read)
+        # 使用強硬讀取法
         df = robust_read_csv(latest_file)
         
         # 欄位清理：移除空白、特殊字元、BOM
         df.columns = df.columns.astype(str).str.replace('\ufeff', '').str.strip()
         
-        # 整理欄位：如果欄位名稱包含「幅度」或「張數」，確保它被轉為數值以便網頁排序
+        # 整理欄位轉為數值
         for col in df.columns:
             if "幅度" in col or "張數" in col:
                 df[col] = pd.to_numeric(df[col], errors='coerce')
         
-        return df, os.path.basename(latest_file)
+        return df, os.path.basename(latest_file), []
     except Exception as e:
-        return pd.DataFrame(), f"讀取失敗: {str(e)}"
+        return pd.DataFrame(), f"讀取失敗: {str(e)}", []
 
 # 執行讀取與顯示
-margin_df, margin_filename = read_margin_data()
+margin_df, margin_filename, debug_csvs = read_margin_data()
 
 if not margin_df.empty:
     st.info(f"💡 資料來源: {margin_filename}")
     st.dataframe(margin_df, use_container_width=True)
 else:
-    st.warning("⚠️ 系統已掃描所有子資料夾，但目前找不到任何檔名包含『融資減少』的 CSV 檔案。")
-    # 🕵️‍♂️ 除錯小幫手：印出當前目錄，確認程式沒迷路
-    st.info(f"🔍 系統除錯資訊 - 當前工作目錄: {os.getcwd()}")
+    st.warning("⚠️ 系統已採用最底層掃描，但仍找不到名稱包含『融資減少』的 CSV 檔案。")
+    st.info(f"🔍 [除錯] 當前目錄: {os.getcwd()}")
+    
+    # 如果有找到其他 CSV，印出前 10 個讓您檢查檔名是不是變了
+    if debug_csvs:
+        st.write("🕵️‍♂️ **伺服器目前有看到這些 CSV 檔案 (列出部分)：**")
+        st.write(debug_csvs[:10])
+    else:
+        st.error("🚨 警告：系統在您的專案中找不到『任何』CSV檔案，請確認 Streamlit 是否已正確同步 GitHub！")
 # ==========================================
 # 📊 【蜂蜜計數器】本站累計觀測人次統計
 # ==========================================
