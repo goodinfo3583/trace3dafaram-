@@ -424,7 +424,33 @@ if search_query:
                     st.line_chart(t_ser, height=240)
         except Exception as chart_err:
             st.info(f"圖表渲染暫無數據: {chart_err}")
+# . 顯示 4-1 ~ 4-3 的籌碼排位診斷
+    st.write("---")
+    st.subheader("📊 籌碼變動排名診斷")
+    
+    # 輔助函數：顯示並篩選
+    def show_rank_result(title, df, query):
+        st.write(f"#### {title}")
+        res = safe_search(df, query)
+        if not res.empty:
+            st.dataframe(res, use_container_width=True)
+        else:
+            st.info("無資料 (未進榜)")
 
+    # 區塊 4-1
+    c1, c2 = st.columns(2)
+    with c1: show_rank_result("📉 融資減少【幅度】", df_pct_margin, search_query)
+    with c2: show_rank_result("📉 融資減少【張數】", df_vol_margin, search_query)
+    
+    # 區塊 4-2
+    c3, c4 = st.columns(2)
+    with c3: show_rank_result("📉 借券賣出減少【幅度】", df_pct_short, search_query)
+    with c4: show_rank_result("📉 借券賣出減少【張數】", df_vol_short, search_query)
+    
+    # 區塊 4-3
+    c5, c6 = st.columns(2)
+    with c5: show_rank_result("📈 融券增加【幅度】", df_pct_margin_plus, search_query)
+    with c6: show_rank_result("📈 融券增加【張數】", df_vol_margin_plus, search_query)
  
 # ==========================================
 # 🧭 側邊欄導航 (無感互動+視覺特效版)
