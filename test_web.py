@@ -659,7 +659,7 @@ if sorted_dates:
             if cnt == 4: bg = 'background-color: rgba(255, 0, 0, 0.15)'     
             elif cnt == 3: bg = 'background-color: rgba(255, 165, 0, 0.15)'    
             elif cnt == 2: bg = 'background-color: rgba(0, 128, 0, 0.15)'    
-            elif cnt == 1: bg = 'background-color: rgba(0, 0, 255, 0.1)'    
+            elif cnt == 1: bg = 'background-color: rgba(0, 0, 220, 0.15)'    
             else: bg = ''                                                   
             return [bg] * len(row)
 
