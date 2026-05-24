@@ -1195,6 +1195,23 @@ with c_wk2:
         st.write("無資料")
 
 # ==========================================
+# 🛠️ 必備函數：強硬讀取法 (解決 Big5/UTF-8 亂碼)
+# ==========================================
+def robust_read_csv(file_path):
+    # 強制嘗試台灣常見編碼 (cp950 為 Big5)
+    for encoding in ['cp950', 'utf-8-sig', 'utf-8']:
+        try:
+            df = pd.read_csv(file_path, encoding=encoding)
+            # 簡單檢查：如果出現了亂碼常見字元，就換下一個編碼
+            if not df.empty and len(df.columns) > 1 and '撖' in str(df.iloc[0, 1]): 
+                continue
+            return df
+        except:
+            continue
+    # 真的都不行就強制讀取並忽略錯誤
+    return pd.read_csv(file_path, encoding='cp950', errors='ignore')
+
+# ==========================================
 # 📅 區塊 4-1：融資減少動向 (5日累計)
 # ==========================================
 st.write("---")
@@ -1218,6 +1235,7 @@ def get_specific_margin_data(keyword):
     file_name = os.path.basename(latest_file)
     
     try:
+        # 這裡會呼叫我們上面定義的 robust_read_csv
         df = robust_read_csv(latest_file)
         if df.empty:
             return pd.DataFrame(), f"讀取成功但內容為空: {file_name}"
