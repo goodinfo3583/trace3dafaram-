@@ -1200,13 +1200,15 @@ with c_wk2:
 # ==========================================
 st.write("---")
 st.markdown("<div id='section-4-1'></div>", unsafe_allow_html=True)
-st.header("📅 區塊 4：融資增減 (5日累計)")
+st.header("📅 區塊 4-1：融資增減 (5日累計)")
 
-csv_pattern = os.path.join(DATA_DIR, "*融資減少幅度*.csv")
-all_csv_files = glob.glob(csv_pattern)
-
-if not all_csv_files:
-    st.warning("⚠️ 找不到任何包含『融資』的 CSV 檔案。")
+# 1. 宣告讀取函數 (把 return 包在裡面)
+def read_margin_data():
+    # 根據您的修改，直接在 DATA_DIR 找檔案
+    csv_pattern = os.path.join(DATA_DIR, "*融資減少幅度*.csv")
+    files = glob.glob(csv_pattern)
+    
+    # 如果找不到檔案，就回傳空的資料與訊息
     if not files:
         return pd.DataFrame(), "無檔案"
     
@@ -1220,8 +1222,7 @@ if not all_csv_files:
         # 欄位清理：移除空白、特殊字元、BOM
         df.columns = df.columns.astype(str).str.replace('\ufeff', '').str.strip()
         
-        # 簡單整理欄位順序 (假設有股票代號與名稱欄位)
-        # 如果欄位名稱包含「減少幅度」，確保它被轉為數值以便排序
+        # 整理欄位：如果欄位名稱包含「幅度」，確保它被轉為數值以便網頁排序
         for col in df.columns:
             if "幅度" in col:
                 df[col] = pd.to_numeric(df[col], errors='coerce')
@@ -1230,15 +1231,15 @@ if not all_csv_files:
     except Exception as e:
         return pd.DataFrame(), f"讀取失敗: {str(e)}"
 
-# 執行讀取與顯示
+# 2. 呼叫函數，執行讀取
 margin_df, margin_filename = read_margin_data()
 
+# 3. 顯示結果在網頁上
 if not margin_df.empty:
     st.info(f"💡 資料來源: {margin_filename}")
-    # 顯示表格，並對代號/名稱進行過濾顯示
     st.dataframe(margin_df, use_container_width=True)
 else:
-    st.warning("⚠️ 目前找不到融資減少幅度的排名檔案，請確認 ./Goodifo_Ranking 資料夾內是否有對應 CSV 檔案。")
+    st.warning("⚠️ 目前找不到融資減少幅度的排名檔案，請確認資料夾內是否有包含『融資減少幅度』的 CSV 檔案。")
 
 # ==========================================
 # 📊 【蜂蜜計數器】本站累計觀測人次統計
