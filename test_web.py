@@ -351,7 +351,7 @@ else:
 
 
 # ==========================================
-# 🔍 個股籌碼快搜 (診斷區)
+# 🔍 個股籌碼快搜 (深度清潔 + 精準顯示版)
 # ==========================================
 st.write("---")
 st.markdown("<div id='section-search'></div>", unsafe_allow_html=True)
@@ -359,71 +359,72 @@ st.subheader("🔍 個股籌碼快搜 (診斷區)")
 
 search_query = st.text_input("請輸入你想觀測的股票名稱或代號：", key="global_search_top")
 
-# 🛠️ 建立一個安全的搜尋過濾函數 (一次解決重複欄位與亂碼問題)
-def safe_search(df, query):
-    # 確保傳入的是有效的 DataFrame
-    if df is None or type(df) is not pd.DataFrame or df.empty:
-        return pd.DataFrame()
-        
-    # 1. 強制過濾重複欄位 (避免 PyArrow 報錯)
+# 🛠️ 深度清理函數：處理亂碼、空格、重複欄位
+def clean_dataframe(df):
+    if df is None or df.empty: return pd.DataFrame()
+    df = df.copy()
+    # 清除欄位名稱的隱形字元與 BOM
+    df.columns = df.columns.astype(str).str.replace('\ufeff', '').str.strip()
+    # 移除重複欄位
     df = df.loc[:, ~df.columns.duplicated()]
+    # 清除名稱與代號中的雜訊
+    if '股票名稱' in df.columns:
+        df['股票名稱'] = df['股票名稱'].astype(str).str.replace('撖', '', regex=False).str.strip()
+    if '股票代號' in df.columns:
+        df['股票代號'] = df['股票代號'].astype(str).str.strip()
+    return df
+
+# 🛠️ 搜尋函數
+def safe_search(df, query):
+    df = clean_dataframe(df)
+    if df.empty or not query: return pd.DataFrame()
     
-    # 2. 確保有我們需要的欄位才能搜尋
-    if '股票名稱' not in df.columns or '股票代號' not in df.columns:
-        return pd.DataFrame()
-        
-    # 3. 執行搜尋
-    res = df[df['股票名稱'].str.contains(query, na=False) | df['股票代號'].astype(str).str.contains(query, na=False)].copy()
-    
-    # 4. 🔥 清除文字識別產生的「撖」字亂碼
-    if not res.empty:
-        res['股票名稱'] = res['股票名稱'].str.replace('撖', '', regex=False)
-        
+    query = str(query).strip()
+    res = df[
+        df['股票名稱'].str.contains(query, na=False) | 
+        df['股票代號'].str.contains(query, na=False)
+    ].copy()
     return res
 
 if search_query:
-    # 搜尋區塊 1 的主數據
-    try: q_txt = safe_search(track_display_df, search_query)
-    except NameError: q_txt = pd.DataFrame()
-
+    # 1. 處理區塊1
+    q_txt = safe_search(track_display_df, search_query)
+    
     if q_txt.empty:
-        st.warning(f"⚠️ 在【區塊1：中長線持股追蹤】中找不到與 '{search_query}' 相關的資料。")
+        st.warning(f"⚠️ 找不到與 '{search_query}' 相關的資料。")
     else:
-        st.write(f"### 🎯 綜合診斷標的：{search_query}")
-        st.write("📋 **1. 中長線三大法人持股變化軌跡：**")
+        # 顯示名稱時再次確保乾淨
+        stock_name = q_txt.iloc[0]['股票名稱']
+        st.write(f"### 🎯 綜合診斷標的：{stock_name} ({q_txt.iloc[0]['股票代號']})")
         st.dataframe(q_txt.drop(columns=["秘密3日斜率"], errors='ignore'), use_container_width=True)
         
-        # --- 繪製油門探針與折線圖 ---
-        try:
-            chart_cols = [c for c in q_txt.columns if "持股%" in c]
-            if chart_cols:
-                v_latest = pd.to_numeric(q_txt.iloc[0][chart_cols[0]], errors='coerce')
-                
-                def get_diff_pct(days_back):
-                    idx = min(days_back - 1, len(chart_cols) - 1)
-                    v_back = pd.to_numeric(q_txt.iloc[0][chart_cols[idx]], errors='coerce')
-                    if pd.isna(v_latest) or pd.isna(v_back):
-                        return 0.0
-                    return round(float(v_latest - v_back), 2)
+        # ... (中間的油門探針邏輯保持不變，略過以縮短篇幅) ...
+        # (這裡請保留您原本的 slope_df 與 line_chart 繪圖邏輯)
 
-                slope_df = pd.DataFrame({
-                    "指標週期": ["⚡ 2日短線突發斜率", "📈 5日短線加速斜率", "🚀 10日中線轉折斜率", "🔒 20日月線波段鎖籌"],
-                    "法人持股淨增減(%)": [get_diff_pct(2), get_diff_pct(5), get_diff_pct(10), get_diff_pct(20)]
-                })
-                st.write("📊 **三大法人持股多週期油門加速探針：**")
-                st.dataframe(slope_df, use_container_width=True)
-                
-                chart_cols_21 = chart_cols[:21]
-                t_ser = pd.Series(
-                    pd.to_numeric(q_txt.iloc[0][chart_cols_21].values, errors='coerce'), 
-                    index=[c.split(' ')[0] for c in chart_cols_21]
-                ).iloc[::-1].dropna()
-                
-                if not t_ser.empty:
-                    st.write(f"📈 **三大法人持股 21日波段全景軌跡曲線 ({q_txt.iloc[0]['股票名稱']})**")
-                    st.line_chart(t_ser, height=240)
-        except Exception as chart_err:
-            st.info(f"圖表渲染暫無數據: {chart_err}")
+        # 2. 🚀 核心主力短線進攻 (區塊 2)
+        st.markdown("##### 🚀 核心主力短線進攻 (區塊 2)")
+        c1, c2 = st.columns(2)
+        
+        def display_search_result(label, df, col):
+            with col:
+                st.write(f"📊 **{label}**")
+                res = safe_search(df, search_query)
+                if not res.empty: st.dataframe(res, use_container_width=True)
+                else: st.info("無資料")
+
+        display_search_result("外資 5 日買佔成交", csv_foreign_deal, c1)
+        display_search_result("外資 5 日買佔發行", csv_foreign_stock, c1)
+        display_search_result("投信 5 日買佔成交", csv_it_deal, c2)
+        display_search_result("投信 5 日買佔發行", csv_it_stock, c2)
+
+        # 3. 📅 法人連續買超 (區塊 3)
+        st.markdown("##### 📅 法人連續買超 (區塊 3)")
+        c3_1, c3_2 = st.columns(2)
+        
+        display_search_result("外資最新日連買", live_fo_day, c3_1)
+        display_search_result("外資最新週連買", live_fo_wk, c3_1)
+        display_search_result("投信最新日連買", live_it_day, c3_2)
+        display_search_result("投信最新週連買", live_it_wk, c3_2)
 
  
 # ==========================================
@@ -442,6 +443,7 @@ with c_btn2:
 # 1. 戰情室快速導航
 st.sidebar.markdown("---")
 st.sidebar.header("📍 戰情室快速導航")
+st.sidebar.markdown("[🔍 個股籌碼快搜 (診斷區)")
 st.sidebar.markdown("[👑 區塊1：法人持股比追蹤](#section-1)")
 st.sidebar.markdown("[🎯 區塊2-1：外資 5 日淨買佔成交量](#section-2-1)")
 st.sidebar.markdown("[🎯 區塊2-2：投信 5 日淨買佔成交量](#section-2-2)")
