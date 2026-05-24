@@ -17,7 +17,7 @@ st.markdown("""
 """, unsafe_allow_html=True)
 
 st.write("")
-st.write("📊 系統已將指標全數展開：中長線法人持股% ｜ 短線外資投信買佔比 ｜ 短線外資投信買佔發行 (已內建 3 日突發加速衝刺追蹤機制)")
+st.write("📊 系統已將指標全數展開：中長線法人持股% ｜ 短線外資投信買佔比 ｜ 短線外資投信買佔發行 (本站進行數據分析僅供參考而非推薦個股與飆股另請愛惜荷包小心騙騙)")
 
 DATA_DIR = "./Goodinfo_Rankings"
 
@@ -446,7 +446,7 @@ elif search_query:
     st.info("請輸入代號或名稱開始診斷個股籌碼...")
 
 # ==========================================
-# 🧭 側邊欄導航 (蜂蜜主題版)
+# 🧭 側邊欄導航 (互動+蜂蜜主題版)
 # ==========================================
 st.sidebar.header("⚡ 籌碼超級篩選器")
 filter_trend = st.sidebar.selectbox("三大法人持股趨勢過濾：", ["全部顯示", "🔥 僅顯示『上升+新進榜』", "📈 僅顯示上升", "🆕 僅顯示新進榜"])
@@ -456,35 +456,30 @@ st.sidebar.subheader("📊 大盤總體經濟指標")
 
 c_btn1, c_btn2 = st.sidebar.columns(2)
 with c_btn1:
-    st.link_button(
-        "📈 恐懼貪婪", 
-        "https://www.wantgoo.com/global/macroeconomics/fearandgreed",
-        use_container_width=True
-    )
+    st.link_button("📈 恐懼貪婪", "https://www.wantgoo.com/global/macroeconomics/fearandgreed", use_container_width=True)
 with c_btn2:
-    st.link_button(
-        "⚠️ VIX 指數", 
-        "https://www.wantgoo.com/global/vix",
-        use_container_width=True
-    )
+    st.link_button("⚠️ VIX 指數", "https://www.wantgoo.com/global/vix", use_container_width=True)
 
-# 1. 新增蜂蜜主題的贊助區塊
+# 1. 互動式贊助區塊
 st.sidebar.markdown("---")
-st.sidebar.subheader("🍯 贊助蜂巢 (支持開發)")
-st.sidebar.button("🪙 蜂蜜金幣")
-st.sidebar.button("🕯️ 打賞蜂蠟")
-st.sidebar.button("🏺 贊助蜜罐")
+st.sidebar.subheader("🍯 贊助蜂巢")
 
-# 2 & 3. 調整導航跳轉 (修正區塊1命名，新增2-1~3)
+if st.sidebar.button("🪙 蜂蜜金幣"):
+    st.toast("金幣進帳！蜜蜂嗡嗡嗡～ 🐝", icon="🪙")
+if st.sidebar.button("🍯 打賞蜂蠟"):
+    st.toast("獲得一罐香甜蜂蠟！🍯", icon="🍯")
+if st.sidebar.button("🏺 贊助蜜罐"):
+    st.toast("蜜罐已裝滿！感謝您的支持～ ✨", icon="🏺")
+
+# 2 & 3. 調整導航跳轉 (修正名稱與連結錨點)
 st.sidebar.markdown("---")
 st.sidebar.header("📍 戰情室快速導航")
-st.sidebar.markdown("[👑 區塊1：法人持股%](#section-1)")
-st.sidebar.markdown("[🚀 區塊2-1：技術面選股](#section-2-1)")
-st.sidebar.markdown("[🚀 區塊2-2：籌碼面分析](#section-2-2)")
-st.sidebar.markdown("[🚀 區塊2-3：量價結構](#section-2-3)")
-st.sidebar.markdown("[🚀 區塊2-4：主力動向](#section-2-4)")
-st.sidebar.markdown("[💎 區塊3：總體策略建議](#section-3)")
-
+st.sidebar.markdown("[👑 區塊1：法人持股比追蹤](#section-1)")
+st.sidebar.markdown("[🎯 區塊2-1：外資 5 日淨買佔成交量](#section-2-1)")
+st.sidebar.markdown("[🎯 區塊2-2：投信 5 日淨買佔成交量](#section-2-2)")
+st.sidebar.markdown("[🎯 區塊2-3：外資 5 日淨買佔發行量](#section-2-3)")
+st.sidebar.markdown("[🎯 區塊2-4：投信 5 日淨超佔發行量](#section-2-4)")
+st.sidebar.markdown("[📅 區塊3：法人連續買超](#section-3)")
 
 # ==========================================
 # 🏠 核心五大區塊
