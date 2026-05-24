@@ -319,11 +319,28 @@ if sorted_dates:
         
         st.info("💡 **多榜單共振說明：** 5/20/60/120日，代表法人持股變化數據分析後於前段班，多榜單籌碼集中度極高。")
         st.success(f"📊 已成功串聯最近 {len(date_cols)} 個交易日的持股數據 (排序優先級：今日上榜數量 > 今日持股%)：")
+        st.session_state['my_final_df'] = final_df
         st.dataframe(styled_df, use_container_width=True)
     else:
         st.warning("⚠️ 讀取到的檔案皆無效或無資料，請檢查 TXT 內容。")
 else:
     st.write("⚠️ 目前暫無持股比例追蹤數據。")
+# ... (區塊 1 的程式碼全部結束後) ...
+
+# 這裡回到最左邊 (縮排 = 0)
+st.write("---")
+st.header("🔍 個股快速查詢") # 這行的縮排要跟區塊 1 的 st.header("👑 區塊1...") 一樣
+
+# 搜尋區塊開始
+search_input = st.text_input("輸入股票代號或名稱 (例如: 3231)", key="search_bar")
+
+if search_input:
+    # 這裡的邏輯就是讀取我們剛剛存的 st.session_state['my_final_df']
+    if 'my_final_df' in st.session_state:
+        df = st.session_state['my_final_df']
+        # ... (搜尋邏輯) ...
+    else:
+        st.error("系統尚未載入區塊 1 的資料")
 
 # ==========================================
 # 🎯 區塊2-1：外資 5 日買超 佔成交量比 追蹤 (穩定精確版)
