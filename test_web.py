@@ -479,7 +479,7 @@ st.sidebar.markdown("[👑 區塊一：三大法人持股%](#section-1)")
 # ==========================================
 st.write("---")
 st.markdown("<div id='section-1'></div>", unsafe_allow_html=True)
-st.header("🏢 區塊1：中長線 三大法人 持股比例 追蹤")
+st.header("🏢 區塊1：中長線 三大法人 持股比例變化 追蹤")
 
 import re
 import os
@@ -587,18 +587,31 @@ if all_txt_files:
         final_df['上榜數量'] = final_df['上榜區塊'].apply(lambda x: len(str(x).split(',')) if pd.notna(x) and x else 0)
             
         def evaluate_trend(row):
-            if len(date_cols) < 2: return "⚪ 資料不足"
-            v0 = row[date_cols[0]]  
-            v1 = row[date_cols[1]]  
-            diff1 = v0 - v1  
+            # 至少需要兩天數據才能判斷漲跌
+            if len(date_cols) < 2: 
+                return "⚪ 資料不足"
+    
+            v0 = row[date_cols[0]]  # 最新日
+            v1 = row[date_cols[1]]  # 前一日
+            diff1 = v0 - v1        # 今日的增減幅度
+    
+            # 1. 如果持股% 持續上升
             if diff1 > 0:
+                # 2. 只有在有三天數據時，才進行「趨緩」比對
                 if len(date_cols) >= 3:
-                    v2 = row[date_cols[2]]
-                    diff2 = v1 - v2
-                    if diff1 < diff2: return "⚠️ 趨緩"
+                    v2 = row[date_cols[2]] # 前二日
+                    diff2 = v1 - v2         # 昨日的增減幅度
+            
+                    # 只有當「昨天也有增長(diff2 > 0)」且「今日增幅 < 昨日增幅」時，才算趨緩
+                    if diff2 > 0 and diff1 < diff2:
+                        return "⚠️ 趨緩"
                 return "📈 上升"
-            elif diff1 < 0: return "📉 下降"
-            else: return "🔄 持平"
+  
+            # 3. 持股減少或不變
+            elif diff1 < 0:
+                return "📉 下降"
+            else:
+                return "🔄 持平"
                 
         final_df['最新動態'] = final_df.apply(evaluate_trend, axis=1)
         
@@ -648,8 +661,8 @@ if all_txt_files:
 
         styled_df = filtered_df.style.apply(highlight_row, axis=1)
         
-        st.info("💡 **多榜單共振說明：** 背景顏色越暖 (紅/橘)，代表同時出現於越多天期的熱門榜單中，籌碼集中度極高。")
-        st.success(f"📊 已成功串聯 {len(date_cols)} 個交易日的數據 (排序優先級：今日上榜榜單數 > 今日持股%)：")
+        st.info("💡 **榜單共振說明：** 出現於5/20/60/120天期均線期的熱門榜單中，法人短線試單/短線點火/籌碼集中度高/吃貨。")
+        st.success(f"📊 已成功串聯 {len(date_cols)} 個交易日的數據")
         st.dataframe(styled_df, use_container_width=True)
     else:
         st.warning("⚠️ 讀取到的檔案皆無效或無資料，請檢查 TXT 內容。")
