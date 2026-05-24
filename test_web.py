@@ -166,12 +166,46 @@ if search_query:
     with c4: scan_and_display("🔹 區塊 2-4:投信5日買佔發行量", 'df_blk2_4', search_query)
 
     # ==========================================
-    # 📊 區塊 3 & 4
+    # 📊 區塊 3：特定籌碼或大戶診斷 (強制 4 榜全景)
     # ==========================================
     st.write("---")
     st.write("#### 📊 區塊 3：特定籌碼或大戶診斷")
-    scan_and_display("🔹 區塊 3 綜合列表", 'df_blk3_main', search_query)
+    
+    if 'df_blk3_main' in st.session_state:
+        df_b3 = st.session_state['df_blk3_main']
+        res_b3 = robust_search_engine(df_b3, search_query)
+        
+        # 決定顯示的代號與名稱 (如果有搜到就用真實的，沒搜到就用輸入的)
+        display_id = res_b3.iloc[0]['股票代號'] if not res_b3.empty else search_query
+        display_name = res_b3.iloc[0]['股票名稱'] if not res_b3.empty else "-"
+        
+        # 強制列出 4 個榜單
+        base_types = ['🌐 外資日連買', '🌐 外資週連買', '🏦 投信日連買', '🏦 投信週連買']
+        display_list = []
+        
+        for b_type in base_types:
+            match = res_b3[res_b3['連買類型'] == b_type] if not res_b3.empty else pd.DataFrame()
+            if not match.empty:
+                display_list.append(match.iloc[0].to_dict())
+            else:
+                # 沒進榜，補上預設文字
+                display_list.append({
+                    '連買類型': b_type,
+                    '股票代號': display_id,
+                    '股票名稱': display_name,
+                    '狀態動態': '⚪ 未進榜',
+                    '連買週期數': '-'
+                })
+                
+        final_b3_display = pd.DataFrame(display_list)
+        st.write("**🔹 區塊 3 綜合列表 (4榜全景)**")
+        st.dataframe(final_b3_display, use_container_width=True, hide_index=True)
+    else:
+        st.info("⚪ 區塊 3：尚未載入資料表 (請確認上半部區塊已執行)")
 
+    # ==========================================
+    # 📊 區塊 4：籌碼變動排名診斷
+    # ==========================================
     st.write("---")
     st.write("#### 📊 區塊 4：籌碼變動排名診斷")
     
@@ -1083,7 +1117,7 @@ def get_specific_margin_data(keyword):
     except Exception as e:
         return pd.DataFrame(), f"讀取崩潰 ({file_name}): {str(e)}"
 
-# 🛠️ 【不可省略】欄位清理與過濾函數 (已模組化，解決勾選框衝突)
+# 🛠️ 【不可省略】欄位清理與過濾函數 (修正欄位名稱，讓搜尋引擎認得)
 def process_margin_df(df, type_name, flag_etf, flag_bond):
     if df.empty: return df
     df = df.copy()
@@ -1111,11 +1145,14 @@ def process_margin_df(df, type_name, flag_etf, flag_bond):
     col_id = next((c for c in df.columns if '代號' in c), None)
     
     if col_name and col_id:
-        df[col_id] = df[col_id].astype(str).str.strip()
-        df[col_name] = df[col_name].astype(str).str.strip()
+        # 🔥 【終極修正】：強迫改名為 '股票代號' 與 '股票名稱'，搜尋引擎才找得到！
+        df = df.rename(columns={col_id: '股票代號', col_name: '股票名稱'})
         
-        mask_bond = df[col_name].str.contains('債', na=False) | df[col_id].str.endswith('B', na=False)
-        mask_etf = df[col_id].str.startswith('00', na=False)
+        df['股票代號'] = df['股票代號'].astype(str).str.strip()
+        df['股票名稱'] = df['股票名稱'].astype(str).str.strip()
+        
+        mask_bond = df['股票名稱'].str.contains('債', na=False) | df['股票代號'].str.endswith('B', na=False)
+        mask_etf = df['股票代號'].str.startswith('00', na=False)
         
         if not flag_bond: df = df[~mask_bond]
         if not flag_etf: df = df[~(mask_etf & ~mask_bond)] 
