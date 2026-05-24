@@ -351,96 +351,166 @@ else:
 
 
 # ==========================================
-# 🔍 個股籌碼快搜 (請直接替換此區塊)
+# 🔍 個股籌碼快搜 (診斷區)
 # ==========================================
 st.write("---")
 st.markdown("<div id='section-search'></div>", unsafe_allow_html=True)
-st.subheader("🔍 個股籌碼快搜 (從現有資料篩選)")
+st.subheader("🔍 個股籌碼快搜 (診斷區)")
 
 search_query = st.text_input("請輸入你想觀測的股票名稱或代號：", key="global_search_top")
 
-# 1. 函數定義 (放在外面)
-def search_in_memory(df, query):
-    if df is None or df.empty: return pd.DataFrame()
-    df_temp = df.copy()
+# 🛠️ 建立一個安全的搜尋過濾函數 (一次解決重複欄位與亂碼問題)
+def safe_search(df, query):
+    # 確保傳入的是有效的 DataFrame
+    if df is None or type(df) is not pd.DataFrame or df.empty:
+        return pd.DataFrame()
+        
+    # 1. 強制過濾重複欄位 (避免 PyArrow 報錯)
+    df = df.loc[:, ~df.columns.duplicated()]
     
-    # 統一處理為字串
-    df_temp['股票代號'] = df_temp['股票代號'].astype(str).str.strip()
-    if '股票名稱' in df_temp.columns:
-        df_temp['股票名稱'] = df_temp['股票名稱'].astype(str).str.replace('撖', '', regex=False).str.strip()
+    # 2. 確保有我們需要的欄位才能搜尋
+    if '股票名稱' not in df.columns or '股票代號' not in df.columns:
+        return pd.DataFrame()
+        
+    # 3. 執行搜尋
+    res = df[df['股票名稱'].str.contains(query, na=False) | df['股票代號'].astype(str).str.contains(query, na=False)].copy()
     
-    query = str(query).strip()
-    res = df_temp[
-        df_temp['股票名稱'].str.contains(query, na=False) | 
-        df_temp['股票代號'].str.contains(query, na=False)
-    ]
+    # 4. 🔥 清除文字識別產生的「撖」字亂碼
+    if not res.empty:
+        res['股票名稱'] = res['股票名稱'].str.replace('撖', '', regex=False)
+        
     return res
 
-# 2. 只有當有輸入搜尋時，才執行顯示邏輯 (縮排對齊)
 if search_query:
-    # 處理區塊1
-    q_txt = search_in_memory(track_display_df, search_query)
-    if not q_txt.empty:
-        st.write(f"### 🎯 綜合診斷標的：{search_query}")
-        st.dataframe(q_txt.loc[:, ~q_txt.columns.duplicated()], use_container_width=True)
+    # 搜尋區塊 1 的主數據
+    try: q_txt = safe_search(track_display_df, search_query)
+    except NameError: q_txt = pd.DataFrame()
+
+    if q_txt.empty:
+        st.warning(f"⚠️ 在【區塊1：中長線持股追蹤】中找不到與 '{search_query}' 相關的資料。")
     else:
-        st.warning(f"⚠️ 在區塊1中找不到與 '{search_query}' 相關資料。")
+        st.write(f"### 🎯 綜合診斷標的：{search_query}")
+        st.write("📋 **1. 中長線三大法人持股變化軌跡：**")
+        st.dataframe(q_txt.drop(columns=["秘密3日斜率"], errors='ignore'), use_container_width=True)
+        
+        # --- 繪製油門探針與折線圖 ---
+        try:
+            chart_cols = [c for c in q_txt.columns if "持股%" in c]
+            if chart_cols:
+                v_latest = pd.to_numeric(q_txt.iloc[0][chart_cols[0]], errors='coerce')
+                
+                def get_diff_pct(days_back):
+                    idx = min(days_back - 1, len(chart_cols) - 1)
+                    v_back = pd.to_numeric(q_txt.iloc[0][chart_cols[idx]], errors='coerce')
+                    if pd.isna(v_latest) or pd.isna(v_back):
+                        return 0.0
+                    return round(float(v_latest - v_back), 2)
 
-    # ==========================================
-    # 🚀 區塊 2-1 ~ 2-4 對接
-    # ==========================================
-    st.markdown("##### 🚀 核心主力短線進攻 (區塊 2)")
-    c1, c2 = st.columns(2)
-    
-    with c1:
-        st.write("📊 **外資 5 日買佔成交：**")
-        res_2_1 = search_in_memory(csv_foreign_deal, search_query)
-        if not res_2_1.empty: st.dataframe(res_2_1, use_container_width=True)
-        else: st.info("無資料")
-        
-        st.write("🔒 **外資 5 日買佔發行：**")
-        res_2_3 = search_in_memory(csv_foreign_stock, search_query)
-        if not res_2_3.empty: st.dataframe(res_2_3, use_container_width=True)
-        else: st.info("無資料")
-            
-    with c2:
-        st.write("🥦 **投信 5 日買佔成交：**")
-        res_2_2 = search_in_memory(csv_it_deal, search_query)
-        if not res_2_2.empty: st.dataframe(res_2_2, use_container_width=True)
-        else: st.info("無資料")
-            
-        st.write("💎 **投信 5 日買佔發行：**")
-        res_2_4 = search_in_memory(csv_it_stock, search_query)
-        if not res_2_4.empty: st.dataframe(res_2_4, use_container_width=True)
-        else: st.info("無資料")
+                slope_df = pd.DataFrame({
+                    "指標週期": ["⚡ 2日短線突發斜率", "📈 5日短線加速斜率", "🚀 10日中線轉折斜率", "🔒 20日月線波段鎖籌"],
+                    "法人持股淨增減(%)": [get_diff_pct(2), get_diff_pct(5), get_diff_pct(10), get_diff_pct(20)]
+                })
+                st.write("📊 **三大法人持股多週期油門加速探針：**")
+                st.dataframe(slope_df, use_container_width=True)
+                
+                chart_cols_21 = chart_cols[:21]
+                t_ser = pd.Series(
+                    pd.to_numeric(q_txt.iloc[0][chart_cols_21].values, errors='coerce'), 
+                    index=[c.split(' ')[0] for c in chart_cols_21]
+                ).iloc[::-1].dropna()
+                
+                if not t_ser.empty:
+                    st.write(f"📈 **三大法人持股 21日波段全景軌跡曲線 ({q_txt.iloc[0]['股票名稱']})**")
+                    st.line_chart(t_ser, height=240)
+        except Exception as chart_err:
+            st.info(f"圖表渲染暫無數據: {chart_err}")
 
-    # ==========================================
-    # 📅 區塊 3 對接
-    # ==========================================
-    st.markdown("##### 📅 法人連續買超 (區塊 3)")
-    c3_1, c3_2 = st.columns(2)
-    
-    with c3_1:
-        st.write("🌐 **外資最新日連買**")
-        res_3_fo_day = search_in_memory(live_fo_day, search_query)
-        if not res_3_fo_day.empty: st.dataframe(res_3_fo_day, use_container_width=True)
-        else: st.info("無資料")
+        # ==========================================
+        # 🚀 區塊 2-1 ~ 2-4 搜尋對接
+        # ==========================================
+        st.write("---")
+        st.markdown("##### 🚀 核心主力短線進攻與鎖籌指標")
         
-        st.write("🌐 **外資最新週連買**")
-        res_3_fo_wk = search_in_memory(live_fo_wk, search_query)
-        if not res_3_fo_wk.empty: st.dataframe(res_3_fo_wk, use_container_width=True)
-        else: st.info("無資料")
-            
-    with c3_2:
-        st.write("🏦 **投信最新日連買**")
-        res_3_it_day = search_in_memory(live_it_day, search_query)
-        if not res_3_it_day.empty: st.dataframe(res_3_it_day, use_container_width=True)
-        else: st.info("無資料")
+        # 使用 try-except 避免因為變數尚未執行到而報錯
+        try: q_2_1 = safe_search(csv_foreign_deal, search_query)
+        except NameError: q_2_1 = pd.DataFrame()
         
-        st.write("🏦 **投信最新週連買**")
-        res_3_it_wk = search_in_memory(live_it_wk, search_query)
-        if not res_3_it_wk.empty: st.dataframe(res_3_it_wk, use_container_width=True)
-        else: st.info("無資料")
+        try: q_2_2 = safe_search(csv_it_deal, search_query)
+        except NameError: q_2_2 = pd.DataFrame()
+        
+        try: q_2_3 = safe_search(csv_foreign_stock, search_query)
+        except NameError: q_2_3 = pd.DataFrame()
+        
+        try: q_2_4 = safe_search(csv_it_stock, search_query)
+        except NameError: q_2_4 = pd.DataFrame()
+
+        c1, c2 = st.columns(2)
+        
+        with c1:
+            st.write("🎯 區塊2-1：外資 5 日買超 佔成交量比 追蹤**")
+            if not q_2_1.empty: st.dataframe(q_2_1, use_container_width=True)
+            else: st.write("無資料")
+                
+            st.write("🔒 **區塊 2-3：外資 5 日淨買佔發行量**")
+            if not q_2_3.empty: st.dataframe(q_2_3, use_container_width=True)
+            else: st.write("無資料")
+                
+        with c2:
+            st.write("🥦 **區塊 2-2：投信 5 日淨買佔成交量**")
+            if not q_2_2.empty: st.dataframe(q_2_2, use_container_width=True)
+            else: st.write("無資料")
+                
+            st.write("💎 **區塊 2-4：投信 5 日淨買佔發行量**")
+            if not q_2_4.empty: st.dataframe(q_2_4, use_container_width=True)
+            else: st.write("無資料")
+
+        # ==========================================
+        # 📅 區塊 3 搜尋對接 (法人連續買超動能)
+        # ==========================================
+        st.write("---")
+        st.markdown("##### 📅 法人連續買超動能 (區塊 3)")
+        
+        # 安全搜尋區塊3的四個獨立資料表
+        try: q_fo_day = safe_search(live_fo_day, search_query)
+        except NameError: q_fo_day = pd.DataFrame()
+        
+        try: q_it_day = safe_search(live_it_day, search_query)
+        except NameError: q_it_day = pd.DataFrame()
+        
+        try: q_fo_wk = safe_search(live_fo_wk, search_query)
+        except NameError: q_fo_wk = pd.DataFrame()
+        
+        try: q_it_wk = safe_search(live_it_wk, search_query)
+        except NameError: q_it_wk = pd.DataFrame()
+
+        # 採用左右兩欄佈局，左邊放外資(日/週)，右邊放投信(日/週)
+        c3_1, c3_2 = st.columns(2)
+        
+        with c3_1:
+            st.write("🌐 **外資最新日連買**")
+            if not q_fo_day.empty: 
+                st.dataframe(q_fo_day, use_container_width=True)
+            else: 
+                st.write("無資料")
+                
+            st.write("🌐 **外資最新週連買**")
+            if not q_fo_wk.empty: 
+                st.dataframe(q_fo_wk, use_container_width=True)
+            else: 
+                st.write("無資料")
+                
+        with c3_2:
+            st.write("🏦 **投信最新日連買**")
+            if not q_it_day.empty: 
+                st.dataframe(q_it_day, use_container_width=True)
+            else: 
+                st.write("無資料")
+                
+            st.write("🏦 **投信最新週連買**")
+            if not q_it_wk.empty: 
+                st.dataframe(q_it_wk, use_container_width=True)
+            else: 
+                st.write("無資料")
 # ==========================================
 # 🧭 側邊欄導航 (無感互動+視覺特效版)
 # ==========================================
