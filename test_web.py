@@ -1291,28 +1291,29 @@ def process_margin_df(df, type_name):
     if df.empty: return df
     df = df.copy()
     
-    # 🔥 修正1：模糊比對刪除「更新日期」欄位 (防空格干擾)
-    cols_to_drop = [c for c in df.columns if "更新日期" in str(c)]
+    # 🔥 精準且無情的刪除「更新日期」欄位
+    # 只要欄位名稱包含「更新」和「日期」這兩個關鍵字，就直接抹除
+    cols_to_drop = [c for c in df.columns if "更新" in str(c) and "日期" in str(c)]
     if cols_to_drop:
         df = df.drop(columns=cols_to_drop)
         
-    # 🔥 修正2：模糊關鍵字定位截斷位置 (不管 CSV 欄位名稱中有多少空格都能精準截斷)
+    # 🔥 模糊關鍵字定位截斷位置 (確保不會因為 CSV 內的空格導致找不到欄位)
     target_idx = -1
     if type_name == "幅度":
-        # 找尋同時包含 "3個月" 與 "%" 的欄位
         for i, col in enumerate(df.columns):
+            # 只要包含「3個月」和「%」就視為截斷點
             if "3個月" in str(col) and ("%" in str(col) or "％" in str(col)):
                 target_idx = i
                 break
     else: # 張數
-        # 找尋同時包含 "3個月" 與 "張數" 的欄位
         for i, col in enumerate(df.columns):
+            # 只要包含「3個月」和「張數」就視為截斷點
             if "3個月" in str(col) and "張數" in str(col):
                 target_idx = i
                 break
                 
     if target_idx != -1:
-        df = df.iloc[:, :target_idx+1] # 只保留到目標欄位為止
+        df = df.iloc[:, :target_idx+1]
         
     # --- 執行 ETF 與 債券過濾邏輯 ---
     col_name = next((c for c in df.columns if '名稱' in c), None)
