@@ -859,7 +859,7 @@ st.markdown("<div id='section-3'></div>", unsafe_allow_html=True)
 st.header("📅 區塊3：連續買超")
 
 st.info("""
-**狀態動態評估依據：***🔥 波段認養: 連買 10以上天/週  ⚡ 買盤點火:連買 5 ~ 9 天/週  🆕 試單觀察:連買 1 ~ 4 天/週 """)
+狀態動態說明：🔥 波段認養: 連買 10以上天/週   ⚡ 買盤點火:連買 5 ~ 9 天/週   🆕 試單觀察:連買 1 ~ 4 天/週 """)
 
 def read_live_ln_report(file_keyword, strict_type, exact_field_name, prefix_keyword, col_label):
     if strict_type == "日":
@@ -1281,11 +1281,11 @@ st.session_state['df_margin_plus_vol'] = df_vol_clean
 # ==========券資比資料請一起搬遷============
 
 # ==========================================
-# 💎 區塊 5：大戶股權分散表 (神秘金字塔)
+# 💎 區塊 5：大戶股權分散表 
 # ==========================================
 st.write("---")
 st.markdown("<div id='section-5'></div>", unsafe_allow_html=True)
-st.header("💎 區塊 5：400張以上股東動向")
+st.header("💎 區塊 5：大股東動向")
 
 import re
 
