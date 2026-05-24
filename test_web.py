@@ -448,9 +448,6 @@ elif search_query:
 # ==========================================
 # 🧭 側邊欄導航 (無感互動+視覺特效版)
 # ==========================================
-st.sidebar.header("⚡ 籌碼超級篩選器")
-filter_trend = st.sidebar.selectbox("三大法人持股趨勢過濾：", ["全部顯示", "🔥 僅顯示『上升+新進榜』", "📈 僅顯示上升", "🆕 僅顯示新進榜"])
-
 st.sidebar.markdown("---")
 st.sidebar.subheader("📊 大盤總體經濟指標")
 
@@ -460,27 +457,8 @@ with c_btn1:
 with c_btn2:
     st.link_button("⚠️ VIX 指數", "https://www.wantgoo.com/global/vix", use_container_width=True)
 
-# 1. 互動式贊助區塊 (獨立邏輯)
-st.sidebar.markdown("---")
-st.sidebar.subheader("🍯 贊助蜂巢")
-st.sidebar.caption("小提醒：此功能僅為開發者互動，不會產生任何實質交易。")
 
-col1, col2, col3 = st.sidebar.columns(3)
-
-# 點擊後觸發氣球特效與 Toast，這是 Streamlit 最好的互動體驗
-if col1.button("🪙"):
-    st.toast("金幣 +1！蜜蜂嗡嗡嗡～ 🐝", icon="🪙")
-    st.balloons() 
-
-if col2.button("🍯"):
-    st.toast("蜂蜜罐翻倒了！好甜啊～ 🍯", icon="🍯")
-    st.balloons()
-
-if col3.button("🏺"):
-    st.toast("蜜蠟已收集！感謝支持～ ✨", icon="🏺")
-    st.balloons()
-
-# 2. 戰情室快速導航
+# 1. 戰情室快速導航
 st.sidebar.markdown("---")
 st.sidebar.header("📍 戰情室快速導航")
 st.sidebar.markdown("[👑 區塊1：法人持股比追蹤](#section-1)")
