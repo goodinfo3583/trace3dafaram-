@@ -91,7 +91,7 @@ if search_query:
     # ==========================================
     # 👑 區塊 1：中長線三大法人持股
     # ==========================================
-    st.write("#### 👑 區塊 1：中長線三大法人持股")
+    st.write("#### 👑 區塊 1：短中長線三大法人持股變化")
     if 'my_final_df' in st.session_state:
         q_blk1 = robust_search_engine(st.session_state['my_final_df'], search_query)
         if not q_blk1.empty:
@@ -147,7 +147,7 @@ if search_query:
     # 📊 區塊 3：特定籌碼或大戶診斷 (4 榜全景)
     # ==========================================
     st.write("---")
-    st.write("#### 📊 區塊 3：法人連買情形")
+    st.write("#### 📊 區塊 3：法人連買排名診斷")
     if 'df_blk3_main' in st.session_state:
         df_b3 = st.session_state['df_blk3_main']
         res_b3 = robust_search_engine(df_b3, search_query)
@@ -163,7 +163,7 @@ if search_query:
             else: display_list.append({'連買類型': b_type, '股票代號': display_id, '股票名稱': display_name, '狀態動態': '⚪ 未進榜', '連買週期數': '-'})
                 
         final_b3_display = pd.DataFrame(display_list)
-        st.write("**🔹 區塊 3 綜合列表 **")
+        st.write("**連續買超日數與連續買超週數 **")
         st.dataframe(final_b3_display, use_container_width=True, hide_index=True)
     else:
         st.info("⚪ 區塊 3：尚未載入資料表 (請確認上半部區塊已執行)")
@@ -173,7 +173,7 @@ if search_query:
     # 📊 區塊 4：籌碼變動排名診斷 (三榜全景 + 強制去小數點)
     # ==========================================
     st.write("---")
-    st.write("#### 📊 區塊 4：券資排名診斷")
+    st.write("#### 📊 區塊 4：券資有利排名")
     
     def render_b4_panorama(view_title, keys_and_labels, query):
         display_list = []
@@ -214,16 +214,16 @@ if search_query:
         st.markdown(f"##### {view_title}")
         st.dataframe(df_panorama[final_cols], use_container_width=True, hide_index=True)
 
-    render_b4_panorama("📊 幅度變動排名", [('📉 融資減少', 'df_margin_pct'), ('📉 借券減少', 'df_short_pct'), ('📈 融券增加', 'df_margin_plus_pct')], search_query)
+    render_b4_panorama("📊 5日幅度變動排名", [('📉 融資減少', 'df_margin_pct'), ('📉 借券減少', 'df_short_pct'), ('📈 融券增加', 'df_margin_plus_pct')], search_query)
     st.write("") 
-    render_b4_panorama("📊 張數變動排名", [('📉 融資減少', 'df_margin_vol'), ('📉 借券減少', 'df_short_vol'), ('📈 融券增加', 'df_margin_plus_vol')], search_query)
+    render_b4_panorama("📊 5日張數變動排名", [('📉 融資減少', 'df_margin_vol'), ('📉 借券減少', 'df_short_vol'), ('📈 融券增加', 'df_margin_plus_vol')], search_query)
 
     # ==========================================
     # 💎 區塊 5：神秘金字塔大戶動向
     # ==========================================
     st.write("---")
-    st.write("#### 💎 區塊 5：神秘金字塔 (大戶動向)")
-    scan_and_display("🔹 400張以上大戶動向", 'df_blk5', search_query)
+    st.write("#### 💰 區塊 5：大股東動向")
+    scan_and_display("400張以上大戶動向", 'df_blk5', search_query)
         
  
 # ==========================================
@@ -243,11 +243,11 @@ with c_btn2:
 st.sidebar.markdown("---")
 st.sidebar.header("📍 戰情室快速導航")
 st.sidebar.markdown("[🔍 個股籌碼快搜 (診斷區)](#section-search)")
-st.sidebar.markdown("[👑 區塊1：法人持股比追蹤](#section-1)")
-st.sidebar.markdown("[🎯 區塊2-1：外資5日淨買佔標的成交量](#section-2-1)")
-st.sidebar.markdown("[🎯 區塊2-2：投信5日淨買佔標的成交量](#section-2-2)")
-st.sidebar.markdown("[🎯 區塊2-3：外資5日淨買佔公司發行量](#section-2-3)")
-st.sidebar.markdown("[🎯 區塊2-4：投信5日淨買佔公司發行量](#section-2-4)")
+st.sidebar.markdown("[👑 區塊1：三大法人持股比追蹤](#section-1)")
+st.sidebar.markdown("[🎯 區塊2-1：外資5日淨買佔成交量](#section-2-1)")
+st.sidebar.markdown("[🎯 區塊2-2：投信5日淨買佔成交量](#section-2-2)")
+st.sidebar.markdown("[🎯 區塊2-3：外資5日淨買佔發行量](#section-2-3)")
+st.sidebar.markdown("[🎯 區塊2-4：投信5日淨買佔發行量](#section-2-4)")
 st.sidebar.markdown("[📅 區塊3：法人連續買超](#section-3)")
 st.sidebar.markdown("[🔄 區塊4-1：融資減少動向](#section-4-1)")
 st.sidebar.markdown("[🔄 區塊4-2：借券賣出減少動向](#section-4-2)")
@@ -262,7 +262,7 @@ st.sidebar.markdown("[💰 區塊5：大股東動向](#section-5)")
 # ==========================================
 st.write("---")
 st.markdown("<div id='section-1'></div>", unsafe_allow_html=True)
-st.header("👑 區塊1：中長線 三大法人 持股比例 追蹤")
+st.header("👑 區塊1：三大法人短中長線持股比追蹤")
 
 import re
 import os
@@ -446,8 +446,8 @@ if sorted_dates:
 
         styled_df = filtered_df.style.apply(highlight_row, axis=1)
         
-        st.info("💡 **多榜單共振說明：** 5/20/60/120日，代表法人持股變化數據分析後於前段班，多榜單籌碼集中度極高。")
-        st.success(f"📊 已成功串聯最近 {len(date_cols)} 個交易日的持股數據 (排序優先級：今日上榜數量 > 今日持股%)：")
+        st.info("**今日上榜說明：** 5/20/60/120日，代表法人持股變化數據分析後於5/20/60/120日前段班，多榜單共振籌碼集中度高，長線具備底氣。")
+        st.success(f"已成功串聯{len(date_cols)}個交易日的持股數據 (今日上榜共振數量排序優先")
         st.session_state['my_final_df'] = final_df
         st.dataframe(styled_df, use_container_width=True)
     else:
@@ -461,7 +461,7 @@ else:
 # ==========================================
 st.write("---")
 st.markdown("<div id='section-2-1'></div>", unsafe_allow_html=True)
-st.header("🎯 區塊2-1：外資 5 日買超 佔成交量比 追蹤")
+st.header("🎯 區塊2-1：外資 5 日買超佔標的成交量 追蹤")
 
 import os
 import glob
@@ -537,7 +537,7 @@ else:
         
         # 動態說明對照表
         st.info("""
-        💡 **外資動態說明：** 🔥 強延續 (買盤加速) | ⚠️ 趨緩 (買盤力道減弱) | 🔄 持平 | 📉 調節洗盤 (微幅調節) | 🚨 劇烈倒貨 (強烈賣出)
+        **動態說明：** 🔥 強延續 (買盤加速) ⚠️ 趨緩 (買盤力道減弱) 🔄 持平 📉 調節洗盤 (微幅調節) 🚨 劇烈倒貨 (強烈賣出)
         """)
         
         # UI 與過濾
@@ -572,7 +572,7 @@ else:
 # ==========================================
 st.write("---")
 st.markdown("<div id='section-2-2'></div>", unsafe_allow_html=True)
-st.header("🎯 區塊2-2：投信 5 日買超 佔成交量比 追蹤")
+st.header("🎯 區塊2-2：投信 5 日買超佔標的成交量 追蹤")
 
 csv_pattern_sitc = os.path.join(DATA_DIR, "*投信買超佔成交比*.csv")
 all_files_sitc = glob.glob(csv_pattern_sitc)
@@ -641,7 +641,7 @@ else:
         
         # 動態說明
         st.info("""
-        💡 **投信動態說明：** 🔥 強延續 (法人認養中) | ⚠️ 趨緩 (買盤力道減弱) | 🔄 持平 | 📉 調節洗盤 (微幅調節) | 🚨 劇烈倒貨 (短線獲利了結)
+        **動態說明：** 🔥 強延續 (法人認養中) ⚠️ 趨緩 (買盤力道減弱) 🔄 持平 📉 調節洗盤 (微幅調節) 🚨 劇烈倒貨 (短線獲利了結)
         """)
         
         # 篩選邏輯
@@ -673,7 +673,7 @@ else:
 # ==========================================
 st.write("---")
 st.markdown("<div id='section-2-3'></div>", unsafe_allow_html=True)
-st.header("🎯 區塊2-3：外資 5 日買超佔發行張數 追蹤")
+st.header("🎯 區塊2-3：外資 5 日買超佔公司發行張數 追蹤")
 csv_pattern_fo = os.path.join(DATA_DIR, "*外資買超佔發行張數*.csv")
 all_files_fo = glob.glob(csv_pattern_fo)
 
@@ -765,7 +765,7 @@ else:
 # ==========================================
 st.write("---")
 st.markdown("<div id='section-2-4'></div>", unsafe_allow_html=True)
-st.header("🎯 區塊2-4：投信 5 日買超佔發行張數 追蹤")
+st.header("🎯 區塊2-4：投信 5 日買超佔公司發行張數 追蹤")
 csv_pattern_sitc = os.path.join(DATA_DIR, "*投信買超佔發行張數*.csv")
 all_files_sitc = glob.glob(csv_pattern_sitc)
 
@@ -859,11 +859,7 @@ st.markdown("<div id='section-3'></div>", unsafe_allow_html=True)
 st.header("📅 區塊3：連續買超")
 
 st.info("""
-💡 **狀態動態評估依據：**
-* 連買 10以上天/週 🔥 波段認養
-* 連買 5 ~ 9 天/週 ⚡ 買盤點火
-* 連買 1 ~ 4 天/週 🆕 試單觀察
-""")
+**狀態動態評估依據：***🔥 波段認養: 連買 10以上天/週  ⚡ 買盤點火:連買 5 ~ 9 天/週  🆕 試單觀察:連買 1 ~ 4 天/週 """)
 
 def read_live_ln_report(file_keyword, strict_type, exact_field_name, prefix_keyword, col_label):
     if strict_type == "日":
