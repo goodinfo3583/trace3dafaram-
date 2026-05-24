@@ -1204,8 +1204,8 @@ st.header("📅 區塊 4-1：融資減少幅度 (5日累計)")
 
 def read_margin_data():
     # 🔥 核心修正：明確指定進入 Goodinfo_Rankings 資料夾尋找
-    csv_pattern = os.path.join(DATA_DIR, "*融資減少幅度*.csv")
-    files = glob.glob(csv_pattern)
+    csv_pattern_fo = os.path.join(DATA_DIR, "*融資減少幅度*.csv")
+    all_files_fo = glob.glob(csv_pattern_fo)
     
     if not files:
         return pd.DataFrame(), "無檔案"
