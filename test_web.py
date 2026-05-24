@@ -196,30 +196,17 @@ st.write("🔥 **戰術策略說明**：以長線 TXT 檔案為絕對基底，�
 
 
 # ==========================================
-# 🔍 個股籌碼快搜 (穩定版本)
+# 🔍 搜尋區塊 (改為精準讀取版)
 # ==========================================
-st.write("---")
-st.markdown("<div id='section-search'></div>", unsafe_allow_html=True)
-st.subheader("🔍 個股籌碼快搜 (診斷區)")
-
-# 定義強韌的搜尋函式 (放在此處，確保全域可用)
-def robust_search_engine(df, query):
-    if df is None or df.empty:
-        return pd.DataFrame()
+if search_query:
+    # 在這裡「瞬間」讀取 (因為有 @st.cache_data，其實是從記憶體拿)
+    # 請將 '您的資料夾/檔名.csv' 換成您實際的路徑
+    track_display_df = load_data_with_encoding('您的檔案路徑.csv')
     
-    # 1. 解決重複欄位錯誤：強制移除重複列
-    df = df.loc[:, ~df.columns.duplicated()].copy()
+    # 接下來就是您的處理邏輯...
+    clean_df = track_display_df.loc[:, ~track_display_df.columns.duplicated()].copy()
     
-    # 2. 解決亂碼問題：完全放棄搜尋名稱，改為搜尋「股票代號」
-    # 將代號強制轉字串並清除可能存在的隱藏空白
-    if '股票代號' in df.columns:
-        df['股票代號'] = df['股票代號'].astype(str).str.strip()
-        query = str(query).strip()
-        
-        # 精準比對代號
-        res = df[df['股票代號'] == query]
-        return res
-    return pd.DataFrame()
+    st.write(f"### 🎯 綜合診斷標的：{search_query}")
 
 # 搜尋輸入框
 search_query = st.text_input("請輸入想觀測的股票代號：", key="global_search_final")
