@@ -449,7 +449,9 @@ st.sidebar.markdown("[🎯 區塊2-2：投信 5 日淨買佔成交量](#section-
 st.sidebar.markdown("[🎯 區塊2-3：外資 5 日淨買佔發行量](#section-2-3)")
 st.sidebar.markdown("[🎯 區塊2-4：投信 5 日淨超佔發行量](#section-2-4)")
 st.sidebar.markdown("[📅 區塊3：法人連續買超](#section-3)")
-
+st.sidebar.markdown("[📅 區塊4-1：融資減少動向](#section-4-1)")
+st.sidebar.markdown("[📅 區塊4-2：借券賣出減少動向](#section-4-2)")
+st.sidebar.markdown("[📅 區塊4-3：融券增加動向](#section-4-3)")
 # ==========================================
 # 🏠 核心五大區塊
 # ==========================================
@@ -1051,7 +1053,7 @@ else:
 # ==========================================
 st.write("---")
 st.markdown("<div id='section-3'></div>", unsafe_allow_html=True)
-st.header("📅 區塊3：連續買超")
+st.header("📅 區塊3：法人連續買超")
 
 st.info("""
 💡 **狀態動態評估依據：**
@@ -1343,7 +1345,7 @@ def process_margin_df(df, type_name):
 c1, c2 = st.columns(2)
 
 with c1:
-    st.subheader("📉 融資減少【幅度】排名")
+    st.subheader("📉 融資減少比例排名")
     df_pct, msg_pct = get_specific_margin_data("融資減少幅度")
     df_pct_clean = process_margin_df(df_pct, "幅度")
     
@@ -1354,7 +1356,7 @@ with c1:
         st.warning(f"⚠️ {msg_pct} 或 過濾後無相符資料")
 
 with c2:
-    st.subheader("📉 融資減少【張數】排名")
+    st.subheader("📉 融資減少張數排名")
     df_vol, msg_vol = get_specific_margin_data("融資減少張數")
     df_vol_clean = process_margin_df(df_vol, "張數")
     
@@ -1384,7 +1386,7 @@ st.write("")
 c1, c2 = st.columns(2)
 
 with c1:
-    st.subheader("📉 借券賣出減少【幅度】排名")
+    st.subheader("📉 借券賣出減少比例排名")
     # 🔥 關鍵修改：關鍵字改為「借券賣出減少幅度」
     df_pct, msg_pct = get_specific_margin_data("借券賣出減少幅度")
     df_pct_clean = process_margin_df(df_pct, "幅度") # 沿用相同的清理邏輯
@@ -1396,7 +1398,7 @@ with c1:
         st.warning(f"⚠️ {msg_pct} 或 過濾後無相符資料")
 
 with c2:
-    st.subheader("📉 借券賣出減少【張數】排名")
+    st.subheader("📉 借券賣出減少張數排名")
     # 🔥 關鍵修改：關鍵字改為「借券賣出減少張數」
     df_vol, msg_vol = get_specific_margin_data("借券賣出減少張數")
     df_vol_clean = process_margin_df(df_vol, "張數")
@@ -1427,7 +1429,7 @@ st.write("")
 c1, c2 = st.columns(2)
 
 with c1:
-    st.subheader("📈 融券增加【幅度】排名")
+    st.subheader("📈 融券增加比例排名")
     # 🔥 關鍵修改：關鍵字改為「融券增加幅度」
     df_pct, msg_pct = get_specific_margin_data("融券增加幅度")
     df_pct_clean = process_margin_df(df_pct, "幅度") # 沿用相同的清理邏輯
@@ -1439,7 +1441,7 @@ with c1:
         st.warning(f"⚠️ {msg_pct} 或 過濾後無相符資料")
 
 with c2:
-    st.subheader("📈 融券增加【張數】排名")
+    st.subheader("📈 融券增加張數排名")
     # 🔥 關鍵修改：關鍵字改為「融券增加張數」
     df_vol, msg_vol = get_specific_margin_data("融券增加張數")
     df_vol_clean = process_margin_df(df_vol, "張數") # 沿用相同的清理邏輯
