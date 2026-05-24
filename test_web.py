@@ -3,6 +3,19 @@ import pandas as pd
 import os
 import glob
 import re
+# ==========================================
+# 🌟 初始化全域變數 (防止 NameError)
+# ==========================================
+# 先將這些變數宣告為空的 DataFrame，這樣下方程式碼就不會報錯
+if 'csv_foreign_deal' not in locals(): csv_foreign_deal = pd.DataFrame()
+if 'csv_it_deal' not in locals(): csv_it_deal = pd.DataFrame()
+if 'csv_foreign_stock' not in locals(): csv_foreign_stock = pd.DataFrame()
+if 'csv_it_stock' not in locals(): csv_it_stock = pd.DataFrame()
+if 'track_display_df' not in locals(): track_display_df = pd.DataFrame()
+if 'live_fo_day' not in locals(): live_fo_day = pd.DataFrame()
+if 'live_it_day' not in locals(): live_it_day = pd.DataFrame()
+if 'live_fo_wk' not in locals(): live_fo_wk = pd.DataFrame()
+if 'live_it_wk' not in locals(): live_it_wk = pd.DataFrame()
 
 # ==========================================
 # 1. 網頁基本設定 & 頂部蜂蜜幸運祝福
