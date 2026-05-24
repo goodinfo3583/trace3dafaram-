@@ -17,7 +17,7 @@ st.markdown("""
 """, unsafe_allow_html=True)
 
 st.write("")
-st.write("📊 系統已將指標全數展開：中長線法人持股% ｜ 短線外資投信買佔比 ｜ 短線外資投信買佔發行 (本站進行數據分析僅供參考而非推薦個股與飆股另請愛惜荷包小心騙騙)")
+st.write("📊 系統全數領域展開：法人持股比 ｜ 短線法人買佔成交量 ｜ 法人買佔發行量比對 (本站進行數據分析僅供參考而非推薦個股與飆股另請愛惜荷包小心騙騙)")
 
 DATA_DIR = "./Goodinfo_Rankings"
 
@@ -490,7 +490,7 @@ st.sidebar.markdown("[📅 區塊3：法人連續買超](#section-3)")
 # ==========================================
 st.write("---")
 st.markdown("<div id='section-1'></div>", unsafe_allow_html=True)
-st.header("🏢 區塊1：中長線 三大法人 持股比例 追蹤")
+st.header("👑 區塊1：中長線 三大法人 持股比例 追蹤")
 
 import re
 import os
@@ -686,6 +686,7 @@ else:
 # 🎯 區塊2-1：外資 5 日買超 佔成交量比 追蹤 (穩定精確版)
 # ==========================================
 st.write("---")
+st.markdown("<div id='section-2-1'></div>", unsafe_allow_html=True)
 st.header("🎯 區塊2-1：外資 5 日買超 佔成交量比 追蹤")
 
 csv_pattern = os.path.join(DATA_DIR, "*外資買超佔成交比*.csv")
@@ -786,6 +787,7 @@ else:
 # 🎯 區塊2-2：投信 5 日買超 佔成交量比 追蹤 (穩定修復版)
 # ==========================================
 st.write("---")
+st.markdown("<div id='section-2-2'></div>", unsafe_allow_html=True)
 st.header("🎯 區塊2-2：投信 5 日買超 佔成交量比 追蹤")
 
 csv_pattern_sitc = os.path.join(DATA_DIR, "*投信買超佔成交比*.csv")
@@ -883,6 +885,7 @@ else:
 # 🎯 區塊2-3：外資 5 日買超佔發行張數 追蹤 (穩定精確版)
 # ==========================================
 st.write("---")
+st.markdown("<div id='section-2-3'></div>", unsafe_allow_html=True)
 st.header("🎯 區塊2-3：外資 5 日買超佔發行張數 追蹤")
 csv_pattern_fo = os.path.join(DATA_DIR, "*外資買超佔發行張數*.csv")
 all_files_fo = glob.glob(csv_pattern_fo)
@@ -980,6 +983,7 @@ else:
 # 🎯 區塊2-4：投信 5 日買超佔發行張數 追蹤 (最終穩定版)
 # ==========================================
 st.write("---")
+st.markdown("<div id='section-2-4'></div>", unsafe_allow_html=True)
 st.header("🎯 區塊2-4：投信 5 日買超佔發行張數 追蹤")
 csv_pattern_sitc = os.path.join(DATA_DIR, "*投信買超佔發行張數*.csv")
 all_files_sitc = glob.glob(csv_pattern_sitc)
@@ -1077,7 +1081,7 @@ else:
 # 📅 區塊六：外資與投信連續買超 (日/週全景戰情室)
 # ==========================================
 st.write("---")
-st.markdown("<div id='section-wk'></div>", unsafe_allow_html=True)
+st.markdown("<div id='section-3'></div>", unsafe_allow_html=True)
 st.header("📅 區塊3：連續買超")
 
 st.info("""
