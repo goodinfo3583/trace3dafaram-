@@ -359,32 +359,39 @@ st.subheader("🔍 個股籌碼快搜 (診斷區)")
 
 search_query = st.text_input("請輸入你想觀測的股票名稱或代號：", key="global_search_top")
 
-# 🛠️ 深度清理函數：處理亂碼、空格、重複欄位
-def clean_dataframe(df):
-    if df is None or df.empty: return pd.DataFrame()
-    df = df.copy()
-    # 清除欄位名稱的隱形字元與 BOM
-    df.columns = df.columns.astype(str).str.replace('\ufeff', '').str.strip()
-    # 移除重複欄位
-    df = df.loc[:, ~df.columns.duplicated()]
-    # 清除名稱與代號中的雜訊
-    if '股票名稱' in df.columns:
-        df['股票名稱'] = df['股票名稱'].astype(str).str.replace('撖', '', regex=False).str.strip()
-    if '股票代號' in df.columns:
-        df['股票代號'] = df['股票代號'].astype(str).str.strip()
-    return df
-
-# 🛠️ 搜尋函數
+# 🛠️ 建立一個安全的搜尋過濾函數 (一次解決重複欄位與亂碼問題)
 def safe_search(df, query):
-    df = clean_dataframe(df)
-    if df.empty or not query: return pd.DataFrame()
+    # 確保傳入的是有效的 DataFrame
+    if df is None or type(df) is not pd.DataFrame or df.empty:
+        return pd.DataFrame()
+        
+    # 1. 強制過濾重複欄位 (避免 PyArrow 報錯)
+    df = df.loc[:, ~df.columns.duplicated()]
     
-    query = str(query).strip()
-    res = df[
-        df['股票名稱'].str.contains(query, na=False) | 
-        df['股票代號'].str.contains(query, na=False)
-    ].copy()
+    # 2. 確保有我們需要的欄位才能搜尋
+    if '股票名稱' not in df.columns or '股票代號' not in df.columns:
+        return pd.DataFrame()
+        
+    # 3. 執行搜尋
+    res = df[df['股票名稱'].str.contains(query, na=False) | df['股票代號'].astype(str).str.contains(query, na=False)].copy()
+    
+    # 4. 🔥 清除文字識別產生的「撖」字亂碼
+    if not res.empty:
+        res['股票名稱'] = res['股票名稱'].str.replace('撖', '', regex=False)
+        
     return res
+
+if search_query:
+    # 搜尋區塊 1 的主數據
+    try: q_txt = safe_search(track_display_df, search_query)
+    except NameError: q_txt = pd.DataFrame()
+
+    if q_txt.empty:
+        st.warning(f"⚠️ 在【區塊1：中長線持股追蹤】中找不到與 '{search_query}' 相關的資料。")
+    else:
+        st.write(f"### 🎯 綜合診斷標的：{search_query}")
+        st.write("📋 **1. 中長線三大法人持股變化軌跡：**")
+        st.dataframe(q_txt.drop(columns=["秘密3日斜率"], errors='ignore'), use_container_width=True)
         
         # --- 繪製油門探針與折線圖 ---
         try:
