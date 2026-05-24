@@ -37,7 +37,7 @@ st.write("🔥 **戰術策略說明**：以長線為絕對基底，放寬偵測�
 
 
 # ==========================================
-# 🔍 個股籌碼快搜 (全區塊聯動掃描版)
+# 🔍 個股籌碼快搜 (全區塊聯動掃描版 - 視覺升級)
 # ==========================================
 st.write("---")
 st.markdown("<div id='section-search'></div>", unsafe_allow_html=True)
@@ -62,16 +62,29 @@ def robust_search_engine(df, query):
         
     return df[mask]
 
-# 🎯 建立通用掃描與顯示工具
+# 🎯 建立通用掃描與顯示工具 (升級版：精準除錯提示)
 def scan_and_display(title, session_key, query):
-    df = st.session_state.get(session_key, pd.DataFrame())
+    # 狀況 A：記憶體完全找不到這個變數 (代表上半部沒存入)
+    if session_key not in st.session_state:
+        st.info(f"⚪ {title}：尚未載入資料表 (請確認上半部區塊已執行)")
+        return
+        
+    df = st.session_state[session_key]
+    
+    # 狀況 B：變數有存入，但是空的
+    if df is None or df.empty:
+        st.info(f"⚪ {title}：該榜單無任何資料")
+        return
+        
     res = robust_search_engine(df, query)
     
+    # 狀況 C：有搜尋到資料
     if not res.empty:
         st.write(f"**{title}**")
         st.dataframe(res, use_container_width=True)
+    # 狀況 D：變數存在，但搜尋不到該標的 (代表沒進榜)
     else:
-        st.info(f"⚪ {title}：無資料 (未進榜)")
+        st.info(f"⚪ {title}：未進榜 (該標的未在此榜單中)")
 
 # 🎯 搜尋輸入框
 search_query = st.text_input("請輸入想觀測的股票代號或名稱 (例如: 3231 或 緯創)：", key="global_search_final")
@@ -90,14 +103,12 @@ if search_query:
         if not q_blk1.empty:
             st.dataframe(q_blk1.drop(columns=["秘密3日斜率"], errors='ignore'), use_container_width=True)
             
-            # --- 任務 2：擴充為 30 日 ---
+            # --- 擴充為 30 日 ---
             chart_cols = [c for c in q_blk1.columns if "持股%" in c]
             if chart_cols:
-                target_cols = chart_cols[:30] # 抓取最近 30 天
+                target_cols = chart_cols[:30] 
                 
-                # --- 任務 1：解決歸零斷崖連線問題 ---
-                # 抓取數值，將 0 強制替換為 NaN，然後 dropna。
-                # 這樣 Streamlit 折線圖就會自動跳過未進榜的日期，將已知數據「平滑連線」，非常真實。
+                # --- 解決歸零斷崖連線問題 ---
                 raw_vals = pd.to_numeric(q_blk1.iloc[0][target_cols].values, errors='coerce')
                 t_ser = pd.Series(
                     raw_vals, 
@@ -105,44 +116,49 @@ if search_query:
                 ).replace(0, None).dropna().iloc[::-1]
                 
                 if not t_ser.empty:
+                    # 標題 1 (一般字體加粗)
                     st.write(f"📈 **持股 {len(t_ser)}日波段真實軌跡 ({q_blk1.iloc[0].get('股票名稱', '標的')})**")
                     st.line_chart(t_ser, height=240)
                     
-                    # --- 任務 3：新增 2, 3, 5, 20 日斜率面版 ---
-                    st.markdown("##### 🚀 籌碼斜率 (與最新持股相比淨增減)")
+                    # 標題 2 (改成與標題 1 完全一致的字體大小)
+                    st.write("🚀 **籌碼斜率 (與最新持股相比淨增減)**")
                     
-                    def get_slope(n_days):
-                        # 確保天數足夠
+                    # --- 自訂義動態 HTML 排版 (解決字體大小問題) ---
+                    def get_slope_ui(label, n_days):
                         if len(target_cols) >= n_days:
                             v_new = pd.to_numeric(q_blk1.iloc[0][target_cols[0]], errors='coerce')
                             v_old = pd.to_numeric(q_blk1.iloc[0][target_cols[n_days-1]], errors='coerce')
                             
-                            # 確保數據有效且不為0 (未進榜)
                             if pd.notna(v_new) and pd.notna(v_old) and v_old != 0 and v_new != 0:
                                 diff = round(v_new - v_old, 2)
-                                return f"{diff:+.2f} %"
-                        return "無對應資料"
+                                color = "red" if diff > 0 else "green" if diff < 0 else "black"
+                                # 【有資料】：顯示較大的數字
+                                return f"<div style='text-align:left; padding:5px;'><div style='font-size:14px; color:gray;'>{label}</div><div style='font-size:22px; font-weight:bold; color:{color};'>{diff:+.2f} %</div></div>"
+                        
+                        # 【無資料】：字體縮小至 16px (與一般標題文字相近)
+                        return f"<div style='text-align:left; padding:5px;'><div style='font-size:14px; color:gray;'>{label}</div><div style='font-size:16px; font-weight:normal; margin-top:5px;'>無對應資料</div></div>"
 
-                    # 使用 st.columns 排版，做出漂亮的儀表板效果
+                    # 渲染儀表板
                     col1, col2, col3, col4 = st.columns(4)
-                    col1.metric("2日斜率", get_slope(2))
-                    col2.metric("3日斜率", get_slope(3))
-                    col3.metric("5日斜率", get_slope(5))
-                    col4.metric("20日斜率", get_slope(20))
+                    col1.markdown(get_slope_ui("2日斜率", 2), unsafe_allow_html=True)
+                    col2.markdown(get_slope_ui("3日斜率", 3), unsafe_allow_html=True)
+                    col3.markdown(get_slope_ui("5日斜率", 5), unsafe_allow_html=True)
+                    col4.markdown(get_slope_ui("20日斜率", 20), unsafe_allow_html=True)
                 else:
                     st.info("⚪ 該標的有效數據過少，無法繪製波段圖表。")
         else:
-            st.info("⚪ 無資料 (該標的未進入中長線榜單)")
+            st.info("⚪ 區塊 1：未進榜 (該標的未進入中長線榜單)")
     else:
         st.error("⚠️ 尚未載入區塊 1 資料。請確認上方區塊 1 已執行。")
+
     # ==========================================
-    # 📊 區塊 2：(替換為您的實際名稱)
+    # 📊 區塊 2：動能與外資診斷
     # ==========================================
     st.write("---")
     st.write("#### 📊 區塊 2：動能與外資診斷 (暫定)")
     
     c1, c2 = st.columns(2)
-    with c1: scan_and_display("🔹 區塊 2-1", 'df_blk2_1', search_query)
+    with c1: scan_and_display("🔹 區塊 2-1 (外資5日佔比)", 'df_blk2_1', search_query)
     with c2: scan_and_display("🔹 區塊 2-2", 'df_blk2_2', search_query)
     
     c3, c4 = st.columns(2)
@@ -150,15 +166,12 @@ if search_query:
     with c4: scan_and_display("🔹 區塊 2-4", 'df_blk2_4', search_query)
 
     # ==========================================
-    # 📊 區塊 3：(替換為您的實際名稱)
+    # 📊 區塊 3 & 4
     # ==========================================
     st.write("---")
-    st.write("#### 📊 區塊 3：特定籌碼或大戶診斷 (暫定)")
+    st.write("#### 📊 區塊 3：特定籌碼或大戶診斷")
     scan_and_display("🔹 區塊 3 綜合列表", 'df_blk3_main', search_query)
 
-    # ==========================================
-    # 📊 區塊 4：籌碼變動排名診斷 (融資/借券/融券) - 無分頁版
-    # ==========================================
     st.write("---")
     st.write("#### 📊 區塊 4：籌碼變動排名診斷")
     
