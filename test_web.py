@@ -436,6 +436,7 @@ if search_query:
     with tab1:
         c1, c2 = st.columns(2)
         # 直接使用您定義好的 show_rank_result 函式
+        # 注意：我們直接傳入變數名稱 (例如 df_margin_pct)，並確保它存在
         with c1: show_rank_result("📉 融資減少【幅度】", 'df_margin_pct', search_query)
         with c2: show_rank_result("📉 融資減少【張數】", 'df_margin_vol', search_query)
         
