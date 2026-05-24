@@ -1275,7 +1275,7 @@ with c2:
     df_vol_clean = process_margin_df(df_vol, "張數", show_etf_43, show_bond_43)
     
     if not df_vol_clean.empty:
-        st.info(f"💡 最新來源: {msg_vol}")
+        st.info(f"💡 已更新")
         st.dataframe(df_vol_clean, use_container_width=True, hide_index=True)
     else:
         st.warning(f"⚠️ {msg_vol} 或 過濾後無相符資料")
@@ -1289,7 +1289,7 @@ st.session_state['df_margin_plus_vol'] = df_vol_clean
 # ==========================================
 st.write("---")
 st.markdown("<div id='section-5'></div>", unsafe_allow_html=True)
-st.header("💎 區塊 5：400張以上股東動向)")
+st.header("💎 區塊 5：400張以上股東動向")
 
 import re
 
