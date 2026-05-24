@@ -167,7 +167,7 @@ except Exception as e:
 # ==========================================
 # 👑 頂級核心：【三大法人多空評分 + 3日短線飆速置頂爆發榜】
 # ==========================================
-st.markdown("## 🏆 頂級核心：解鎖")
+st.markdown("## 🏆 頂級核心：解鎖中")
 st.write("🔥 **戰術策略說明**：以長線 TXT 檔案為絕對基底，放寬偵測：今日數據對比前1天、前2天或前3天只要有實質增加（含突破未進榜斷層）即鎖定！短線不再強迫四大表全數交集，只要短線 4 大指標任一命中，即列入黃金名單！")
 
 
@@ -178,73 +178,55 @@ st.write("---")
 st.markdown("<div id='section-search'></div>", unsafe_allow_html=True)
 st.subheader("🔍 個股籌碼快搜 (診斷區)")
 
+# 1. 搜尋輸入框
 search_query = st.text_input("請輸入你想觀測的股票名稱或代號：", key="global_search_top")
 
-# 🛠️ 建立一個安全的搜尋過濾函數 (一次解決重複欄位與亂碼問題)
-def safe_search(df, query):
-    # 確保傳入的是有效的 DataFrame
-    if df is None or type(df) is not pd.DataFrame or df.empty:
-        return pd.DataFrame()
-        
-    # 1. 強制過濾重複欄位 (避免 PyArrow 報錯)
-    df = df.loc[:, ~df.columns.duplicated()]
-    
-    # 2. 確保有我們需要的欄位才能搜尋
-    if '股票名稱' not in df.columns or '股票代號' not in df.columns:
-        return pd.DataFrame()
-        
-    # 3. 執行搜尋
-    res = df[df['股票名稱'].str.contains(query, na=False) | df['股票代號'].astype(str).str.contains(query, na=False)].copy()
-    
-    # 4. 🔥 清除文字識別產生的「撖」字亂碼
-    if not res.empty:
-        res['股票名稱'] = res['股票名稱'].str.replace('撖', '', regex=False)
-        
-    return res
-
+# 2. 顯示處理邏輯 (確保順序：區塊1 -> 4-1 -> 4-2 -> 4-3)
 if search_query:
-    # 搜尋區塊 1 的主數據
-    try: q_txt = safe_search(track_display_df, search_query)
-    except NameError: q_txt = pd.DataFrame()
+    st.write(f"### 🎯 綜合診斷標的：{search_query}")
+    
+    # --- 顯示區塊 1 ---
+    st.write("📋 **1. 中長線三大法人持股變化軌跡：**")
+    try:
+        q_txt = safe_search(track_display_df, search_query)
+        if not q_txt.empty:
+            st.dataframe(q_txt.drop(columns=["秘密3日斜率"], errors='ignore'), use_container_width=True)
+            # ... (這裡放入您原本繪製油門探針與折線圖的代碼) ...
+        else:
+            st.warning("⚠️ 在【中長線持股追蹤】中找不到該標的。")
+    except Exception as e:
+        st.info("中長線資料暫無顯示")
 
-    if q_txt.empty:
-        st.warning(f"⚠️ 在【區塊1：中長線持股追蹤】中找不到與 '{search_query}' 相關的資料。")
-    else:
-        st.write(f"### 🎯 綜合診斷標的：{search_query}")
-        st.write("📋 **1. 中長線三大法人持股變化軌跡：**")
-        st.dataframe(q_txt.drop(columns=["秘密3日斜率"], errors='ignore'), use_container_width=True)
+    # --- 顯示 4-1 ~ 4-3 排名診斷 ---
+    st.write("---")
+    st.subheader("📊 籌碼變動排名診斷")
+    
+    # 定義顯示函數 (無外部依賴)
+    def show_rank_result(title, session_key, query):
+        st.write(f"#### {title}")
+        df = st.session_state.get(session_key, pd.DataFrame())
+        res = safe_search(df, query)
+        if not res.empty:
+            st.dataframe(res, use_container_width=True)
+        else:
+            st.info("無資料 (未進榜)")
+
+    tab1, tab2, tab3 = st.tabs(["📉 融資減少", "📉 借券賣出減少", "📈 融券增加"])
+    
+    with tab1:
+        c1, c2 = st.columns(2)
+        with c1: show_rank_result("📉 融資減少【幅度】", 'df_margin_pct', search_query)
+        with c2: show_rank_result("📉 融資減少【張數】", 'df_margin_vol', search_query)
         
-        # --- 繪製油門探針與折線圖 ---
-        try:
-            chart_cols = [c for c in q_txt.columns if "持股%" in c]
-            if chart_cols:
-                v_latest = pd.to_numeric(q_txt.iloc[0][chart_cols[0]], errors='coerce')
-                
-                def get_diff_pct(days_back):
-                    idx = min(days_back - 1, len(chart_cols) - 1)
-                    v_back = pd.to_numeric(q_txt.iloc[0][chart_cols[idx]], errors='coerce')
-                    if pd.isna(v_latest) or pd.isna(v_back):
-                        return 0.0
-                    return round(float(v_latest - v_back), 2)
-
-                slope_df = pd.DataFrame({
-                    "指標週期": ["⚡ 2日短線突發斜率", "📈 5日短線加速斜率", "🚀 10日中線轉折斜率", "🔒 20日月線波段鎖籌"],
-                    "法人持股淨增減(%)": [get_diff_pct(2), get_diff_pct(5), get_diff_pct(10), get_diff_pct(20)]
-                })
-                st.write("📊 **三大法人持股多週期油門加速探針：**")
-                st.dataframe(slope_df, use_container_width=True)
-                
-                chart_cols_21 = chart_cols[:21]
-                t_ser = pd.Series(
-                    pd.to_numeric(q_txt.iloc[0][chart_cols_21].values, errors='coerce'), 
-                    index=[c.split(' ')[0] for c in chart_cols_21]
-                ).iloc[::-1].dropna()
-                
-                if not t_ser.empty:
-                    st.write(f"📈 **三大法人持股 21日波段全景軌跡曲線 ({q_txt.iloc[0]['股票名稱']})**")
-                    st.line_chart(t_ser, height=240)
-        except Exception as chart_err:
-            st.info(f"圖表渲染暫無數據: {chart_err}")
+    with tab2:
+        c3, c4 = st.columns(2)
+        with c3: show_rank_result("📉 借券賣出減少【幅度】", 'df_short_pct', search_query)
+        with c4: show_rank_result("📉 借券賣出減少【張數】", 'df_short_vol', search_query)
+        
+    with tab3:
+        c5, c6 = st.columns(2)
+        with c5: show_rank_result("📈 融券增加【幅度】", 'df_margin_plus_pct', search_query)
+        with c6: show_rank_result("📈 融券增加【張數】", 'df_margin_plus_vol', search_query)
 
  
 # ==========================================
