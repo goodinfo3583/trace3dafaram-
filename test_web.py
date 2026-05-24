@@ -656,10 +656,10 @@ if sorted_dates:
         # 🎨 護眼淺色系底色
         def highlight_row(row):
             cnt = color_ref.get(row['股票代號'], 0)
-            if cnt == 4: bg = 'background-color: rgba(255, 225, 225, 0.15)'     
-            elif cnt == 3: bg = 'background-color: rgba(255, 250, 205, 0.15)'    
-            elif cnt == 2: bg = 'background-color: rgba(215, 245, 215, 0.15)'    
-            elif cnt == 1: bg = 'background-color: rgba(220, 238, 255, 0.1)'    
+            if cnt == 4: bg = 'background-color: rgba(255, 0, 0, 0.15)'     
+            elif cnt == 3: bg = 'background-color: rgba(255, 165, 0, 0.15)'    
+            elif cnt == 2: bg = 'background-color: rgba(0, 128, 0, 0.15)'    
+            elif cnt == 1: bg = 'background-color: rgba(0, 0, 255, 0.1)'    
             else: bg = ''                                                   
             return [bg] * len(row)
 
