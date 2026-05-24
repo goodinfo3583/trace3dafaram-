@@ -1200,12 +1200,12 @@ with c_wk2:
 # ==========================================
 st.write("---")
 st.markdown("<div id='section-4-1'></div>", unsafe_allow_html=True)
-st.header("📅 區塊 4-1：融資減少幅度 (5日累計)")
+st.header("📅 區塊 4-1：融資減少動向 (5日累計)")
 
 def read_margin_data():
-    # 🔥 終極雷達穿透掃描：使用 "**" 代表所有子資料夾，並開啟 recursive=True
-    csv_pattern = os.path.join(DATA_DIR, "**", "*融資減少*.csv")
-    files = glob.glob(csv_pattern, recursive=True)
+    # 🔥 絕對無敵掃描：完全不依賴 DATA_DIR，直接從專案「根目錄」全面搜尋
+    # 使用 "**/*融資減少*.csv" 可以在所有子資料夾中尋找
+    files = glob.glob("**/*融資減少*.csv", recursive=True)
     
     if not files:
         return pd.DataFrame(), "無檔案"
@@ -1237,6 +1237,8 @@ if not margin_df.empty:
     st.dataframe(margin_df, use_container_width=True)
 else:
     st.warning("⚠️ 系統已掃描所有子資料夾，但目前找不到任何檔名包含『融資減少』的 CSV 檔案。")
+    # 🕵️‍♂️ 除錯小幫手：印出當前目錄，確認程式沒迷路
+    st.info(f"🔍 系統除錯資訊 - 當前工作目錄: {os.getcwd()}")
 # ==========================================
 # 📊 【蜂蜜計數器】本站累計觀測人次統計
 # ==========================================
