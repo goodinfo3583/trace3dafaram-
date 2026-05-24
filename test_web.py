@@ -1212,15 +1212,38 @@ def robust_read_csv(file_path):
     return pd.read_csv(file_path, encoding='cp950', errors='ignore')
 
 # ==========================================
+# 🛠️ 必備函數：強硬讀取法
+# ==========================================
+def robust_read_csv(file_path):
+    for encoding in ['cp950', 'utf-8-sig', 'utf-8']:
+        try:
+            df = pd.read_csv(file_path, encoding=encoding)
+            if not df.empty and len(df.columns) > 1 and '撖' in str(df.iloc[0, 1]): 
+                continue
+            return df
+        except:
+            continue
+    return pd.read_csv(file_path, encoding='cp950', errors='ignore')
+
+# ==========================================
 # 📅 區塊 4-1：融資減少動向 (5日累計)
 # ==========================================
 st.write("---")
 st.markdown("<div id='section-4-1'></div>", unsafe_allow_html=True)
 st.header("📅 區塊 4-1：融資減少動向 (5日累計)")
 
+# 🛠️ 新增：自訂標的顯示過濾 UI
+st.write("🔧 **自訂標的顯示過濾：**")
+f_col1, f_col2, _ = st.columns([1, 1, 2])
+with f_col1:
+    show_etf = st.checkbox("☑️ 顯示 ETF", value=True, key="margin_show_etf")
+with f_col2:
+    show_bond = st.checkbox("☑️ 顯示債券/債券ETF", value=True, key="margin_show_bond")
+st.write("") # 增加一點間距讓排版更舒適
+
+# --- 讀取函數 ---
 def get_specific_margin_data(keyword):
     found_files = []
-    # 走訪所有資料夾尋找指定關鍵字
     for root, dirs, files in os.walk(os.getcwd()):
         if '.git' in root or 'venv' in root: continue
         for file in files:
@@ -1230,20 +1253,17 @@ def get_specific_margin_data(keyword):
     if not found_files:
         return pd.DataFrame(), f"找不到包含『{keyword}』的檔案"
     
-    # 依照修改時間排序，抓取最新的那個
-    latest_file = sorted(found_files, key=os.path.getmtime, reverse=True)[0]
+    # 🔥 修正1：改用「檔名字母」排序，確保 0522 絕對大於 0519
+    latest_file = sorted(found_files, key=lambda x: os.path.basename(x), reverse=True)[0]
     file_name = os.path.basename(latest_file)
     
     try:
-        # 這裡會呼叫我們上面定義的 robust_read_csv
         df = robust_read_csv(latest_file)
         if df.empty:
             return pd.DataFrame(), f"讀取成功但內容為空: {file_name}"
         
-        # 清除 BOM 亂碼與空格
         df.columns = df.columns.astype(str).str.replace('\ufeff', '').str.strip()
         
-        # 欄位數值化強化：清除逗號(,)與百分比(%)再轉換，避免變成 NaN
         for col in df.columns:
             if "幅度" in col or "張數" in col or "%" in col or "％" in col:
                 df[col] = df[col].astype(str).str.replace(',', '', regex=False).str.replace('%', '', regex=False)
@@ -1251,29 +1271,72 @@ def get_specific_margin_data(keyword):
                 
         return df, file_name
     except Exception as e:
-        # 如果發生程式崩潰，明確回傳錯誤原因
         return pd.DataFrame(), f"讀取崩潰 ({file_name}): {str(e)}"
 
-# 建立左右兩個欄位並排顯示
+# --- 欄位清理與過濾函數 ---
+def process_margin_df(df, type_name):
+    if df.empty: return df
+    df = df.copy()
+    
+    # 🔥 修正2：刪除「更新日期」欄位
+    if "更新日期" in df.columns:
+        df = df.drop(columns=["更新日期"])
+        
+    # 🔥 修正2：精準截斷不需要的後段欄位
+    target_col = "3個月增減(%)" if type_name == "幅度" else "3個月增減張數"
+    if target_col in df.columns:
+        target_idx = df.columns.get_loc(target_col)
+        df = df.iloc[:, :target_idx+1]
+        
+    # 🔥 修正4：執行 ETF 與 債券過濾邏輯
+    col_name = next((c for c in df.columns if '名稱' in c), None)
+    col_id = next((c for c in df.columns if '代號' in c), None)
+    
+    if col_name and col_id:
+        df[col_id] = df[col_id].astype(str).str.strip()
+        df[col_name] = df[col_name].astype(str).str.strip()
+        
+        # 判定條件：名稱含債或代號尾數為B即為債券，代號00開頭即為ETF
+        mask_bond = df[col_name].str.contains('債', na=False) | df[col_id].str.endswith('B', na=False)
+        mask_etf = df[col_id].str.startswith('00', na=False)
+        
+        if not show_bond:
+            df = df[~mask_bond]
+        if not show_etf:
+            df = df[~(mask_etf & ~mask_bond)] # 剔除 ETF，但保留純債券(若債券未被取消勾選)
+
+    # 🔥 修正3：重置 Index 並讓它從 1 開始
+    df = df.reset_index(drop=True)
+    df.index = df.index + 1
+    
+    return df
+
+# ==========================================
+# 📊 畫面佈局顯示
+# ==========================================
 c1, c2 = st.columns(2)
 
 with c1:
     st.subheader("📉 融資減少【幅度】排名")
     df_pct, msg_pct = get_specific_margin_data("融資減少幅度")
-    if not df_pct.empty:
+    df_pct_clean = process_margin_df(df_pct, "幅度")
+    
+    if not df_pct_clean.empty:
         st.info(f"💡 最新來源: {msg_pct}")
-        st.dataframe(df_pct, use_container_width=True)
+        st.dataframe(df_pct_clean, use_container_width=True)
     else:
-        st.warning(f"⚠️ {msg_pct}")
+        st.warning(f"⚠️ {msg_pct} 或 過濾後無相符資料")
 
 with c2:
     st.subheader("📉 融資減少【張數】排名")
     df_vol, msg_vol = get_specific_margin_data("融資減少張數")
-    if not df_vol.empty:
+    df_vol_clean = process_margin_df(df_vol, "張數")
+    
+    if not df_vol_clean.empty:
         st.info(f"💡 最新來源: {msg_vol}")
-        st.dataframe(df_vol, use_container_width=True)
+        st.dataframe(df_vol_clean, use_container_width=True)
     else:
-        st.warning(f"⚠️ {msg_vol}")
+        st.warning(f"⚠️ {msg_vol} 或 過濾後無相符資料")
 # ==========================================
 # 📊 【蜂蜜計數器】本站累計觀測人次統計
 # ==========================================
