@@ -26,6 +26,29 @@ def extract_date_from_name(filepath):
     filename = os.path.basename(filepath)
     date_match = re.search(r'(\d+)', filename)
     return date_match.group(1) if date_match else "00000000"
+# ==========================================
+# 1. 確保函式在最上方定義 (解決 NameError)
+# ==========================================
+def safe_search(df, query):
+    if df is None or df.empty:
+        return pd.DataFrame()
+    
+    # 建立副本以防修改到原始資料
+    df = df.copy()
+    
+    # 確保代號轉字串並去除空白
+    if '股票代號' in df.columns:
+        df['股票代號'] = df['股票代號'].astype(str).str.strip()
+    
+    # 【關鍵】由於名稱目前是亂碼，我們主要依靠「股票代號」搜尋
+    query = str(query).strip()
+    
+    # 搜尋條件：代號符合 或 (若名稱不亂碼時) 名稱符合
+    mask = df['股票代號'].str.contains(query, na=False)
+    if '股票名稱' in df.columns:
+        mask = mask | df['股票名稱'].str.contains(query, na=False)
+        
+    return df[mask]
 
 # ==========================================
 # ⚙️ 萬能解析與讀取核心層 (全面升級雙軌編碼相容)
@@ -171,31 +194,41 @@ st.markdown("## 🏆 頂級核心：解鎖中")
 st.write("🔥 **戰術策略說明**：以長線 TXT 檔案為絕對基底，放寬偵測：今日數據對比前1天、前2天或前3天只要有實質增加（含突破未進榜斷層）即鎖定！短線不再強迫四大表全數交集，只要短線 4 大指標任一命中，即列入黃金名單！")
 
 
-# ==========================================
-# 🔍 個股籌碼快搜 (診斷區)
-# ==========================================
-# --- 顯示區塊 1 ---
-st.write("📋 **中長線三大法人持股變化軌跡：**")
 
-# 【除錯區】：請先確認這些資訊
-if 'track_display_df' in globals():
-    st.write(f"除錯：DataFrame 欄位列表: {track_display_df.columns.tolist()}")
-    st.write(f"除錯：前三筆資料範例: {track_display_df.head(3).to_dict('records')}")
-else:
-    st.error("除錯：找不到 track_display_df 變數！")
+# ==========================================
+# 2. 搜尋與顯示區塊 (整合區塊 1)
+# ==========================================
+st.write("---")
+st.markdown("<div id='section-search'></div>", unsafe_allow_html=True)
+st.subheader("🔍 個股籌碼快搜 (診斷區)")
 
-try:
-    # 執行搜尋
-    q_txt = safe_search(track_display_df, search_query)
+search_query = st.text_input("請輸入你想觀測的股票代號 (推薦優先用代號):", key="global_search_top")
+
+if search_query:
+    st.write(f"### 🎯 綜合診斷標的：{search_query}")
+    st.write("📋 **中長線三大法人持股變化軌跡：**")
     
-    if not q_txt.empty:
-        st.dataframe(q_txt.drop(columns=["秘密3日斜率"], errors='ignore'), use_container_width=True)
-        # ... (繪圖代碼保持不變) ...
-    else:
-        st.warning(f"⚠️ 找不到資料。請確認 CSV 中的欄位名稱是否包含 '股票名稱' 與 '股票代號'。")
-except Exception as e:
-    st.error(f"程式錯誤: {e}")
-
+    try:
+        # 使用我們剛剛定義好的函式
+        q_txt = safe_search(track_display_df, search_query)
+        
+        if not q_txt.empty:
+            st.dataframe(q_txt.drop(columns=["秘密3日斜率"], errors='ignore'), use_container_width=True)
+            
+            # --- 繪圖邏輯 ---
+            chart_cols = [c for c in q_txt.columns if "持股%" in c]
+            if chart_cols:
+                # 簡單繪圖示例
+                t_ser = pd.Series(
+                    pd.to_numeric(q_txt.iloc[0][chart_cols[:21]].values, errors='coerce'), 
+                    index=[c.split(' ')[0] for c in chart_cols[:21]]
+                ).iloc[::-1].dropna()
+                st.line_chart(t_ser, height=240)
+        else:
+            st.warning(f"⚠️ 在資料庫中找不到 '{search_query}'。請確認代號是否正確。")
+            
+    except Exception as e:
+        st.error(f"資料處理發生錯誤: {e}")
  
 # ==========================================
 # 🧭 側邊欄導航 (無感互動+視覺特效版)
