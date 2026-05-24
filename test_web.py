@@ -656,16 +656,16 @@ if sorted_dates:
         # 🎨 護眼淺色系底色
         def highlight_row(row):
             cnt = color_ref.get(row['股票代號'], 0)
-            if cnt == 4: bg = 'background-color: rgba(255, 225, 225, 0.55)'     
-            elif cnt == 3: bg = 'background-color: rgba(255, 250, 205, 0.65)'    
-            elif cnt == 2: bg = 'background-color: rgba(215, 245, 215, 0.65)'    
-            elif cnt == 1: bg = 'background-color: rgba(220, 238, 255, 0.75)'    
+            if cnt == 4: bg = 'background-color: rgba(255, 225, 225, 0.15)'     
+            elif cnt == 3: bg = 'background-color: rgba(255, 250, 205, 0.15)'    
+            elif cnt == 2: bg = 'background-color: rgba(215, 245, 215, 0.15)'    
+            elif cnt == 1: bg = 'background-color: rgba(220, 238, 255, 0.1)'    
             else: bg = ''                                                   
             return [bg] * len(row)
 
         styled_df = filtered_df.style.apply(highlight_row, axis=1)
         
-        st.info("💡 **多榜單共振說明：** 背景底色依今日上榜數量區分（淺紅/淺黃/淺綠/淺藍），暖色調代表同時出現於越多天期的熱門持股榜單中。")
+        st.info("💡 **多榜單共振說明：** 5/20/60/120日，代表法人持股變化數據分析後於前段班，多榜單籌碼集中度極高。")
         st.success(f"📊 已成功串聯最近 {len(date_cols)} 個交易日的持股數據 (排序優先級：今日上榜數量 > 今日持股%)：")
         st.dataframe(styled_df, use_container_width=True)
     else:
