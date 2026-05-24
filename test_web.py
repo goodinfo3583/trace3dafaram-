@@ -490,35 +490,44 @@ def parse_special_txt(file_path, is_latest=False):
     parsed_data = []
     date_label = os.path.basename(file_path)[:8]
     target_col = f"{date_label}持股%"
-    current_section = "5日" 
+    
+    # 【關鍵修改】：將區塊範圍與字串對應表定義清楚
+    # 這裡的 key 就是 TXT 檔案中會出現的標題關鍵字
+    sections_map = {
+        "排名(5日)": "5日",
+        "排名(20日)": "20日",
+        "排名(60日)": "60日",
+        "排名(120日)": "120日"
+    }
+    
+    current_section = None
     
     try:
         with open(file_path, 'r', encoding='utf-8-sig', errors='ignore') as f:
             for line in f:
                 line_str = line.strip()
                 
-                if "排名(5日)" in line_str: current_section = "5日"
-                elif "排名(20日)" in line_str: current_section = "20日"
-                elif "排名(60日)" in line_str: current_section = "60日"
-                elif "排名(120日)" in line_str: current_section = "120日"
+                # 1. 偵測切換點：檢查這一行是否包含任何一個榜單的標題
+                for key, name in sections_map.items():
+                    if key in line_str:
+                        current_section = name
+                        break # 找到標題後就跳出，進入該區塊的解析模式
                 
+                # 2. 只有在已經確認進入某個區塊 (current_section is not None) 的情況下，才去撈資料
+                # 判斷是否為真實資料行 (特徵: 第一欄是數字排名)
                 parts = line_str.split('\t')
-                if len(parts) >= 5 and parts[0].isdigit():
+                if current_section and len(parts) >= 5 and parts[0].isdigit():
                     stock_str = parts[1].strip()  
                     
+                    # 進行名稱與代號切割
                     m = re.match(r'^(\d+)(.*)', stock_str)
-                    if m:
-                        stock_id = m.group(1)
-                        stock_name = m.group(2).strip()
-                    else:
-                        stock_id = stock_str
-                        stock_name = stock_str
+                    stock_id = m.group(1) if m else stock_str
+                    stock_name = m.group(2).strip() if m else stock_str
                     
                     try:
                         holding_pct = float(parts[-2])
-                    except ValueError:
-                        continue
-                        
+                    except ValueError: continue
+                    
                     parsed_data.append({
                         '股票代號': stock_id,
                         '股票名稱': stock_name,
@@ -529,16 +538,13 @@ def parse_special_txt(file_path, is_latest=False):
         return pd.DataFrame()
 
     df = pd.DataFrame(parsed_data)
-    if df.empty:
-        return pd.DataFrame()
-        
+    if df.empty: return pd.DataFrame()
+    
+    # 聚合處理
     def agg_sections(x):
-        sections = set(x)
-        order = ['5日', '20日', '60日', '120日']
-        return ",".join([s for s in order if s in sections])
+        return ",".join(sorted(list(set(x)), key=lambda s: ['5日', '20日', '60日', '120日'].index(s)))
         
     df_agg = df.groupby(['股票代號', '股票名稱', target_col])['上榜區塊'].agg(agg_sections).reset_index()
-    
     if not is_latest:
         df_agg = df_agg.drop(columns=['上榜區塊'])
         
@@ -649,8 +655,8 @@ if all_txt_files:
 
         styled_df = filtered_df.style.apply(highlight_row, axis=1)
         
-        st.info("💡 **多榜單共振說明：** 背景顏色越暖 (紅/橘)，代表同時出現於越多天期的熱門榜單中，籌碼集中度極高。")
-        st.success(f"📊 已成功串聯 {len(date_cols)} 個交易日的數據 (排序優先級：今日上榜榜單數 > 今日持股%)：")
+        st.info("💡 **榜單共振說明：** 5/20/60/120日，代表法人持股變化數據分析後於前段班，多榜單籌碼集中度極高。")
+        st.success(f"📊 已成功串聯 {len(date_cols)} 個交易日的數據：")
         st.dataframe(styled_df, use_container_width=True)
     else:
         st.warning("⚠️ 讀取到的檔案皆無效或無資料，請檢查 TXT 內容。")
