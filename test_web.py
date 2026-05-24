@@ -1288,7 +1288,9 @@ st.session_state['df_margin_plus_vol'] = df_vol_clean
 # ==========================================
 st.write("---")
 st.markdown("<div id='section-5'></div>", unsafe_allow_html=True)
-st.header("💎 區塊 5：400張以上大股東動向")
+st.header("💎 區塊 5：神秘金字塔 (400張以上大戶動向)")
+
+import re
 
 # 讀取符合關鍵字的 CSV 檔案
 csv_pattern_b5 = os.path.join(DATA_DIR, "*神秘金字塔 - 股權類股排行(5日之400張以上股東排行)*.csv")
@@ -1297,37 +1299,113 @@ all_files_b5 = glob.glob(csv_pattern_b5)
 if not all_files_b5:
     st.warning("⚠️ 找不到相關 CSV 檔案，請確認檔名包含『神秘金字塔 - 股權類股排行(5日之400張以上股東排行)』。")
 else:
-    # 抓取最新日期的檔案
-    latest_file_b5 = sorted(all_files_b5, key=lambda x: os.path.basename(x), reverse=True)[0]
-    try:
-        df_b5 = robust_read_csv(latest_file_b5)
-        
-        # 清洗欄位名稱 (防呆)
-        df_b5.columns = [str(c).replace(" ", "").replace("\n", "").replace("\ufeff", "").strip() for c in df_b5.columns]
+    # 1. 抓取所有歷史檔案並依日期降冪排序 (確保最新檔案在最前面)
+    sorted_files_b5 = sorted(all_files_b5, key=lambda x: os.path.basename(x), reverse=True)
+    
+    base_df = None
+    date_cols_set = set()
+    
+    # 2. 讀取前 4 個最新檔案來做歷史拼接 (足以涵蓋 6 週的日期)
+    for f in sorted_files_b5[:4]:
+        try:
+            df = robust_read_csv(f)
+            # 清洗欄位名稱
+            df.columns = [str(c).replace(" ", "").replace("\n", "").replace("\ufeff", "").strip() for c in df.columns]
+            
+            # 動態抓取代號與名稱欄位
+            id_col = next((c for c in df.columns if '代號' in c or '代碼' in c), None)
+            name_col = next((c for c in df.columns if '名稱' in c or '股名' in c), None)
+            if not id_col or not name_col: continue
+            
+            df = df.rename(columns={id_col: '股票代號', name_col: '股票名稱'})
+            df['股票代號'] = df['股票代號'].astype(str).str.strip()
+            df['股票名稱'] = df['股票名稱'].astype(str).str.strip()
+            
+            # 尋找日期欄位 (自動抓取4碼如 0522，或8碼如 20260522)
+            date_cols = [c for c in df.columns if re.match(r'^(\d{4}|\d{8})$', c)]
+            
+            temp_df = df[['股票代號', '股票名稱'] + date_cols].copy()
+            
+            for dc in date_cols:
+                date_cols_set.add(dc)
+                temp_df[dc] = pd.to_numeric(temp_df[dc], errors='coerce')
+                
+            if base_df is None:
+                base_df = temp_df
+            else:
+                # 拼接歷史資料，填補空缺
+                base_df = pd.merge(base_df, temp_df, on=['股票代號', '股票名稱'], how='outer')
+                # 處理因合併產生的重複欄位 (_x, _y)
+                for dc in date_cols:
+                    if f"{dc}_x" in base_df.columns and f"{dc}_y" in base_df.columns:
+                        base_df[dc] = base_df[f"{dc}_x"].combine_first(base_df[f"{dc}_y"])
+                        base_df = base_df.drop(columns=[f"{dc}_x", f"{dc}_y"])
+        except Exception:
+            continue
 
-        # 動態抓取代號與名稱欄位
-        id_col = next((c for c in df_b5.columns if '代號' in c or '代碼' in c), None)
-        name_col = next((c for c in df_b5.columns if '名稱' in c or '股名' in c), None)
+    if base_df is not None:
+        # 3. 排序日期 (將 8碼轉 4碼做統一比較，確保越新的日期在越前面)
+        def sort_key(d):
+            return d[-4:] if len(d) == 8 else d
         
-        if id_col: df_b5 = df_b5.rename(columns={id_col: '股票代號'})
-        if name_col: df_b5 = df_b5.rename(columns={name_col: '股票名稱'})
+        # 只取最近 6 週的日期欄位
+        sorted_dates = sorted(list(date_cols_set), key=sort_key, reverse=True)[:6] 
         
-        # 確保型態為字串並去空白
-        if '股票代號' in df_b5.columns:
-            df_b5['股票代號'] = df_b5['股票代號'].astype(str).str.strip()
-        if '股票名稱' in df_b5.columns:
-            df_b5['股票名稱'] = df_b5['股票名稱'].astype(str).str.strip()
+        # 4. 計算本週與上週的「最新週動態」
+        def calc_trend(row):
+            if len(sorted_dates) < 2: return "⚪ 資料不足"
+            v_new = row.get(sorted_dates[0])
+            v_old = row.get(sorted_dates[1])
+            
+            if pd.isna(v_new) or pd.isna(v_old): return "⚪ 觀望"
+            
+            diff = v_new - v_old
+            if diff >= 1.5: return f"🔥 大增 (+{diff:.2f}%)"
+            elif diff >= 0.5: return f"📈 增 (+{diff:.2f}%)"
+            elif diff > 0: return f"↗️ 微增 (+{diff:.2f}%)"
+            elif diff == 0: return "🔄 持平"
+            elif diff > -0.5: return f"↘️ 微減 ({diff:.2f}%)"
+            elif diff > -1.5: return f"📉 減 ({diff:.2f}%)"
+            else: return f"🚨 大減 ({diff:.2f}%)"
+
+        base_df['最新週動態'] = base_df.apply(calc_trend, axis=1)
         
-        st.info(f"💡 最新來源: {os.path.basename(latest_file_b5)}")
+        # 5. 抓取最新檔案的其他有用資訊 (過濾掉不需要的雜訊欄位)
+        latest_df = robust_read_csv(sorted_files_b5[0])
+        latest_df.columns = [str(c).replace(" ", "").replace("\n", "").replace("\ufeff", "").strip() for c in latest_df.columns]
+        l_id = next((c for c in latest_df.columns if '代號' in c or '代碼' in c), None)
         
-        # 顯示區塊 5 資料表
-        st.dataframe(df_b5, use_container_width=True, hide_index=True)
+        extra_cols_to_keep = []
+        if l_id:
+            latest_df = latest_df.rename(columns={l_id: '股票代號'})
+            latest_df['股票代號'] = latest_df['股票代號'].astype(str).str.strip()
+            
+            # 🔥 無情刪除雜訊欄位 (包含 .1, #, Unnamed 等)
+            bad_keywords = ['.1', '#', '.2', '.3', '.4', '.5', 'Unnamed', '走勢', '名稱', '股名', '類別', '總增減', '上週持有']
+            for c in latest_df.columns:
+                if not any(b in c for b in bad_keywords) and not re.match(r'^(\d{4}|\d{8})$', c) and c != '股票代號':
+                    extra_cols_to_keep.append(c)
+            
+            if extra_cols_to_keep:
+                base_df = pd.merge(base_df, latest_df[['股票代號'] + extra_cols_to_keep], on='股票代號', how='left')
+
+        # 6. 整理最終顯示排版
+        final_cols = ['股票代號', '股票名稱', '最新週動態'] + sorted_dates + extra_cols_to_keep
+        final_df = base_df[final_cols].copy()
         
-        # 🔥 【連動儲存】：存入記憶體供搜尋區塊掃描
-        st.session_state['df_blk5'] = df_b5
+        # 依據「最新一週」的大戶持股比例，做降冪排序 (大戶持股越多排越上面)
+        if sorted_dates:
+            temp_sort = pd.to_numeric(final_df[sorted_dates[0]], errors='coerce').fillna(-999)
+            final_df = final_df.iloc[temp_sort.argsort()[::-1]]
         
-    except Exception as e:
-        st.error(f"❌ 無法讀取區塊 5 數據: {str(e)}")
+        # 替換 NaN 為橫線，隱藏醜陋的空值
+        final_df = final_df.fillna('-')
+        
+        st.success(f"📊 已成功串連 {len(final_df)} 筆大戶動向資料 (自動呈現近 6 週)")
+        st.dataframe(final_df, use_container_width=True, hide_index=True)
+        
+        # 🔥 【連動儲存】：存入記憶體供最下方的搜尋區塊掃描
+        st.session_state['df_blk5'] = final_df
 # ==========================================
 # 📊 【蜂蜜計數器】本站累計觀測人次統計
 # ==========================================
