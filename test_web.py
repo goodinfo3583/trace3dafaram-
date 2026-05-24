@@ -348,6 +348,114 @@ if (not track_display_df.empty and not csv_foreign_deal.empty and not csv_foreig
 else:
     st.error("❌ 頂級核心多空矩陣運算失敗，請確認資料夾中的外資/投信 CSV 檔案是否完整。")
 
+
+# ==========================================
+# 🔍 個股籌碼快搜 (診斷區)
+# ==========================================
+st.write("---")
+st.markdown("<div id='section-search'></div>", unsafe_allow_html=True)
+st.subheader("🔍 個股籌碼快搜 (診斷區)")
+
+search_query = st.text_input("請輸入你想觀測的股票名稱或代號：", key="global_search_top")
+
+q_txt = q_f_deal = q_i_deal = q_f_stock = q_i_stock = pd.DataFrame()
+
+if search_query and not track_display_df.empty:
+    q_txt = track_display_df[track_display_df['股票名稱'].str.contains(search_query, na=False) | track_display_df['股票代號'].str.contains(search_query, na=False)]
+    
+    # 🌟 【核心修正】：強制過濾掉名稱重複的欄位，防止 PyArrow 渲染崩潰
+    q_txt = q_txt.loc[:, ~q_txt.columns.duplicated()]
+    
+    try:
+        if not csv_foreign_deal.empty:
+            csv_foreign_deal = csv_foreign_deal.loc[:, ~csv_foreign_deal.columns.duplicated()] # 一併保護其他表
+            q_f_deal = csv_foreign_deal[csv_foreign_deal['股票名稱'].str.contains(search_query, na=False) | csv_foreign_deal['股票代號'].str.contains(search_query, na=False)]
+            
+        if not csv_it_deal.empty:
+            csv_it_deal = csv_it_deal.loc[:, ~csv_it_deal.columns.duplicated()]
+            q_i_deal = csv_it_deal[csv_it_deal['股票名稱'].str.contains(search_query, na=False) | csv_it_deal['股票代號'].str.contains(search_query, na=False)]
+            
+        if not csv_foreign_stock.empty:
+            csv_foreign_stock = csv_foreign_stock.loc[:, ~csv_foreign_stock.columns.duplicated()]
+            q_f_stock = csv_foreign_stock[csv_foreign_stock['股票名稱'].str.contains(search_query, na=False) | csv_foreign_stock['股票代號'].str.contains(search_query, na=False)]
+            
+        if not csv_it_stock.empty:
+            csv_it_stock = csv_it_stock.loc[:, ~csv_it_stock.columns.duplicated()]
+            q_i_stock = csv_it_stock[csv_it_stock['股票名稱'].str.contains(search_query, na=False) | csv_it_stock['股票代號'].str.contains(search_query, na=False)]
+            
+    except Exception as e:
+        st.error(f"資料篩選過程發生錯誤: {e}")
+
+    if q_txt.empty:
+        st.warning(f"⚠️ 系統中找不到與 '{search_query}' 相關的資料。")
+    else:
+        st.write(f"### 🎯 綜合診斷標的：{search_query}")
+        st.write("📋 **1. 中長線三大法人持股變化軌跡：**")
+        st.dataframe(q_txt.drop(columns=["秘密3日斜率"], errors='ignore'), use_container_width=True)
+        
+        try:
+            chart_cols = [c for c in q_txt.columns if "持股%" in c]
+            if chart_cols:
+                v_latest = pd.to_numeric(q_txt.iloc[0][chart_cols[0]], errors='coerce')
+                
+                def get_diff_pct(days_back):
+                    idx = min(days_back - 1, len(chart_cols) - 1)
+                    v_back = pd.to_numeric(q_txt.iloc[0][chart_cols[idx]], errors='coerce')
+                    if pd.isna(v_latest) or pd.isna(v_back):
+                        return 0.0
+                    return round(float(v_latest - v_back), 2)
+
+                slope_df = pd.DataFrame({
+                    "指標週期": ["⚡ 2日短線突發斜率", "📈 5日短線加速斜率", "🚀 10日中線轉折斜率", "🔒 20日月線波段鎖籌"],
+                    "法人持股淨增減(%)": [get_diff_pct(2), get_diff_pct(5), get_diff_pct(10), get_diff_pct(20)]
+                })
+                st.write("📊 **三大法人持股多週期油門加速探針：**")
+                st.dataframe(slope_df, use_container_width=True)
+                
+                chart_cols_21 = chart_cols[:21]
+                t_ser = pd.Series(
+                    pd.to_numeric(q_txt.iloc[0][chart_cols_21].values, errors='coerce'), 
+                    index=[c.split(' ')[0] for c in chart_cols_21]
+                ).iloc[::-1].dropna()
+                
+                if not t_ser.empty:
+                    st.write(f"📈 **三大法人持股 21日波段全景軌跡曲線 ({q_txt.iloc[0]['股票名稱']})**")
+                    st.line_chart(t_ser, height=240)
+        except Exception as chart_err:
+            st.info(f"圖表渲染暫無數據: {chart_err}")
+
+        st.write("---")
+        st.markdown("##### 🚀 核心主力短線進攻與鎖籌指標")
+        c1, c2 = st.columns(2)
+        
+        with c1:
+            st.write("📊 **外資買佔比軌跡：**")
+            if not q_f_deal.empty:
+                st.dataframe(q_f_deal, use_container_width=True)
+            else:
+                st.write("無資料")
+                
+            st.write("🔒 **外資買佔發行軌跡：**")
+            if not q_f_stock.empty:
+                st.dataframe(q_f_stock, use_container_width=True)
+            else:
+                st.write("無資料")
+                
+        with c2:
+            st.write("🥦 **投信買佔比軌跡：**")
+            if not q_i_deal.empty:
+                st.dataframe(q_i_deal, use_container_width=True)
+            else:
+                st.write("無資料")
+                
+            st.write("💎 **投信買佔發行軌跡：**")
+            if not q_i_stock.empty:
+                st.dataframe(q_i_stock, use_container_width=True)
+            else:
+                st.write("無資料")
+
+elif search_query:
+    st.info("請輸入代號或名稱開始診斷個股籌碼...")
 # ==========================================
 # 🔍 個股籌碼快搜 (診斷區)
 # ==========================================
