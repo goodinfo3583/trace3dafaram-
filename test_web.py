@@ -1226,20 +1226,34 @@ def robust_read_csv(file_path):
     return pd.read_csv(file_path, encoding='cp950', errors='ignore')
 
 # ==========================================
+# 🛠️ 必備函數：強硬讀取法
+# ==========================================
+def robust_read_csv(file_path):
+    for encoding in ['cp950', 'utf-8-sig', 'utf-8']:
+        try:
+            df = pd.read_csv(file_path, encoding=encoding)
+            if not df.empty and len(df.columns) > 1 and '撖' in str(df.iloc[0, 1]): 
+                continue
+            return df
+        except:
+            continue
+    return pd.read_csv(file_path, encoding='cp950', errors='ignore')
+
+# ==========================================
 # 📅 區塊 4-1：融資減少動向 (5日累計)
 # ==========================================
 st.write("---")
 st.markdown("<div id='section-4-1'></div>", unsafe_allow_html=True)
 st.header("📅 區塊 4-1：融資減少動向 (5日累計)")
 
-# 🛠️ 新增：自訂標的顯示過濾 UI
+# 🛠️ 新增：自訂標的顯示過濾 UI (已刪除紫色勾勾符號)
 st.write("🔧 **自訂標的顯示過濾：**")
 f_col1, f_col2, _ = st.columns([1, 1, 2])
 with f_col1:
-    show_etf = st.checkbox("☑️ 顯示 ETF", value=True, key="margin_show_etf")
+    show_etf = st.checkbox("顯示 ETF", value=True, key="margin_show_etf")
 with f_col2:
-    show_bond = st.checkbox("☑️ 顯示債券/債券ETF", value=True, key="margin_show_bond")
-st.write("") # 增加一點間距讓排版更舒適
+    show_bond = st.checkbox("顯示債券/債券ETF", value=True, key="margin_show_bond")
+st.write("") 
 
 # --- 讀取函數 ---
 def get_specific_margin_data(keyword):
@@ -1253,7 +1267,6 @@ def get_specific_margin_data(keyword):
     if not found_files:
         return pd.DataFrame(), f"找不到包含『{keyword}』的檔案"
     
-    # 🔥 修正1：改用「檔名字母」排序，確保 0522 絕對大於 0519
     latest_file = sorted(found_files, key=lambda x: os.path.basename(x), reverse=True)[0]
     file_name = os.path.basename(latest_file)
     
@@ -1278,17 +1291,30 @@ def process_margin_df(df, type_name):
     if df.empty: return df
     df = df.copy()
     
-    # 🔥 修正2：刪除「更新日期」欄位
-    if "更新日期" in df.columns:
-        df = df.drop(columns=["更新日期"])
+    # 🔥 修正1：模糊比對刪除「更新日期」欄位 (防空格干擾)
+    cols_to_drop = [c for c in df.columns if "更新日期" in str(c)]
+    if cols_to_drop:
+        df = df.drop(columns=cols_to_drop)
         
-    # 🔥 修正2：精準截斷不需要的後段欄位
-    target_col = "3個月增減(%)" if type_name == "幅度" else "3個月增減張數"
-    if target_col in df.columns:
-        target_idx = df.columns.get_loc(target_col)
-        df = df.iloc[:, :target_idx+1]
+    # 🔥 修正2：模糊關鍵字定位截斷位置 (不管 CSV 欄位名稱中有多少空格都能精準截斷)
+    target_idx = -1
+    if type_name == "幅度":
+        # 找尋同時包含 "3個月" 與 "%" 的欄位
+        for i, col in enumerate(df.columns):
+            if "3個月" in str(col) and ("%" in str(col) or "％" in str(col)):
+                target_idx = i
+                break
+    else: # 張數
+        # 找尋同時包含 "3個月" 與 "張數" 的欄位
+        for i, col in enumerate(df.columns):
+            if "3個月" in str(col) and "張數" in str(col):
+                target_idx = i
+                break
+                
+    if target_idx != -1:
+        df = df.iloc[:, :target_idx+1] # 只保留到目標欄位為止
         
-    # 🔥 修正4：執行 ETF 與 債券過濾邏輯
+    # --- 執行 ETF 與 債券過濾邏輯 ---
     col_name = next((c for c in df.columns if '名稱' in c), None)
     col_id = next((c for c in df.columns if '代號' in c), None)
     
@@ -1296,16 +1322,15 @@ def process_margin_df(df, type_name):
         df[col_id] = df[col_id].astype(str).str.strip()
         df[col_name] = df[col_name].astype(str).str.strip()
         
-        # 判定條件：名稱含債或代號尾數為B即為債券，代號00開頭即為ETF
         mask_bond = df[col_name].str.contains('債', na=False) | df[col_id].str.endswith('B', na=False)
         mask_etf = df[col_id].str.startswith('00', na=False)
         
         if not show_bond:
             df = df[~mask_bond]
         if not show_etf:
-            df = df[~(mask_etf & ~mask_bond)] # 剔除 ETF，但保留純債券(若債券未被取消勾選)
+            df = df[~(mask_etf & ~mask_bond)] 
 
-    # 🔥 修正3：重置 Index 並讓它從 1 開始
+    # --- 重置 Index 並讓它從 1 開始 ---
     df = df.reset_index(drop=True)
     df.index = df.index + 1
     
