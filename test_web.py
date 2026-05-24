@@ -485,31 +485,6 @@ st.sidebar.markdown("[🚀 區塊2-3：量價結構](#section-2-3)")
 st.sidebar.markdown("[🚀 區塊2-4：主力動向](#section-2-4)")
 st.sidebar.markdown("[💎 區塊3：總體策略建議](#section-3)")
 
-# ==========================================
-# 🧭 側邊欄導航
-# ==========================================
-st.sidebar.header("⚡ 籌碼超級篩選器")
-filter_trend = st.sidebar.selectbox("三大法人持股趨勢過濾：", ["全部顯示", "🔥 僅顯示『上升+新進榜』", "📈 僅顯示上升", "🆕 僅顯示新進榜"])
-
-st.sidebar.markdown("---")
-st.sidebar.subheader("📊 大盤總體經濟指標")
-
-c_btn1, c_btn2 = st.sidebar.columns(2)
-with c_btn1:
-    st.link_button(
-        "📈 恐懼貪婪指數", 
-        "https://www.wantgoo.com/global/macroeconomics/fearandgreed",
-        use_container_width=True
-    )
-with c_btn2:
-    st.link_button(
-        "⚠️ VIX 恐慌指數", 
-        "https://www.wantgoo.com/global/vix",
-        use_container_width=True
-    )
-st.sidebar.markdown("---")
-st.sidebar.header("📍 戰情室快速導航跳轉")
-st.sidebar.markdown("[👑 區塊一：三大法人持股%](#section-1)")
 
 # ==========================================
 # 🏠 核心五大區塊
