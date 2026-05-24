@@ -1281,33 +1281,76 @@ st.session_state['df_margin_plus_vol'] = df_vol_clean
 # ==========券資比資料請一起搬遷============
 
 # ==========================================
-# 💎 區塊 5 除錯偵測器
+# 💎 區塊 5：大戶股權分散表 (神秘金字塔)
 # ==========================================
 st.write("---")
-st.write("### 💎 [除錯中] 區塊 5 狀態檢查")
+st.markdown("<div id='section-5'></div>", unsafe_allow_html=True)
+st.header("💎 區塊 5：神秘金字塔 (400張以上大戶動向)")
 
-# 1. 檢查目錄路徑
-st.write(f"📂 正在搜尋的路徑: `{DATA_DIR}`")
+csv_pattern_b5 = os.path.join(DATA_DIR, "*神秘金字塔 - 股權類股排行(5日之400張以上股東排行)*.csv")
+all_files_b5 = glob.glob(csv_pattern_b5)
 
-# 2. 測試 glob 搜尋
-pattern = os.path.join(DATA_DIR, "*神秘金字塔*.csv") # 簡化搜尋條件
-files = glob.glob(pattern)
-st.write(f"🔍 搜尋到的檔案清單 (共 {len(files)} 個):")
-st.write(files)
-
-# 3. 檢查欄位名稱 (如果找到檔案)
-if files:
-    st.write("📊 嘗試讀取最新檔案欄位:")
-    try:
-        latest = sorted(files, key=os.path.basename, reverse=True)[0]
-        df_head = pd.read_csv(latest, encoding='utf-8-sig', nrows=5)
-        st.write(f"檔案名稱: {os.path.basename(latest)}")
-        st.write("欄位名稱如下 (請確認是否有包含『代號』、『名稱』關鍵字):")
-        st.write(df_head.columns.tolist())
-    except Exception as e:
-        st.error(f"讀取錯誤: {str(e)}")
+if not all_files_b5:
+    st.warning("⚠️ 找不到檔案，請確認檔名包含『神秘金字塔 - 股權類股排行(5日之400張以上股東排行)』。")
 else:
-    st.error("❌ 找不到符合條件的檔案，請檢查檔案名稱是否正確 (有無空格、日期格式是否變更)。")
+    # 抓取最新日期的檔案
+    latest_file_b5 = sorted(all_files_b5, key=os.path.basename, reverse=True)[0]
+    try:
+        # 讀取檔案
+        df = pd.read_csv(latest_file_b5, encoding='utf-8-sig')
+        
+        # 1. 清洗欄位並移除雜訊 (無情的清除所有奇怪欄位)
+        df.columns = [str(c).strip() for c in df.columns]
+        
+        # 2. 特殊處理：解析「股票代號/名稱」欄位
+        if '股票代號/名稱' in df.columns:
+            # 假設格式為 "4916事欣科"，將數字分出來
+            df['股票代號'] = df['股票代號/名稱'].astype(str).str.extract(r'(\d+)')
+            df['股票名稱'] = df['股票代號/名稱'].astype(str).str.replace(r'^\d+', '', regex=True)
+        
+        # 3. 留下有意義的欄位 (保留代號、名稱、日期、類別)
+        # 篩選日期欄位：凡是數字組成的 (如 0417, 0522)
+        date_cols = [c for c in df.columns if re.match(r'^\d{4}$', c)]
+        # 依照日期排序 (最新日期在最前面)
+        sorted_dates = sorted(date_cols, reverse=True)
+        
+        keep_cols = ['股票代號', '股票名稱', '類別'] + sorted_dates
+        df = df[keep_cols]
+        
+        # 4. 計算週動態 (最新 vs 次新)
+        if len(sorted_dates) >= 2:
+            newest = sorted_dates[0]
+            prev = sorted_dates[1]
+            df[newest] = pd.to_numeric(df[newest], errors='coerce')
+            df[prev] = pd.to_numeric(df[prev], errors='coerce')
+            
+            def calc_weekly_trend(row):
+                diff = row[newest] - row[prev]
+                if diff >= 1.5: return "🔥 大增"
+                if diff >= 0.5: return "📈 增"
+                if diff > 0: return "↗️ 微增"
+                if diff == 0: return "🔄 持平"
+                if diff > -0.5: return "↘️ 微減"
+                if diff > -1.5: return "📉 減"
+                return "🚨 大減"
+                
+            df['週動態'] = df.apply(calc_weekly_trend, axis=1)
+            # 調整順序：把動態放在日期旁邊
+            cols_order = ['股票代號', '股票名稱', '週動態'] + sorted_dates + ['類別']
+            df = df[cols_order]
+        
+        # 移除所有 `.0` 小數點字串表示 (若有需要)
+        for col in sorted_dates:
+            df[col] = df[col].astype(str).str.replace('.0', '', regex=False)
+            
+        st.success(f"📊 已成功串連 {len(df)} 筆神秘金字塔大戶數據")
+        st.dataframe(df, use_container_width=True, hide_index=True)
+        
+        # 儲存供搜尋使用
+        st.session_state['df_blk5'] = df
+        
+    except Exception as e:
+        st.error(f"❌ 讀取區塊 5 失敗: {str(e)}")
 # ==========================================
 # 📊 【蜂蜜計數器】本站累計觀測人次統計
 # ==========================================
