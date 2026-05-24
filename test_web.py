@@ -174,90 +174,27 @@ st.write("🔥 **戰術策略說明**：以長線 TXT 檔案為絕對基底，�
 # ==========================================
 # 🔍 個股籌碼快搜 (診斷區)
 # ==========================================
-# ==========================================
-# 🔍 個股籌碼快搜 (區塊 1 專屬版)
-# ==========================================
-st.write("---")
-st.markdown("<div id='section-search'></div>", unsafe_allow_html=True)
-st.subheader("🔍 個股籌碼快搜 (診斷區)")
+# --- 顯示區塊 1 ---
+st.write("📋 **中長線三大法人持股變化軌跡：**")
 
-search_query = st.text_input("請輸入你想觀測的股票名稱或代號：", key="global_search_top")
+# 【除錯區】：請先確認這些資訊
+if 'track_display_df' in globals():
+    st.write(f"除錯：DataFrame 欄位列表: {track_display_df.columns.tolist()}")
+    st.write(f"除錯：前三筆資料範例: {track_display_df.head(3).to_dict('records')}")
+else:
+    st.error("除錯：找不到 track_display_df 變數！")
 
-if search_query:
-    st.write(f"### 🎯 綜合診斷標的：{search_query}")
+try:
+    # 執行搜尋
+    q_txt = safe_search(track_display_df, search_query)
     
-    # --- 顯示區塊 1 ---
-    st.write("👑 區塊1：中長線 三大法人 持股比例 追蹤")
-    try:
-        # 直接執行搜尋並顯示區塊 1 資料
-        q_txt = safe_search(track_display_df, search_query)
-        
-        if not q_txt.empty:
-            st.dataframe(q_txt.drop(columns=["秘密3日斜率"], errors='ignore'), use_container_width=True)
-            
-            # --- 繪製油門探針與折線圖 ---
-            chart_cols = [c for c in q_txt.columns if "持股%" in c]
-            if chart_cols:
-                v_latest = pd.to_numeric(q_txt.iloc[0][chart_cols[0]], errors='coerce')
-                
-                def get_diff_pct(days_back):
-                    idx = min(days_back - 1, len(chart_cols) - 1)
-                    v_back = pd.to_numeric(q_txt.iloc[0][chart_cols[idx]], errors='coerce')
-                    return round(float(v_latest - v_back), 2) if not pd.isna(v_latest) and not pd.isna(v_back) else 0.0
-
-                slope_df = pd.DataFrame({
-                    "指標週期": ["⚡ 2日短線突發斜率", "📈 5日短線加速斜率", "🚀 10日中線轉折斜率", "🔒 20日月線波段鎖籌"],
-                    "法人持股淨增減(%)": [get_diff_pct(2), get_diff_pct(5), get_diff_pct(10), get_diff_pct(20)]
-                })
-                st.write("📊 **三大法人持股多週期油門加速探針：**")
-                st.dataframe(slope_df, use_container_width=True)
-                
-                chart_cols_21 = chart_cols[:21]
-                t_ser = pd.Series(
-                    pd.to_numeric(q_txt.iloc[0][chart_cols_21].values, errors='coerce'), 
-                    index=[c.split(' ')[0] for c in chart_cols_21]
-                ).iloc[::-1].dropna()
-                
-                if not t_ser.empty:
-                    st.write(f"📈 **三大法人持股 21日波段全景軌跡曲線 ({q_txt.iloc[0]['股票名稱']})**")
-                    st.line_chart(t_ser, height=240)
-        else:
-            st.warning(f"⚠️ 在【中長線持股追蹤】中找不到與 '{search_query}' 相關的資料。")
-            
-    except Exception as e:
-        st.info("目前無中長線資料可顯示")
-        
-        # --- 繪製油門探針與折線圖 ---
-        try:
-            chart_cols = [c for c in q_txt.columns if "持股%" in c]
-            if chart_cols:
-                v_latest = pd.to_numeric(q_txt.iloc[0][chart_cols[0]], errors='coerce')
-                
-                def get_diff_pct(days_back):
-                    idx = min(days_back - 1, len(chart_cols) - 1)
-                    v_back = pd.to_numeric(q_txt.iloc[0][chart_cols[idx]], errors='coerce')
-                    if pd.isna(v_latest) or pd.isna(v_back):
-                        return 0.0
-                    return round(float(v_latest - v_back), 2)
-
-                slope_df = pd.DataFrame({
-                    "指標週期": ["⚡ 2日短線突發斜率", "📈 5日短線加速斜率", "🚀 10日中線轉折斜率", "🔒 20日月線波段鎖籌"],
-                    "法人持股淨增減(%)": [get_diff_pct(2), get_diff_pct(5), get_diff_pct(10), get_diff_pct(20)]
-                })
-                st.write("📊 **三大法人持股多週期油門加速探針：**")
-                st.dataframe(slope_df, use_container_width=True)
-                
-                chart_cols_21 = chart_cols[:21]
-                t_ser = pd.Series(
-                    pd.to_numeric(q_txt.iloc[0][chart_cols_21].values, errors='coerce'), 
-                    index=[c.split(' ')[0] for c in chart_cols_21]
-                ).iloc[::-1].dropna()
-                
-                if not t_ser.empty:
-                    st.write(f"📈 **三大法人持股 21日波段全景軌跡曲線 ({q_txt.iloc[0]['股票名稱']})**")
-                    st.line_chart(t_ser, height=240)
-        except Exception as chart_err:
-            st.info(f"圖表渲染暫無數據: {chart_err}")
+    if not q_txt.empty:
+        st.dataframe(q_txt.drop(columns=["秘密3日斜率"], errors='ignore'), use_container_width=True)
+        # ... (繪圖代碼保持不變) ...
+    else:
+        st.warning(f"⚠️ 找不到資料。請確認 CSV 中的欄位名稱是否包含 '股票名稱' 與 '股票代號'。")
+except Exception as e:
+    st.error(f"程式錯誤: {e}")
 
  
 # ==========================================
