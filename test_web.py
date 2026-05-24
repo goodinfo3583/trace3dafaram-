@@ -167,224 +167,86 @@ except Exception as e:
 # ==========================================
 # 👑 頂級核心：【三大法人多空評分 + 3日短線飆速置頂爆發榜】
 # ==========================================
-st.markdown("## 🏆 頂級核心：選股偵測池")
+st.markdown("## 🏆 頂級核心：解鎖")
 st.write("🔥 **戰術策略說明**：以長線 TXT 檔案為絕對基底，放寬偵測：今日數據對比前1天、前2天或前3天只要有實質增加（含突破未進榜斷層）即鎖定！短線不再強迫四大表全數交集，只要短線 4 大指標任一命中，即列入黃金名單！")
 
-if (not track_display_df.empty and not csv_foreign_deal.empty and not csv_foreign_stock.empty 
-    and not csv_it_deal.empty and not csv_it_stock.empty and not csv_foreign_sell.empty and not csv_it_sell.empty):
-    
-    import glob, os
-    import numpy as np
-
-    def align_stock_id_type(df, target_col):
-        if df.empty: return df
-        df = df.copy()
-        df[target_col] = df[target_col].astype(str).str.strip()
-        return df
-
-    clean_track = align_stock_id_type(track_display_df, "股票代號")
-    clean_f_sell = align_stock_id_type(csv_foreign_sell, "股票代號")
-    clean_i_sell = align_stock_id_type(csv_it_sell, "股票代號")
-    
-    try:
-        chart_cols = [c for c in clean_track.columns if "持股%" in c]
-        if len(chart_cols) >= 4:
-            def clean_pct_val(series):
-                return pd.to_numeric(series.astype(str).str.replace('%', ''), errors='coerce').fillna(0.0)
-            
-            v_today = clean_pct_val(clean_track[chart_cols[0]])
-            v_t_1 = clean_pct_val(clean_track[chart_cols[1]])
-            v_t_2 = clean_pct_val(clean_track[chart_cols[2]])
-            v_t_3 = clean_pct_val(clean_track[chart_cols[3]])
-            
-            cond_inc_1 = (v_today - v_t_1 > 0)
-            cond_inc_2 = (v_today - v_t_2 > 0)
-            cond_inc_3 = (v_today - v_t_3 > 0)
-            
-            clean_track["長線戰略狀態"] = "🚨 觀察中"
-            clean_track.loc[cond_inc_3, "長線戰略狀態"] = "📈 前3日扣增"
-            clean_track.loc[cond_inc_2, "長線戰略狀態"] = "🚀 前2日加速"
-            clean_track.loc[cond_inc_1, "長線戰略狀態"] = "🔥 前1日暴衝"
-            
-            base_pool = clean_track[clean_track["長線戰略狀態"].isin(["🔥 前1日暴衝", "🚀 前2日加速", "📈 前3日扣增"])].copy()
-        else:
-            base_pool = clean_track[clean_track["籌碼趨勢"].isin(["📈 上升", "🆕 新進榜"])].copy()
-            base_pool["長線戰略狀態"] = base_pool["籌碼趨勢"]
-    except:
-        base_pool = clean_track[clean_track["籌碼趨勢"].isin(["📈 上升", "🆕 新進榜"])].copy()
-        base_pool["長線戰略狀態"] = base_pool["籌碼趨勢"]
-
-    def fetch_latest_dynamic(pattern, mode="ratio"):
-        files = glob.glob(os.path.join(DATA_DIR, pattern))
-        if not files: return pd.DataFrame(columns=["股票代號", "動態"])
-        latest_file = sorted(files, key=lambda x: os.path.basename(x), reverse=True)[0]
-        
-        try:
-            # 這裡修正為安全讀取
-            df = safe_read_csv(latest_file, dtype=str)
-            df.columns = [str(c).replace(" ", "").strip() for c in df.columns]
-            id_col = next((c for c in df.columns if c in ['代號', '股票代號', '證券代號']), None)
-            if not id_col: return pd.DataFrame(columns=["股票代號", "動態"])
-            df['股票代號'] = df[id_col].astype(str).str.strip()
-
-            t_col = next((c for c in df.columns if '當日' in c), None)
-            f_col = next((c for c in df.columns if '5日' in c), None)
-            if not t_col: return pd.DataFrame(columns=["股票代號", "動態"])
-
-            df['t'] = pd.to_numeric(df[t_col], errors='coerce')
-            df['f'] = pd.to_numeric(df[f_col], errors='coerce') if f_col else 0
-
-            def tag(r):
-                t, f = r['t'], r['f']
-                if pd.isna(t): return "未進榜"
-                
-                if mode == "ratio":  
-                    if t > 0 and (pd.isna(f) or f == 0): return f"🆕 新進榜 (+{t}%)"
-                    if t > f and t > 0: return f"🔥 強延續 (+{t}%)"
-                    if 0 < t <= f: return f"⚠️ 放緩 (+{t}%)"
-                    if t < 0: return f"🚨 轉賣 ({t}%)"
-                    return "💤 觀望"
-                else:                
-                    if t > 0 and (pd.isna(f) or f == 0): return f"🆕 突擊卡位 (+{t}%)"
-                    if t > 0: return f"🔥 持續加碼 (+{t}%)"
-                    if t < 0: return f"🚨 轉賣反轉 ({t}%)"
-                    return "💤 觀望"
-                    
-            df["動態"] = df.apply(tag, axis=1)
-            return df[["股票代號", "動態"]]
-        except: 
-            return pd.DataFrame(columns=["股票代號", "動態"])
-
-    dyn_f_deal = fetch_latest_dynamic("*外資買超佔成交比*.csv", mode="ratio").rename(columns={"動態": "外資買比動態"})
-    dyn_f_stock = fetch_latest_dynamic("*外資買超佔發行張數*.csv", mode="stock").rename(columns={"動態": "外資發行動態"})
-    dyn_i_deal = fetch_latest_dynamic("*投信買超佔成交比*.csv", mode="ratio").rename(columns={"動態": "投信買比動態"})
-    dyn_i_stock = fetch_latest_dynamic("*投信買超佔發行張數*.csv", mode="stock").rename(columns={"動態": "投信發行動態"})
-
-    m = pd.merge(base_pool[["股票代號", "股票名稱", "長線戰略狀態", "秘密3日斜率"]], dyn_f_deal, on="股票代號", how="left").fillna("未進榜")
-    m = pd.merge(m, dyn_f_stock, on="股票代號", how="left").fillna("未進榜")
-    m = pd.merge(m, dyn_i_deal, on="股票代號", how="left").fillna("未進榜")
-    m = pd.merge(m, dyn_i_stock, on="股票代號", how="left").fillna("未進榜")
-
-    def extract_dyn_col(df, new_col_name):
-        if df.empty: return pd.DataFrame(columns=["股票代號", new_col_name])
-        target_col = "今日短動態" if "今日短動態" in df.columns else "動態"
-        if target_col not in df.columns: return pd.DataFrame(columns=["股票代號", new_col_name])
-        return df[["股票代號", target_col]].rename(columns={target_col: new_col_name})
-
-    m = pd.merge(m, extract_dyn_col(clean_f_sell, "外資賣比動態"), on="股票代號", how="left").fillna("觀察中")
-    m = pd.merge(m, extract_dyn_col(clean_i_sell, "投信賣比動態"), on="股票代號", how="left").fillna("觀察中")
-
-    def get_latest_val(df_target, col_keyword):
-        if df_target.empty: return pd.Series(0, index=m.index)
-        val_cols = [c for c in df_target.columns if col_keyword in c and c not in ["股票代號", "股票名稱", "動態"]]
-        if not val_cols: return pd.Series(0, index=m.index)
-        sub_df = df_target[["股票代號", val_cols[0]]].rename(columns={val_cols[0]: "val_target"})
-        merged_sub = pd.merge(m[["股票代號"]], sub_df, on="股票代號", how="left")
-        return pd.to_numeric(merged_sub["val_target"], errors='coerce').fillna(0)
-
-    v_it_d = get_latest_val(csv_it_ln_day, "投信連買日")
-    v_it_w = get_latest_val(csv_it_ln_wk, "投信連買週")
-    v_f_d = get_latest_val(csv_foreign_ln_day, "外資連買日")
-    v_f_w = get_latest_val(csv_foreign_ln_wk, "外資連買週")
-
-    def is_active(series):
-        inactive_words = ["未進榜", "觀望", "💤", "⚪", "⏳", "觀察中"]
-        pattern = "|".join(inactive_words)
-        return ~series.str.contains(pattern, na=False)
-
-    short_term_hit = (
-        is_active(m["外資買比動態"]) | 
-        is_active(m["外資發行動態"]) | 
-        is_active(m["投信買比動態"]) | 
-        is_active(m["投信發行動態"])
-    )
-    elite_filtered = m[short_term_hit].copy()
-
-    if not elite_filtered.empty:
-        idx = elite_filtered.index
-        
-        p1 = elite_filtered["外資買比動態"].str.contains("🔥|🆕|⚠️", na=False).astype(int)
-        p2 = elite_filtered["外資發行動態"].str.contains("🔥|🆕|⚠️", na=False).astype(int)
-        p3 = elite_filtered["投信買比動態"].str.contains("🔥|🆕|⚠️", na=False).astype(int)
-        p4 = elite_filtered["投信發行動態"].str.contains("🔥|🆕|⚠️", na=False).astype(int)
-        p5 = (v_it_d.loc[idx] > 0).astype(int)
-        p6 = (v_it_w.loc[idx] > 0).astype(int)
-        p7 = (v_f_d.loc[idx] > 0).astype(int)
-        p8 = (v_f_w.loc[idx] > 0).astype(int)
-        
-        m1 = elite_filtered["外資賣比動態"].str.contains("🚨|❌|🚀|劇烈", na=False).astype(int)
-        m2 = elite_filtered["投信賣比動態"].str.contains("🚨|❌|🚀|劇烈", na=False).astype(int)
-        m3 = elite_filtered["外資買比動態"].str.contains("🚨|❌", na=False).astype(int)
-        m4 = elite_filtered["外資發行動態"].str.contains("🚨|❌", na=False).astype(int)
-        
-        elite_filtered["籌碼淨得分"] = (p1 + p2 + p3 + p4 + p5 + p6 + p7 + p8) - (m1 + m2 + m3 + m4)
-        
-        elite_final_result = elite_filtered.sort_values(by=["籌碼淨得分", "秘密3日斜率"], ascending=[False, False])
-        
-        def get_score_tag(score):
-            if score >= 6: return f"👑 頂級爆發 ({score}分)"
-            elif score >= 3: return f"🔥 強力共振 ({score}分)"
-            elif score >= 1: return f"📈 籌碼溫增 ({score}分)"
-            elif score == 0: return "🔄 多空拉鋸 (0分)"
-            else: return f"🚨 賣壓警訊 ({score}分)"
-            
-        elite_final_result["戰情訊號"] = elite_final_result["籌碼淨得分"].apply(get_score_tag)
-        
-        view_elite_df = elite_final_result[[
-            "股票代號", "股票名稱", "戰情訊號", "長線戰略狀態", 
-            "外資買比動態", "外資發行動態", "投信買比動態", "投信發行動態"
-        ]].copy()
-        
-        view_elite_df.columns = [
-            "股票代號", "股票名稱", "戰情多空評分", "長線法人軌跡", 
-            "外資買佔比", "外資買佔發行", "投信買佔比", "投信買佔發行"
-        ]
-        
-        view_elite_df.index = range(1, len(view_elite_df) + 1)
-        
-        st.success(f"🎯 戰情雷達：經『長線1~3日回推加碼』與『短線4表任一命中機制』交叉篩選，目前共追蹤到 **{len(view_elite_df)}** 檔潛在黑馬股！")
-        st.dataframe(view_elite_df, use_container_width=True)
-    else:
-        st.info("💡 目前長線看增的名單中，短線 4 大指標檔案尚無任何一項產生聯手交集。")
-else:
-    st.error("❌ 頂級核心多空矩陣運算失敗，請確認資料夾中的外資/投信 CSV 檔案是否完整。")
-
 
 # ==========================================
-# 🔍 診斷區功能整合
+# 🔍 個股籌碼快搜 (診斷區)
 # ==========================================
-
-# 1. 診斷顯示函式 (放在搜尋區塊上方)
-def show_rank_result(title, session_key, query):
-    st.write(f"#### {title}")
-    # 從 session_state 直接安全讀取
-    df = st.session_state.get(session_key, pd.DataFrame())
-    res = safe_search(df, query)
-    if not res.empty:
-        st.dataframe(res, use_container_width=True)
-    else:
-        st.info("無資料 (未進榜)")
-
-# 2. 顯示分頁與排名診斷 (放在 if search_query: 區塊內)
 st.write("---")
-st.subheader("📊 籌碼變動排名診斷")
-tab1, tab2, tab3 = st.tabs(["📉 融資減少", "📉 借券賣出減少", "📈 融券增加"])
+st.markdown("<div id='section-search'></div>", unsafe_allow_html=True)
+st.subheader("🔍 個股籌碼快搜 (診斷區)")
 
-with tab1:
-    c1, c2 = st.columns(2)
-    with c1: show_rank_result("📉 融資減少【幅度】", 'df_margin_pct', search_query)
-    with c2: show_rank_result("📉 融資減少【張數】", 'df_margin_vol', search_query)
+search_query = st.text_input("請輸入你想觀測的股票名稱或代號：", key="global_search_top")
 
-with tab2:
-    c3, c4 = st.columns(2)
-    with c3: show_rank_result("📉 借券賣出減少【幅度】", 'df_short_pct', search_query)
-    with c4: show_rank_result("📉 借券賣出減少【張數】", 'df_short_vol', search_query)
+# 🛠️ 建立一個安全的搜尋過濾函數 (一次解決重複欄位與亂碼問題)
+def safe_search(df, query):
+    # 確保傳入的是有效的 DataFrame
+    if df is None or type(df) is not pd.DataFrame or df.empty:
+        return pd.DataFrame()
+        
+    # 1. 強制過濾重複欄位 (避免 PyArrow 報錯)
+    df = df.loc[:, ~df.columns.duplicated()]
+    
+    # 2. 確保有我們需要的欄位才能搜尋
+    if '股票名稱' not in df.columns or '股票代號' not in df.columns:
+        return pd.DataFrame()
+        
+    # 3. 執行搜尋
+    res = df[df['股票名稱'].str.contains(query, na=False) | df['股票代號'].astype(str).str.contains(query, na=False)].copy()
+    
+    # 4. 🔥 清除文字識別產生的「撖」字亂碼
+    if not res.empty:
+        res['股票名稱'] = res['股票名稱'].str.replace('撖', '', regex=False)
+        
+    return res
 
-with tab3:
-    c5, c6 = st.columns(2)
-    with c5: show_rank_result("📈 融券增加【幅度】", 'df_margin_plus_pct', search_query)
-    with c6: show_rank_result("📈 融券增加【張數】", 'df_margin_plus_vol', search_query)
+if search_query:
+    # 搜尋區塊 1 的主數據
+    try: q_txt = safe_search(track_display_df, search_query)
+    except NameError: q_txt = pd.DataFrame()
 
+    if q_txt.empty:
+        st.warning(f"⚠️ 在【區塊1：中長線持股追蹤】中找不到與 '{search_query}' 相關的資料。")
+    else:
+        st.write(f"### 🎯 綜合診斷標的：{search_query}")
+        st.write("📋 **1. 中長線三大法人持股變化軌跡：**")
+        st.dataframe(q_txt.drop(columns=["秘密3日斜率"], errors='ignore'), use_container_width=True)
+        
+        # --- 繪製油門探針與折線圖 ---
+        try:
+            chart_cols = [c for c in q_txt.columns if "持股%" in c]
+            if chart_cols:
+                v_latest = pd.to_numeric(q_txt.iloc[0][chart_cols[0]], errors='coerce')
+                
+                def get_diff_pct(days_back):
+                    idx = min(days_back - 1, len(chart_cols) - 1)
+                    v_back = pd.to_numeric(q_txt.iloc[0][chart_cols[idx]], errors='coerce')
+                    if pd.isna(v_latest) or pd.isna(v_back):
+                        return 0.0
+                    return round(float(v_latest - v_back), 2)
+
+                slope_df = pd.DataFrame({
+                    "指標週期": ["⚡ 2日短線突發斜率", "📈 5日短線加速斜率", "🚀 10日中線轉折斜率", "🔒 20日月線波段鎖籌"],
+                    "法人持股淨增減(%)": [get_diff_pct(2), get_diff_pct(5), get_diff_pct(10), get_diff_pct(20)]
+                })
+                st.write("📊 **三大法人持股多週期油門加速探針：**")
+                st.dataframe(slope_df, use_container_width=True)
+                
+                chart_cols_21 = chart_cols[:21]
+                t_ser = pd.Series(
+                    pd.to_numeric(q_txt.iloc[0][chart_cols_21].values, errors='coerce'), 
+                    index=[c.split(' ')[0] for c in chart_cols_21]
+                ).iloc[::-1].dropna()
+                
+                if not t_ser.empty:
+                    st.write(f"📈 **三大法人持股 21日波段全景軌跡曲線 ({q_txt.iloc[0]['股票名稱']})**")
+                    st.line_chart(t_ser, height=240)
+        except Exception as chart_err:
+            st.info(f"圖表渲染暫無數據: {chart_err}")
+
+ 
 # ==========================================
 # 🧭 側邊欄導航 (無感互動+視覺特效版)
 # ==========================================
@@ -1012,7 +874,7 @@ else:
 # ==========================================
 st.write("---")
 st.markdown("<div id='section-3'></div>", unsafe_allow_html=True)
-st.header("📅 區塊3：法人連續買超")
+st.header("📅 區塊3：連續買超")
 
 st.info("""
 💡 **狀態動態評估依據：**
@@ -1311,9 +1173,6 @@ with c1:
     if not df_pct_clean.empty:
         st.info(f"💡 最新來源: {msg_pct}")
         st.dataframe(df_pct_clean, use_container_width=True)
-        # 🔥 在這裡存入幅度表格
-        st.session_state['df_margin_pct'] = df_pct_clean
-        st.session_state['df_margin_vol'] = df_vol_clean
     else:
         st.warning(f"⚠️ {msg_pct} 或 過濾後無相符資料")
 
@@ -1325,20 +1184,9 @@ with c2:
     if not df_vol_clean.empty:
         st.info(f"💡 最新來源: {msg_vol}")
         st.dataframe(df_vol_clean, use_container_width=True)
-        # 🔥 在這裡存入張數表格
-        st.session_state['df_margin_vol'] = df_vol_clean
     else:
         st.warning(f"⚠️ {msg_vol} 或 過濾後無相符資料")
-# 確保這些變數在全域是存在的
-if 'df_pct_clean' in locals():
-    globals()['df_margin_pct'] = df_pct_clean
-else:
-    globals()['df_margin_pct'] = pd.DataFrame()
 
-if 'df_vol_clean' in locals():
-    globals()['df_margin_vol'] = df_vol_clean
-else:
-    globals()['df_margin_vol'] = pd.DataFrame()
 # ==========================================
 # 📅 區塊 4-2：借券賣出減少動向 (5日累計)
 # ==========================================
