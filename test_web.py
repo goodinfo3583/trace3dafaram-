@@ -1281,7 +1281,7 @@ st.session_state['df_margin_plus_vol'] = df_vol_clean
 # ==========券資比資料請一起搬遷============
 
 # ==========================================
-# 💰 區塊 5：大股東動向 (歷史智能拼接與對齊版)
+# 💰 區塊 5：大股東動向 (日期去重與去西元修復版)
 # ==========================================
 st.write("---")
 st.markdown("<div id='section-5'></div>", unsafe_allow_html=True)
@@ -1295,7 +1295,7 @@ all_files_b5 = glob.glob(csv_pattern_b5)
 if not all_files_b5:
     st.warning("⚠️ 找不到相關 CSV 檔案。")
 else:
-    # 依照檔名排序，確保最新的檔案 (例如 0522) 在最前面
+    # 依照檔名排序，確保最新的檔案在最前面
     all_files_b5 = sorted(all_files_b5, key=os.path.basename, reverse=True)
     
     master_df = None
@@ -1307,6 +1307,18 @@ else:
             df = pd.read_csv(file, encoding='utf-8-sig')
             df.columns = [str(c).strip() for c in df.columns]
             
+            # 🔥 【核心修復 1】：即時偵測並刪除欄位名稱開頭的 "2026"
+            standardized_cols = []
+            for c in df.columns:
+                if re.match(r'^2026\d{4}$', c):  # 如果是 2026XXXX 格式
+                    standardized_cols.append(c[-4:])  # 只取後方 4 碼 XXXX
+                else:
+                    standardized_cols.append(c)
+            df.columns = standardized_cols
+            
+            # 🔥 【核心修復 2】：刪除單檔內部可能重複的相同日期欄位
+            df = df.loc[:, ~df.columns.duplicated()]
+            
             # 分離代號與名稱
             if '股票代號/名稱' in df.columns:
                 df['股票代號'] = df['股票代號/名稱'].astype(str).str.extract(r'(\d+)')
@@ -1315,28 +1327,27 @@ else:
             if '股票代號' not in df.columns:
                 continue
                 
-            # 抓取 4 碼或 8 碼的日期欄位
-            date_cols = [c for c in df.columns if re.match(r'^\d{4}$|^\d{8}$', c)]
+            # 抓取已被標準化為 4 碼的日期欄位
+            date_cols = [c for c in df.columns if re.match(r'^\d{4}$', c)]
             all_date_cols.update(date_cols)
             
             # 決定保留的欄位
             cols_to_keep = ['股票代號', '股票名稱'] + date_cols
             
-            # 【關鍵】：只有在讀取最新檔案 (idx == 0) 時，才把「上週持有%」抓進來
+            # 只有在讀取最新檔案 (idx == 0) 時，才把「上週持有%」抓進來
             if idx == 0 and '上週持有%' in df.columns:
                 cols_to_keep.append('上週持有%')
             
-            # 過濾掉異常欄位
             cols_to_keep = [c for c in cols_to_keep if c in df.columns]
             temp_df = df[cols_to_keep].copy()
             
-            # 設定索引，以便後續進行智慧拼接 (不會產生 _x, _y 衝突)
+            # 設定索引進行智慧拼接
             temp_df = temp_df.set_index(['股票代號', '股票名稱'])
             
             if master_df is None:
                 master_df = temp_df
             else:
-                # combine_first 會將舊檔案的資料補進最新檔案的 NaN 空缺中，且不會覆蓋最新檔案的資料
+                # 智慧拼接歷史資料
                 master_df = master_df.combine_first(temp_df)
         except Exception:
             continue
@@ -1344,13 +1355,12 @@ else:
     if master_df is not None:
         master_df = master_df.reset_index()
         
-        # 2. 智慧排序日期邏輯：統一擷取最後 4 碼來比較 (解決 20260417 字串排序錯誤的問題)
-        sorted_dates = sorted(list(all_date_cols), key=lambda x: x[-4:], reverse=True)
+        # 2. 排序日期欄位 (皆已轉為4碼，可直接降冪排序，越新越前面)
+        sorted_dates = sorted(list(all_date_cols), reverse=True)
         
         # 3. 計算週動態
         if len(sorted_dates) >= 2:
             newest, prev = sorted_dates[0], sorted_dates[1]
-            # 強制轉為數值以供計算
             master_df[newest] = pd.to_numeric(master_df[newest], errors='coerce')
             master_df[prev] = pd.to_numeric(master_df[prev], errors='coerce')
             
@@ -1376,17 +1386,16 @@ else:
             final_cols.append('上週持有%')
         final_cols.extend(sorted_dates)
         
-        # 只選取確實存在的欄位
         final_df = master_df[[c for c in final_cols if c in master_df.columns]].copy()
         
-        # 5. 排序表單：以最新日期 (例如 0522) 的持股比率做降冪排列
+        # 5. 排序表單：以最新日期做為置頂降冪排序依據
         if sorted_dates:
             final_df = final_df.sort_values(by=sorted_dates[0], ascending=False)
         
         # 6. 清理小數點與空值 (安全去除 .0 尾數)
         def clean_decimals(val):
             if pd.isna(val): return "無資料"
-            s = str(val)
+            s = str(val).strip()
             if s.endswith('.0'): return s[:-2]
             return s
             
@@ -1397,10 +1406,10 @@ else:
             
         final_df = final_df.fillna("無資料")
         
-        st.success(f"已成功串連 {len(final_df)} 筆股東歷史數據")
+        st.success(f"已成功串連 {len(final_df)} 筆股東數據")
         st.dataframe(final_df, use_container_width=True, hide_index=True)
         
-        # 將最終結果存入記憶體供搜尋區塊掃描
+        # 將最終結果同步存入記憶體，供搜尋區塊聯動掃描
         st.session_state['df_blk5'] = final_df
     else:
         st.error("無法合併資料。")
