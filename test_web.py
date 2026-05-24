@@ -89,28 +89,51 @@ if search_query:
         if not q_blk1.empty:
             st.dataframe(q_blk1.drop(columns=["秘密3日斜率"], errors='ignore'), use_container_width=True)
             
-            # --- 繪圖區 (折線圖 + 防呆提示) ---
-            try:
-                chart_cols = [c for c in q_blk1.columns if "持股%" in c]
-                if chart_cols:
-                    t_ser = pd.Series(
-                        pd.to_numeric(q_blk1.iloc[0][chart_cols[:21]].values, errors='coerce'), 
-                        index=[c.split(' ')[0] for c in chart_cols[:21]]
-                    ).iloc[::-1].dropna()
+            # --- 任務 2：擴充為 30 日 ---
+            chart_cols = [c for c in q_blk1.columns if "持股%" in c]
+            if chart_cols:
+                target_cols = chart_cols[:30] # 抓取最近 30 天
+                
+                # --- 任務 1：解決歸零斷崖連線問題 ---
+                # 抓取數值，將 0 強制替換為 NaN，然後 dropna。
+                # 這樣 Streamlit 折線圖就會自動跳過未進榜的日期，將已知數據「平滑連線」，非常真實。
+                raw_vals = pd.to_numeric(q_blk1.iloc[0][target_cols].values, errors='coerce')
+                t_ser = pd.Series(
+                    raw_vals, 
+                    index=[c.split(' ')[0] for c in target_cols]
+                ).replace(0, np.nan).dropna().iloc[::-1]
+                
+                if not t_ser.empty:
+                    st.write(f"📈 **持股 {len(t_ser)}日波段真實軌跡 ({q_blk1.iloc[0].get('股票名稱', '標的')})**")
+                    st.line_chart(t_ser, height=240)
                     
-                    if not t_ser.empty:
-                        st.write(f"📈 **持股 21日波段軌跡 ({q_blk1.iloc[0].get('股票名稱', '目標個股')})**")
-                        st.line_chart(t_ser, height=240)
-                    else:
-                        raise ValueError("無足夠數據")
-            except Exception:
-                # 解決您的需求 1：改成白話文的未進榜說明
-                st.info("⚪ 該標的未連續進榜 5/20/60/120 日，故無足夠連續持股%數據可供繪製波段圖表。")
+                    # --- 任務 3：新增 2, 3, 5, 20 日斜率面版 ---
+                    st.markdown("##### 🚀 籌碼斜率 (與最新持股相比淨增減)")
+                    
+                    def get_slope(n_days):
+                        # 確保天數足夠
+                        if len(target_cols) >= n_days:
+                            v_new = pd.to_numeric(q_blk1.iloc[0][target_cols[0]], errors='coerce')
+                            v_old = pd.to_numeric(q_blk1.iloc[0][target_cols[n_days-1]], errors='coerce')
+                            
+                            # 確保數據有效且不為0 (未進榜)
+                            if pd.notna(v_new) and pd.notna(v_old) and v_old != 0 and v_new != 0:
+                                diff = round(v_new - v_old, 2)
+                                return f"{diff:+.2f} %"
+                        return "無對應資料"
+
+                    # 使用 st.columns 排版，做出漂亮的儀表板效果
+                    col1, col2, col3, col4 = st.columns(4)
+                    col1.metric("2日斜率", get_slope(2))
+                    col2.metric("3日斜率", get_slope(3))
+                    col3.metric("5日斜率", get_slope(5))
+                    col4.metric("20日斜率", get_slope(20))
+                else:
+                    st.info("⚪ 該標的有效數據過少，無法繪製波段圖表。")
         else:
             st.info("⚪ 無資料 (該標的未進入中長線榜單)")
     else:
         st.error("⚠️ 尚未載入區塊 1 資料。請確認上方區塊 1 已執行。")
-
     # ==========================================
     # 📊 區塊 2：(替換為您的實際名稱)
     # ==========================================
@@ -858,7 +881,7 @@ def read_live_ln_report(file_keyword, strict_type, exact_field_name, prefix_keyw
 
 # 執行排程與渲染 (與您原先邏輯相同)
 live_fo_day, date_fo_day = read_live_ln_report("外資連續買超", "日", "外資連續買賣日數", "外資", "最新連買天數")
-# ... (下方保持您原本的排程呼叫) ...
+# ... (下方保持原本排程呼叫) ...
 
 # ========================================================
 # 🚀 執行排程
@@ -1095,7 +1118,9 @@ with c2:
         st.dataframe(df_vol_clean, use_container_width=True)
     else:
         st.warning(f"⚠️ {msg_vol} 或 過濾後無相符資料")
-
+        # 存入 4-1
+        st.session_state['df_margin_pct'] = df_pct_clean
+        st.session_state['df_margin_vol'] = df_vol_clean
 # ==========================================
 # 📅 區塊 4-2：借券賣出減少動向 (5日累計)
 # ==========================================
@@ -1138,7 +1163,9 @@ with c2:
         st.dataframe(df_vol_clean, use_container_width=True)
     else:
         st.warning(f"⚠️ {msg_vol} 或 過濾後無相符資料")
-
+       # 存入 4-2
+        st.session_state['df_short_pct'] = df_pct_clean_short
+        st.session_state['df_short_vol'] = df_vol_clean_short
 # ==========================================
 # 📅 區塊 4-3：融券增加動向 (5日累計)
 # ==========================================
@@ -1181,6 +1208,9 @@ with c2:
         st.dataframe(df_vol_clean, use_container_width=True)
     else:
         st.warning(f"⚠️ {msg_vol} 或 過濾後無相符資料")
+        # 存入 4-3
+        st.session_state['df_margin_plus_pct'] = df_pct_clean_plus
+        st.session_state['df_margin_plus_vol'] = df_vol_clean_plus
 # ==========券資比資料請一起搬遷============
 # ==========================================
 # 📊 【蜂蜜計數器】本站累計觀測人次統計
