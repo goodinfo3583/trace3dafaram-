@@ -1281,7 +1281,7 @@ st.session_state['df_margin_plus_vol'] = df_vol_clean
 # ==========券資比資料請一起搬遷============
 
 # ==========================================
-# 💰 區塊 5：大股東動向 (歷史數據合併與自動對齊版)
+# 💰 區塊 5：大股東動向 (精準對齊版)
 # ==========================================
 st.write("---")
 st.markdown("<div id='section-5'></div>", unsafe_allow_html=True)
@@ -1293,55 +1293,42 @@ all_files_b5 = glob.glob(csv_pattern_b5)
 if not all_files_b5:
     st.warning("⚠️ 找不到相關 CSV 檔案。")
 else:
-    # 1. 建立主資料表 (Master DataFrame)
-    master_df = None
-    all_date_cols = set()
-
-    # 2. 遍歷所有檔案進行合併
-    for file in all_files_b5:
-        try:
-            df = pd.read_csv(file, encoding='utf-8-sig')
-            df.columns = [str(c).strip() for c in df.columns]
-            
-            # 【關鍵修正】：解析 "股票代號/名稱"
-            if '股票代號/名稱' in df.columns:
-                df['股票代號'] = df['股票代號/名稱'].astype(str).str.extract(r'(\d+)')
-                df['股票名稱'] = df['股票代號/名稱'].astype(str).str.replace(r'^\d+', '', regex=True)
-            
-            # 識別日期欄位 (4位數字，例如 0522)
-            date_cols = [c for c in df.columns if re.match(r'^\d{4}$', c)]
-            all_date_cols.update(date_cols)
-            
-            # 只保留必要的列
-            cols_to_keep = ['股票代號', '股票名稱'] + date_cols
-            temp_df = df[cols_to_keep].copy()
-            
-            if master_df is None:
-                master_df = temp_df
-            else:
-                # 使用 outer merge，確保所有日期的資料都能對齊
-                master_df = pd.merge(master_df, temp_df, on=['股票代號', '股票名稱'], how='outer')
-        except Exception:
-            continue
-
-    if master_df is not None:
+    # 讀取最新的一個檔案 (該檔案已包含歷史週次資料)
+    latest_file = sorted(all_files_b5, key=os.path.basename, reverse=True)[0]
+    
+    try:
+        # 讀取檔案
+        df = pd.read_csv(latest_file, encoding='utf-8-sig')
+        df.columns = [str(c).strip() for c in df.columns]
+        
+        # 1. 處理股票代號與名稱 (將 "4916事欣科" 分離)
+        if '股票代號/名稱' in df.columns:
+            df['股票代號'] = df['股票代號/名稱'].astype(str).str.extract(r'(\d+)')
+            df['股票名稱'] = df['股票代號/名稱'].astype(str).str.replace(r'^\d+', '', regex=True)
+        
+        # 2. 自動識別日期欄位 (尋找 4 碼日期，例如 0522 或 0417)
+        # 排除掉不需要的雜訊欄位
+        ignore_cols = [' ', ' .1', '#', '股票代號/名稱', '類別', ' .2', '走 勢', '總增減', ' .3', '上週持有%', '今日收盤價', '今日漲跌', ' .4']
+        date_cols = [c for c in df.columns if re.match(r'^\d{4}$|^\d{8}$', c) and c not in ignore_cols]
+        
         # 排序日期 (由新到舊)
-        sorted_dates = sorted(list(all_date_cols), reverse=True)
-        final_cols = ['股票代號', '股票名稱'] + sorted_dates
+        sorted_dates = sorted(date_cols, reverse=True)
         
-        # 重新排序並清理
-        final_df = master_df.reindex(columns=final_cols).copy()
+        # 3. 欄位整理：[代號, 名稱, 週動態, 日期1, 日期2..., 上週持有%]
+        final_cols = ['股票代號', '股票名稱'] + sorted_dates + ['上週持有%']
         
-        # 計算週動態 (最新對次新)
+        # 確保選取的欄位存在
+        df = df[[c for c in final_cols if c in df.columns]].copy()
+        
+        # 4. 計算週動態 (根據最新兩欄)
         if len(sorted_dates) >= 2:
             newest, prev = sorted_dates[0], sorted_dates[1]
-            # 強制轉數值計算
-            val_new = pd.to_numeric(final_df[newest], errors='coerce')
-            val_prev = pd.to_numeric(final_df[prev], errors='coerce')
+            df[newest] = pd.to_numeric(df[newest], errors='coerce')
+            df[prev] = pd.to_numeric(df[prev], errors='coerce')
             
             def get_trend(row):
-                v1, v2 = pd.to_numeric(row[newest], errors='coerce'), pd.to_numeric(row[prev], errors='coerce')
-                if pd.isna(v1) or pd.isna(v2): return "-"
+                v1, v2 = row[newest], row[prev]
+                if pd.isna(v1) or pd.isna(v2): return "無資料"
                 diff = v1 - v2
                 if diff >= 1.5: return "🔥 大增"
                 if diff >= 0.5: return "📈 增"
@@ -1351,24 +1338,25 @@ else:
                 if diff > -1.5: return "📉 減"
                 return "🚨 大減"
             
-            final_df.insert(2, "週動態", final_df.apply(get_trend, axis=1))
-
-        # 依最新日期排序
-        final_df[sorted_dates[0]] = pd.to_numeric(final_df[sorted_dates[0]], errors='coerce')
-        final_df = final_df.sort_values(by=sorted_dates[0], ascending=False)
+            df.insert(2, "週動態", df.apply(get_trend, axis=1))
         
-        # 填補空值
-        final_df = final_df.fillna("無資料")
-        
-        # 刪除無用的 float 小數點 (例如 11.94 留著，但 11.0 變 11)
+        # 排序：根據最新日期欄位做降冪排列
+        if sorted_dates:
+            df = df.sort_values(by=sorted_dates[0], ascending=False)
+            
+        # 格式化顯示 (去掉 .0)
         for col in sorted_dates:
-             final_df[col] = final_df[col].apply(lambda x: str(x).replace('.0', '') if str(x).endswith('.0') else x)
-
-        st.success(f"已成功串連 {len(final_df)} 筆股東數據")
-        st.dataframe(final_df, use_container_width=True, hide_index=True)
+            df[col] = df[col].astype(str).str.replace('.0', '', regex=False)
+        df = df.fillna("無資料")
         
-        # 儲存供搜尋
-        st.session_state['df_blk5'] = final_df
+        st.success(f"已成功串連 {len(df)} 筆股東數據")
+        st.dataframe(df, use_container_width=True, hide_index=True)
+        
+        # 存入 Session 以供搜尋
+        st.session_state['df_blk5'] = df
+        
+    except Exception as e:
+        st.error(f"❌ 讀取數據時發生錯誤: {str(e)}")
 # ==========================================
 # 📊 【蜂蜜計數器】本站累計觀測人次統計
 # ==========================================
