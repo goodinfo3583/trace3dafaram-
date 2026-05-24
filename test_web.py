@@ -1417,14 +1417,10 @@ else:
 with top_pool_container:
     st.write("---")
     st.markdown("<div id='section-top-pool'></div>", unsafe_allow_html=True)
-    st.header("🏆 置頂信心與頂級選股池 (全區塊綜合評比)")
+    st.header("🏆 數據分析觀察名單 (全區塊綜合評比)")
     st.info("""
-    💡 **權重評分規則**：
-    * **基底**：需符合區塊1動能(趨緩/上升/持平)。
-    * **區塊2**：進榜且無衰退動態(+1分)。
-    * **區塊3**：日連買(依天數 +0.5~1分)；週連買(依週數 +1~2分)。
-    * **區塊4**：幅度進榜(+1分)；張數進榜(+0.5分)。
-    * **區塊5**：大股東微增(+1) / 大增(+2) / 減(-0.5) / 大減(-1)。
+    💡 **權重評分規則**：以三大法人持股變化打底進行區區塊數據掃描。
+    
     """)
 
     if 'my_final_df' not in st.session_state or st.session_state['my_final_df'].empty:
