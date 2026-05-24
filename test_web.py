@@ -922,8 +922,8 @@ else:
             if val_5d == 0 or val_5d == "未進榜":
                 return f"🆕 今日突擊卡位 ({val_today}%)" if val_today > 0 else "💤 籌碼沉澱中"
             
-            if val_today < 0: return f"🚨 今日轉賣反轉 ({val_today}%)"
-            elif val_today > 0: return f"🔥 今日持續加碼 ({val_today}%)"
+            if val_today < 0: return f"🚨 轉賣反轉 ({val_today}%)"
+            elif val_today > 0: return f"🔥 持續加碼 ({val_today}%)"
             return "🔄 今日量縮持平"
 
         csv_display['今日短動態'] = csv_display.apply(judge_today_alert_fo, axis=1)
@@ -1019,8 +1019,8 @@ else:
             if val_5d == 0 or val_5d == "未進榜":
                 return f"🆕 今日突擊卡位 ({val_today}%)" if val_today > 0 else "💤 籌碼沉澱中"
             
-            if val_today < 0: return f"🚨 今日轉賣反轉 ({val_today}%)"
-            elif val_today > 0: return f"🔥 今日持續加碼 ({val_today}%)"
+            if val_today < 0: return f"🚨 轉賣反轉 ({val_today}%)"
+            elif val_today > 0: return f"🔥 持續加碼 ({val_today}%)"
             return "🔄 今日量縮持平"
 
         csv_display['今日短動態'] = csv_display.apply(judge_today_alert_sitc, axis=1)
