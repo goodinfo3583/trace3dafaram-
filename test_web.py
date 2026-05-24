@@ -187,7 +187,7 @@ if search_query:
     st.write(f"### 🎯 綜合診斷標的：{search_query}")
     
     # --- 顯示區塊 1 ---
-    st.write("📋 **中長線三大法人持股變化軌跡：**")
+    st.write("👑 區塊1：中長線 三大法人 持股比例 追蹤")
     try:
         # 直接執行搜尋並顯示區塊 1 資料
         q_txt = safe_search(track_display_df, search_query)
