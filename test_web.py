@@ -351,7 +351,7 @@ else:
 
 
 # ==========================================
-# 🔍 個股籌碼快搜 (直接由記憶體現有表格篩選)
+# 🔍 個股籌碼快搜 (請直接替換此區塊)
 # ==========================================
 st.write("---")
 st.markdown("<div id='section-search'></div>", unsafe_allow_html=True)
@@ -359,17 +359,13 @@ st.subheader("🔍 個股籌碼快搜 (從現有資料篩選)")
 
 search_query = st.text_input("請輸入你想觀測的股票名稱或代號：", key="global_search_top")
 
-# 定義一個專門在已存在表格中搜尋的輕量函數
+# 1. 函數定義 (放在外面)
 def search_in_memory(df, query):
     if df is None or df.empty: return pd.DataFrame()
-    
-    # 確保搜尋時的欄位名稱是對應的
-    # 這裡我們預設您的表格已經有 '股票代號' 和 '股票名稱'
     df_temp = df.copy()
     
-    # 統一處理為字串以便比對
+    # 統一處理為字串
     df_temp['股票代號'] = df_temp['股票代號'].astype(str).str.strip()
-    # 清理名稱中的亂碼
     if '股票名稱' in df_temp.columns:
         df_temp['股票名稱'] = df_temp['股票名稱'].astype(str).str.replace('撖', '', regex=False).str.strip()
     
@@ -380,62 +376,71 @@ def search_in_memory(df, query):
     ]
     return res
 
-        # ==========================================
-        # 🚀 區塊 2-1 ~ 2-4 對接 (修正版：正確顯示"無資料")
-        # ==========================================
-        st.markdown("##### 🚀 核心主力短線進攻 (區塊 2)")
-        c1, c2 = st.columns(2)
-        
-        with c1:
-            st.write("📊 **外資 5 日買佔成交：**")
-            res_2_1 = search_in_memory(csv_foreign_deal, search_query)
-            if not res_2_1.empty: st.dataframe(res_2_1, use_container_width=True)
-            else: st.info("無資料")
-            
-            st.write("🔒 **外資 5 日買佔發行：**")
-            res_2_3 = search_in_memory(csv_foreign_stock, search_query)
-            if not res_2_3.empty: st.dataframe(res_2_3, use_container_width=True)
-            else: st.info("無資料")
-                
-        with c2:
-            st.write("🥦 **投信 5 日買佔成交：**")
-            res_2_2 = search_in_memory(csv_it_deal, search_query)
-            if not res_2_2.empty: st.dataframe(res_2_2, use_container_width=True)
-            else: st.info("無資料")
-                
-            st.write("💎 **投信 5 日買佔發行：**")
-            res_2_4 = search_in_memory(csv_it_stock, search_query)
-            if not res_2_4.empty: st.dataframe(res_2_4, use_container_width=True)
-            else: st.info("無資料")
+# 2. 只有當有輸入搜尋時，才執行顯示邏輯 (縮排對齊)
+if search_query:
+    # 處理區塊1
+    q_txt = search_in_memory(track_display_df, search_query)
+    if not q_txt.empty:
+        st.write(f"### 🎯 綜合診斷標的：{search_query}")
+        st.dataframe(q_txt.loc[:, ~q_txt.columns.duplicated()], use_container_width=True)
+    else:
+        st.warning(f"⚠️ 在區塊1中找不到與 '{search_query}' 相關資料。")
 
-        # ==========================================
-        # 📅 區塊 3 (修正版：正確顯示"無資料")
-        # ==========================================
-        st.markdown("##### 📅 法人連續買超 (區塊 3)")
-        c3_1, c3_2 = st.columns(2)
+    # ==========================================
+    # 🚀 區塊 2-1 ~ 2-4 對接
+    # ==========================================
+    st.markdown("##### 🚀 核心主力短線進攻 (區塊 2)")
+    c1, c2 = st.columns(2)
+    
+    with c1:
+        st.write("📊 **外資 5 日買佔成交：**")
+        res_2_1 = search_in_memory(csv_foreign_deal, search_query)
+        if not res_2_1.empty: st.dataframe(res_2_1, use_container_width=True)
+        else: st.info("無資料")
         
-        with c3_1:
-            st.write("🌐 **外資最新日連買**")
-            res_3_fo_day = search_in_memory(live_fo_day, search_query)
-            if not res_3_fo_day.empty: st.dataframe(res_3_fo_day, use_container_width=True)
-            else: st.info("無資料")
+        st.write("🔒 **外資 5 日買佔發行：**")
+        res_2_3 = search_in_memory(csv_foreign_stock, search_query)
+        if not res_2_3.empty: st.dataframe(res_2_3, use_container_width=True)
+        else: st.info("無資料")
             
-            st.write("🌐 **外資最新週連買**")
-            res_3_fo_wk = search_in_memory(live_fo_wk, search_query)
-            if not res_3_fo_wk.empty: st.dataframe(res_3_fo_wk, use_container_width=True)
-            else: st.info("無資料")
-                
-        with c3_2:
-            st.write("🏦 **投信最新日連買**")
-            res_3_it_day = search_in_memory(live_it_day, search_query)
-            if not res_3_it_day.empty: st.dataframe(res_3_it_day, use_container_width=True)
-            else: st.info("無資料")
+    with c2:
+        st.write("🥦 **投信 5 日買佔成交：**")
+        res_2_2 = search_in_memory(csv_it_deal, search_query)
+        if not res_2_2.empty: st.dataframe(res_2_2, use_container_width=True)
+        else: st.info("無資料")
             
-            st.write("🏦 **投信最新週連買**")
-            res_3_it_wk = search_in_memory(live_it_wk, search_query)
-            if not res_3_it_wk.empty: st.dataframe(res_3_it_wk, use_container_width=True)
-            else: st.info("無資料")
+        st.write("💎 **投信 5 日買佔發行：**")
+        res_2_4 = search_in_memory(csv_it_stock, search_query)
+        if not res_2_4.empty: st.dataframe(res_2_4, use_container_width=True)
+        else: st.info("無資料")
 
+    # ==========================================
+    # 📅 區塊 3 對接
+    # ==========================================
+    st.markdown("##### 📅 法人連續買超 (區塊 3)")
+    c3_1, c3_2 = st.columns(2)
+    
+    with c3_1:
+        st.write("🌐 **外資最新日連買**")
+        res_3_fo_day = search_in_memory(live_fo_day, search_query)
+        if not res_3_fo_day.empty: st.dataframe(res_3_fo_day, use_container_width=True)
+        else: st.info("無資料")
+        
+        st.write("🌐 **外資最新週連買**")
+        res_3_fo_wk = search_in_memory(live_fo_wk, search_query)
+        if not res_3_fo_wk.empty: st.dataframe(res_3_fo_wk, use_container_width=True)
+        else: st.info("無資料")
+            
+    with c3_2:
+        st.write("🏦 **投信最新日連買**")
+        res_3_it_day = search_in_memory(live_it_day, search_query)
+        if not res_3_it_day.empty: st.dataframe(res_3_it_day, use_container_width=True)
+        else: st.info("無資料")
+        
+        st.write("🏦 **投信最新週連買**")
+        res_3_it_wk = search_in_memory(live_it_wk, search_query)
+        if not res_3_it_wk.empty: st.dataframe(res_3_it_wk, use_container_width=True)
+        else: st.info("無資料")
 # ==========================================
 # 🧭 側邊欄導航 (無感互動+視覺特效版)
 # ==========================================
