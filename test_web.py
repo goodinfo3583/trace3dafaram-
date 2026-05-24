@@ -424,33 +424,25 @@ if search_query:
                     st.line_chart(t_ser, height=240)
         except Exception as chart_err:
             st.info(f"圖表渲染暫無數據: {chart_err}")
-# 2. 顯示 4-1 ~ 4-3 的籌碼排位診斷
+    # ==========================================
+    # 🔍 整合診斷區 (4-1 ~ 4-3)
+    # ==========================================
     st.write("---")
     st.subheader("📊 籌碼變動排名診斷")
     
-    # 🛠️ 輔助函數：增加變數安全性檢查
-    def show_rank_result(title, df_name, query):
-        st.write(f"#### {title}")
-        # 使用 locals().get(df_name) 嘗試取得變數，找不到就給空的 DataFrame
-        df = locals().get(df_name, pd.DataFrame())
+    # 建立分頁，讓版面更乾淨
+    tab1, tab2, tab3 = st.tabs(["📉 融資減少", "📉 借券賣出減少", "📈 融券增加"])
+    
+    with tab1:
+        c1, c2 = st.columns(2)
+        # 直接使用您定義好的 show_rank_result 函式
+        with c1: show_rank_result("📉 融資減少【幅度】", 'df_margin_pct', search_query)
+        with c2: show_rank_result("📉 融資減少【張數】", 'df_margin_vol', search_query)
         
-        # 如果是字串 (代表是讀取後的變數名稱)，則從全域環境找
-        if isinstance(df, str):
-            df = globals().get(df, pd.DataFrame())
-
-        res = safe_search(df, query)
-        if not res.empty:
-            st.dataframe(res, use_container_width=True)
-        else:
-            st.info("無資料 (未進榜)")
-
-    # 執行檢查與顯示 (直接傳入變數名稱字串，最安全)
-    c1, c2 = st.columns(2)
-    with c1: show_rank_result("📉 融資減少【幅度】", 'df_pct_margin', search_query)
-    with c2: show_rank_result("📉 融資減少【張數】", 'df_vol_margin', search_query)
-
-    with c3: show_rank_result("📉 借券賣出減少【幅度】", 'df_pct_short', search_query)
-    with c4: show_rank_result("📉 借券賣出減少【張數】", 'df_vol_short', search_query)
+    with tab2:
+        c3, c4 = st.columns(2)
+        with c3: show_rank_result("📉 借券賣出減少【幅度】", 'df_pct_short', search_query)
+        with c4: show_rank_result("📉 借券賣出減少【張數】", 'df_vol_short', search_query)
         
     with tab3:
         c5, c6 = st.columns(2)
@@ -480,9 +472,9 @@ st.sidebar.markdown("[🎯 區塊2-2：投信 5 日淨買佔成交量](#section-
 st.sidebar.markdown("[🎯 區塊2-3：外資 5 日淨買佔發行量](#section-2-3)")
 st.sidebar.markdown("[🎯 區塊2-4：投信 5 日淨超佔發行量](#section-2-4)")
 st.sidebar.markdown("[📅 區塊3：法人連續買超](#section-3)")
-st.sidebar.markdown("[📅 區塊4-1：融資減少動向](#section-4-1)")
-st.sidebar.markdown("[📅 區塊4-2：借券賣出減少動向](#section-4-2)")
-st.sidebar.markdown("[📅 區塊4-3：融券增加動向](#section-4-3)")
+st.sidebar.markdown("[🔄 區塊4-1：融資減少動向](#section-4-1)")
+st.sidebar.markdown("[🔄 區塊4-2：借券賣出減少動向](#section-4-2)")
+st.sidebar.markdown("[🔄 區塊4-3：融券增加動向](#section-4-3)")
 # ==========================================
 # 🏠 核心五大區塊
 # ==========================================
@@ -1383,6 +1375,8 @@ with c1:
     if not df_pct_clean.empty:
         st.info(f"💡 最新來源: {msg_pct}")
         st.dataframe(df_pct_clean, use_container_width=True)
+        # 🔥 在這裡存入幅度表格
+        st.session_state['df_margin_pct'] = df_pct_clean
     else:
         st.warning(f"⚠️ {msg_pct} 或 過濾後無相符資料")
 
@@ -1394,9 +1388,10 @@ with c2:
     if not df_vol_clean.empty:
         st.info(f"💡 最新來源: {msg_vol}")
         st.dataframe(df_vol_clean, use_container_width=True)
+        # 🔥 在這裡存入張數表格
+        st.session_state['df_margin_vol'] = df_vol_clean
     else:
         st.warning(f"⚠️ {msg_vol} 或 過濾後無相符資料")
-
 # ==========================================
 # 📅 區塊 4-2：借券賣出減少動向 (5日累計)
 # ==========================================
