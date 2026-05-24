@@ -1204,60 +1204,59 @@ st.header("📅 區塊 4-1：融資減少動向 (5日累計)")
 
 def read_margin_data():
     found_files = []
-    all_csvs_debug = [] # 用來收集所有csv以便除錯
+    all_csvs_debug = [] 
     
-    # 🔥 終極暴力掃描：親自走遍所有資料夾，絕對不漏！
     for root, dirs, files in os.walk(os.getcwd()):
-        # 排除隱藏資料夾與虛擬環境，加快速度
         if '.git' in root or 'venv' in root:
             continue
             
         for file in files:
-            if file.endswith(".csv"):
+            # 🔥 修正：大小寫通吃！把檔名轉小寫再判斷，避免 .CSV 被略過
+            if file.lower().endswith(".csv"):
                 all_csvs_debug.append(file)
-                # 只要檔名有這四個字就抓起來
                 if "融資減少" in file:
                     found_files.append(os.path.join(root, file))
     
     if not found_files:
-        # 找不到的話，把除錯清單一起回傳
         return pd.DataFrame(), "無檔案", all_csvs_debug
     
-    # 取得最新檔案
     latest_file = sorted(found_files, key=os.path.getmtime, reverse=True)[0]
     
     try:
-        # 使用強硬讀取法
         df = robust_read_csv(latest_file)
-        
-        # 欄位清理：移除空白、特殊字元、BOM
         df.columns = df.columns.astype(str).str.replace('\ufeff', '').str.strip()
-        
-        # 整理欄位轉為數值
         for col in df.columns:
             if "幅度" in col or "張數" in col:
                 df[col] = pd.to_numeric(df[col], errors='coerce')
-        
         return df, os.path.basename(latest_file), []
     except Exception as e:
         return pd.DataFrame(), f"讀取失敗: {str(e)}", []
 
-# 執行讀取與顯示
+# 執行讀取
 margin_df, margin_filename, debug_csvs = read_margin_data()
 
+# 顯示結果
 if not margin_df.empty:
     st.info(f"💡 資料來源: {margin_filename}")
     st.dataframe(margin_df, use_container_width=True)
 else:
-    st.warning("⚠️ 系統已採用最底層掃描，但仍找不到名稱包含『融資減少』的 CSV 檔案。")
-    st.info(f"🔍 [除錯] 當前目錄: {os.getcwd()}")
+    st.error("⚠️ 系統依然找不到對應的 CSV 檔案。")
     
-    # 如果有找到其他 CSV，印出前 10 個讓您檢查檔名是不是變了
-    if debug_csvs:
-        st.write("🕵️‍♂️ **伺服器目前有看到這些 CSV 檔案 (列出部分)：**")
-        st.write(debug_csvs[:10])
-    else:
-        st.error("🚨 警告：系統在您的專案中找不到『任何』CSV檔案，請確認 Streamlit 是否已正確同步 GitHub！")
+    # 🩻 資料夾 X 光機 (幫您看透伺服器內部)
+    st.write("### 🩻 伺服器內部資料夾 X 光機")
+    try:
+        root_items = os.listdir(".")
+        st.write("📂 **根目錄 (`/mount/src/...`) 底下有這些東西：**", root_items)
+        
+        target_dir = "Goodinfo_Rankings"
+        if target_dir in root_items:
+            sub_items = os.listdir(target_dir)
+            st.success(f"✅ 找到 `{target_dir}` 資料夾！裡面有以下檔案：")
+            st.write(sub_items)
+        else:
+            st.error(f"❌ 嚴重錯誤：伺服器上根本沒有 `{target_dir}` 這個資料夾！請去執行 Reboot app！")
+    except Exception as e:
+        st.write(f"X光機故障: {e}")
 # ==========================================
 # 📊 【蜂蜜計數器】本站累計觀測人次統計
 # ==========================================
