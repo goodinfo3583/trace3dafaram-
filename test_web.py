@@ -1196,18 +1196,17 @@ with c_wk2:
 
 
 # ==========================================
-# 📅 區塊 4：融資增減幅度 (5日累計)
+# 📅 區塊 4-1：融資增減幅度 (5日累計)
 # ==========================================
 st.write("---")
-st.markdown("<div id='section-4'></div>", unsafe_allow_html=True)
-st.header("📅 區塊 4：融資增減幅度 (5日累計)")
+st.markdown("<div id='section-4-1'></div>", unsafe_allow_html=True)
+st.header("📅 區塊 4：融資增減 (5日累計)")
 
-def read_margin_data():
-    # 定義路徑：指向 ./Goodifo_Ranking 資料夾
-    folder_path = os.path.join(DATA_DIR, "Goodifo_Ranking")
-    search_pattern = os.path.join(folder_path, "*融資減少幅度*.csv")
-    
-    files = glob.glob(search_pattern)
+csv_pattern = os.path.join(DATA_DIR, "*融資減少幅度*.csv")
+all_csv_files = glob.glob(csv_pattern)
+
+if not all_csv_files:
+    st.warning("⚠️ 找不到任何包含『融資』的 CSV 檔案。")
     if not files:
         return pd.DataFrame(), "無檔案"
     
