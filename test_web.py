@@ -414,6 +414,10 @@ st.write("---")
 st.markdown("<div id='section-2-1'></div>", unsafe_allow_html=True)
 st.header("🎯 區塊2-1：外資 5 日買超 佔成交量比 追蹤")
 
+import os
+import glob
+import pandas as pd
+
 csv_pattern = os.path.join(DATA_DIR, "*外資買超佔成交比*.csv")
 all_csv_files = glob.glob(csv_pattern)
 
@@ -505,6 +509,12 @@ else:
         
         st.success(f"📊 已成功串聯交易日，追蹤共 {len(csv_display)} 檔：")
         st.dataframe(csv_display, use_container_width=True)
+        
+        # ==========================================================
+        # 🔥 【重點新增】：將結果存入記憶體，供搜尋區塊讀取！
+        # ==========================================================
+        st.session_state['df_blk2_1'] = csv_display
+        
     else:
         st.error("❌ 無法讀取外資買超數據，請檢查 CSV 欄位名稱是否包含『5日』與『成交』關鍵字。")
 
