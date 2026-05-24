@@ -201,7 +201,9 @@ st.write("🔥 **戰術策略說明**：以長線 TXT 檔案為絕對基底，�
 st.write("---")
 st.markdown("<div id='section-search'></div>", unsafe_allow_html=True)
 st.subheader("🔍 個股籌碼快搜 (診斷區)")
-
+    # 強制讀取並清洗所有欄位名稱 (移除空格、換行、BOM)
+    df = pd.read_csv(f, encoding='utf-8-sig')
+    df.columns = [str(c).replace(" ", "").replace("\n", "").replace("\ufeff", "").strip() for c in df.columns]
 # 定義強韌的搜尋函式 (放在此處，確保全域可用)
 def robust_search_engine(df, query):
     if df is None or df.empty:
@@ -209,7 +211,9 @@ def robust_search_engine(df, query):
     
     # 1. 解決重複欄位錯誤：強制移除重複列
     df = df.loc[:, ~df.columns.duplicated()].copy()
-    
+
+            
+   
     # 2. 解決亂碼問題：完全放棄搜尋名稱，改為搜尋「股票代號」
     # 將代號強制轉字串並清除可能存在的隱藏空白
     if '股票代號' in df.columns:
@@ -255,28 +259,7 @@ if search_query:
             st.warning(f"⚠️ 找不到代號為 '{search_query}' 的資料。請確認代號是否正確。")
     else:
         st.error("系統尚未載入中長線籌碼資料 (track_display_df)。")
-        import plotly.express as px # 請確保程式開頭有 import plotly.express as px
-
-# --- 在搜尋區塊內替換掉原本的 line_chart 區塊 ---
-if chart_cols:
-    # 準備繪圖用的資料
-    plot_data = pd.DataFrame({
-        "日期": [c.split(' ')[0] for c in chart_cols[:21]],
-        "持股%": pd.to_numeric(q_txt.iloc[0][chart_cols[:21]].values, errors='coerce')
-    }).iloc[::-1].dropna()
-
-    # 建立圖表
-    fig = px.line(plot_data, x="日期", y="持股%", title=f"三大法人持股 21日波段全景 ({q_txt.iloc[0].get('股票名稱', '目標個股')})")
-
-    # 標記 20260508 為紅色
-    target_date = "20260508"
-    if target_date in plot_data["日期"].values:
-        target_val = plot_data[plot_data["日期"] == target_date]["持股%"].values[0]
-        fig.add_scatter(x=[target_date], y=[target_val], mode='markers+text', 
-                        marker=dict(color='red', size=12), 
-                        text=["⚠️ 0508"], textposition="top center", name="觀察日")
-
-    st.plotly_chart(fig, use_container_width=True)
+        
 
         
  
