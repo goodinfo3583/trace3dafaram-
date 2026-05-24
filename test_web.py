@@ -201,18 +201,13 @@ st.write("🔥 **戰術策略說明**：以長線 TXT 檔案為絕對基底，�
 st.write("---")
 st.markdown("<div id='section-search'></div>", unsafe_allow_html=True)
 st.subheader("🔍 個股籌碼快搜 (診斷區)")
-    # 強制讀取並清洗所有欄位名稱 (移除空格、換行、BOM)
-df = pd.read_csv(f, encoding='utf-8-sig')
-df.columns = [str(c).replace(" ", "").replace("\n", "").replace("\ufeff", "").strip() for c in df.columns]
+
 # 定義強韌的搜尋函式 (放在此處，確保全域可用)
 def robust_search_engine(df, query):
     if df is None or df.empty:
         return pd.DataFrame()
-    
     # 1. 解決重複欄位錯誤：強制移除重複列
-    df = df.loc[:, ~df.columns.duplicated()].copy()
-
-            
+    df = df.loc[:, ~df.columns.duplicated()].copy()         
    
     # 2. 解決亂碼問題：完全放棄搜尋名稱，改為搜尋「股票代號」
     # 將代號強制轉字串並清除可能存在的隱藏空白
