@@ -1194,6 +1194,53 @@ with c_wk2:
     else:
         st.write("無資料")
 
+
+# ==========================================
+# 📅 區塊 4：融資增減幅度 (5日累計)
+# ==========================================
+st.write("---")
+st.markdown("<div id='section-4'></div>", unsafe_allow_html=True)
+st.header("📅 區塊 4：融資增減幅度 (5日累計)")
+
+def read_margin_data():
+    # 定義路徑：指向 ./Goodifo_Ranking 資料夾
+    folder_path = os.path.join(DATA_DIR, "Goodifo_Ranking")
+    search_pattern = os.path.join(folder_path, "*融資減少幅度*.csv")
+    
+    files = glob.glob(search_pattern)
+    if not files:
+        return pd.DataFrame(), "無檔案"
+    
+    # 取得最新檔案
+    latest_file = sorted(files, key=os.path.getmtime, reverse=True)[0]
+    
+    try:
+        # 使用我們之前定義的強硬讀取法 (Robust Read)
+        df = robust_read_csv(latest_file)
+        
+        # 欄位清理：移除空白、特殊字元、BOM
+        df.columns = df.columns.astype(str).str.replace('\ufeff', '').str.strip()
+        
+        # 簡單整理欄位順序 (假設有股票代號與名稱欄位)
+        # 如果欄位名稱包含「減少幅度」，確保它被轉為數值以便排序
+        for col in df.columns:
+            if "幅度" in col:
+                df[col] = pd.to_numeric(df[col], errors='coerce')
+        
+        return df, os.path.basename(latest_file)
+    except Exception as e:
+        return pd.DataFrame(), f"讀取失敗: {str(e)}"
+
+# 執行讀取與顯示
+margin_df, margin_filename = read_margin_data()
+
+if not margin_df.empty:
+    st.info(f"💡 資料來源: {margin_filename}")
+    # 顯示表格，並對代號/名稱進行過濾顯示
+    st.dataframe(margin_df, use_container_width=True)
+else:
+    st.warning("⚠️ 目前找不到融資減少幅度的排名檔案，請確認 ./Goodifo_Ranking 資料夾內是否有對應 CSV 檔案。")
+
 # ==========================================
 # 📊 【蜂蜜計數器】本站累計觀測人次統計
 # ==========================================
