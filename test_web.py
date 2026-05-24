@@ -196,39 +196,65 @@ st.write("🔥 **戰術策略說明**：以長線 TXT 檔案為絕對基底，�
 
 
 # ==========================================
-# 2. 搜尋與顯示區塊 (整合區塊 1)
+# 🔍 個股籌碼快搜 (穩定版本)
 # ==========================================
 st.write("---")
 st.markdown("<div id='section-search'></div>", unsafe_allow_html=True)
 st.subheader("🔍 個股籌碼快搜 (診斷區)")
 
-search_query = st.text_input("請輸入你想觀測的股票代號 (推薦優先用代號):", key="global_search_top")
+# 定義強韌的搜尋函式 (放在此處，確保全域可用)
+def robust_search_engine(df, query):
+    if df is None or df.empty:
+        return pd.DataFrame()
+    
+    # 1. 解決重複欄位錯誤：強制移除重複列
+    df = df.loc[:, ~df.columns.duplicated()].copy()
+    
+    # 2. 解決亂碼問題：完全放棄搜尋名稱，改為搜尋「股票代號」
+    # 將代號強制轉字串並清除可能存在的隱藏空白
+    if '股票代號' in df.columns:
+        df['股票代號'] = df['股票代號'].astype(str).str.strip()
+        query = str(query).strip()
+        
+        # 精準比對代號
+        res = df[df['股票代號'] == query]
+        return res
+    return pd.DataFrame()
+
+# 搜尋輸入框
+search_query = st.text_input("請輸入想觀測的股票代號：", key="global_search_final")
 
 if search_query:
     st.write(f"### 🎯 綜合診斷標的：{search_query}")
-    st.write("📋 **中長線三大法人持股變化軌跡：**")
     
-    try:
-        # 使用我們剛剛定義好的函式
-        q_txt = safe_search(track_display_df, search_query)
+    # 檢查是否有資料
+    if 'track_display_df' in globals():
+        # 執行搜尋
+        q_txt = robust_search_engine(track_display_df, search_query)
         
         if not q_txt.empty:
+            st.write("📋 **中長線三大法人持股變化軌跡：**")
+            # 顯示表格 (移除秘密欄位)
             st.dataframe(q_txt.drop(columns=["秘密3日斜率"], errors='ignore'), use_container_width=True)
             
-            # --- 繪圖邏輯 ---
-            chart_cols = [c for c in q_txt.columns if "持股%" in c]
-            if chart_cols:
-                # 簡單繪圖示例
-                t_ser = pd.Series(
-                    pd.to_numeric(q_txt.iloc[0][chart_cols[:21]].values, errors='coerce'), 
-                    index=[c.split(' ')[0] for c in chart_cols[:21]]
-                ).iloc[::-1].dropna()
-                st.line_chart(t_ser, height=240)
+            # --- 繪圖區 ---
+            try:
+                chart_cols = [c for c in q_txt.columns if "持股%" in c]
+                if chart_cols:
+                    # 抓取最近 21 日數據繪圖
+                    t_ser = pd.Series(
+                        pd.to_numeric(q_txt.iloc[0][chart_cols[:21]].values, errors='coerce'), 
+                        index=[c.split(' ')[0] for c in chart_cols[:21]]
+                    ).iloc[::-1].dropna()
+                    
+                    st.write(f"📈 **持股 21日波段軌跡 ({q_txt.iloc[0].get('股票名稱', '目標個股')})**")
+                    st.line_chart(t_ser, height=240)
+            except Exception as chart_e:
+                st.info(f"圖表渲染中: {chart_e}")
         else:
-            st.warning(f"⚠️ 在資料庫中找不到 '{search_query}'。請確認代號是否正確。")
-            
-    except Exception as e:
-        st.error(f"資料處理發生錯誤: {e}")
+            st.warning(f"⚠️ 找不到代號為 '{search_query}' 的資料。請確認代號是否正確。")
+    else:
+        st.error("系統尚未載入中長線籌碼資料 (track_display_df)。")
  
 # ==========================================
 # 🧭 側邊欄導航 (無感互動+視覺特效版)
