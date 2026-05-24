@@ -102,7 +102,7 @@ if search_query:
                 t_ser = pd.Series(
                     raw_vals, 
                     index=[c.split(' ')[0] for c in target_cols]
-                ).replace(0, np.nan).dropna().iloc[::-1]
+                ).replace(0, None).dropna().iloc[::-1]
                 
                 if not t_ser.empty:
                     st.write(f"📈 **持股 {len(t_ser)}日波段真實軌跡 ({q_blk1.iloc[0].get('股票名稱', '標的')})**")
