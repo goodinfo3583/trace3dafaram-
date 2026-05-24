@@ -196,17 +196,30 @@ st.write("🔥 **戰術策略說明**：以長線 TXT 檔案為絕對基底，�
 
 
 # ==========================================
-# 🔍 搜尋區塊 (改為精準讀取版)
+# 🔍 個股籌碼快搜 (穩定版本)
 # ==========================================
-if search_query:
-    # 在這裡「瞬間」讀取 (因為有 @st.cache_data，其實是從記憶體拿)
-    # 請將 '您的資料夾/檔名.csv' 換成您實際的路徑
-    track_display_df = load_data_with_encoding('您的檔案路徑.csv')
+st.write("---")
+st.markdown("<div id='section-search'></div>", unsafe_allow_html=True)
+st.subheader("🔍 個股籌碼快搜 (診斷區)")
+
+# 定義強韌的搜尋函式 (放在此處，確保全域可用)
+def robust_search_engine(df, query):
+    if df is None or df.empty:
+        return pd.DataFrame()
     
-    # 接下來就是您的處理邏輯...
-    clean_df = track_display_df.loc[:, ~track_display_df.columns.duplicated()].copy()
+    # 1. 解決重複欄位錯誤：強制移除重複列
+    df = df.loc[:, ~df.columns.duplicated()].copy()
     
-    st.write(f"### 🎯 綜合診斷標的：{search_query}")
+    # 2. 解決亂碼問題：完全放棄搜尋名稱，改為搜尋「股票代號」
+    # 將代號強制轉字串並清除可能存在的隱藏空白
+    if '股票代號' in df.columns:
+        df['股票代號'] = df['股票代號'].astype(str).str.strip()
+        query = str(query).strip()
+        
+        # 精準比對代號
+        res = df[df['股票代號'] == query]
+        return res
+    return pd.DataFrame()
 
 # 搜尋輸入框
 search_query = st.text_input("請輸入想觀測的股票代號：", key="global_search_final")
@@ -242,6 +255,30 @@ if search_query:
             st.warning(f"⚠️ 找不到代號為 '{search_query}' 的資料。請確認代號是否正確。")
     else:
         st.error("系統尚未載入中長線籌碼資料 (track_display_df)。")
+        import plotly.express as px # 請確保程式開頭有 import plotly.express as px
+
+# --- 在搜尋區塊內替換掉原本的 line_chart 區塊 ---
+if chart_cols:
+    # 準備繪圖用的資料
+    plot_data = pd.DataFrame({
+        "日期": [c.split(' ')[0] for c in chart_cols[:21]],
+        "持股%": pd.to_numeric(q_txt.iloc[0][chart_cols[:21]].values, errors='coerce')
+    }).iloc[::-1].dropna()
+
+    # 建立圖表
+    fig = px.line(plot_data, x="日期", y="持股%", title=f"三大法人持股 21日波段全景 ({q_txt.iloc[0].get('股票名稱', '目標個股')})")
+
+    # 標記 20260508 為紅色
+    target_date = "20260508"
+    if target_date in plot_data["日期"].values:
+        target_val = plot_data[plot_data["日期"] == target_date]["持股%"].values[0]
+        fig.add_scatter(x=[target_date], y=[target_val], mode='markers+text', 
+                        marker=dict(color='red', size=12), 
+                        text=["⚠️ 0508"], textposition="top center", name="觀察日")
+
+    st.plotly_chart(fig, use_container_width=True)
+
+        
  
 # ==========================================
 # 🧭 側邊欄導航 (無感互動+視覺特效版)
