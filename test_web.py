@@ -751,7 +751,7 @@ else:
         csv_display = csv_display[cols]
         csv_display.index = range(1, len(csv_display) + 1)
         
-        st.success(f"📊 已成功串聯 {len(date_labels)} 交易日，追蹤共 {len(csv_display)} 檔：")
+        st.success(f"📊 已成功串聯交易日，追蹤共 {len(csv_display)} 檔：")
         st.dataframe(csv_display, use_container_width=True)
     else:
         st.error("❌ 無法讀取外資買超數據，請檢查 CSV 欄位名稱是否包含『5日』與『成交』關鍵字。")
@@ -848,7 +848,7 @@ else:
         csv_display = csv_display[cols]
         csv_display.index = range(1, len(csv_display) + 1)
         
-        st.success(f"📊 已成功串聯 {len(date_labels)} 交易日，追蹤共 {len(csv_display)} 檔：")
+        st.success(f"📊 已成功串聯交易日，追蹤共 {len(csv_display)} 檔：")
         st.dataframe(csv_display, use_container_width=True)
     else:
         st.error("❌ 無法讀取投信買超數據，請確認 CSV 檔案內含有『5日』與『成交』欄位。")
