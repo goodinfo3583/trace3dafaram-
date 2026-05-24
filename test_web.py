@@ -446,7 +446,7 @@ if search_query:
         c1, c2 = st.columns(2)
         
         with c1:
-            st.write("📊 **區塊 2-1：外資 5 日淨買佔成交量**")
+            st.write("🎯 區塊2-1：外資 5 日買超 佔成交量比 追蹤**")
             if not q_2_1.empty: st.dataframe(q_2_1, use_container_width=True)
             else: st.write("無資料")
                 
