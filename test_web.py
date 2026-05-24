@@ -252,6 +252,7 @@ st.sidebar.markdown("[📅 區塊3：法人連續買超](#section-3)")
 st.sidebar.markdown("[🔄 區塊4-1：融資減少動向](#section-4-1)")
 st.sidebar.markdown("[🔄 區塊4-2：借券賣出減少動向](#section-4-2)")
 st.sidebar.markdown("[🔄 區塊4-3：融券增加動向](#section-4-3)")
+st.sidebar.markdown("[💰 區塊5：大股東動向](#section-5)")
 # ==========================================
 # 🏠 核心五大區塊
 # ==========================================
@@ -1288,7 +1289,7 @@ st.session_state['df_margin_plus_vol'] = df_vol_clean
 # ==========================================
 st.write("---")
 st.markdown("<div id='section-5'></div>", unsafe_allow_html=True)
-st.header("💎 區塊 5：神秘金字塔 (400張以上大戶動向)")
+st.header("💎 區塊 5：400張以上股東動向)")
 
 import re
 
