@@ -3,19 +3,7 @@ import pandas as pd
 import os
 import glob
 import re
-# ==========================================
-# 🌟 初始化全域變數 (防止 NameError)
-# ==========================================
-# 先將這些變數宣告為空的 DataFrame，這樣下方程式碼就不會報錯
-if 'csv_foreign_deal' not in locals(): csv_foreign_deal = pd.DataFrame()
-if 'csv_it_deal' not in locals(): csv_it_deal = pd.DataFrame()
-if 'csv_foreign_stock' not in locals(): csv_foreign_stock = pd.DataFrame()
-if 'csv_it_stock' not in locals(): csv_it_stock = pd.DataFrame()
-if 'track_display_df' not in locals(): track_display_df = pd.DataFrame()
-if 'live_fo_day' not in locals(): live_fo_day = pd.DataFrame()
-if 'live_it_day' not in locals(): live_it_day = pd.DataFrame()
-if 'live_fo_wk' not in locals(): live_fo_wk = pd.DataFrame()
-if 'live_it_wk' not in locals(): live_it_wk = pd.DataFrame()
+
 
 # ==========================================
 # 1. 網頁基本設定 & 頂部蜂蜜幸運祝福
@@ -363,61 +351,88 @@ else:
 # ==========================================# ==========================================
 
 # ==========================================
-# 🔍 升級版安全搜尋函數 (自動偵測欄位 + 深度清理)
+# 🔍 個股籌碼快搜 (直接由記憶體現有表格篩選)
 # ==========================================
-def safe_search(df, query):
-    if df is None or df.empty:
-        return pd.DataFrame()
+st.write("---")
+st.markdown("<div id='section-search'></div>", unsafe_allow_html=True)
+st.subheader("🔍 個股籌碼快搜 (從現有資料篩選)")
+
+search_query = st.text_input("請輸入你想觀測的股票名稱或代號：", key="global_search_top")
+
+# 定義一個專門在已存在表格中搜尋的輕量函數
+def search_in_memory(df, query):
+    if df is None or df.empty: return pd.DataFrame()
     
-    # 1. 自動偵測欄位名稱 (避免欄位名稱不符導致找不到資料)
-    # 只要包含「代號」或「名稱」的欄位就抓出來
-    col_id = next((c for c in df.columns if '代號' in c), df.columns[0])
-    col_name = next((c for c in df.columns if '名稱' in c), df.columns[1])
-    
-    # 2. 統一處理為文字型態，方便比對
+    # 確保搜尋時的欄位名稱是對應的
+    # 這裡我們預設您的表格已經有 '股票代號' 和 '股票名稱'
     df_temp = df.copy()
-    df_temp[col_id] = df_temp[col_id].astype(str).str.strip()
-    df_temp[col_name] = df_temp[col_name].astype(str).str.replace('撖', '', regex=False).str.strip()
     
-    # 3. 搜尋比對 (將查詢字串也轉為字串)
+    # 統一處理為字串以便比對
+    df_temp['股票代號'] = df_temp['股票代號'].astype(str).str.strip()
+    # 清理名稱中的亂碼
+    if '股票名稱' in df_temp.columns:
+        df_temp['股票名稱'] = df_temp['股票名稱'].astype(str).str.replace('撖', '', regex=False).str.strip()
+    
     query = str(query).strip()
     res = df_temp[
-        df_temp[col_name].str.contains(query, na=False) | 
-        df_temp[col_id].str.contains(query, na=False)
+        df_temp['股票名稱'].str.contains(query, na=False) | 
+        df_temp['股票代號'].str.contains(query, na=False)
     ]
     return res
 
-# ==========================================
-# 🚀 區塊 2-1 ~ 2-4 對接邏輯 (修正版)
-# ==========================================
-st.write("---")
-st.markdown("##### 🚀 核心主力短線進攻與鎖籌指標")
+if search_query:
+    # 直接使用程式記憶體中已經有的 DataFrame 進行篩選
+    q_txt = search_in_memory(track_display_df, search_query)
+    
+    if q_txt.empty:
+        st.warning(f"⚠️ 找不到與 '{search_query}' 相關的資料。")
+    else:
+        st.write(f"### 🎯 綜合診斷標的：{search_query}")
+        st.dataframe(q_txt.loc[:, ~q_txt.columns.duplicated()], use_container_width=True)
 
-# 這裡我們直接對各個 DataFrame 進行搜尋
-# 請確認這些變數名稱 (csv_foreign_deal 等) 是否正確對應您讀取的資料
-c1, c2 = st.columns(2)
+        # 🚀 區塊 2 (直接對接記憶體中的變數)
+        st.markdown("##### 🚀 核心主力短線進攻 (區塊 2)")
+        c1, c2 = st.columns(2)
+        
+        with c1:
+            st.write("📊 **外資5日買佔成交：**")
+            res_2_1 = search_in_memory(csv_foreign_deal, search_query)
+            st.dataframe(res_2_1 if not res_2_1.empty else "無資料", use_container_width=True)
+            
+            st.write("🔒 **外資5日買佔發行：**")
+            res_2_3 = search_in_memory(csv_foreign_stock, search_query)
+            st.dataframe(res_2_3 if not res_2_3.empty else "無資料", use_container_width=True)
+                
+        with c2:
+            st.write("🥦 **投信5日買佔成交：**")
+            res_2_2 = search_in_memory(csv_it_deal, search_query)
+            st.dataframe(res_2_2 if not res_2_2.empty else "無資料", use_container_width=True)
+                
+            st.write("💎 **投信5日買佔發行：**")
+            res_2_4 = search_in_memory(csv_it_stock, search_query)
+            st.dataframe(res_2_4 if not res_2_4.empty else "無資料", use_container_width=True)
 
-with c1:
-    st.write("📊 **區塊 2-1：外資 5 日淨買佔成交量**")
-    q_2_1 = safe_search(csv_foreign_deal, search_query)
-    if not q_2_1.empty: st.dataframe(q_2_1, use_container_width=True)
-    else: st.write("無資料")
+        # 📅 區塊 3 (直接對接記憶體中的變數)
+        st.markdown("##### 📅 法人連續買超 (區塊 3)")
+        c3_1, c3_2 = st.columns(2)
         
-    st.write("🔒 **區塊 2-3：外資 5 日淨買佔發行量**")
-    q_2_3 = safe_search(csv_foreign_stock, search_query)
-    if not q_2_3.empty: st.dataframe(q_2_3, use_container_width=True)
-    else: st.write("無資料")
-        
-with c2:
-    st.write("🥦 **區塊 2-2：投信 5 日淨買佔成交量**")
-    q_2_2 = safe_search(csv_it_deal, search_query)
-    if not q_2_2.empty: st.dataframe(q_2_2, use_container_width=True)
-    else: st.write("無資料")
-        
-    st.write("💎 **區塊 2-4：投信 5 日淨買佔發行量**")
-    q_2_4 = safe_search(csv_it_stock, search_query)
-    if not q_2_4.empty: st.dataframe(q_2_4, use_container_width=True)
-    else: st.write("無資料")
+        with c3_1:
+            st.write("🌐 **外資最新日連買**")
+            res_3_fo_day = search_in_memory(live_fo_day, search_query)
+            st.dataframe(res_3_fo_day if not res_3_fo_day.empty else "無資料", use_container_width=True)
+            
+            st.write("🌐 **外資最新週連買**")
+            res_3_fo_wk = search_in_memory(live_fo_wk, search_query)
+            st.dataframe(res_3_fo_wk if not res_3_fo_wk.empty else "無資料", use_container_width=True)
+                
+        with c3_2:
+            st.write("🏦 **投信最新日連買**")
+            res_3_it_day = search_in_memory(live_it_day, search_query)
+            st.dataframe(res_3_it_day if not res_3_it_day.empty else "無資料", use_container_width=True)
+            
+            st.write("🏦 **投信最新週連買**")
+            res_3_it_wk = search_in_memory(live_it_wk, search_query)
+            st.dataframe(res_3_it_wk if not res_3_it_wk.empty else "無資料", use_container_width=True)
 
 # ==========================================# ==========================================
 # ==========================================
