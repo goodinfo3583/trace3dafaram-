@@ -477,7 +477,7 @@ st.sidebar.markdown("[👑 區塊一：三大法人持股%](#section-1)")
 # ==========================================
 # ==========================================
 # ==========================================
-# 🏠 區塊1：中長線 三大法人 持股比例 追蹤 (比對順序修正+柔和護眼版)
+# 🏠 區塊1：中長線 三大法人 持股比例 追蹤 (字串精確比對+柔和護眼版)
 # ==========================================
 st.write("---")
 st.markdown("<div id='section-1'></div>", unsafe_allow_html=True)
@@ -507,7 +507,7 @@ def parse_special_txt(file_path, date_label):
                 
                 # 💡 【區塊開關】：讀到對應標題才開啟
                 if "三大法人持股變化排名" in line_str or ("排名" in line_str and "日)" in line_str):
-                    # 🔥 【終極修正】：必須先比對 "120日" 再比對 "20日"，避免 120日 被 20日 攔截！
+                    # 必須先比對 120日 再比對 20日
                     if "120日" in line_str: current_section = "120日"
                     elif "20日" in line_str: current_section = "20日"
                     elif "5日" in line_str: current_section = "5日"
@@ -547,7 +547,7 @@ def agg_sections_func(x):
 txt_pattern = os.path.join(DATA_DIR, "*持股排名變化*.txt")
 all_txt_files = glob.glob(txt_pattern)
 
-# 依日期分群，防止重複檔案合併錯亂
+# 依日期分群
 date_files = defaultdict(list)
 for f in all_txt_files:
     date_label = os.path.basename(f)[:8]
@@ -591,13 +591,15 @@ if sorted_dates:
         for c in date_cols:
             final_df[c] = pd.to_numeric(final_df[c], errors='coerce').fillna(0)
             
+        # 🔥 【終極修正】：改成絕對陣列比對，避免 "20日" 吃到 "120日" 的豆腐
         def generate_tags(sections):
             if pd.isna(sections) or not sections: return ""
+            sec_list = str(sections).split(',')
             tags = []
-            if '5日' in sections: tags.append('🔴5日')
-            if '20日' in sections: tags.append('🟡20日')
-            if '60日' in sections: tags.append('🟢60日')
-            if '120日' in sections: tags.append('🔵120日')
+            if '5日' in sec_list: tags.append('🔴5日')
+            if '20日' in sec_list: tags.append('🟡20日')
+            if '60日' in sec_list: tags.append('🟢60日')
+            if '120日' in sec_list: tags.append('🔵120日')
             return " ".join(tags)
             
         if '上榜區塊' not in final_df.columns:
@@ -651,14 +653,13 @@ if sorted_dates:
             filtered_df[c] = filtered_df[c].apply(lambda x: f"{x:.2f}" if x != 0 else "-")
         filtered_df.index = range(1, len(filtered_df) + 1)
         
-        # 🎨 【自訂顏色調整區】：改為極度柔和護眼的高級低飽和色系
-        # rgba(紅, 綠, 藍, 透明度) -> 最後一個小數點可以微調深淺 (例如 0.4 改 0.5 會變深)
+        # 🎨 護眼淺色系底色
         def highlight_row(row):
             cnt = color_ref.get(row['股票代號'], 0)
-            if cnt == 4: bg = 'background-color: rgba(255, 225, 225, 0.55)'     # 4榜單：百搭淺紅
-            elif cnt == 3: bg = 'background-color: rgba(255, 250, 205, 0.65)'    # 3榜單：粉嫩淺黃
-            elif cnt == 2: bg = 'background-color: rgba(215, 245, 215, 0.65)'    # 2榜單：莫蘭迪淺綠 (已稍微加深)
-            elif cnt == 1: bg = 'background-color: rgba(220, 238, 255, 0.75)'    # 1榜單：晴空淺藍 (已稍微加深)
+            if cnt == 4: bg = 'background-color: rgba(255, 225, 225, 0.55)'     
+            elif cnt == 3: bg = 'background-color: rgba(255, 250, 205, 0.65)'    
+            elif cnt == 2: bg = 'background-color: rgba(215, 245, 215, 0.65)'    
+            elif cnt == 1: bg = 'background-color: rgba(220, 238, 255, 0.75)'    
             else: bg = ''                                                   
             return [bg] * len(row)
 
