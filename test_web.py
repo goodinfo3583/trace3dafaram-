@@ -37,7 +37,7 @@ st.write("🔥 **戰術策略說明**：以長線為絕對基底，放寬偵測�
 
 
 # ==========================================
-# 🔍 個股籌碼快搜 (全區塊聯動掃描版 - 視覺升級)
+# 🔍 個股籌碼快搜 (全區塊聯動掃描版 - 終極全景版)
 # ==========================================
 st.write("---")
 st.markdown("<div id='section-search'></div>", unsafe_allow_html=True)
@@ -62,27 +62,23 @@ def robust_search_engine(df, query):
         
     return df[mask]
 
-# 🎯 建立通用掃描與顯示工具 (升級版：精準除錯提示)
+# 🎯 建立通用掃描與顯示工具 (✅ 已修復：加入 hide_index=True 隱藏索引)
 def scan_and_display(title, session_key, query):
-    # 狀況 A：記憶體完全找不到這個變數 (代表上半部沒存入)
     if session_key not in st.session_state:
         st.info(f"⚪ {title}：尚未載入資料表 (請確認上半部區塊已執行)")
         return
         
     df = st.session_state[session_key]
     
-    # 狀況 B：變數有存入，但是空的
     if df is None or df.empty:
         st.info(f"⚪ {title}：該榜單無任何資料")
         return
         
     res = robust_search_engine(df, query)
     
-    # 狀況 C：有搜尋到資料
     if not res.empty:
         st.write(f"**{title}**")
-        st.dataframe(res, use_container_width=True)
-    # 狀況 D：變數存在，但搜尋不到該標的 (代表沒進榜)
+        st.dataframe(res, use_container_width=True, hide_index=True)
     else:
         st.info(f"⚪ {title}：未進榜 (該標的未在此榜單中)")
 
@@ -101,14 +97,13 @@ if search_query:
         q_blk1 = robust_search_engine(st.session_state['my_final_df'], search_query)
         
         if not q_blk1.empty:
-            st.dataframe(q_blk1.drop(columns=["秘密3日斜率"], errors='ignore'), use_container_width=True)
+            # ✅ 加入 hide_index=True
+            st.dataframe(q_blk1.drop(columns=["秘密3日斜率"], errors='ignore'), use_container_width=True, hide_index=True)
             
-            # --- 擴充為 30 日 ---
             chart_cols = [c for c in q_blk1.columns if "持股%" in c]
             if chart_cols:
                 target_cols = chart_cols[:30] 
                 
-                # --- 解決歸零斷崖連線問題 ---
                 raw_vals = pd.to_numeric(q_blk1.iloc[0][target_cols].values, errors='coerce')
                 t_ser = pd.Series(
                     raw_vals, 
@@ -116,14 +111,10 @@ if search_query:
                 ).replace(0, None).dropna().iloc[::-1]
                 
                 if not t_ser.empty:
-                    # 標題 1 (一般字體加粗)
                     st.write(f"📈 **持股 {len(t_ser)}日波段真實軌跡 ({q_blk1.iloc[0].get('股票名稱', '標的')})**")
                     st.line_chart(t_ser, height=240)
-                    
-                    # 標題 2 (改成與標題 1 完全一致的字體大小)
                     st.write("🚀 **籌碼斜率 (與最新持股相比淨增減)**")
                     
-                    # --- 自訂義動態 HTML 排版 (解決字體大小問題) ---
                     def get_slope_ui(label, n_days):
                         if len(target_cols) >= n_days:
                             v_new = pd.to_numeric(q_blk1.iloc[0][target_cols[0]], errors='coerce')
@@ -132,13 +123,9 @@ if search_query:
                             if pd.notna(v_new) and pd.notna(v_old) and v_old != 0 and v_new != 0:
                                 diff = round(v_new - v_old, 2)
                                 color = "red" if diff > 0 else "green" if diff < 0 else "black"
-                                # 【有資料】：顯示較大的數字
                                 return f"<div style='text-align:left; padding:5px;'><div style='font-size:14px; color:gray;'>{label}</div><div style='font-size:22px; font-weight:bold; color:{color};'>{diff:+.2f} %</div></div>"
-                        
-                        # 【無資料】：字體縮小至 16px (與一般標題文字相近)
                         return f"<div style='text-align:left; padding:5px;'><div style='font-size:14px; color:gray;'>{label}</div><div style='font-size:16px; font-weight:normal; margin-top:5px;'>無對應資料</div></div>"
 
-                    # 渲染儀表板
                     col1, col2, col3, col4 = st.columns(4)
                     col1.markdown(get_slope_ui("2日斜率", 2), unsafe_allow_html=True)
                     col2.markdown(get_slope_ui("3日斜率", 3), unsafe_allow_html=True)
@@ -155,18 +142,18 @@ if search_query:
     # 📊 區塊 2：動能與外資診斷
     # ==========================================
     st.write("---")
-    st.write("#### 🎯 區塊 2：動能買超診斷 ")
+    st.write("#### 📊 區塊 2：動能與外資診斷 (暫定)")
     
     c1, c2 = st.columns(2)
-    with c1: scan_and_display("🔹 區塊 2-1:外資5日買佔成交比", 'df_blk2_1', search_query)
-    with c2: scan_and_display("🔹 區塊 2-2:外資5日買佔發行量", 'df_blk2_2', search_query)
+    with c1: scan_and_display("🔹 區塊 2-1 (外資5日佔比)", 'df_blk2_1', search_query)
+    with c2: scan_and_display("🔹 區塊 2-2", 'df_blk2_2', search_query)
     
     c3, c4 = st.columns(2)
-    with c3: scan_and_display("🔹 區塊 2-3:投信5日買佔成交比", 'df_blk2_3', search_query)
-    with c4: scan_and_display("🔹 區塊 2-4:投信5日買佔發行量", 'df_blk2_4', search_query)
+    with c3: scan_and_display("🔹 區塊 2-3", 'df_blk2_3', search_query)
+    with c4: scan_and_display("🔹 區塊 2-4", 'df_blk2_4', search_query)
 
     # ==========================================
-    # 📊 區塊 3：特定籌碼或大戶診斷 (強制 4 榜全景)
+    # 📊 區塊 3：特定籌碼或大戶診斷 (4 榜全景)
     # ==========================================
     st.write("---")
     st.write("#### 📊 區塊 3：特定籌碼或大戶診斷")
@@ -175,11 +162,9 @@ if search_query:
         df_b3 = st.session_state['df_blk3_main']
         res_b3 = robust_search_engine(df_b3, search_query)
         
-        # 決定顯示的代號與名稱 (如果有搜到就用真實的，沒搜到就用輸入的)
         display_id = res_b3.iloc[0]['股票代號'] if not res_b3.empty else search_query
         display_name = res_b3.iloc[0]['股票名稱'] if not res_b3.empty else "-"
         
-        # 強制列出 4 個榜單
         base_types = ['🌐 外資日連買', '🌐 外資週連買', '🏦 投信日連買', '🏦 投信週連買']
         display_list = []
         
@@ -188,7 +173,6 @@ if search_query:
             if not match.empty:
                 display_list.append(match.iloc[0].to_dict())
             else:
-                # 沒進榜，補上預設文字
                 display_list.append({
                     '連買類型': b_type,
                     '股票代號': display_id,
@@ -199,30 +183,92 @@ if search_query:
                 
         final_b3_display = pd.DataFrame(display_list)
         st.write("**🔹 區塊 3 綜合列表 (4榜全景)**")
+        # ✅ 加入 hide_index=True
         st.dataframe(final_b3_display, use_container_width=True, hide_index=True)
     else:
         st.info("⚪ 區塊 3：尚未載入資料表 (請確認上半部區塊已執行)")
 
+
     # ==========================================
-    # 📊 區塊 4：籌碼變動排名診斷
+    # 📊 區塊 4：籌碼變動排名診斷 (🔥 全新升級：三榜全景)
     # ==========================================
     st.write("---")
     st.write("#### 📊 區塊 4：籌碼變動排名診斷")
     
-    st.markdown("##### 📉 融資減少")
-    c1, c2 = st.columns(2)
-    with c1: scan_and_display("【幅度】", 'df_margin_pct', search_query)
-    with c2: scan_and_display("【張數】", 'df_margin_vol', search_query)
+    def render_b4_panorama(view_title, keys_and_labels, query):
+        display_list = []
+        display_id = query
+        display_name = "-"
         
-    st.markdown("##### 📉 借券賣出減少")
-    c3, c4 = st.columns(2)
-    with c3: scan_and_display("【幅度】", 'df_short_pct', search_query)
-    with c4: scan_and_display("【張數】", 'df_short_vol', search_query)
+        # 先抓取代號與名稱
+        for label, key in keys_and_labels:
+            if key in st.session_state:
+                res = robust_search_engine(st.session_state[key], query)
+                if not res.empty:
+                    display_id = res.iloc[0].get('股票代號', query)
+                    display_name = res.iloc[0].get('股票名稱', '-')
+                    break
+                    
+        # 進行三榜資料合併
+        for label, key in keys_and_labels:
+            if key in st.session_state:
+                res = robust_search_engine(st.session_state[key], query)
+                if not res.empty:
+                    row_data = res.iloc[0].to_dict()
+                    new_row = {'榜單類型': label}
+                    new_row.update(row_data)
+                    display_list.append(new_row)
+                else:
+                    display_list.append({
+                        '榜單類型': label,
+                        '股票代號': display_id,
+                        '股票名稱': display_name,
+                        '進榜狀態': '⚪ 未進榜'
+                    })
+            else:
+                display_list.append({
+                    '榜單類型': label,
+                    '股票代號': display_id,
+                    '股票名稱': display_name,
+                    '進榜狀態': '⚠️ 尚未載入'
+                })
+                
+        df_panorama = pd.DataFrame(display_list)
+        df_panorama = df_panorama.fillna('-')
         
-    st.markdown("##### 📈 融券增加")
-    c5, c6 = st.columns(2)
-    with c5: scan_and_display("【幅度】", 'df_margin_plus_pct', search_query)
-    with c6: scan_and_display("【張數】", 'df_margin_plus_vol', search_query)
+        # 整理欄位順序 (讓 榜單類型, 代號, 名稱 排在最前面)
+        front_cols = ['榜單類型', '股票代號', '股票名稱', '進榜狀態']
+        data_cols = [c for c in df_panorama.columns if c not in front_cols]
+        
+        final_cols = [c for c in front_cols if c in df_panorama.columns] + data_cols
+        
+        st.markdown(f"##### {view_title}")
+        # ✅ 加入 hide_index=True 徹底消滅所有索引
+        st.dataframe(df_panorama[final_cols], use_container_width=True, hide_index=True)
+
+    # 執行幅度三榜全景
+    render_b4_panorama(
+        "📊 【幅度】三榜全景", 
+        [
+            ('📉 融資減少', 'df_margin_pct'), 
+            ('📉 借券減少', 'df_short_pct'), 
+            ('📈 融券增加', 'df_margin_plus_pct')
+        ], 
+        search_query
+    )
+    
+    st.write("") # 增加排版間距
+    
+    # 執行張數三榜全景
+    render_b4_panorama(
+        "📊 【張數】三榜全景", 
+        [
+            ('📉 融資減少', 'df_margin_vol'), 
+            ('📉 借券減少', 'df_short_vol'), 
+            ('📈 融券增加', 'df_margin_plus_vol')
+        ], 
+        search_query
+    )
         
  
 # ==========================================
