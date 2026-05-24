@@ -62,7 +62,7 @@ def robust_search_engine(df, query):
         
     return df[mask]
 
-# 🎯 建立通用掃描與顯示工具 (✅ 已修復：加入 hide_index=True 隱藏索引)
+# 🎯 建立通用掃描與顯示工具
 def scan_and_display(title, session_key, query):
     if session_key not in st.session_state:
         st.info(f"⚪ {title}：尚未載入資料表 (請確認上半部區塊已執行)")
@@ -92,22 +92,16 @@ if search_query:
     # 👑 區塊 1：中長線三大法人持股
     # ==========================================
     st.write("#### 👑 區塊 1：中長線三大法人持股")
-    
     if 'my_final_df' in st.session_state:
         q_blk1 = robust_search_engine(st.session_state['my_final_df'], search_query)
-        
         if not q_blk1.empty:
-            # ✅ 加入 hide_index=True
             st.dataframe(q_blk1.drop(columns=["秘密3日斜率"], errors='ignore'), use_container_width=True, hide_index=True)
-            
             chart_cols = [c for c in q_blk1.columns if "持股%" in c]
             if chart_cols:
                 target_cols = chart_cols[:30] 
-                
                 raw_vals = pd.to_numeric(q_blk1.iloc[0][target_cols].values, errors='coerce')
                 t_ser = pd.Series(
-                    raw_vals, 
-                    index=[c.split(' ')[0] for c in target_cols]
+                    raw_vals, index=[c.split(' ')[0] for c in target_cols]
                 ).replace(0, None).dropna().iloc[::-1]
                 
                 if not t_ser.empty:
@@ -119,7 +113,6 @@ if search_query:
                         if len(target_cols) >= n_days:
                             v_new = pd.to_numeric(q_blk1.iloc[0][target_cols[0]], errors='coerce')
                             v_old = pd.to_numeric(q_blk1.iloc[0][target_cols[n_days-1]], errors='coerce')
-                            
                             if pd.notna(v_new) and pd.notna(v_old) and v_old != 0 and v_new != 0:
                                 diff = round(v_new - v_old, 2)
                                 color = "red" if diff > 0 else "green" if diff < 0 else "black"
@@ -134,7 +127,7 @@ if search_query:
                 else:
                     st.info("⚪ 該標的有效數據過少，無法繪製波段圖表。")
         else:
-            st.info("⚪ 區塊 1：未進榜 (該標的未進入中長線榜單)")
+            st.info("⚪ 區塊 1：未進榜 ")
     else:
         st.error("⚠️ 尚未載入區塊 1 資料。請確認上方區塊 1 已執行。")
 
@@ -142,12 +135,10 @@ if search_query:
     # 📊 區塊 2：動能與外資診斷
     # ==========================================
     st.write("---")
-    st.write("#### 📊 區塊 2：動能與外資診斷 (暫定)")
-    
+    st.write("#### 📊 區塊 2：法人買超診斷")
     c1, c2 = st.columns(2)
     with c1: scan_and_display("🔹 區塊 2-1 (外資5日佔比)", 'df_blk2_1', search_query)
-    with c2: scan_and_display("🔹 區塊 2-2", 'df_blk2_2', search_query)
-    
+    with c2: scan_and_display("🔹 區塊 2-2 (投信5日佔比)", 'df_blk2_2', search_query)
     c3, c4 = st.columns(2)
     with c3: scan_and_display("🔹 區塊 2-3", 'df_blk2_3', search_query)
     with c4: scan_and_display("🔹 區塊 2-4", 'df_blk2_4', search_query)
@@ -156,8 +147,7 @@ if search_query:
     # 📊 區塊 3：特定籌碼或大戶診斷 (4 榜全景)
     # ==========================================
     st.write("---")
-    st.write("#### 📊 區塊 3：特定籌碼或大戶診斷")
-    
+    st.write("#### 📊 區塊 3：法人連買情形")
     if 'df_blk3_main' in st.session_state:
         df_b3 = st.session_state['df_blk3_main']
         res_b3 = robust_search_engine(df_b3, search_query)
@@ -167,40 +157,29 @@ if search_query:
         
         base_types = ['🌐 外資日連買', '🌐 外資週連買', '🏦 投信日連買', '🏦 投信週連買']
         display_list = []
-        
         for b_type in base_types:
             match = res_b3[res_b3['連買類型'] == b_type] if not res_b3.empty else pd.DataFrame()
-            if not match.empty:
-                display_list.append(match.iloc[0].to_dict())
-            else:
-                display_list.append({
-                    '連買類型': b_type,
-                    '股票代號': display_id,
-                    '股票名稱': display_name,
-                    '狀態動態': '⚪ 未進榜',
-                    '連買週期數': '-'
-                })
+            if not match.empty: display_list.append(match.iloc[0].to_dict())
+            else: display_list.append({'連買類型': b_type, '股票代號': display_id, '股票名稱': display_name, '狀態動態': '⚪ 未進榜', '連買週期數': '-'})
                 
         final_b3_display = pd.DataFrame(display_list)
-        st.write("**🔹 區塊 3 綜合列表 (4榜全景)**")
-        # ✅ 加入 hide_index=True
+        st.write("**🔹 區塊 3 綜合列表 **")
         st.dataframe(final_b3_display, use_container_width=True, hide_index=True)
     else:
         st.info("⚪ 區塊 3：尚未載入資料表 (請確認上半部區塊已執行)")
 
 
     # ==========================================
-    # 📊 區塊 4：籌碼變動排名診斷 (🔥 全新升級：三榜全景)
+    # 📊 區塊 4：籌碼變動排名診斷 (三榜全景 + 強制去小數點)
     # ==========================================
     st.write("---")
-    st.write("#### 📊 區塊 4：籌碼變動排名診斷")
+    st.write("#### 📊 區塊 4：券資排名診斷")
     
     def render_b4_panorama(view_title, keys_and_labels, query):
         display_list = []
         display_id = query
         display_name = "-"
         
-        # 先抓取代號與名稱
         for label, key in keys_and_labels:
             if key in st.session_state:
                 res = robust_search_engine(st.session_state[key], query)
@@ -209,7 +188,6 @@ if search_query:
                     display_name = res.iloc[0].get('股票名稱', '-')
                     break
                     
-        # 進行三榜資料合併
         for label, key in keys_and_labels:
             if key in st.session_state:
                 res = robust_search_engine(st.session_state[key], query)
@@ -219,56 +197,33 @@ if search_query:
                     new_row.update(row_data)
                     display_list.append(new_row)
                 else:
-                    display_list.append({
-                        '榜單類型': label,
-                        '股票代號': display_id,
-                        '股票名稱': display_name,
-                        '進榜狀態': '⚪ 未進榜'
-                    })
+                    display_list.append({'榜單類型': label, '股票代號': display_id, '股票名稱': display_name, '進榜狀態': '⚪ 未進榜'})
             else:
-                display_list.append({
-                    '榜單類型': label,
-                    '股票代號': display_id,
-                    '股票名稱': display_name,
-                    '進榜狀態': '⚠️ 尚未載入'
-                })
+                display_list.append({'榜單類型': label, '股票代號': display_id, '股票名稱': display_name, '進榜狀態': '⚠️ 尚未載入'})
                 
-        df_panorama = pd.DataFrame(display_list)
-        df_panorama = df_panorama.fillna('-')
+        df_panorama = pd.DataFrame(display_list).fillna('-')
         
-        # 整理欄位順序 (讓 榜單類型, 代號, 名稱 排在最前面)
         front_cols = ['榜單類型', '股票代號', '股票名稱', '進榜狀態']
         data_cols = [c for c in df_panorama.columns if c not in front_cols]
-        
         final_cols = [c for c in front_cols if c in df_panorama.columns] + data_cols
         
+        # 🔥 【神級修正】：強制將以 '.0' 結尾的數值轉為整數字串 (消除 190.0 的現象)
+        for c in final_cols:
+            df_panorama[c] = df_panorama[c].apply(lambda x: str(x)[:-2] if str(x).endswith('.0') else x)
+        
         st.markdown(f"##### {view_title}")
-        # ✅ 加入 hide_index=True 徹底消滅所有索引
         st.dataframe(df_panorama[final_cols], use_container_width=True, hide_index=True)
 
-    # 執行幅度三榜全景
-    render_b4_panorama(
-        "📊 【幅度】三榜全景", 
-        [
-            ('📉 融資減少', 'df_margin_pct'), 
-            ('📉 借券減少', 'df_short_pct'), 
-            ('📈 融券增加', 'df_margin_plus_pct')
-        ], 
-        search_query
-    )
-    
-    st.write("") # 增加排版間距
-    
-    # 執行張數三榜全景
-    render_b4_panorama(
-        "📊 【張數】三榜全景", 
-        [
-            ('📉 融資減少', 'df_margin_vol'), 
-            ('📉 借券減少', 'df_short_vol'), 
-            ('📈 融券增加', 'df_margin_plus_vol')
-        ], 
-        search_query
-    )
+    render_b4_panorama("📊 幅度變動排名", [('📉 融資減少', 'df_margin_pct'), ('📉 借券減少', 'df_short_pct'), ('📈 融券增加', 'df_margin_plus_pct')], search_query)
+    st.write("") 
+    render_b4_panorama("📊 張數變動排名", [('📉 融資減少', 'df_margin_vol'), ('📉 借券減少', 'df_short_vol'), ('📈 融券增加', 'df_margin_plus_vol')], search_query)
+
+    # ==========================================
+    # 💎 區塊 5：神秘金字塔大戶動向
+    # ==========================================
+    st.write("---")
+    st.write("#### 💎 區塊 5：神秘金字塔 (大戶動向)")
+    scan_and_display("🔹 400張以上大戶動向", 'df_blk5', search_query)
         
  
 # ==========================================
@@ -1327,6 +1282,52 @@ with c2:
 st.session_state['df_margin_plus_pct'] = df_pct_clean
 st.session_state['df_margin_plus_vol'] = df_vol_clean
 # ==========券資比資料請一起搬遷============
+
+# ==========================================
+# 💎 區塊 5：大戶股權分散表 (神秘金字塔)
+# ==========================================
+st.write("---")
+st.markdown("<div id='section-5'></div>", unsafe_allow_html=True)
+st.header("💎 區塊 5：400張以上大股東動向")
+
+# 讀取符合關鍵字的 CSV 檔案
+csv_pattern_b5 = os.path.join(DATA_DIR, "*神秘金字塔 - 股權類股排行(5日之400張以上股東排行)*.csv")
+all_files_b5 = glob.glob(csv_pattern_b5)
+
+if not all_files_b5:
+    st.warning("⚠️ 找不到相關 CSV 檔案，請確認檔名包含『神秘金字塔 - 股權類股排行(5日之400張以上股東排行)』。")
+else:
+    # 抓取最新日期的檔案
+    latest_file_b5 = sorted(all_files_b5, key=lambda x: os.path.basename(x), reverse=True)[0]
+    try:
+        df_b5 = robust_read_csv(latest_file_b5)
+        
+        # 清洗欄位名稱 (防呆)
+        df_b5.columns = [str(c).replace(" ", "").replace("\n", "").replace("\ufeff", "").strip() for c in df_b5.columns]
+
+        # 動態抓取代號與名稱欄位
+        id_col = next((c for c in df_b5.columns if '代號' in c or '代碼' in c), None)
+        name_col = next((c for c in df_b5.columns if '名稱' in c or '股名' in c), None)
+        
+        if id_col: df_b5 = df_b5.rename(columns={id_col: '股票代號'})
+        if name_col: df_b5 = df_b5.rename(columns={name_col: '股票名稱'})
+        
+        # 確保型態為字串並去空白
+        if '股票代號' in df_b5.columns:
+            df_b5['股票代號'] = df_b5['股票代號'].astype(str).str.strip()
+        if '股票名稱' in df_b5.columns:
+            df_b5['股票名稱'] = df_b5['股票名稱'].astype(str).str.strip()
+        
+        st.info(f"💡 最新來源: {os.path.basename(latest_file_b5)}")
+        
+        # 顯示區塊 5 資料表
+        st.dataframe(df_b5, use_container_width=True, hide_index=True)
+        
+        # 🔥 【連動儲存】：存入記憶體供搜尋區塊掃描
+        st.session_state['df_blk5'] = df_b5
+        
+    except Exception as e:
+        st.error(f"❌ 無法讀取區塊 5 數據: {str(e)}")
 # ==========================================
 # 📊 【蜂蜜計數器】本站累計觀測人次統計
 # ==========================================
