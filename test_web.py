@@ -1238,7 +1238,7 @@ def robust_read_csv(file_path):
         except:
             continue
     return pd.read_csv(file_path, encoding='cp950', errors='ignore')
-
+# ==========券資比資料請一起搬遷============
 # ==========================================
 # 📅 區塊 4-1：融資減少動向 (5日累計)
 # ==========================================
@@ -1406,6 +1406,50 @@ with c2:
         st.dataframe(df_vol_clean, use_container_width=True)
     else:
         st.warning(f"⚠️ {msg_vol} 或 過濾後無相符資料")
+
+# ==========================================
+# 📅 區塊 4-3：融券增加動向 (5日累計)
+# ==========================================
+st.write("---")
+st.markdown("<div id='section-4-3'></div>", unsafe_allow_html=True)
+st.header("📅 區塊 4-3：融券增加動向 (5日累計)")
+
+# 🛠️ 標的顯示過濾 UI
+st.write("🔧 **自訂標的顯示過濾：**")
+f_col1, f_col2, _ = st.columns([1, 1, 2])
+with f_col1:
+    show_etf_43 = st.checkbox("顯示 ETF", value=True, key="stock_show_etf_43")
+with f_col2:
+    show_bond_43 = st.checkbox("顯示債券/債券ETF", value=True, key="stock_show_bond_43")
+st.write("") 
+
+# --- 畫面佈局顯示 ---
+c1, c2 = st.columns(2)
+
+with c1:
+    st.subheader("📈 融券增加【幅度】排名")
+    # 🔥 關鍵修改：關鍵字改為「融券增加幅度」
+    df_pct, msg_pct = get_specific_margin_data("融券增加幅度")
+    df_pct_clean = process_margin_df(df_pct, "幅度") # 沿用相同的清理邏輯
+    
+    if not df_pct_clean.empty:
+        st.info(f"💡 最新來源: {msg_pct}")
+        st.dataframe(df_pct_clean, use_container_width=True)
+    else:
+        st.warning(f"⚠️ {msg_pct} 或 過濾後無相符資料")
+
+with c2:
+    st.subheader("📈 融券增加【張數】排名")
+    # 🔥 關鍵修改：關鍵字改為「融券增加張數」
+    df_vol, msg_vol = get_specific_margin_data("融券增加張數")
+    df_vol_clean = process_margin_df(df_vol, "張數") # 沿用相同的清理邏輯
+    
+    if not df_vol_clean.empty:
+        st.info(f"💡 最新來源: {msg_vol}")
+        st.dataframe(df_vol_clean, use_container_width=True)
+    else:
+        st.warning(f"⚠️ {msg_vol} 或 過濾後無相符資料")
+# ==========券資比資料請一起搬遷============
 # ==========================================
 # 📊 【蜂蜜計數器】本站累計觀測人次統計
 # ==========================================
