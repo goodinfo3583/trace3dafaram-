@@ -5,7 +5,6 @@ import os
 import glob
 import re
 
-
 # ==========================================
 # 1. 網頁基本設定 & 頂部蜂蜜幸運祝福
 # ==========================================
@@ -29,11 +28,9 @@ def extract_date_from_name(filepath):
     return date_match.group(1) if date_match else "00000000"
 
 # ==========================================
-# 👑 頂級核心：【三大法人多空評分 + 3日短線飆速置頂爆發榜】
+# 🏆 預留置頂空間：頂級選股池容器
 # ==========================================
-st.markdown("## 🏆 頂級核心：解鎖中")
-st.write("🔥 **戰術策略說明**：")
-
+top_pool_container = st.container()
 
 
 # ==========================================
@@ -1413,6 +1410,143 @@ else:
         st.session_state['df_blk5'] = final_df
     else:
         st.error("無法合併資料。")
+
+# ==========================================
+# 🏆 頂級選股池核心引擎 (置頂信心排行榜)
+# ==========================================
+with top_pool_container:
+    st.write("---")
+    st.markdown("<div id='section-top-pool'></div>", unsafe_allow_html=True)
+    st.header("🏆 置頂信心與頂級選股池 (全區塊綜合評比)")
+    st.info("💡 **評分規則**：以區塊1動能(趨緩/上升/持平)為基底。各大榜單出現+1分；大股東微增+1分，大增/增+2分。")
+
+    if 'my_final_df' not in st.session_state or st.session_state['my_final_df'].empty:
+        st.warning("⚠️ 尚未載入區塊 1 資料，無法進行選股池評比。")
+    else:
+        df_b1 = st.session_state['my_final_df'].copy()
+        
+        # 1. 尋找區塊 1 的動態欄位 (包含 '動態' 或 '動能')
+        dyn_col = next((c for c in df_b1.columns if '動態' in c or '動能' in c), None)
+        
+        # 2. 篩選基底：動能為 趨緩、上升(加碼/強延續)、持平
+        if dyn_col:
+            mask = df_b1[dyn_col].astype(str).str.contains('趨緩|上升|升|持平|加碼|延續', na=False)
+            pool_df = df_b1[mask].copy()
+        else:
+            pool_df = df_b1.copy()
+            
+        if pool_df.empty:
+            st.warning("⚪ 目前區塊 1 中沒有符合「趨緩、上升、持平」動能的標的。")
+        else:
+            # 3. 讀取賣出警示名單 (外資3日賣出、投信5日賣出)
+            fo_sell_ids, it_sell_ids = set(), set()
+            try:
+                # 抓取外資賣出
+                fo_sell_files = glob.glob(os.path.join(DATA_DIR, "*外資賣出佔成交比*3日*.csv"))
+                if not fo_sell_files: fo_sell_files = glob.glob(os.path.join(DATA_DIR, "*外資賣出佔成交比*.csv"))
+                if fo_sell_files:
+                    df_fs = robust_read_csv(sorted(fo_sell_files, reverse=True)[0])
+                    id_c = next((c for c in df_fs.columns if '代號' in c), None)
+                    if id_c: fo_sell_ids = set(df_fs[id_c].astype(str).str.replace(r'\D', '', regex=True))
+                
+                # 抓取投信賣出
+                it_sell_files = glob.glob(os.path.join(DATA_DIR, "*投信賣出佔成交比*5日*.csv"))
+                if not it_sell_files: it_sell_files = glob.glob(os.path.join(DATA_DIR, "*投信賣出佔成交比*.csv"))
+                if it_sell_files:
+                    df_is = robust_read_csv(sorted(it_sell_files, reverse=True)[0])
+                    id_c = next((c for c in df_is.columns if '代號' in c), None)
+                    if id_c: it_sell_ids = set(df_is[id_c].astype(str).str.replace(r'\D', '', regex=True))
+            except: pass
+
+            # 4. 取得其他區塊的股票池 (Set 快速比對)
+            def get_ids(key):
+                if key in st.session_state and not st.session_state[key].empty:
+                    return set(st.session_state[key]['股票代號'].astype(str))
+                return set()
+
+            s_b2_1, s_b2_2, s_b2_3, s_b2_4 = get_ids('df_blk2_1'), get_ids('df_blk2_2'), get_ids('df_blk2_3'), get_ids('df_blk2_4')
+            
+            df_b3 = st.session_state.get('df_blk3_main', pd.DataFrame())
+            s_b3_f_d = set(df_b3[df_b3['連買類型'].str.contains('外資日', na=False)]['股票代號'].astype(str)) if not df_b3.empty else set()
+            s_b3_f_w = set(df_b3[df_b3['連買類型'].str.contains('外資週', na=False)]['股票代號'].astype(str)) if not df_b3.empty else set()
+            s_b3_i_d = set(df_b3[df_b3['連買類型'].str.contains('投信日', na=False)]['股票代號'].astype(str)) if not df_b3.empty else set()
+            s_b3_i_w = set(df_b3[df_b3['連買類型'].str.contains('投信週', na=False)]['股票代號'].astype(str)) if not df_b3.empty else set()
+            
+            s_b4_mar = get_ids('df_margin_pct') | get_ids('df_margin_vol')
+            s_b4_sho = get_ids('df_short_pct') | get_ids('df_short_vol')
+            s_b4_m_p = get_ids('df_margin_plus_pct') | get_ids('df_margin_plus_vol')
+            
+            df_b5 = st.session_state.get('df_blk5', pd.DataFrame())
+
+            # 5. 計分迴圈
+            results = []
+            for _, row in pool_df.iterrows():
+                sid = str(row['股票代號']).strip()
+                sname = str(row.get('股票名稱', '')).strip()
+                b1_dyn = str(row.get(dyn_col, '')) if dyn_col else '-'
+                score = 0
+                
+                # B2 計分
+                r_b2_1 = "✔️" if sid in s_b2_1 else ""; score += 1 if r_b2_1 else 0
+                r_b2_2 = "✔️" if sid in s_b2_2 else ""; score += 1 if r_b2_2 else 0
+                r_b2_3 = "✔️" if sid in s_b2_3 else ""; score += 1 if r_b2_3 else 0
+                r_b2_4 = "✔️" if sid in s_b2_4 else ""; score += 1 if r_b2_4 else 0
+                
+                # B3 計分
+                r_b3_fd = "✔️" if sid in s_b3_f_d else ""; score += 1 if r_b3_fd else 0
+                r_b3_fw = "✔️" if sid in s_b3_f_w else ""; score += 1 if r_b3_fw else 0
+                r_b3_id = "✔️" if sid in s_b3_i_d else ""; score += 1 if r_b3_id else 0
+                r_b3_iw = "✔️" if sid in s_b3_i_w else ""; score += 1 if r_b3_iw else 0
+                
+                # B4 計分
+                r_b4_mar = "✔️" if sid in s_b4_mar else ""; score += 1 if r_b4_mar else 0
+                r_b4_sho = "✔️" if sid in s_b4_sho else ""; score += 1 if r_b4_sho else 0
+                r_b4_mp  = "✔️" if sid in s_b4_m_p else ""; score += 1 if r_b4_mp else 0
+                
+                # B5 大股東計分
+                r_b5 = ""
+                if not df_b5.empty and sid in df_b5['股票代號'].values:
+                    trend = str(df_b5[df_b5['股票代號'] == sid].iloc[0].get('週動態', ''))
+                    if '大增' in trend or ('增' in trend and '微' not in trend):
+                        score += 2; r_b5 = "🔥大增(+2)"
+                    elif '微增' in trend:
+                        score += 1; r_b5 = "↗️微增(+1)"
+                    else:
+                        r_b5 = trend
+                
+                # 法人賣出警示
+                warns = []
+                if sid in fo_sell_ids: warns.append("⚠️外資倒貨")
+                if sid in it_sell_ids: warns.append("⚠️投信倒貨")
+                r_warn = "、".join(warns) if warns else "-"
+
+                results.append({
+                    '總分': score,
+                    '股票代號': sid,
+                    '股票名稱': sname,
+                    'B1動態': b1_dyn,
+                    '外買佔比': r_b2_1,
+                    '投買佔比': r_b2_2,
+                    '外佔發行': r_b2_3,
+                    '投佔發行': r_b2_4,
+                    '外日連': r_b3_fd,
+                    '外週連': r_b3_fw,
+                    '投日連': r_b3_id,
+                    '投週連': r_b3_iw,
+                    '資減': r_b4_mar,
+                    '借減': r_b4_sho,
+                    '券增': r_b4_mp,
+                    '大股東動向': r_b5,
+                    '法人賣出警示': r_warn
+                })
+                
+            # 6. 生成表格並排序
+            res_df = pd.DataFrame(results)
+            res_df = res_df.sort_values(by='總分', ascending=False).reset_index(drop=True)
+            
+            # 美化警示欄位 (若有警告則排在前面提醒)
+            st.dataframe(res_df, use_container_width=True, hide_index=True)
+            st.success(f"🎯 頂級選股池掃描完成！共過濾出 {len(res_df)} 檔潛力標的。")
 # ==========================================
 # 📊 【蜂蜜計數器】本站累計觀測人次統計
 # ==========================================
