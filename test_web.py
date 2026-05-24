@@ -475,7 +475,7 @@ st.sidebar.markdown("[👑 區塊一：三大法人持股%](#section-1)")
 # 🏠 核心五大區塊
 # ==========================================
 # ==========================================
-# 🏠 區塊1：中長線 三大法人 持股比例 追蹤 (視覺絕對同步版)
+# 🏠 區塊1：中長線 三大法人 持股比例 追蹤 (多榜單色彩強化 + 趨緩修正版)
 # ==========================================
 st.write("---")
 st.markdown("<div id='section-1'></div>", unsafe_allow_html=True)
@@ -490,51 +490,55 @@ def parse_special_txt(file_path, is_latest=False):
     parsed_data = []
     date_label = os.path.basename(file_path)[:8]
     target_col = f"{date_label}持股%"
-    
-    sections_map = {
-        "排名(5日)": "5日",
-        "排名(20日)": "20日",
-        "排名(60日)": "60日",
-        "排名(120日)": "120日"
-    }
-    current_section = None
+    current_section = "5日" 
     
     try:
         with open(file_path, 'r', encoding='utf-8-sig', errors='ignore') as f:
             for line in f:
                 line_str = line.strip()
                 
-                for key, name in sections_map.items():
-                    if key in line_str:
-                        current_section = name
-                        break
+                if "排名(5日)" in line_str: current_section = "5日"
+                elif "排名(20日)" in line_str: current_section = "20日"
+                elif "排名(60日)" in line_str: current_section = "60日"
+                elif "排名(120日)" in line_str: current_section = "120日"
                 
                 parts = line_str.split('\t')
-                if current_section and len(parts) >= 5 and parts[0].isdigit():
+                if len(parts) >= 5 and parts[0].isdigit():
                     stock_str = parts[1].strip()  
+                    
                     m = re.match(r'^(\d+)(.*)', stock_str)
-                    stock_id = m.group(1) if m else stock_str
-                    stock_name = m.group(2).strip() if m else stock_str
+                    if m:
+                        stock_id = m.group(1)
+                        stock_name = m.group(2).strip()
+                    else:
+                        stock_id = stock_str
+                        stock_name = stock_str
                     
-                    try: holding_pct = float(parts[-2])
-                    except ValueError: continue
-                    
+                    try:
+                        holding_pct = float(parts[-2])
+                    except ValueError:
+                        continue
+                        
                     parsed_data.append({
                         '股票代號': stock_id,
                         '股票名稱': stock_name,
                         target_col: holding_pct,
                         '上榜區塊': current_section
                     })
-    except Exception:
+    except Exception as e:
         return pd.DataFrame()
 
     df = pd.DataFrame(parsed_data)
-    if df.empty: return pd.DataFrame()
-    
+    if df.empty:
+        return pd.DataFrame()
+        
     def agg_sections(x):
-        return ",".join(sorted(list(set(x)), key=lambda s: ['5日', '20日', '60日', '120日'].index(s)))
+        sections = set(x)
+        order = ['5日', '20日', '60日', '120日']
+        return ",".join([s for s in order if s in sections])
         
     df_agg = df.groupby(['股票代號', '股票名稱', target_col])['上榜區塊'].agg(agg_sections).reset_index()
+    
     if not is_latest:
         df_agg = df_agg.drop(columns=['上榜區塊'])
         
@@ -548,14 +552,20 @@ all_txt_files = sorted(glob.glob(txt_pattern), reverse=True)
 
 if all_txt_files:
     final_df = None
+    
     for i, file_path in enumerate(all_txt_files[:30]):
         df_day = parse_special_txt(file_path, is_latest=(i==0))
-        if df_day.empty: continue
-        if final_df is None: final_df = df_day
-        else: final_df = pd.merge(final_df, df_day, on=['股票代號', '股票名稱'], how='outer')
+        if df_day.empty: 
+            continue
+            
+        if final_df is None:
+            final_df = df_day
+        else:
+            final_df = pd.merge(final_df, df_day, on=['股票代號', '股票名稱'], how='outer')
             
     if final_df is not None and not final_df.empty:
         date_cols = [c for c in final_df.columns if '持股%' in c]
+        
         for c in date_cols:
             final_df[c] = pd.to_numeric(final_df[c], errors='coerce').fillna(0)
             
@@ -572,21 +582,26 @@ if all_txt_files:
             final_df['上榜區塊'] = ""
             
         final_df['今日上榜'] = final_df['上榜區塊'].apply(generate_tags)
-        
-        # 🔥 【關鍵修正 1】：直接計算畫面上的「日」字數量，保證顏色判定與標籤 100% 吻合
-        final_df['上榜數量'] = final_df['今日上榜'].apply(lambda x: str(x).count('日'))
+        final_df['上榜數量'] = final_df['上榜區塊'].apply(lambda x: len(str(x).split(',')) if pd.notna(x) and x else 0)
             
+        # 🔥 修正點：加入「防禦性數值檢測」，避免將空值(0)當作趨緩運算基準
         def evaluate_trend(row):
             if len(date_cols) < 2: return "⚪ 資料不足"
-            v0, v1 = row[date_cols[0]], row[date_cols[1]]
+            
+            v0 = row[date_cols[0]]  
+            v1 = row[date_cols[1]]  
             diff1 = v0 - v1  
+            
             if diff1 > 0:
                 if len(date_cols) >= 3:
                     v2 = row[date_cols[2]]
+                    # 必須確保 v2 和 v1 都不是 0 (代表前兩天都有真實上榜紀錄)
                     if v1 != 0 and v2 != 0:
                         diff2 = v1 - v2
-                        if diff2 > 0 and diff1 < diff2: return "⚠️ 趨緩"
+                        if diff2 > 0 and diff1 < diff2: 
+                            return "⚠️ 趨緩"
                 return "📈 上升"
+                
             elif diff1 < 0: return "📉 下降"
             else: return "🔄 持平"
                 
@@ -596,6 +611,7 @@ if all_txt_files:
             final_df = final_df.sort_values(by=['上榜數量', date_cols[0]], ascending=[False, False])
             
         color_ref = final_df.set_index('股票代號')['上榜數量'].to_dict()
+            
         cols = ['股票代號', '股票名稱', '今日上榜', '最新動態'] + date_cols
         final_df = final_df[cols]
         
@@ -604,8 +620,8 @@ if all_txt_files:
         # ==========================================
         st.write("🔧 **自訂標的顯示過濾：**")
         c1, c2 = st.columns(2)
-        show_etf = c1.checkbox("顯示 ETF", value=True, key="blk1_etf_sync")
-        show_bond = c2.checkbox("顯示 債券/債券ETF", value=True, key="blk1_bond_sync")
+        show_etf = c1.checkbox("顯示 ETF", value=True, key="blk1_etf_color")
+        show_bond = c2.checkbox("顯示 債券/債券ETF", value=True, key="blk1_bond_color")
         
         is_bond = final_df['股票代號'].str.endswith('B')
         is_etf = (final_df['股票代號'].str.len() >= 5) & (~is_bond)
@@ -616,24 +632,25 @@ if all_txt_files:
         if show_bond: mask |= is_bond
             
         filtered_df = final_df[mask].copy()
+        
         for c in date_cols:
             filtered_df[c] = filtered_df[c].apply(lambda x: f"{x:.2f}" if x != 0 else "-")
+            
         filtered_df.index = range(1, len(filtered_df) + 1)
         
-        # 🔥 【關鍵修正 2】：加深顏色不透明度 (0.35)，讓紅色與橘色在視覺上產生極大差異
         def highlight_row(row):
             cnt = color_ref.get(row['股票代號'], 0)
-            if cnt == 4: bg = 'background-color: rgba(255, 50, 50, 0.35)'     # 明顯的紅
-            elif cnt == 3: bg = 'background-color: rgba(255, 150, 0, 0.35)'   # 明顯的橘
-            elif cnt == 2: bg = 'background-color: rgba(0, 200, 0, 0.25)'     # 柔和的綠
-            elif cnt == 1: bg = 'background-color: rgba(0, 100, 255, 0.25)'   # 柔和的藍
+            if cnt == 4: bg = 'background-color: rgba(255, 0, 0, 0.15)'
+            elif cnt == 3: bg = 'background-color: rgba(255, 165, 0, 0.15)' 
+            elif cnt == 2: bg = 'background-color: rgba(0, 128, 0, 0.15)'   
+            elif cnt == 1: bg = 'background-color: rgba(0, 0, 255, 0.1)'    
             else: bg = ''                                                   
             return [bg] * len(row)
 
         styled_df = filtered_df.style.apply(highlight_row, axis=1)
         
-        st.info("💡 **多榜單共振說明：** 背景顏色越暖 (紅/橘)，代表同時出現於越多天期的熱門榜單中，籌碼集中度極高。")
-        st.success(f"📊 已成功串聯 {len(date_cols)} 個交易日的數據 (排序優先級：今日上榜榜單數 > 今日持股%)：")
+        st.info("💡 **榜單共振說明：** 5/20/60/120日，代表法人持股變化數據分析後於前段班，多榜單籌碼集中度極高。")
+        st.success(f"📊 已成功串聯 {len(date_cols)} 個交易日的數據：")
         st.dataframe(styled_df, use_container_width=True)
     else:
         st.warning("⚠️ 讀取到的檔案皆無效或無資料，請檢查 TXT 內容。")
