@@ -380,60 +380,61 @@ def search_in_memory(df, query):
     ]
     return res
 
-if search_query:
-    # 直接使用程式記憶體中已經有的 DataFrame 進行篩選
-    q_txt = search_in_memory(track_display_df, search_query)
-    
-    if q_txt.empty:
-        st.warning(f"⚠️ 找不到與 '{search_query}' 相關的資料。")
-    else:
-        st.write(f"### 🎯 綜合診斷標的：{search_query}")
-        st.dataframe(q_txt.loc[:, ~q_txt.columns.duplicated()], use_container_width=True)
-
-        # 🚀 區塊 2 (直接對接記憶體中的變數)
+        # ==========================================
+        # 🚀 區塊 2-1 ~ 2-4 對接 (修正版：正確顯示"無資料")
+        # ==========================================
         st.markdown("##### 🚀 核心主力短線進攻 (區塊 2)")
         c1, c2 = st.columns(2)
         
         with c1:
-            st.write("📊 **外資5日買佔成交：**")
+            st.write("📊 **外資 5 日買佔成交：**")
             res_2_1 = search_in_memory(csv_foreign_deal, search_query)
-            st.dataframe(res_2_1 if not res_2_1.empty else "無資料", use_container_width=True)
+            if not res_2_1.empty: st.dataframe(res_2_1, use_container_width=True)
+            else: st.info("無資料")
             
-            st.write("🔒 **外資5日買佔發行：**")
+            st.write("🔒 **外資 5 日買佔發行：**")
             res_2_3 = search_in_memory(csv_foreign_stock, search_query)
-            st.dataframe(res_2_3 if not res_2_3.empty else "無資料", use_container_width=True)
+            if not res_2_3.empty: st.dataframe(res_2_3, use_container_width=True)
+            else: st.info("無資料")
                 
         with c2:
-            st.write("🥦 **投信5日買佔成交：**")
+            st.write("🥦 **投信 5 日買佔成交：**")
             res_2_2 = search_in_memory(csv_it_deal, search_query)
-            st.dataframe(res_2_2 if not res_2_2.empty else "無資料", use_container_width=True)
+            if not res_2_2.empty: st.dataframe(res_2_2, use_container_width=True)
+            else: st.info("無資料")
                 
-            st.write("💎 **投信5日買佔發行：**")
+            st.write("💎 **投信 5 日買佔發行：**")
             res_2_4 = search_in_memory(csv_it_stock, search_query)
-            st.dataframe(res_2_4 if not res_2_4.empty else "無資料", use_container_width=True)
+            if not res_2_4.empty: st.dataframe(res_2_4, use_container_width=True)
+            else: st.info("無資料")
 
-        # 📅 區塊 3 (直接對接記憶體中的變數)
+        # ==========================================
+        # 📅 區塊 3 (修正版：正確顯示"無資料")
+        # ==========================================
         st.markdown("##### 📅 法人連續買超 (區塊 3)")
         c3_1, c3_2 = st.columns(2)
         
         with c3_1:
             st.write("🌐 **外資最新日連買**")
             res_3_fo_day = search_in_memory(live_fo_day, search_query)
-            st.dataframe(res_3_fo_day if not res_3_fo_day.empty else "無資料", use_container_width=True)
+            if not res_3_fo_day.empty: st.dataframe(res_3_fo_day, use_container_width=True)
+            else: st.info("無資料")
             
             st.write("🌐 **外資最新週連買**")
             res_3_fo_wk = search_in_memory(live_fo_wk, search_query)
-            st.dataframe(res_3_fo_wk if not res_3_fo_wk.empty else "無資料", use_container_width=True)
+            if not res_3_fo_wk.empty: st.dataframe(res_3_fo_wk, use_container_width=True)
+            else: st.info("無資料")
                 
         with c3_2:
             st.write("🏦 **投信最新日連買**")
             res_3_it_day = search_in_memory(live_it_day, search_query)
-            st.dataframe(res_3_it_day if not res_3_it_day.empty else "無資料", use_container_width=True)
+            if not res_3_it_day.empty: st.dataframe(res_3_it_day, use_container_width=True)
+            else: st.info("無資料")
             
             st.write("🏦 **投信最新週連買**")
             res_3_it_wk = search_in_memory(live_it_wk, search_query)
-            st.dataframe(res_3_it_wk if not res_3_it_wk.empty else "無資料", use_container_width=True)
-
+            if not res_3_it_wk.empty: st.dataframe(res_3_it_wk, use_container_width=True)
+            else: st.info("無資料")
 
 # ==========================================
 # 🧭 側邊欄導航 (無感互動+視覺特效版)
