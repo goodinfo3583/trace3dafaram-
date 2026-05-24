@@ -32,7 +32,7 @@ def extract_date_from_name(filepath):
 # 👑 頂級核心：【三大法人多空評分 + 3日短線飆速置頂爆發榜】
 # ==========================================
 st.markdown("## 🏆 頂級核心：解鎖中")
-st.write("🔥 **戰術策略說明**：以長線為絕對基底，放寬偵測：今日數據對比前1天、前2天或前3天只要有實質增加（含突破未進榜斷層）即鎖定！")
+st.write("🔥 **戰術策略說明**：")
 
 
 
@@ -80,10 +80,10 @@ def scan_and_display(title, session_key, query):
         st.write(f"**{title}**")
         st.dataframe(res, use_container_width=True, hide_index=True)
     else:
-        st.info(f"⚪ {title}：未進榜 (該標的未在此榜單中)")
+        st.info(f"⚪ {title}：未進榜")
 
 # 🎯 搜尋輸入框
-search_query = st.text_input("請輸入想觀測的股票代號或名稱 (例如: 3231 或 緯創)：", key="global_search_final")
+search_query = st.text_input("請輸入想觀測的股票代號或名稱 (例如: 3231 或 緯創，未顯示任何資料代表你的標的可能太弱了)：", key="global_search_final")
 
 if search_query:
     st.write(f"### 🎯 綜合診斷標的：{search_query}")
@@ -137,11 +137,11 @@ if search_query:
     st.write("---")
     st.write("#### 📊 區塊 2：法人買超診斷")
     c1, c2 = st.columns(2)
-    with c1: scan_and_display("🔹 區塊 2-1 (外資5日佔比)", 'df_blk2_1', search_query)
-    with c2: scan_and_display("🔹 區塊 2-2 (投信5日佔比)", 'df_blk2_2', search_query)
+    with c1: scan_and_display("🔹 區塊 2-1 -外資5日淨買佔標的成交量", 'df_blk2_1', search_query)
+    with c2: scan_and_display("🔹 區塊 2-2 -投信5日淨買佔標的成交量", 'df_blk2_2', search_query)
     c3, c4 = st.columns(2)
-    with c3: scan_and_display("🔹 區塊 2-3", 'df_blk2_3', search_query)
-    with c4: scan_and_display("🔹 區塊 2-4", 'df_blk2_4', search_query)
+    with c3: scan_and_display("🔹 區塊 2-3 -外資5日淨買佔公司發行量", 'df_blk2_3', search_query)
+    with c4: scan_and_display("🔹 區塊 2-4 -投信5日淨買佔公司發行量", 'df_blk2_4', search_query)
 
     # ==========================================
     # 📊 區塊 3：特定籌碼或大戶診斷 (4 榜全景)
@@ -244,10 +244,10 @@ st.sidebar.markdown("---")
 st.sidebar.header("📍 戰情室快速導航")
 st.sidebar.markdown("[🔍 個股籌碼快搜 (診斷區)](#section-search)")
 st.sidebar.markdown("[👑 區塊1：法人持股比追蹤](#section-1)")
-st.sidebar.markdown("[🎯 區塊2-1：外資 5 日淨買佔成交量](#section-2-1)")
-st.sidebar.markdown("[🎯 區塊2-2：投信 5 日淨買佔成交量](#section-2-2)")
-st.sidebar.markdown("[🎯 區塊2-3：外資 5 日淨買佔發行量](#section-2-3)")
-st.sidebar.markdown("[🎯 區塊2-4：投信 5 日淨超佔發行量](#section-2-4)")
+st.sidebar.markdown("[🎯 區塊2-1：外資5日淨買佔標的成交量](#section-2-1)")
+st.sidebar.markdown("[🎯 區塊2-2：投信5日淨買佔標的成交量](#section-2-2)")
+st.sidebar.markdown("[🎯 區塊2-3：外資5日淨買佔公司發行量](#section-2-3)")
+st.sidebar.markdown("[🎯 區塊2-4：投信5日淨買佔公司發行量](#section-2-4)")
 st.sidebar.markdown("[📅 區塊3：法人連續買超](#section-3)")
 st.sidebar.markdown("[🔄 區塊4-1：融資減少動向](#section-4-1)")
 st.sidebar.markdown("[🔄 區塊4-2：借券賣出減少動向](#section-4-2)")
@@ -1275,7 +1275,7 @@ with c2:
     df_vol_clean = process_margin_df(df_vol, "張數", show_etf_43, show_bond_43)
     
     if not df_vol_clean.empty:
-        st.info(f"💡 已更新")
+        st.info(f"💡 最新來源: {msg_vol}")
         st.dataframe(df_vol_clean, use_container_width=True, hide_index=True)
     else:
         st.warning(f"⚠️ {msg_vol} 或 過濾後無相符資料")
