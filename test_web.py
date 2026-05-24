@@ -477,7 +477,7 @@ st.sidebar.markdown("[👑 區塊一：三大法人持股%](#section-1)")
 # ==========================================
 # ==========================================
 # ==========================================
-# 🏠 區塊1：中長線 三大法人 持股比例 追蹤 (嚴格分隔線與柔和底色版)
+# 🏠 區塊1：中長線 三大法人 持股比例 追蹤 (比對順序修正+柔和護眼版)
 # ==========================================
 st.write("---")
 st.markdown("<div id='section-1'></div>", unsafe_allow_html=True)
@@ -500,18 +500,18 @@ def parse_special_txt(file_path, date_label):
             for line in f:
                 line_str = line.strip()
                 
-                # 🛑 【絕對斷路器】：只要遇到分隔線，立刻清空狀態！
-                # 這樣就保證了 20日的資料絕對不會跑到 5日，60日絕對不會跑到 20日
+                # 🛑 【絕對斷路器】：只要遇到分隔線，立刻清空狀態
                 if line_str.startswith("---") or line_str.startswith("==="):
                     current_section = None
                     continue
                 
                 # 💡 【區塊開關】：讀到對應標題才開啟
                 if "三大法人持股變化排名" in line_str or ("排名" in line_str and "日)" in line_str):
-                    if "5日" in line_str: current_section = "5日"
+                    # 🔥 【終極修正】：必須先比對 "120日" 再比對 "20日"，避免 120日 被 20日 攔截！
+                    if "120日" in line_str: current_section = "120日"
                     elif "20日" in line_str: current_section = "20日"
+                    elif "5日" in line_str: current_section = "5日"
                     elif "60日" in line_str: current_section = "60日"
-                    elif "120日" in line_str: current_section = "120日"
                     continue
                 
                 # 抓取資料：必須在開啟狀態，且該行是資料(數字開頭)才抓
@@ -547,7 +547,7 @@ def agg_sections_func(x):
 txt_pattern = os.path.join(DATA_DIR, "*持股排名變化*.txt")
 all_txt_files = glob.glob(txt_pattern)
 
-# 依日期分群，防止您不小心下載了重複的檔案 (如 0522(1).txt) 導致合併錯亂
+# 依日期分群，防止重複檔案合併錯亂
 date_files = defaultdict(list)
 for f in all_txt_files:
     date_label = os.path.basename(f)[:8]
@@ -573,7 +573,6 @@ if sorted_dates:
         df_day_raw = pd.concat(day_dfs, ignore_index=True)
         target_col = f"{date_label}持股%"
         
-        # 將同一天的資料先收攏
         if is_latest:
             df_day = df_day_raw.groupby(['股票代號', '股票名稱']).agg({
                 target_col: 'max',  
@@ -584,7 +583,6 @@ if sorted_dates:
                 target_col: 'max'
             }).reset_index()
             
-        # 跨日橫向合併
         if final_df is None: final_df = df_day
         else: final_df = pd.merge(final_df, df_day, on=['股票代號', '股票名稱'], how='outer')
             
@@ -653,15 +651,14 @@ if sorted_dates:
             filtered_df[c] = filtered_df[c].apply(lambda x: f"{x:.2f}" if x != 0 else "-")
         filtered_df.index = range(1, len(filtered_df) + 1)
         
-        # 🎨 【自訂顏色教學】：rgba(紅, 綠, 藍, 透明度)
-        # 數字介於 0~255，最後一個小數點代表透明度 (越接近 1 越深，越接近 0 越透)
-        # 您可以自由修改括號內的數值來改變顏色！
+        # 🎨 【自訂顏色調整區】：改為極度柔和護眼的高級低飽和色系
+        # rgba(紅, 綠, 藍, 透明度) -> 最後一個小數點可以微調深淺 (例如 0.4 改 0.5 會變深)
         def highlight_row(row):
             cnt = color_ref.get(row['股票代號'], 0)
-            if cnt == 4: bg = 'background-color: rgba(255, 200, 200, 0.45)'     # 淺紅 (護眼)
-            elif cnt == 3: bg = 'background-color: rgba(255, 240, 160, 0.45)'   # 淺黃 (護眼)
-            elif cnt == 2: bg = 'background-color: rgba(180, 240, 180, 0.45)'   # 淺綠 (已加深)
-            elif cnt == 1: bg = 'background-color: rgba(200, 225, 255, 0.55)'   # 淺藍 (已加深)
+            if cnt == 4: bg = 'background-color: rgba(255, 225, 225, 0.55)'     # 4榜單：百搭淺紅
+            elif cnt == 3: bg = 'background-color: rgba(255, 250, 205, 0.65)'    # 3榜單：粉嫩淺黃
+            elif cnt == 2: bg = 'background-color: rgba(215, 245, 215, 0.65)'    # 2榜單：莫蘭迪淺綠 (已稍微加深)
+            elif cnt == 1: bg = 'background-color: rgba(220, 238, 255, 0.75)'    # 1榜單：晴空淺藍 (已稍微加深)
             else: bg = ''                                                   
             return [bg] * len(row)
 
