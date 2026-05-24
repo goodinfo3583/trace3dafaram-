@@ -1204,22 +1204,21 @@ st.header("📅 區塊 4-1：融資減少動向 (5日累計)")
 
 def read_margin_data():
     found_files = []
-    all_csvs_debug = [] 
     
     for root, dirs, files in os.walk(os.getcwd()):
         if '.git' in root or 'venv' in root:
             continue
             
         for file in files:
-            # 🔥 修正：大小寫通吃！把檔名轉小寫再判斷，避免 .CSV 被略過
             if file.lower().endswith(".csv"):
-                all_csvs_debug.append(file)
-                if "融資減少" in file:
+                # 🔥 破解修正：放寬條件！只要檔名有「融資」就先抓起來再說
+                if "融資" in file:
                     found_files.append(os.path.join(root, file))
     
     if not found_files:
-        return pd.DataFrame(), "無檔案", all_csvs_debug
+        return pd.DataFrame(), "無檔案", []
     
+    # 取得最新的「融資」檔案 (假設最新的一定是您剛上傳的)
     latest_file = sorted(found_files, key=os.path.getmtime, reverse=True)[0]
     
     try:
@@ -1228,35 +1227,36 @@ def read_margin_data():
         for col in df.columns:
             if "幅度" in col or "張數" in col:
                 df[col] = pd.to_numeric(df[col], errors='coerce')
-        return df, os.path.basename(latest_file), []
+        return df, os.path.basename(latest_file), found_files
     except Exception as e:
-        return pd.DataFrame(), f"讀取失敗: {str(e)}", []
+        return pd.DataFrame(), f"讀取失敗: {str(e)}", found_files
 
 # 執行讀取
-margin_df, margin_filename, debug_csvs = read_margin_data()
+margin_df, margin_filename, all_margin_files = read_margin_data()
 
-# 顯示結果
 if not margin_df.empty:
     st.info(f"💡 資料來源: {margin_filename}")
     st.dataframe(margin_df, use_container_width=True)
 else:
     st.error("⚠️ 系統依然找不到對應的 CSV 檔案。")
+
+# ==========================================
+# 🩻 檔名真面目解析器 (強制展開不摺疊)
+# ==========================================
+st.write("### 🩻 伺服器真實檔名解析")
+target_dir = "Goodinfo_Rankings"
+if os.path.exists(target_dir):
+    files = os.listdir(target_dir)
+    csv_files = [f for f in files if f.lower().endswith('.csv')]
+    # 依照修改時間排序，最新的排前面
+    csv_files.sort(key=lambda x: os.path.getmtime(os.path.join(target_dir, x)), reverse=True)
     
-    # 🩻 資料夾 X 光機 (幫您看透伺服器內部)
-    st.write("### 🩻 伺服器內部資料夾 X 光機")
-    try:
-        root_items = os.listdir(".")
-        st.write("📂 **根目錄 (`/mount/src/...`) 底下有這些東西：**", root_items)
-        
-        target_dir = "Goodinfo_Rankings"
-        if target_dir in root_items:
-            sub_items = os.listdir(target_dir)
-            st.success(f"✅ 找到 `{target_dir}` 資料夾！裡面有以下檔案：")
-            st.write(sub_items)
-        else:
-            st.error(f"❌ 嚴重錯誤：伺服器上根本沒有 `{target_dir}` 這個資料夾！請去執行 Reboot app！")
-    except Exception as e:
-        st.write(f"X光機故障: {e}")
+    st.warning("請檢查下方列出的『最新 10 個 CSV 檔名』，是否有亂碼？或者名稱跟您想的不一樣？")
+    # 強制一行一行印出來，防止 Streamlit 摺疊
+    for idx, f_name in enumerate(csv_files[:10]):
+        st.code(f"{idx+1}. {f_name}")
+else:
+    st.error("找不到 Goodinfo_Rankings 資料夾")
 # ==========================================
 # 📊 【蜂蜜計數器】本站累計觀測人次統計
 # ==========================================
