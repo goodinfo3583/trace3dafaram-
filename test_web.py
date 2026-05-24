@@ -724,7 +724,7 @@ else:
             today = latest_day_today_data.get(row['股票代號'], 0)
             base = pd.to_numeric(row.get(latest_col_name, 0), errors='coerce')
             if pd.isna(today): return "⚪ 觀望"
-            if today > 0: return "🔥 強延續" if today > base else "⚠️ 放緩 (持續買進)"
+            if today > 0: return "🔥 強延續" if today > base else "⚠️ 趨緩"
             elif today < 0: return "🚨 劇烈倒貨" if abs(today) > abs(base) else "📉 調節洗盤"
             return "🔄 持平"
 
@@ -732,7 +732,7 @@ else:
         
         # 動態說明對照表
         st.info("""
-        💡 **外資動態說明：** 🔥 強延續 (買盤加速) | ⚠️ 放緩 (力道弱於均線) | 🔄 持平 | 📉 調節洗盤 (微幅調節) | 🚨 劇烈倒貨 (強烈賣出)
+        💡 **外資動態說明：** 🔥 強延續 (買盤加速) | ⚠️ 趨緩 (買盤力道減弱) | 🔄 持平 | 📉 調節洗盤 (微幅調節) | 🚨 劇烈倒貨 (強烈賣出)
         """)
         
         # UI 與過濾
@@ -821,7 +821,7 @@ else:
             today = latest_day_today_data_sitc.get(row['股票代號'], 0)
             base = pd.to_numeric(row.get(latest_col_name, 0), errors='coerce')
             if pd.isna(today): return "⚪ 觀望"
-            if today > 0: return "🔥 強延續" if today > base else "⚠️ 放緩 (持續買進)"
+            if today > 0: return "🔥 強延續" if today > base else "⚠️ 趨緩"
             elif today < 0: return "🚨 劇烈倒貨" if abs(today) > abs(base) else "📉 調節洗盤"
             return "🔄 持平"
 
@@ -829,7 +829,7 @@ else:
         
         # 動態說明
         st.info("""
-        💡 **投信動態說明：** 🔥 強延續 (法人認養中) | ⚠️ 放緩 (買盤力道減弱) | 🔄 持平 | 📉 調節洗盤 (微幅調節) | 🚨 劇烈倒貨 (短線獲利了結)
+        💡 **投信動態說明：** 🔥 強延續 (法人認養中) | ⚠️ 趨緩 (買盤力道減弱) | 🔄 持平 | 📉 調節洗盤 (微幅調節) | 🚨 劇烈倒貨 (短線獲利了結)
         """)
         
         # 篩選邏輯
