@@ -1244,7 +1244,7 @@ def robust_read_csv(file_path):
 # ==========================================
 st.write("---")
 st.markdown("<div id='section-4-1'></div>", unsafe_allow_html=True)
-st.header("📅 區塊 4-1：融資減少動向 (5日累計)")
+st.header("📅 區塊 4-1：融資減少動向")
 
 # 🛠️ 新增：自訂標的顯示過濾 UI (已刪除紫色勾勾符號)
 st.write("🔧 **自訂標的顯示過濾：**")
@@ -1356,6 +1356,49 @@ with c1:
 with c2:
     st.subheader("📉 融資減少【張數】排名")
     df_vol, msg_vol = get_specific_margin_data("融資減少張數")
+    df_vol_clean = process_margin_df(df_vol, "張數")
+    
+    if not df_vol_clean.empty:
+        st.info(f"💡 最新來源: {msg_vol}")
+        st.dataframe(df_vol_clean, use_container_width=True)
+    else:
+        st.warning(f"⚠️ {msg_vol} 或 過濾後無相符資料")
+
+# ==========================================
+# 📅 區塊 4-2：借券賣出減少動向 (5日累計)
+# ==========================================
+st.write("---")
+st.markdown("<div id='section-4-2'></div>", unsafe_allow_html=True)
+st.header("📅 區塊 4-2：借券賣出減少動向")
+
+# 🛠️ 標的顯示過濾 UI
+st.write("🔧 **自訂標的顯示過濾：**")
+f_col1, f_col2, _ = st.columns([1, 1, 2])
+with f_col1:
+    show_etf_42 = st.checkbox("顯示 ETF", value=True, key="stock_show_etf_42")
+with f_col2:
+    show_bond_42 = st.checkbox("顯示債券/債券ETF", value=True, key="stock_show_bond_42")
+st.write("") 
+
+# --- 畫面佈局顯示 (直接復用 get_specific_margin_data 與 process_margin_df) ---
+c1, c2 = st.columns(2)
+
+with c1:
+    st.subheader("📉 借券賣出減少【幅度】排名")
+    # 🔥 關鍵修改：關鍵字改為「借券賣出減少幅度」
+    df_pct, msg_pct = get_specific_margin_data("借券賣出減少幅度")
+    df_pct_clean = process_margin_df(df_pct, "幅度") # 沿用相同的清理邏輯
+    
+    if not df_pct_clean.empty:
+        st.info(f"💡 最新來源: {msg_pct}")
+        st.dataframe(df_pct_clean, use_container_width=True)
+    else:
+        st.warning(f"⚠️ {msg_pct} 或 過濾後無相符資料")
+
+with c2:
+    st.subheader("📉 借券賣出減少【張數】排名")
+    # 🔥 關鍵修改：關鍵字改為「借券賣出減少張數」
+    df_vol, msg_vol = get_specific_margin_data("借券賣出減少張數")
     df_vol_clean = process_margin_df(df_vol, "張數")
     
     if not df_vol_clean.empty:
