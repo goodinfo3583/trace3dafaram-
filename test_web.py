@@ -446,7 +446,7 @@ elif search_query:
     st.info("請輸入代號或名稱開始診斷個股籌碼...")
 
 # ==========================================
-# 🧭 側邊欄導航 (互動+蜂蜜主題版)
+# 🧭 側邊欄導航 (無感互動+視覺特效版)
 # ==========================================
 st.sidebar.header("⚡ 籌碼超級篩選器")
 filter_trend = st.sidebar.selectbox("三大法人持股趨勢過濾：", ["全部顯示", "🔥 僅顯示『上升+新進榜』", "📈 僅顯示上升", "🆕 僅顯示新進榜"])
@@ -460,27 +460,27 @@ with c_btn1:
 with c_btn2:
     st.link_button("⚠️ VIX 指數", "https://www.wantgoo.com/global/vix", use_container_width=True)
 
-# ==========================================
-# 🍯 1動式贊助區塊 (趣味版)
-# ==========================================
+# 1. 互動式贊助區塊 (獨立邏輯)
 st.sidebar.markdown("---")
-st.sidebar.subheader("🍯 贊助蜂巢 (互動小遊戲)")
-st.sidebar.caption("小提醒：此功能僅為開發者互動小遊戲，不會產生任何實質交易。")
+st.sidebar.subheader("🍯 贊助蜂巢")
+st.sidebar.caption("小提醒：此功能僅為開發者互動，不會產生任何實質交易。")
 
-# 使用 columns 讓按鈕並排，縮短頁面長度，降低視覺重載感
 col1, col2, col3 = st.sidebar.columns(3)
 
-with col1:
-    if st.button("🪙", help="蜂蜜金幣"):
-        st.toast("蜂蜜金幣 +1！蜜蜂嗡嗡嗡～ 🐝", icon="🪙")
-with col2:
-    if st.button("🍯", help="打賞蜂蠟"):
-        st.toast("獲得一罐香甜蜂蠟！🍯", icon="🍯")
-with col3:
-    if st.button("🏺", help="贊助蜜罐"):
-        st.toast("蜜罐已裝滿！感謝支持！✨", icon="🏺")
+# 點擊後觸發氣球特效與 Toast，這是 Streamlit 最好的互動體驗
+if col1.button("🪙"):
+    st.toast("金幣 +1！蜜蜂嗡嗡嗡～ 🐝", icon="🪙")
+    st.balloons() 
 
-# 2 & 3. 調整導航跳轉 (修正名稱與連結錨點)
+if col2.button("🍯"):
+    st.toast("蜂蜜罐翻倒了！好甜啊～ 🍯", icon="🍯")
+    st.balloons()
+
+if col3.button("🏺"):
+    st.toast("蜜蠟已收集！感謝支持～ ✨", icon="🏺")
+    st.balloons()
+
+# 2. 戰情室快速導航
 st.sidebar.markdown("---")
 st.sidebar.header("📍 戰情室快速導航")
 st.sidebar.markdown("[👑 區塊1：法人持股比追蹤](#section-1)")
