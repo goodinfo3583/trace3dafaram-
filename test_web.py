@@ -1393,6 +1393,16 @@ with c2:
         st.session_state['df_margin_vol'] = df_vol_clean
     else:
         st.warning(f"⚠️ {msg_vol} 或 過濾後無相符資料")
+# 確保這些變數在全域是存在的
+if 'df_pct_clean' in locals():
+    globals()['df_margin_pct'] = df_pct_clean
+else:
+    globals()['df_margin_pct'] = pd.DataFrame()
+
+if 'df_vol_clean' in locals():
+    globals()['df_margin_vol'] = df_vol_clean
+else:
+    globals()['df_margin_vol'] = pd.DataFrame()
 # ==========================================
 # 📅 區塊 4-2：借券賣出減少動向 (5日累計)
 # ==========================================
