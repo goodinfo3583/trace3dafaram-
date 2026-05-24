@@ -424,33 +424,30 @@ if search_query:
                     st.line_chart(t_ser, height=240)
         except Exception as chart_err:
             st.info(f"圖表渲染暫無數據: {chart_err}")
-# . 顯示 4-1 ~ 4-3 的籌碼排位診斷
+# 2. 顯示 4-1 ~ 4-3 的籌碼排位診斷
     st.write("---")
     st.subheader("📊 籌碼變動排名診斷")
     
-    # 輔助函數：顯示並篩選
-    def show_rank_result(title, df, query):
+    # 🛠️ 輔助函數：增加變數安全性檢查
+    def show_rank_result(title, df_name, query):
         st.write(f"#### {title}")
+        # 使用 locals().get(df_name) 嘗試取得變數，找不到就給空的 DataFrame
+        df = locals().get(df_name, pd.DataFrame())
+        
+        # 如果是字串 (代表是讀取後的變數名稱)，則從全域環境找
+        if isinstance(df, str):
+            df = globals().get(df, pd.DataFrame())
+
         res = safe_search(df, query)
         if not res.empty:
             st.dataframe(res, use_container_width=True)
         else:
             st.info("無資料 (未進榜)")
 
-    # 區塊 4-1
+    # 執行檢查與顯示 (直接傳入變數名稱字串，最安全)
     c1, c2 = st.columns(2)
-    with c1: show_rank_result("📉 融資減少【幅度】", df_pct_margin, search_query)
-    with c2: show_rank_result("📉 融資減少【張數】", df_vol_margin, search_query)
-    
-    # 區塊 4-2
-    c3, c4 = st.columns(2)
-    with c3: show_rank_result("📉 借券賣出減少【幅度】", df_pct_short, search_query)
-    with c4: show_rank_result("📉 借券賣出減少【張數】", df_vol_short, search_query)
-    
-    # 區塊 4-3
-    c5, c6 = st.columns(2)
-    with c5: show_rank_result("📈 融券增加【幅度】", df_pct_margin_plus, search_query)
-    with c6: show_rank_result("📈 融券增加【張數】", df_vol_margin_plus, search_query)
+    with c1: show_rank_result("📉 融資減少【幅度】", 'df_pct_margin', search_query)
+    with c2: show_rank_result("📉 融資減少【張數】", 'df_vol_margin', search_query)
  
 # ==========================================
 # 🧭 側邊欄導航 (無感互動+視覺特效版)
