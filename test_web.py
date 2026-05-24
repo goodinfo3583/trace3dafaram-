@@ -1281,7 +1281,7 @@ st.session_state['df_margin_plus_vol'] = df_vol_clean
 # ==========券資比資料請一起搬遷============
 
 # ==========================================
-# 💰 區塊 5：大股東動向 (歷史數據合併版)
+# 💰 區塊 5：大股東動向 (極度穩健版)
 # ==========================================
 st.write("---")
 st.markdown("<div id='section-5'></div>", unsafe_allow_html=True)
@@ -1291,32 +1291,32 @@ csv_pattern_b5 = os.path.join(DATA_DIR, "*神秘金字塔 - 股權類股排行(5
 all_files_b5 = glob.glob(csv_pattern_b5)
 
 if not all_files_b5:
-    st.warning("⚠️ 找不到相關 CSV 檔案，請檢查資料夾路徑。")
+    st.warning("⚠️ 找不到相關 CSV 檔案。")
 else:
-    # 準備一個空的 DataFrame 作為合併基礎
     master_df = None
     all_date_cols = set()
 
-    # 讀取並合併所有檔案
+    # 讀取並合併
     for file in all_files_b5:
         try:
             df = pd.read_csv(file, encoding='utf-8-sig')
             df.columns = [str(c).strip() for c in df.columns]
             
-            # 處理代號/名稱
+            # 【強制正規化】：處理「股票代號/名稱」欄位
             if '股票代號/名稱' in df.columns:
                 df['股票代號'] = df['股票代號/名稱'].astype(str).str.extract(r'(\d+)')
                 df['股票名稱'] = df['股票代號/名稱'].astype(str).str.replace(r'^\d+', '', regex=True)
+            
+            # 確保代號存在
+            if '股票代號' not in df.columns: continue
             
             # 識別日期欄位 (4位數字)
             date_cols = [c for c in df.columns if re.match(r'^\d{4}$', c)]
             all_date_cols.update(date_cols)
             
-            # 只保留必要的列進行合併
             cols_to_keep = ['股票代號', '股票名稱'] + date_cols
             temp_df = df[cols_to_keep].copy()
             
-            # 合併進主表
             if master_df is None:
                 master_df = temp_df
             else:
@@ -1325,24 +1325,21 @@ else:
             continue
 
     if master_df is not None:
-        # 排序日期欄位 (由新到舊)
+        # 排序日期 (新到舊)
         sorted_dates = sorted(list(all_date_cols), reverse=True)
-        
-        # 重新排列順序
         final_cols = ['股票代號', '股票名稱'] + sorted_dates
-        final_df = master_df[final_cols].copy()
         
-        # 填補空值為 "無資料"
-        final_df = final_df.fillna("無資料")
+        # 【修正關鍵】：改用 reindex，如果欄位缺失會填入 NaN，不會報錯
+        final_df = master_df.reindex(columns=final_cols).copy()
         
-        # 計算週動態 (取最新兩欄有資料的欄位)
+        # 計算週動態
         if len(sorted_dates) >= 2:
-            newest = sorted_dates[0]
-            prev = sorted_dates[1]
+            newest, prev = sorted_dates[0], sorted_dates[1]
+            final_df[newest] = pd.to_numeric(final_df[newest], errors='coerce')
+            final_df[prev] = pd.to_numeric(final_df[prev], errors='coerce')
             
             def get_trend(row):
-                v1 = pd.to_numeric(row[newest], errors='coerce')
-                v2 = pd.to_numeric(row[prev], errors='coerce')
+                v1, v2 = row[newest], row[prev]
                 if pd.isna(v1) or pd.isna(v2): return "-"
                 diff = v1 - v2
                 if diff >= 1.5: return "🔥 大增"
@@ -1355,13 +1352,12 @@ else:
             
             final_df.insert(2, "週動態", final_df.apply(get_trend, axis=1))
 
-        # 顯示結果
-        st.success(f"已成功串連 {len(final_df)} 筆股東數據")
+        # 整理呈現 (補齊無資料、移除空值)
+        final_df = final_df.fillna("無資料")
         
-        # 將 DataFrame 顯示，並隱藏索引
+        st.success(f"已成功串連 {len(final_df)} 筆股東數據")
         st.dataframe(final_df, use_container_width=True, hide_index=True)
         
-        # 儲存供搜尋使用 (注意：為了讓搜尋區塊能順利讀取，存入 session_state)
         st.session_state['df_blk5'] = final_df
 # ==========================================
 # 📊 【蜂蜜計數器】本站累計觀測人次統計
