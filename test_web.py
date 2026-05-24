@@ -475,18 +475,17 @@ st.sidebar.markdown("[👑 區塊一：三大法人持股%](#section-1)")
 # 🏠 核心五大區塊
 # ==========================================
 # ==========================================
-# 🏠 區塊1：中長線 三大法人 持股比例 追蹤 (多榜單色彩強化修復版)
+# 🏠 區塊1：中長線 三大法人 持股比例 追蹤 (多榜單色彩強化 + 趨緩修正版)
 # ==========================================
 st.write("---")
 st.markdown("<div id='section-1'></div>", unsafe_allow_html=True)
-st.header("🏢 區塊1：中長線 三大法人 持股比例變化 追蹤")
+st.header("🏢 區塊1：中長線 三大法人 持股比例 追蹤")
 
 import re
 import os
 import glob
 import pandas as pd
 
-# 1. 強化版讀取函式：自動偵測所屬榜單 (5日/20日/60日/120日)
 def parse_special_txt(file_path, is_latest=False):
     parsed_data = []
     date_label = os.path.basename(file_path)[:8]
@@ -498,7 +497,6 @@ def parse_special_txt(file_path, is_latest=False):
             for line in f:
                 line_str = line.strip()
                 
-                # 動態偵測區塊
                 if "排名(5日)" in line_str: current_section = "5日"
                 elif "排名(20日)" in line_str: current_section = "20日"
                 elif "排名(60日)" in line_str: current_section = "60日"
@@ -586,42 +584,34 @@ if all_txt_files:
         final_df['今日上榜'] = final_df['上榜區塊'].apply(generate_tags)
         final_df['上榜數量'] = final_df['上榜區塊'].apply(lambda x: len(str(x).split(',')) if pd.notna(x) and x else 0)
             
+        # 🔥 修正點：加入「防禦性數值檢測」，避免將空值(0)當作趨緩運算基準
         def evaluate_trend(row):
-            # 至少需要兩天數據才能判斷漲跌
-            if len(date_cols) < 2: 
-                return "⚪ 資料不足"
-    
-            v0 = row[date_cols[0]]  # 最新日
-            v1 = row[date_cols[1]]  # 前一日
-            diff1 = v0 - v1        # 今日的增減幅度
-    
-            # 1. 如果持股% 持續上升
-            if diff1 > 0:
-                # 2. 只有在有三天數據時，才進行「趨緩」比對
-                if len(date_cols) >= 3:
-                    v2 = row[date_cols[2]] # 前二日
-                    diff2 = v1 - v2         # 昨日的增減幅度
+            if len(date_cols) < 2: return "⚪ 資料不足"
             
-                    # 只有當「昨天也有增長(diff2 > 0)」且「今日增幅 < 昨日增幅」時，才算趨緩
-                    if diff2 > 0 and diff1 < diff2:
-                        return "⚠️ 趨緩"
+            v0 = row[date_cols[0]]  
+            v1 = row[date_cols[1]]  
+            diff1 = v0 - v1  
+            
+            if diff1 > 0:
+                if len(date_cols) >= 3:
+                    v2 = row[date_cols[2]]
+                    # 必須確保 v2 和 v1 都不是 0 (代表前兩天都有真實上榜紀錄)
+                    if v1 != 0 and v2 != 0:
+                        diff2 = v1 - v2
+                        if diff2 > 0 and diff1 < diff2: 
+                            return "⚠️ 趨緩"
                 return "📈 上升"
-  
-            # 3. 持股減少或不變
-            elif diff1 < 0:
-                return "📉 下降"
-            else:
-                return "🔄 持平"
+                
+            elif diff1 < 0: return "📉 下降"
+            else: return "🔄 持平"
                 
         final_df['最新動態'] = final_df.apply(evaluate_trend, axis=1)
         
         if date_cols:
             final_df = final_df.sort_values(by=['上榜數量', date_cols[0]], ascending=[False, False])
             
-        # 🔥 關鍵修正：在刪減欄位之前，先把「上榜數量」抽出來做成顏色字典
         color_ref = final_df.set_index('股票代號')['上榜數量'].to_dict()
             
-        # 整理欄位顯示順序 (這裡會隱藏不必要的運算欄位)
         cols = ['股票代號', '股票名稱', '今日上榜', '最新動態'] + date_cols
         final_df = final_df[cols]
         
@@ -648,9 +638,7 @@ if all_txt_files:
             
         filtered_df.index = range(1, len(filtered_df) + 1)
         
-        # 🎨 Pandas Styler: 依據上榜數量給予不同底色
         def highlight_row(row):
-            # 安全讀取剛剛存好的顏色字典
             cnt = color_ref.get(row['股票代號'], 0)
             if cnt == 4: bg = 'background-color: rgba(255, 0, 0, 0.15)'
             elif cnt == 3: bg = 'background-color: rgba(255, 165, 0, 0.15)' 
@@ -661,8 +649,8 @@ if all_txt_files:
 
         styled_df = filtered_df.style.apply(highlight_row, axis=1)
         
-        st.info("💡 **榜單共振說明：** 出現於5/20/60/120天期均線期的熱門榜單中，法人短線試單/短線點火/籌碼集中度高/吃貨。")
-        st.success(f"📊 已成功串聯 {len(date_cols)} 個交易日的數據")
+        st.info("💡 **多榜單共振說明：** 背景顏色越暖 (紅/橘)，代表同時出現於越多天期的熱門榜單中，籌碼集中度極高。")
+        st.success(f"📊 已成功串聯 {len(date_cols)} 個交易日的數據 (排序優先級：今日上榜榜單數 > 今日持股%)：")
         st.dataframe(styled_df, use_container_width=True)
     else:
         st.warning("⚠️ 讀取到的檔案皆無效或無資料，請檢查 TXT 內容。")
@@ -763,7 +751,7 @@ else:
         csv_display = csv_display[cols]
         csv_display.index = range(1, len(csv_display) + 1)
         
-        st.success(f"📊 已成功串聯交易日，追蹤共 {len(csv_display)} 檔。")
+        st.success(f"📊 已成功串聯 {len(date_labels)} 交易日，追蹤共 {len(csv_display)} 檔：")
         st.dataframe(csv_display, use_container_width=True)
     else:
         st.error("❌ 無法讀取外資買超數據，請檢查 CSV 欄位名稱是否包含『5日』與『成交』關鍵字。")
@@ -860,7 +848,7 @@ else:
         csv_display = csv_display[cols]
         csv_display.index = range(1, len(csv_display) + 1)
         
-        st.success(f"📊 已成功串聯交易日，追蹤共 {len(csv_display)} 檔。")
+        st.success(f"📊 已成功串聯 {len(date_labels)} 交易日，追蹤共 {len(csv_display)} 檔：")
         st.dataframe(csv_display, use_container_width=True)
     else:
         st.error("❌ 無法讀取投信買超數據，請確認 CSV 檔案內含有『5日』與『成交』欄位。")
@@ -1053,7 +1041,7 @@ else:
         csv_display = csv_display[["股票代號", "股票名稱", "今日短動態"] + history_cols]
         csv_display.index = range(1, len(csv_display) + 1)
         
-        st.success(f"📊 已成功串聯 {len(date_labels)} 個交易日，追蹤共 {len(csv_display)} 檔。")
+        st.success(f"📊 已成功串聯 {len(date_labels)} 個交易日，追蹤共 {len(csv_display)} 檔：")
         st.dataframe(csv_display, use_container_width=True)
     else:
         st.error("❌ 無法讀取投信數據，請確保檔案內含『5日買賣超佔發行張數』欄位。")
