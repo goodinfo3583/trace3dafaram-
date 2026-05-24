@@ -1194,69 +1194,68 @@ with c_wk2:
     else:
         st.write("無資料")
 
-
 # ==========================================
-# 📅 區塊 4-1：融資增減動向 (5日累計)
+# 📅 區塊 4-1：融資減少動向 (5日累計)
 # ==========================================
 st.write("---")
 st.markdown("<div id='section-4-1'></div>", unsafe_allow_html=True)
 st.header("📅 區塊 4-1：融資減少動向 (5日累計)")
 
-def read_margin_data():
+def get_specific_margin_data(keyword):
     found_files = []
-    
+    # 走訪所有資料夾尋找指定關鍵字
     for root, dirs, files in os.walk(os.getcwd()):
-        if '.git' in root or 'venv' in root:
-            continue
-            
+        if '.git' in root or 'venv' in root: continue
         for file in files:
-            if file.lower().endswith(".csv"):
-                # 🔥 破解修正：放寬條件！只要檔名有「融資」就先抓起來再說
-                if "融資" in file:
-                    found_files.append(os.path.join(root, file))
+            if file.lower().endswith(".csv") and keyword in file:
+                found_files.append(os.path.join(root, file))
     
     if not found_files:
-        return pd.DataFrame(), "無檔案", []
+        return pd.DataFrame(), f"找不到包含『{keyword}』的檔案"
     
-    # 取得最新的「融資」檔案 (假設最新的一定是您剛上傳的)
+    # 依照修改時間排序，抓取最新的那個
     latest_file = sorted(found_files, key=os.path.getmtime, reverse=True)[0]
+    file_name = os.path.basename(latest_file)
     
     try:
         df = robust_read_csv(latest_file)
+        if df.empty:
+            return pd.DataFrame(), f"讀取成功但內容為空: {file_name}"
+        
+        # 清除 BOM 亂碼與空格
         df.columns = df.columns.astype(str).str.replace('\ufeff', '').str.strip()
+        
+        # 欄位數值化強化：清除逗號(,)與百分比(%)再轉換，避免變成 NaN
         for col in df.columns:
-            if "幅度" in col or "張數" in col:
+            if "幅度" in col or "張數" in col or "%" in col or "％" in col:
+                df[col] = df[col].astype(str).str.replace(',', '', regex=False).str.replace('%', '', regex=False)
                 df[col] = pd.to_numeric(df[col], errors='coerce')
-        return df, os.path.basename(latest_file), found_files
+                
+        return df, file_name
     except Exception as e:
-        return pd.DataFrame(), f"讀取失敗: {str(e)}", found_files
+        # 如果發生程式崩潰，明確回傳錯誤原因
+        return pd.DataFrame(), f"讀取崩潰 ({file_name}): {str(e)}"
 
-# 執行讀取
-margin_df, margin_filename, all_margin_files = read_margin_data()
+# 建立左右兩個欄位並排顯示
+c1, c2 = st.columns(2)
 
-if not margin_df.empty:
-    st.info(f"💡 資料來源: {margin_filename}")
-    st.dataframe(margin_df, use_container_width=True)
-else:
-    st.error("⚠️ 系統依然找不到對應的 CSV 檔案。")
+with c1:
+    st.subheader("📉 融資減少【幅度】排名")
+    df_pct, msg_pct = get_specific_margin_data("融資減少幅度")
+    if not df_pct.empty:
+        st.info(f"💡 最新來源: {msg_pct}")
+        st.dataframe(df_pct, use_container_width=True)
+    else:
+        st.warning(f"⚠️ {msg_pct}")
 
-# ==========================================
-# 🩻 檔名真面目解析器 (強制展開不摺疊)
-# ==========================================
-st.write("### 🩻 伺服器真實檔名解析")
-target_dir = "Goodinfo_Rankings"
-if os.path.exists(target_dir):
-    files = os.listdir(target_dir)
-    csv_files = [f for f in files if f.lower().endswith('.csv')]
-    # 依照修改時間排序，最新的排前面
-    csv_files.sort(key=lambda x: os.path.getmtime(os.path.join(target_dir, x)), reverse=True)
-    
-    st.warning("請檢查下方列出的『最新 10 個 CSV 檔名』，是否有亂碼？或者名稱跟您想的不一樣？")
-    # 強制一行一行印出來，防止 Streamlit 摺疊
-    for idx, f_name in enumerate(csv_files[:10]):
-        st.code(f"{idx+1}. {f_name}")
-else:
-    st.error("找不到 Goodinfo_Rankings 資料夾")
+with c2:
+    st.subheader("📉 融資減少【張數】排名")
+    df_vol, msg_vol = get_specific_margin_data("融資減少張數")
+    if not df_vol.empty:
+        st.info(f"💡 最新來源: {msg_vol}")
+        st.dataframe(df_vol, use_container_width=True)
+    else:
+        st.warning(f"⚠️ {msg_vol}")
 # ==========================================
 # 📊 【蜂蜜計數器】本站累計觀測人次統計
 # ==========================================
