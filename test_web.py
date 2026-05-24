@@ -460,16 +460,25 @@ with c_btn1:
 with c_btn2:
     st.link_button("⚠️ VIX 指數", "https://www.wantgoo.com/global/vix", use_container_width=True)
 
-# 1. 互動式贊助區塊
+# ==========================================
+# 🍯 1動式贊助區塊 (趣味版)
+# ==========================================
 st.sidebar.markdown("---")
-st.sidebar.subheader("🍯 贊助蜂巢")
+st.sidebar.subheader("🍯 贊助蜂巢 (互動小遊戲)")
+st.sidebar.caption("小提醒：此功能僅為開發者互動小遊戲，不會產生任何實質交易。")
 
-if st.sidebar.button("🪙 蜂蜜金幣"):
-    st.toast("金幣進帳！蜜蜂嗡嗡嗡～ 🐝", icon="🪙")
-if st.sidebar.button("🍯 打賞蜂蠟"):
-    st.toast("獲得一罐香甜蜂蠟！🍯", icon="🍯")
-if st.sidebar.button("🏺 贊助蜜罐"):
-    st.toast("蜜罐已裝滿！感謝您的支持～ ✨", icon="🏺")
+# 使用 columns 讓按鈕並排，縮短頁面長度，降低視覺重載感
+col1, col2, col3 = st.sidebar.columns(3)
+
+with col1:
+    if st.button("🪙", help="蜂蜜金幣"):
+        st.toast("蜂蜜金幣 +1！蜜蜂嗡嗡嗡～ 🐝", icon="🪙")
+with col2:
+    if st.button("🍯", help="打賞蜂蠟"):
+        st.toast("獲得一罐香甜蜂蠟！🍯", icon="🍯")
+with col3:
+    if st.button("🏺", help="贊助蜜罐"):
+        st.toast("蜜罐已裝滿！感謝支持！✨", icon="🏺")
 
 # 2 & 3. 調整導航跳轉 (修正名稱與連結錨點)
 st.sidebar.markdown("---")
