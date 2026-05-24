@@ -1203,14 +1203,14 @@ st.markdown("<div id='section-4-1'></div>", unsafe_allow_html=True)
 st.header("📅 區塊 4-1：融資減少幅度 (5日累計)")
 
 def read_margin_data():
-    # 🔥 核心修正：明確指定進入 Goodinfo_Rankings 資料夾尋找
-    csv_pattern_fo = os.path.join(DATA_DIR, "*融資減少幅度*.csv")
-    all_files_fo = glob.glob(csv_pattern_fo)
+    # 🔥 終極雷達穿透掃描：使用 "**" 代表所有子資料夾，並開啟 recursive=True
+    csv_pattern = os.path.join(DATA_DIR, "**", "*融資減少*.csv")
+    files = glob.glob(csv_pattern, recursive=True)
     
     if not files:
         return pd.DataFrame(), "無檔案"
     
-    # 取得最新檔案
+    # 取得最新檔案 (不管檔名是寫張數還是幅度，都會抓最新的)
     latest_file = sorted(files, key=os.path.getmtime, reverse=True)[0]
     
     try:
@@ -1220,9 +1220,9 @@ def read_margin_data():
         # 欄位清理：移除空白、特殊字元、BOM
         df.columns = df.columns.astype(str).str.replace('\ufeff', '').str.strip()
         
-        # 整理欄位：如果欄位名稱包含「幅度」，確保它被轉為數值以便網頁排序
+        # 整理欄位：如果欄位名稱包含「幅度」或「張數」，確保它被轉為數值以便網頁排序
         for col in df.columns:
-            if "幅度" in col:
+            if "幅度" in col or "張數" in col:
                 df[col] = pd.to_numeric(df[col], errors='coerce')
         
         return df, os.path.basename(latest_file)
@@ -1236,8 +1236,7 @@ if not margin_df.empty:
     st.info(f"💡 資料來源: {margin_filename}")
     st.dataframe(margin_df, use_container_width=True)
 else:
-    st.warning("⚠️ 目前找不到融資減少幅度的排名檔案，請確認 Goodinfo_Rankings 資料夾內是否有包含『融資減少幅度』的 CSV 檔案。")
-
+    st.warning("⚠️ 系統已掃描所有子資料夾，但目前找不到任何檔名包含『融資減少』的 CSV 檔案。")
 # ==========================================
 # 📊 【蜂蜜計數器】本站累計觀測人次統計
 # ==========================================
