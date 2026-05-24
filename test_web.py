@@ -202,8 +202,8 @@ st.write("---")
 st.markdown("<div id='section-search'></div>", unsafe_allow_html=True)
 st.subheader("🔍 個股籌碼快搜 (診斷區)")
     # 強制讀取並清洗所有欄位名稱 (移除空格、換行、BOM)
-    df = pd.read_csv(f, encoding='utf-8-sig')
-    df.columns = [str(c).replace(" ", "").replace("\n", "").replace("\ufeff", "").strip() for c in df.columns]
+df = pd.read_csv(f, encoding='utf-8-sig')
+df.columns = [str(c).replace(" ", "").replace("\n", "").replace("\ufeff", "").strip() for c in df.columns]
 # 定義強韌的搜尋函式 (放在此處，確保全域可用)
 def robust_search_engine(df, query):
     if df is None or df.empty:
