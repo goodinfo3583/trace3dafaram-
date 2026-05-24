@@ -347,8 +347,66 @@ if (not track_display_df.empty and not csv_foreign_deal.empty and not csv_foreig
         st.info("💡 目前長線看增的名單中，短線 4 大指標檔案尚無任何一項產生聯手交集。")
 else:
     st.error("❌ 頂級核心多空矩陣運算失敗，請確認資料夾中的外資/投信 CSV 檔案是否完整。")
+# ==========================================# ==========================================
 
+# ==========================================
+# 🔍 升級版安全搜尋函數 (自動偵測欄位 + 深度清理)
+# ==========================================
+def safe_search(df, query):
+    if df is None or df.empty:
+        return pd.DataFrame()
+    
+    # 1. 自動偵測欄位名稱 (避免欄位名稱不符導致找不到資料)
+    # 只要包含「代號」或「名稱」的欄位就抓出來
+    col_id = next((c for c in df.columns if '代號' in c), df.columns[0])
+    col_name = next((c for c in df.columns if '名稱' in c), df.columns[1])
+    
+    # 2. 統一處理為文字型態，方便比對
+    df_temp = df.copy()
+    df_temp[col_id] = df_temp[col_id].astype(str).str.strip()
+    df_temp[col_name] = df_temp[col_name].astype(str).str.replace('撖', '', regex=False).str.strip()
+    
+    # 3. 搜尋比對 (將查詢字串也轉為字串)
+    query = str(query).strip()
+    res = df_temp[
+        df_temp[col_name].str.contains(query, na=False) | 
+        df_temp[col_id].str.contains(query, na=False)
+    ]
+    return res
 
+# ==========================================
+# 🚀 區塊 2-1 ~ 2-4 對接邏輯 (修正版)
+# ==========================================
+st.write("---")
+st.markdown("##### 🚀 核心主力短線進攻與鎖籌指標")
+
+# 這裡我們直接對各個 DataFrame 進行搜尋
+# 請確認這些變數名稱 (csv_foreign_deal 等) 是否正確對應您讀取的資料
+c1, c2 = st.columns(2)
+
+with c1:
+    st.write("📊 **區塊 2-1：外資 5 日淨買佔成交量**")
+    q_2_1 = safe_search(csv_foreign_deal, search_query)
+    if not q_2_1.empty: st.dataframe(q_2_1, use_container_width=True)
+    else: st.write("無資料")
+        
+    st.write("🔒 **區塊 2-3：外資 5 日淨買佔發行量**")
+    q_2_3 = safe_search(csv_foreign_stock, search_query)
+    if not q_2_3.empty: st.dataframe(q_2_3, use_container_width=True)
+    else: st.write("無資料")
+        
+with c2:
+    st.write("🥦 **區塊 2-2：投信 5 日淨買佔成交量**")
+    q_2_2 = safe_search(csv_it_deal, search_query)
+    if not q_2_2.empty: st.dataframe(q_2_2, use_container_width=True)
+    else: st.write("無資料")
+        
+    st.write("💎 **區塊 2-4：投信 5 日淨買佔發行量**")
+    q_2_4 = safe_search(csv_it_stock, search_query)
+    if not q_2_4.empty: st.dataframe(q_2_4, use_container_width=True)
+    else: st.write("無資料")
+
+# ==========================================# ==========================================
 # ==========================================
 # 🔍 個股籌碼快搜 (診斷區)
 # ==========================================
