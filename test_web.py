@@ -477,7 +477,7 @@ st.sidebar.markdown("[👑 區塊一：三大法人持股%](#section-1)")
 # ==========================================
 # ==========================================
 # ==========================================
-# 🏠 區塊1：中長線 三大法人 持股比例 追蹤 (斷路器精準版)
+# 🏠 區塊1：中長線 三大法人 持股比例 追蹤 (精準修正底色與榜單版)
 # ==========================================
 st.write("---")
 st.markdown("<div id='section-1'></div>", unsafe_allow_html=True)
@@ -487,12 +487,13 @@ import re
 import os
 import glob
 import pandas as pd
-from collections import defaultdict
 
-# 1. 解析引擎 (嚴格依賴分隔線與精準標題)
-def parse_special_txt(file_path, date_label):
+def parse_special_txt(file_path):
     parsed_data = []
+    # 從檔名前8碼抓取日期 (例如 20260522)
+    date_label = os.path.basename(file_path)[:8]
     target_col = f"{date_label}持股%"
+    
     current_section = None
     
     try:
@@ -500,24 +501,21 @@ def parse_special_txt(file_path, date_label):
             for line in f:
                 line_str = line.strip()
                 
-                # 🔥 【斷路器】：遇到分隔線，立刻清空狀態，絕對不讓上一個榜單的狀態溢出！
-                if line_str.startswith("---") or line_str.startswith("==="):
-                    current_section = None
+                # 💡 【精準防護】：升級標題列判定邏輯，防止狀態繼承或殘留
+                if "變化排名" in line_str or ("排名" in line_str and "(" in line_str):
+                    if "5日" in line_str: current_section = "5日"
+                    elif "20日" in line_str: current_section = "20日"
+                    elif "60日" in line_str: current_section = "60日"
+                    elif "120日" in line_str: current_section = "120日"
                     continue
                 
-                # 🔥 【精準開關】：只認可明確包含「三大法人持股變化排名」的標題
-                if "三大法人持股變化排名" in line_str:
-                    if "(5日)" in line_str: current_section = "5日"
-                    elif "(20日)" in line_str: current_section = "20日"
-                    elif "(60日)" in line_str: current_section = "60日"
-                    elif "(120日)" in line_str: current_section = "120日"
-                    continue
-                
-                # 抓取資料：必須在通電狀態 (current_section 有值) 且是資料行才抓
                 parts = line_str.split('\t')
+                # 只有在確認進入特定區塊且為數據行(數字開頭)時才進行擷取
                 if current_section and len(parts) >= 5 and parts[0].isdigit():
-                    try: holding_pct = float(parts[-2])
-                    except ValueError: continue
+                    try:
+                        holding_pct = float(parts[-2])
+                    except ValueError:
+                        continue
                     
                     stock_str = parts[1].strip()  
                     m = re.match(r'^(\d+)(.*)', stock_str)
@@ -532,57 +530,47 @@ def parse_special_txt(file_path, date_label):
                     })
     except Exception:
         pass
-    return pd.DataFrame(parsed_data)
-
-# 聚合相同標的的不同榜單標籤 (徹底拔除10日)
-def agg_sections_func(x):
-    valid_x = set([s for s in x if pd.notna(s) and s != ""])
-    order = ['5日', '20日', '60日', '120日']
-    return ",".join([s for s in order if s in valid_x])
+        
+    df = pd.DataFrame(parsed_data)
+    return df, date_label, target_col
 
 # ==========================================
-# 🔄 多日歷史資料合併與邏輯運算
+# 🔄 多日歷史資料合併與邏輯運算 (最多 30 天)
 # ==========================================
 txt_pattern = os.path.join(DATA_DIR, "*持股排名變化*.txt")
-all_txt_files = glob.glob(txt_pattern)
+all_txt_files = sorted(glob.glob(txt_pattern), reverse=True)
 
-# 同日檔案聚合 (防止產生 _x, _y 欄位)
-date_files = defaultdict(list)
-for f in all_txt_files:
-    date_label = os.path.basename(f)[:8]
-    if date_label.isdigit():
-        date_files[date_label].append(f)
-
-sorted_dates = sorted(date_files.keys(), reverse=True)
-
-if sorted_dates:
+if all_txt_files:
     final_df = None
     
-    for i, date_label in enumerate(sorted_dates[:30]):
-        is_latest = (i == 0)
-        day_dfs = []
-        
-        for file_path in date_files[date_label]:
-            df_part = parse_special_txt(file_path, date_label)
-            if not df_part.empty:
-                day_dfs.append(df_part)
+    for i, file_path in enumerate(all_txt_files[:30]):
+        df_file, date_label, target_col = parse_special_txt(file_path)
+        if df_file.empty: 
+            continue
+            
+        if i == 0:  # 最新的一天需保留上榜區塊進行標籤聚合
+            def agg_sections_func(x):
+                valid_x = set([s for s in x if pd.notna(s) and s != ""])
+                order = ['5日', '20日', '60日', '120日']
+                return ",".join([s for s in order if s in valid_x])
                 
-        if not day_dfs: continue
+            df_day = df_file.groupby(['股票代號', '股票名稱']).agg({
+                target_col: 'max',  
+                '上榜區塊': agg_sections_func
+            }).reset_index()
+        else:
+            df_day = df_file.groupby(['股票代號', '股票名稱']).agg({
+                target_col: 'max'
+            }).reset_index()
             
-        df_day = pd.concat(day_dfs, ignore_index=True)
-        
-        target_col = f"{date_label}持股%"
-        agg_dict = {target_col: 'max'}
-        if is_latest:
-            agg_dict['上榜區塊'] = agg_sections_func
-            
-        df_day = df_day.groupby(['股票代號', '股票名稱']).agg(agg_dict).reset_index()
-        
-        if final_df is None: final_df = df_day
-        else: final_df = pd.merge(final_df, df_day, on=['股票代號', '股票名稱'], how='outer')
+        if final_df is None: 
+            final_df = df_day
+        else: 
+            final_df = pd.merge(final_df, df_day, on=['股票代號', '股票名稱'], how='outer')
             
     if final_df is not None and not final_df.empty:
         date_cols = sorted([c for c in final_df.columns if '持股%' in c], reverse=True)
+        
         for c in date_cols:
             final_df[c] = pd.to_numeric(final_df[c], errors='coerce').fillna(0)
             
@@ -641,24 +629,25 @@ if sorted_dates:
         if show_bond: mask |= is_bond
             
         filtered_df = final_df[mask].copy()
+        
         for c in date_cols:
             filtered_df[c] = filtered_df[c].apply(lambda x: f"{x:.2f}" if x != 0 else "-")
         filtered_df.index = range(1, len(filtered_df) + 1)
         
-        # 🎨 回歸最初正確的顏色判定邏輯 (4紅 / 3黃 / 2綠 / 1藍)
+        # 🎨 【底色優化】：全面改為極柔和、舒適的低飽和度淺色系
         def highlight_row(row):
             cnt = color_ref.get(row['股票代號'], 0)
-            if cnt == 4: bg = 'background-color: rgba(255, 50, 50, 0.35)'     # 四榜單: 紅色
-            elif cnt == 3: bg = 'background-color: rgba(255, 215, 0, 0.35)'   # 三榜單: 黃色 (Gold)
-            elif cnt == 2: bg = 'background-color: rgba(0, 200, 0, 0.25)'     # 雙榜單: 綠色
-            elif cnt == 1: bg = 'background-color: rgba(0, 100, 255, 0.25)'   # 單榜單: 淺藍色
+            if cnt == 4: bg = 'background-color: rgba(255, 215, 215, 0.25)'     # 四榜單：優雅淺紅
+            elif cnt == 3: bg = 'background-color: rgba(255, 246, 185, 0.35)'    # 三榜單：溫和淺黃
+            elif cnt == 2: bg = 'background-color: rgba(220, 246, 220, 0.25)'   # 雙榜單：清新淺綠
+            elif cnt == 1: bg = 'background-color: rgba(220, 236, 255, 0.35)'    # 單榜單：沉靜淺藍
             else: bg = ''                                                   
             return [bg] * len(row)
 
         styled_df = filtered_df.style.apply(highlight_row, axis=1)
         
-        st.info("💡 **多榜單共振說明：** 背景顏色越暖 (紅/黃)，代表同時出現於越多天期的熱門榜單中，籌碼集中度極高。")
-        st.success(f"📊 已成功串聯 {len(date_cols)} 個交易日的數據 (排序優先級：今日上榜榜單數 > 今日持股%)：")
+        st.info("💡 **多榜單共振說明：** 背景底色依今日上榜數量區分（淺紅/淺黃/淺綠/淺藍），暖色調代表同時出現於越多天期的熱門持股榜單中。")
+        st.success(f"📊 已成功串聯最近 {len(date_cols)} 個交易日的持股數據 (排序優先級：今日上榜數量 > 今日持股%)：")
         st.dataframe(styled_df, use_container_width=True)
     else:
         st.warning("⚠️ 讀取到的檔案皆無效或無資料，請檢查 TXT 內容。")
