@@ -1012,41 +1012,120 @@ def robust_read_csv(file_path):
 # ==========================================
 # ...（以上維持您原本的4個 columns 視覺程式碼）...
 
-# 🔥 【重點新增】：將區塊 3 的日、週連買共 4 張資料表清洗、標記並整合，供搜尋引擎進行全功能跨表掃描
+# 🔥 【重點新增】：將區塊 3 的日、週連買共 4 張資料表清洗、標記並整合
 b3_combined_list = []
 
 if 'live_fo_day' in locals() and not live_fo_day.empty:
     df_tmp = live_fo_day.copy()
     df_tmp['連買類型'] = '🌐 外資日連買'
     df_tmp = df_tmp.rename(columns={'最新連買天數': '連買週期數'})
-    b3_combined_list.append(df_tmp[['股票代號', '股票名稱', '狀態動態', '連買類型', '連買週期數']])
+    b3_combined_list.append(df_tmp)
 
 if 'live_it_day' in locals() and not live_it_day.empty:
     df_tmp = live_it_day.copy()
     df_tmp['連買類型'] = '🏦 投信日連買'
     df_tmp = df_tmp.rename(columns={'最新連買天數': '連買週期數'})
-    b3_combined_list.append(df_tmp[['股票代號', '股票名稱', '狀態動態', '連買類型', '連買週期數']])
+    b3_combined_list.append(df_tmp)
 
 if 'live_fo_wk' in locals() and not live_fo_wk.empty:
     df_tmp = live_fo_wk.copy()
     df_tmp['連買類型'] = '🌐 外資週連買'
     df_tmp = df_tmp.rename(columns={'最新連買週數': '連買週期數'})
-    b3_combined_list.append(df_tmp[['股票代號', '股票名稱', '狀態動態', '連買類型', '連買週期數']])
+    b3_combined_list.append(df_tmp)
 
 if 'live_it_wk' in locals() and not live_it_wk.empty:
     df_tmp = live_it_wk.copy()
     df_tmp['連買類型'] = '🏦 投信週連買'
     df_tmp = df_tmp.rename(columns={'最新連買週數': '連買週期數'})
-    b3_combined_list.append(df_tmp[['股票代號', '股票名稱', '狀態動態', '連買類型', '連買週期數']])
+    b3_combined_list.append(df_tmp)
 
 if b3_combined_list:
-    st.session_state['df_blk3_main'] = pd.concat(b3_combined_list, ignore_index=True)
+    df_b3 = pd.concat(b3_combined_list, ignore_index=True)
+    # 💡 【修改點】：重新排列欄位，將「連買類型」移至最前面
+    df_b3 = df_b3[['連買類型', '股票代號', '股票名稱', '狀態動態', '連買週期數']]
+    st.session_state['df_blk3_main'] = df_b3
 else:
-    st.session_state['df_blk3_main'] = pd.DataFrame(columns=['股票代號', '股票名稱', '狀態動態', '連買類型', '連買週期數'])
+    st.session_state['df_blk3_main'] = pd.DataFrame(columns=['連買類型', '股票代號', '股票名稱', '狀態動態', '連買週期數'])
 
 # ==========券資比資料請一起搬遷============
 # ==========================================
-# 📅 區塊 4-1：融資減少動向 (5日累計)
+# 📅 區塊 4 綜合區：融資與借券動向 (5日累計)
+# ==========================================
+
+# 🛠️ 【不可省略】讀取函數
+def get_specific_margin_data(keyword):
+    found_files = []
+    for root, dirs, files in os.walk(os.getcwd()):
+        if '.git' in root or 'venv' in root: continue
+        for file in files:
+            if file.lower().endswith(".csv") and keyword in file:
+                found_files.append(os.path.join(root, file))
+    
+    if not found_files:
+        return pd.DataFrame(), f"找不到包含『{keyword}』的檔案"
+    
+    latest_file = sorted(found_files, key=lambda x: os.path.basename(x), reverse=True)[0]
+    file_name = os.path.basename(latest_file)
+    
+    try:
+        df = robust_read_csv(latest_file)
+        if df.empty:
+            return pd.DataFrame(), f"讀取成功但內容為空: {file_name}"
+        
+        df.columns = df.columns.astype(str).str.replace('\ufeff', '').str.strip()
+        
+        for col in df.columns:
+            if "幅度" in col or "張數" in col or "%" in col or "％" in col:
+                df[col] = df[col].astype(str).str.replace(',', '', regex=False).str.replace('%', '', regex=False)
+                df[col] = pd.to_numeric(df[col], errors='coerce')
+                
+        return df, file_name
+    except Exception as e:
+        return pd.DataFrame(), f"讀取崩潰 ({file_name}): {str(e)}"
+
+# 🛠️ 【不可省略】欄位清理與過濾函數 (已模組化，解決勾選框衝突)
+def process_margin_df(df, type_name, flag_etf, flag_bond):
+    if df.empty: return df
+    df = df.copy()
+    
+    cols_to_drop = [c for c in df.columns if "更新" in str(c) and "日期" in str(c)]
+    if cols_to_drop:
+        df = df.drop(columns=cols_to_drop)
+        
+    target_idx = -1
+    if type_name == "幅度":
+        for i, col in enumerate(df.columns):
+            if "3個月" in str(col) and ("%" in str(col) or "％" in str(col)):
+                target_idx = i
+                break
+    else: 
+        for i, col in enumerate(df.columns):
+            if "3個月" in str(col) and "張數" in str(col):
+                target_idx = i
+                break
+                
+    if target_idx != -1:
+        df = df.iloc[:, :target_idx+1]
+        
+    col_name = next((c for c in df.columns if '名稱' in c), None)
+    col_id = next((c for c in df.columns if '代號' in c), None)
+    
+    if col_name and col_id:
+        df[col_id] = df[col_id].astype(str).str.strip()
+        df[col_name] = df[col_name].astype(str).str.strip()
+        
+        mask_bond = df[col_name].str.contains('債', na=False) | df[col_id].str.endswith('B', na=False)
+        mask_etf = df[col_id].str.startswith('00', na=False)
+        
+        if not flag_bond: df = df[~mask_bond]
+        if not flag_etf: df = df[~(mask_etf & ~mask_bond)] 
+
+    df = df.reset_index(drop=True)
+    df.index = df.index + 1
+    return df
+
+# ==========================================
+# 📅 區塊 4-1：融資減少動向
 # ==========================================
 st.write("---")
 st.markdown("<div id='section-4-1'></div>", unsafe_allow_html=True)
@@ -1054,10 +1133,8 @@ st.header("📅 區塊 4-1：融資減少動向")
 
 st.write("🔧 **自訂標的顯示過濾：**")
 f_col1, f_col2, _ = st.columns([1, 1, 2])
-with f_col1:
-    show_etf = st.checkbox("顯示 ETF", value=True, key="margin_show_etf")
-with f_col2:
-    show_bond = st.checkbox("顯示債券/債券ETF", value=True, key="margin_show_bond")
+with f_col1: show_etf_41 = st.checkbox("顯示 ETF", value=True, key="margin_show_etf")
+with f_col2: show_bond_41 = st.checkbox("顯示債券/債券ETF", value=True, key="margin_show_bond")
 st.write("") 
 
 c1, c2 = st.columns(2)
@@ -1065,7 +1142,7 @@ c1, c2 = st.columns(2)
 with c1:
     st.subheader("📉 融資減少比例排名")
     df_pct, msg_pct = get_specific_margin_data("融資減少幅度")
-    df_pct_clean = process_margin_df(df_pct, "幅度")
+    df_pct_clean = process_margin_df(df_pct, "幅度", show_etf_41, show_bond_41)
     
     if not df_pct_clean.empty:
         st.info(f"💡 最新來源: {msg_pct}")
@@ -1076,7 +1153,7 @@ with c1:
 with c2:
     st.subheader("📉 融資減少張數排名")
     df_vol, msg_vol = get_specific_margin_data("融資減少張數")
-    df_vol_clean = process_margin_df(df_vol, "張數")
+    df_vol_clean = process_margin_df(df_vol, "張數", show_etf_41, show_bond_41)
     
     if not df_vol_clean.empty:
         st.info(f"💡 最新來源: {msg_vol}")
@@ -1084,13 +1161,11 @@ with c2:
     else:
         st.warning(f"⚠️ {msg_vol} 或 過濾後無相符資料")
 
-# 🔥 【正確位置儲存 4-1】
 st.session_state['df_margin_pct'] = df_pct_clean
 st.session_state['df_margin_vol'] = df_vol_clean
 
-
 # ==========================================
-# 📅 區塊 4-2：借券賣出減少動向 (5日累計)
+# 📅 區塊 4-2：借券賣出減少動向
 # ==========================================
 st.write("---")
 st.markdown("<div id='section-4-2'></div>", unsafe_allow_html=True)
@@ -1098,10 +1173,8 @@ st.header("📅 區塊 4-2：借券賣出減少動向")
 
 st.write("🔧 **自訂標的顯示過濾：**")
 f_col1, f_col2, _ = st.columns([1, 1, 2])
-with f_col1:
-    show_etf_42 = st.checkbox("顯示 ETF", value=True, key="stock_show_etf_42")
-with f_col2:
-    show_bond_42 = st.checkbox("顯示債券/債券ETF", value=True, key="stock_show_bond_42")
+with f_col1: show_etf_42 = st.checkbox("顯示 ETF", value=True, key="stock_show_etf_42")
+with f_col2: show_bond_42 = st.checkbox("顯示債券/債券ETF", value=True, key="stock_show_bond_42")
 st.write("") 
 
 c1, c2 = st.columns(2)
@@ -1109,7 +1182,7 @@ c1, c2 = st.columns(2)
 with c1:
     st.subheader("📉 借券賣出減少比例排名")
     df_pct, msg_pct = get_specific_margin_data("借券賣出減少幅度")
-    df_pct_clean = process_margin_df(df_pct, "幅度")
+    df_pct_clean = process_margin_df(df_pct, "幅度", show_etf_42, show_bond_42)
     
     if not df_pct_clean.empty:
         st.info(f"💡 最新來源: {msg_pct}")
@@ -1120,7 +1193,7 @@ with c1:
 with c2:
     st.subheader("📉 借券賣出減少張數排名")
     df_vol, msg_vol = get_specific_margin_data("借券賣出減少張數")
-    df_vol_clean = process_margin_df(df_vol, "張數")
+    df_vol_clean = process_margin_df(df_vol, "張數", show_etf_42, show_bond_42)
     
     if not df_vol_clean.empty:
         st.info(f"💡 最新來源: {msg_vol}")
@@ -1128,13 +1201,11 @@ with c2:
     else:
         st.warning(f"⚠️ {msg_vol} 或 過濾後無相符資料")
 
-# 🔥 【正確位置與導正名稱儲存 4-2】
 st.session_state['df_short_pct'] = df_pct_clean
 st.session_state['df_short_vol'] = df_vol_clean
 
-
 # ==========================================
-# 📅 區塊 4-3：融券增加動向 (5日累計)
+# 📅 區塊 4-3：融券增加動向
 # ==========================================
 st.write("---")
 st.markdown("<div id='section-4-3'></div>", unsafe_allow_html=True)
@@ -1142,10 +1213,8 @@ st.header("📅 區塊 4-3：融券增加動向 (5日累計)")
 
 st.write("🔧 **自訂標的顯示過濾：**")
 f_col1, f_col2, _ = st.columns([1, 1, 2])
-with f_col1:
-    show_etf_43 = st.checkbox("顯示 ETF", value=True, key="stock_show_etf_43")
-with f_col2:
-    show_bond_43 = st.checkbox("顯示債券/債券ETF", value=True, key="stock_show_bond_43")
+with f_col1: show_etf_43 = st.checkbox("顯示 ETF", value=True, key="stock_show_etf_43")
+with f_col2: show_bond_43 = st.checkbox("顯示債券/債券ETF", value=True, key="stock_show_bond_43")
 st.write("") 
 
 c1, c2 = st.columns(2)
@@ -1153,7 +1222,7 @@ c1, c2 = st.columns(2)
 with c1:
     st.subheader("📈 融券增加比例排名")
     df_pct, msg_pct = get_specific_margin_data("融券增加幅度")
-    df_pct_clean = process_margin_df(df_pct, "幅度")
+    df_pct_clean = process_margin_df(df_pct, "幅度", show_etf_43, show_bond_43)
     
     if not df_pct_clean.empty:
         st.info(f"💡 最新來源: {msg_pct}")
@@ -1164,7 +1233,7 @@ with c1:
 with c2:
     st.subheader("📈 融券增加張數排名")
     df_vol, msg_vol = get_specific_margin_data("融券增加張數")
-    df_vol_clean = process_margin_df(df_vol, "張數")
+    df_vol_clean = process_margin_df(df_vol, "張數", show_etf_43, show_bond_43)
     
     if not df_vol_clean.empty:
         st.info(f"💡 最新來源: {msg_vol}")
@@ -1172,7 +1241,6 @@ with c2:
     else:
         st.warning(f"⚠️ {msg_vol} 或 過濾後無相符資料")
 
-# 🔥 【正確位置與導正名稱儲存 4-3】
 st.session_state['df_margin_plus_pct'] = df_pct_clean
 st.session_state['df_margin_plus_vol'] = df_vol_clean
 # ==========券資比資料請一起搬遷============
