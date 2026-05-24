@@ -42,30 +42,35 @@ st.write("---")
 st.markdown("<div id='section-search'></div>", unsafe_allow_html=True)
 st.subheader("🔍 個股籌碼快搜 (全方位診斷)")
 
-# 🛠️ 定義強韌的搜尋函式 (支援代號與名稱雙引擎)
+# 🛠️ 定義強韌的搜尋函式
 def robust_search_engine(df, query):
     if df is None or df.empty:
         return pd.DataFrame()
         
-    # 1. 解決重複欄位錯誤
     df = df.loc[:, ~df.columns.duplicated()].copy()
-    
-    # 2. 搜尋條件設定
     query = str(query).strip()
-    mask = pd.Series(False, index=df.index) # 預設全不選
+    mask = pd.Series(False, index=df.index)
     
-    # 精準比對代號
     if '股票代號' in df.columns:
         df['股票代號'] = df['股票代號'].astype(str).str.strip()
         mask = mask | (df['股票代號'] == query)
         
-    # 模糊比對名稱 (防呆與便利設計)
     if '股票名稱' in df.columns:
         df['股票名稱'] = df['股票名稱'].astype(str).str.strip()
         mask = mask | df['股票名稱'].str.contains(query, na=False, case=False)
         
     return df[mask]
 
+# 🎯 建立通用掃描與顯示工具
+def scan_and_display(title, session_key, query):
+    df = st.session_state.get(session_key, pd.DataFrame())
+    res = robust_search_engine(df, query)
+    
+    if not res.empty:
+        st.write(f"**{title}**")
+        st.dataframe(res, use_container_width=True)
+    else:
+        st.info(f"⚪ {title}：無資料 (未進榜)")
 
 # 🎯 搜尋輸入框
 search_query = st.text_input("請輸入想觀測的股票代號或名稱 (例如: 3231 或 緯創)：", key="global_search_final")
@@ -74,19 +79,17 @@ if search_query:
     st.write(f"### 🎯 綜合診斷標的：{search_query}")
     
     # ==========================================
-    # 👑 掃描 區塊 1：中長線三大法人持股
+    # 👑 區塊 1：中長線三大法人持股
     # ==========================================
     st.write("#### 👑 區塊 1：中長線三大法人持股")
     
-    # 檢查區塊 1 的記憶體資料 (請確保區塊 1 有存入 my_final_df)
     if 'my_final_df' in st.session_state:
         q_blk1 = robust_search_engine(st.session_state['my_final_df'], search_query)
         
         if not q_blk1.empty:
-            # 有資料：顯示表格與圖表
             st.dataframe(q_blk1.drop(columns=["秘密3日斜率"], errors='ignore'), use_container_width=True)
             
-            # --- 繪圖區 (整合 Plotly 標記紅點功能) ---
+            # --- 繪圖區 (折線圖 + 防呆提示) ---
             try:
                 chart_cols = [c for c in q_blk1.columns if "持股%" in c]
                 if chart_cols:
@@ -95,57 +98,60 @@ if search_query:
                         index=[c.split(' ')[0] for c in chart_cols[:21]]
                     ).iloc[::-1].dropna()
                     
-                    import plotly.express as px
-                    plot_data = pd.DataFrame({"日期": t_ser.index, "持股%": t_ser.values})
-                    fig = px.line(plot_data, x="日期", y="持股%", title=f"三大法人持股 21日波段軌跡")
-                    
-                    # 標記 0508 為紅色
-                    if "20260508" in plot_data["日期"].values:
-                        val = plot_data[plot_data["日期"] == "20260508"]["持股%"].values[0]
-                        fig.add_scatter(x=["20260508"], y=[val], mode='markers+text', 
-                                        marker=dict(color='red', size=12), text=["⚠️ 0508"], textposition="top center", name="觀察點")
-                    
-                    st.plotly_chart(fig, use_container_width=True)
-            except Exception as chart_e:
-                st.info(f"圖表渲染提示: {chart_e}")
+                    if not t_ser.empty:
+                        st.write(f"📈 **持股 21日波段軌跡 ({q_blk1.iloc[0].get('股票名稱', '目標個股')})**")
+                        st.line_chart(t_ser, height=240)
+                    else:
+                        raise ValueError("無足夠數據")
+            except Exception:
+                # 解決您的需求 1：改成白話文的未進榜說明
+                st.info("⚪ 該標的未連續進榜 5/20/60/120 日，故無足夠連續持股%數據可供繪製波段圖表。")
         else:
-            # 沒進榜
             st.info("⚪ 無資料 (該標的未進入中長線榜單)")
     else:
         st.error("⚠️ 尚未載入區塊 1 資料。請確認上方區塊 1 已執行。")
 
+    # ==========================================
+    # 📊 區塊 2：(替換為您的實際名稱)
+    # ==========================================
+    st.write("---")
+    st.write("#### 📊 區塊 2：動能與外資診斷 (暫定)")
+    
+    c1, c2 = st.columns(2)
+    with c1: scan_and_display("🔹 區塊 2-1", 'df_blk2_1', search_query)
+    with c2: scan_and_display("🔹 區塊 2-2", 'df_blk2_2', search_query)
+    
+    c3, c4 = st.columns(2)
+    with c3: scan_and_display("🔹 區塊 2-3", 'df_blk2_3', search_query)
+    with c4: scan_and_display("🔹 區塊 2-4", 'df_blk2_4', search_query)
 
     # ==========================================
-    # 📊 掃描 區塊 4：籌碼變動排名診斷 (融資/借券/融券)
+    # 📊 區塊 3：(替換為您的實際名稱)
+    # ==========================================
+    st.write("---")
+    st.write("#### 📊 區塊 3：特定籌碼或大戶診斷 (暫定)")
+    scan_and_display("🔹 區塊 3 綜合列表", 'df_blk3_main', search_query)
+
+    # ==========================================
+    # 📊 區塊 4：籌碼變動排名診斷 (融資/借券/融券) - 無分頁版
     # ==========================================
     st.write("---")
     st.write("#### 📊 區塊 4：籌碼變動排名診斷")
     
-    # 建立一個小工具函式，專門用來掃描區塊 4 的各個子表單
-    def scan_and_display(title, session_key, query):
-        df = st.session_state.get(session_key, pd.DataFrame())
-        res = robust_search_engine(df, query)
+    st.markdown("##### 📉 融資減少")
+    c1, c2 = st.columns(2)
+    with c1: scan_and_display("【幅度】", 'df_margin_pct', search_query)
+    with c2: scan_and_display("【張數】", 'df_margin_vol', search_query)
         
-        if not res.empty:
-            st.write(f"**{title}**")
-            st.dataframe(res, use_container_width=True)
-        else:
-            st.info(f"⚪ {title}：無資料 (未進榜)")
-
-    # 使用 Tab 分頁顯示，讓版面不至於太長
-    tab1, tab2, tab3 = st.tabs(["📉 融資減少", "📉 借券賣出減少", "📈 融券增加"])
-    
-    with tab1:
-        scan_and_display("📉 融資減少【幅度】", 'df_margin_pct', search_query)
-        scan_and_display("📉 融資減少【張數】", 'df_margin_vol', search_query)
+    st.markdown("##### 📉 借券賣出減少")
+    c3, c4 = st.columns(2)
+    with c3: scan_and_display("【幅度】", 'df_short_pct', search_query)
+    with c4: scan_and_display("【張數】", 'df_short_vol', search_query)
         
-    with tab2:
-        scan_and_display("📉 借券賣出減少【幅度】", 'df_short_pct', search_query)
-        scan_and_display("📉 借券賣出減少【張數】", 'df_short_vol', search_query)
-        
-    with tab3:
-        scan_and_display("📈 融券增加【幅度】", 'df_margin_plus_pct', search_query)
-        scan_and_display("📈 融券增加【張數】", 'df_margin_plus_vol', search_query)
+    st.markdown("##### 📈 融券增加")
+    c5, c6 = st.columns(2)
+    with c5: scan_and_display("【幅度】", 'df_margin_plus_pct', search_query)
+    with c6: scan_and_display("【張數】", 'df_margin_plus_vol', search_query)
         
  
 # ==========================================
