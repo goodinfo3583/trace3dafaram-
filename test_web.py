@@ -351,105 +351,40 @@ else:
 
 
 # ==========================================
-# 🔍 個股籌碼快搜 (診斷區)
+# 🔍 診斷區功能整合
 # ==========================================
-st.write("---")
-st.markdown("<div id='section-search'></div>", unsafe_allow_html=True)
-st.subheader("🔍 個股籌碼快搜 (診斷區)")
 
-search_query = st.text_input("請輸入你想觀測的股票名稱或代號：", key="global_search_top")
-
-# 🛠️ 建立一個安全的搜尋過濾函數 (一次解決重複欄位與亂碼問題)
-def safe_search(df, query):
-    # 確保傳入的是有效的 DataFrame
-    if df is None or type(df) is not pd.DataFrame or df.empty:
-        return pd.DataFrame()
-        
-    # 1. 強制過濾重複欄位 (避免 PyArrow 報錯)
-    df = df.loc[:, ~df.columns.duplicated()]
-    
-    # 2. 確保有我們需要的欄位才能搜尋
-    if '股票名稱' not in df.columns or '股票代號' not in df.columns:
-        return pd.DataFrame()
-        
-    # 3. 執行搜尋
-    res = df[df['股票名稱'].str.contains(query, na=False) | df['股票代號'].astype(str).str.contains(query, na=False)].copy()
-    
-    # 4. 🔥 清除文字識別產生的「撖」字亂碼
+# 1. 診斷顯示函式 (放在搜尋區塊上方)
+def show_rank_result(title, session_key, query):
+    st.write(f"#### {title}")
+    # 從 session_state 直接安全讀取
+    df = st.session_state.get(session_key, pd.DataFrame())
+    res = safe_search(df, query)
     if not res.empty:
-        res['股票名稱'] = res['股票名稱'].str.replace('撖', '', regex=False)
-        
-    return res
-
-if search_query:
-    # 搜尋區塊 1 的主數據
-    try: q_txt = safe_search(track_display_df, search_query)
-    except NameError: q_txt = pd.DataFrame()
-
-    if q_txt.empty:
-        st.warning(f"⚠️ 在【區塊1：中長線持股追蹤】中找不到與 '{search_query}' 相關的資料。")
+        st.dataframe(res, use_container_width=True)
     else:
-        st.write(f"### 🎯 綜合診斷標的：{search_query}")
-        st.write("📋 **1. 中長線三大法人持股變化軌跡：**")
-        st.dataframe(q_txt.drop(columns=["秘密3日斜率"], errors='ignore'), use_container_width=True)
-        
-        # --- 繪製油門探針與折線圖 ---
-        try:
-            chart_cols = [c for c in q_txt.columns if "持股%" in c]
-            if chart_cols:
-                v_latest = pd.to_numeric(q_txt.iloc[0][chart_cols[0]], errors='coerce')
-                
-                def get_diff_pct(days_back):
-                    idx = min(days_back - 1, len(chart_cols) - 1)
-                    v_back = pd.to_numeric(q_txt.iloc[0][chart_cols[idx]], errors='coerce')
-                    if pd.isna(v_latest) or pd.isna(v_back):
-                        return 0.0
-                    return round(float(v_latest - v_back), 2)
+        st.info("無資料 (未進榜)")
 
-                slope_df = pd.DataFrame({
-                    "指標週期": ["⚡ 2日短線突發斜率", "📈 5日短線加速斜率", "🚀 10日中線轉折斜率", "🔒 20日月線波段鎖籌"],
-                    "法人持股淨增減(%)": [get_diff_pct(2), get_diff_pct(5), get_diff_pct(10), get_diff_pct(20)]
-                })
-                st.write("📊 **三大法人持股多週期油門加速探針：**")
-                st.dataframe(slope_df, use_container_width=True)
-                
-                chart_cols_21 = chart_cols[:21]
-                t_ser = pd.Series(
-                    pd.to_numeric(q_txt.iloc[0][chart_cols_21].values, errors='coerce'), 
-                    index=[c.split(' ')[0] for c in chart_cols_21]
-                ).iloc[::-1].dropna()
-                
-                if not t_ser.empty:
-                    st.write(f"📈 **三大法人持股 21日波段全景軌跡曲線 ({q_txt.iloc[0]['股票名稱']})**")
-                    st.line_chart(t_ser, height=240)
-        except Exception as chart_err:
-            st.info(f"圖表渲染暫無數據: {chart_err}")
-    # ==========================================
-    # 🔍 整合診斷區 (4-1 ~ 4-3)
-    # ==========================================
-    st.write("---")
-    st.subheader("📊 籌碼變動排名診斷")
-    
-    # 建立分頁，讓版面更乾淨
-    tab1, tab2, tab3 = st.tabs(["📉 融資減少", "📉 借券賣出減少", "📈 融券增加"])
-    
-    with tab1:
-        c1, c2 = st.columns(2)
-        # 直接使用您定義好的 show_rank_result 函式
-        # 注意：我們直接傳入變數名稱 (例如 df_margin_pct)，並確保它存在
-        with c1: show_rank_result("📉 融資減少【幅度】", 'df_margin_pct', search_query)
-        with c2: show_rank_result("📉 融資減少【張數】", 'df_margin_vol', search_query)
-        
-    with tab2:
-        c3, c4 = st.columns(2)
-        with c3: show_rank_result("📉 借券賣出減少【幅度】", 'df_pct_short', search_query)
-        with c4: show_rank_result("📉 借券賣出減少【張數】", 'df_vol_short', search_query)
-        
-    with tab3:
-        c5, c6 = st.columns(2)
-        with c5: show_rank_result("📈 融券增加【幅度】", 'df_pct_margin_plus', search_query)
-        with c6: show_rank_result("📈 融券增加【張數】", 'df_vol_margin_plus', search_query)
- 
+# 2. 顯示分頁與排名診斷 (放在 if search_query: 區塊內)
+st.write("---")
+st.subheader("📊 籌碼變動排名診斷")
+tab1, tab2, tab3 = st.tabs(["📉 融資減少", "📉 借券賣出減少", "📈 融券增加"])
+
+with tab1:
+    c1, c2 = st.columns(2)
+    with c1: show_rank_result("📉 融資減少【幅度】", 'df_margin_pct', search_query)
+    with c2: show_rank_result("📉 融資減少【張數】", 'df_margin_vol', search_query)
+
+with tab2:
+    c3, c4 = st.columns(2)
+    with c3: show_rank_result("📉 借券賣出減少【幅度】", 'df_short_pct', search_query)
+    with c4: show_rank_result("📉 借券賣出減少【張數】", 'df_short_vol', search_query)
+
+with tab3:
+    c5, c6 = st.columns(2)
+    with c5: show_rank_result("📈 融券增加【幅度】", 'df_margin_plus_pct', search_query)
+    with c6: show_rank_result("📈 融券增加【張數】", 'df_margin_plus_vol', search_query)
+
 # ==========================================
 # 🧭 側邊欄導航 (無感互動+視覺特效版)
 # ==========================================
@@ -1378,6 +1313,7 @@ with c1:
         st.dataframe(df_pct_clean, use_container_width=True)
         # 🔥 在這裡存入幅度表格
         st.session_state['df_margin_pct'] = df_pct_clean
+        st.session_state['df_margin_vol'] = df_vol_clean
     else:
         st.warning(f"⚠️ {msg_pct} 或 過濾後無相符資料")
 
