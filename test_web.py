@@ -1200,15 +1200,13 @@ with c_wk2:
 # ==========================================
 st.write("---")
 st.markdown("<div id='section-4-1'></div>", unsafe_allow_html=True)
-st.header("📅 區塊 4-1：融資增減 (5日累計)")
+st.header("📅 區塊 4-1：融資減少幅度 (5日累計)")
 
-# 1. 宣告讀取函數 (把 return 包在裡面)
 def read_margin_data():
-    # 根據您的修改，直接在 DATA_DIR 找檔案
-    csv_pattern = os.path.join(DATA_DIR, "*融資減少幅度*.csv")
+    # 🔥 核心修正：明確指定進入 Goodinfo_Rankings 資料夾尋找
+    csv_pattern = os.path.join(DATA_DIR, "Goodinfo_Rankings", "*融資減少幅度*.csv")
     files = glob.glob(csv_pattern)
     
-    # 如果找不到檔案，就回傳空的資料與訊息
     if not files:
         return pd.DataFrame(), "無檔案"
     
@@ -1231,15 +1229,14 @@ def read_margin_data():
     except Exception as e:
         return pd.DataFrame(), f"讀取失敗: {str(e)}"
 
-# 2. 呼叫函數，執行讀取
+# 執行讀取與顯示
 margin_df, margin_filename = read_margin_data()
 
-# 3. 顯示結果在網頁上
 if not margin_df.empty:
     st.info(f"💡 資料來源: {margin_filename}")
     st.dataframe(margin_df, use_container_width=True)
 else:
-    st.warning("⚠️ 目前找不到融資減少幅度的排名檔案，請確認資料夾內是否有包含『融資減少幅度』的 CSV 檔案。")
+    st.warning("⚠️ 目前找不到融資減少幅度的排名檔案，請確認 Goodinfo_Rankings 資料夾內是否有包含『融資減少幅度』的 CSV 檔案。")
 
 # ==========================================
 # 📊 【蜂蜜計數器】本站累計觀測人次統計
