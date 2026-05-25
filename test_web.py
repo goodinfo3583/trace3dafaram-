@@ -161,7 +161,7 @@ def render_technical_chart(stock_id, timeframe="日線"):
         ), row=1, col=1)
 
         # 7. 繪製均線
-        colors = ['orange', 'purple', 'blue', 'green', 'brown', 'pink']
+        colors = ['#FEF143', 'purple', 'blue', 'green', 'brown', '#D2691E']
         for idx, ma in enumerate(ma_windows):
             latest_val = get_latest_price(f'{ma}MA')
             fig.add_trace(go.Scatter(
