@@ -82,42 +82,74 @@ st.subheader("🔍 個股籌碼快搜 (全方位診斷)")
 # ==========================================
 # 📈 專業 K 線圖與技術分析繪製引擎 (升級版)
 # ==========================================
-def render_technical_chart(df, stock_id):
+# ==========================================
+# 📈 專業 K 線圖與技術分析引擎 (yfinance 終極防彈版)
+# ==========================================
+def render_technical_chart(stock_id):
+    import yfinance as yf
     import plotly.graph_objects as go
     from plotly.subplots import make_subplots
     import pandas as pd
-    try:
-        # 1. 時間格式轉換與設置索引 (處理時區)
-        df['Datetime'] = pd.to_datetime(df['Datetime'], utc=True).dt.tz_convert('Asia/Taipei')
-        df = df.set_index('Datetime')
+    import streamlit as st
 
-        # 2. 智慧壓縮：5分K 轉 日K
-        daily_df = df.resample('D').agg({
-            'Open': 'first', 'High': 'max', 'Low': 'min', 'Close': 'last', 'Volume': 'sum'
-        }).dropna()
+    try:
+        # 1. 智慧連線：台股代號分為上市(.TW)與上櫃(.TWO)
+        ticker_tw = f"{stock_id}.TW"
+        ticker_two = f"{stock_id}.TWO"
+        
+        # 下載過去 2 年的歷史資料 (確保 240MA 算得出來)
+        df = yf.download(ticker_tw, period="2y", progress=False)
+        if df is None or df.empty:
+            df = yf.download(ticker_two, period="2y", progress=False)
+            
+        if df is None or df.empty:
+            st.warning(f"⚠️ 無法從 Yahoo Finance 取得 {stock_id} 的即時報價，請確認代號是否正確。")
+            return
+
+        # 2. 強制清洗 yfinance 最新版本的雙層欄位 (MultiIndex) 陷阱
+        if isinstance(df.columns, pd.MultiIndex):
+            df.columns = df.columns.get_level_values(0)
+            
+        # 移除可能重複的欄位名稱 (防呆)
+        df = df.loc[:, ~df.columns.duplicated()]
+
+        # 確保時區與日期格式正確
+        if df.index.tz is not None:
+            df.index = df.index.tz_convert('Asia/Taipei')
+        else:
+            df.index = df.index.tz_localize('UTC').tz_convert('Asia/Taipei')
+
+        daily_df = df.copy()
 
         # 3. 計算多週期均線 (MA)
         ma_windows = [5, 10, 20, 60, 120, 240]
         for ma in ma_windows:
             daily_df[f'{ma}MA'] = daily_df['Close'].rolling(window=ma).mean()
 
-        # 安全取得最新有效均價 (用來顯示在圖例上)
+        # 安全取得最新有效均價 (增加防 TypeError 機制)
         def get_latest_price(col):
             valid_data = daily_df[col].dropna()
-            return f"{valid_data.iloc[-1]:.2f}" if not valid_data.empty else "-"
+            if not valid_data.empty:
+                val = valid_data.iloc[-1]
+                if isinstance(val, pd.Series): # 防止 pandas 回傳 Series
+                    val = val.iloc[0]
+                return f"{float(val):.2f}"
+            return "-"
 
         # 4. 建立上下分割畫布
         fig = make_subplots(rows=2, cols=1, shared_xaxes=True, 
                             vertical_spacing=0.03, row_heights=[0.7, 0.3])
 
-        # 5. 自訂 K 線顏色 (紅K/黑K)
-        up_color = 'rgb(205,92,92)'    # 莫蘭迪紅
-        down_color = 'rgb(80,200,120)'   # 沉穩綠 (黑K)
+        # 5. 自訂 K 線顏色
+        up_color = 'rgb(205,92,92)'    # 莫蘭迪紅 (紅K)
+        down_color = 'rgb(80,200,120)' # 護眼綠色 (黑K)
 
-        # 6. 繪製 K 線
+        # 6. 繪製 K 線 (使用最穩定的欄位讀取法)
         fig.add_trace(go.Candlestick(
-            x=daily_df.index, open=daily_df['Open'], high=daily_df['High'],
-            low=daily_df['Low'], close=daily_df['Close'], name='K線',
+            x=daily_df.index, 
+            open=daily_df['Open'], high=daily_df['High'],
+            low=daily_df['Low'], close=daily_df['Close'], 
+            name='K線',
             increasing_line_color=up_color, increasing_fillcolor=up_color,
             decreasing_line_color=down_color, decreasing_fillcolor=down_color
         ), row=1, col=1)
@@ -128,39 +160,37 @@ def render_technical_chart(df, stock_id):
             latest_val = get_latest_price(f'{ma}MA')
             fig.add_trace(go.Scatter(
                 x=daily_df.index, y=daily_df[f'{ma}MA'], mode='lines', 
-                name=f'{ma}MA ({latest_val})',  # 圖例加上最新均價
+                name=f'{ma}MA ({latest_val})', 
                 line=dict(color=colors[idx], width=1.2)
             ), row=1, col=1)
 
-        # 8. 繪製成交量 (顏色與當日K線同步)
+        # 8. 繪製成交量 (使用 iterrows 迴避 TypeError)
         vol_colors = [up_color if row['Close'] >= row['Open'] else down_color for _, row in daily_df.iterrows()]
         fig.add_trace(go.Bar(
             x=daily_df.index, y=daily_df['Volume'], name='成交量', marker_color=vol_colors
         ), row=2, col=1)
 
-        # 9. 版面美化與 X 軸日期格式修改
+        # 9. 版面美化與防重疊機制
         fig.update_layout(
-            title=f'📊 {stock_id} 歷史日 K 線與成交量',
+            title=f'📊 {stock_id} 最新日 K 線與成交量 (資料來源: Yahoo Finance)',
             yaxis_title='股價 (TWD)',
             xaxis_rangeslider_visible=False,
-            height=650, # 👈 稍微加高圖表，給圖例多一點空間
+            height=650,
             template='plotly_white',
-            margin=dict(l=10, r=10, t=60, b=10), # 👈 將上邊距 (t) 從 40 增加到 60，把圖表往下推
+            margin=dict(l=10, r=10, t=60, b=10), # t=60 把圖表往下推
             hovermode='x unified',
-            # 👈 將 y=1.02 改為 y=1.05 或更高，讓圖例浮在標題上方，避免重疊
-            legend=dict(orientation="h", yanchor="bottom", y=1.08, xanchor="right", x=1) 
+            legend=dict(orientation="h", yanchor="bottom", y=1.08, xanchor="right", x=1)
         )
         
-        # 強制 X 軸顯示為數字格式 (例如 2026-05-25)
         fig.update_xaxes(tickformat="%Y-%m-%d", row=1, col=1)
         fig.update_xaxes(tickformat="%Y-%m-%d", row=2, col=1)
         
-        # 使用 unique key 徹底防止 ID 重複報錯
-        import streamlit as st
+        # 隱藏周末空白 (台股適用)
+        fig.update_xaxes(rangebreaks=[dict(bounds=["sat", "mon"])], row=1, col=1)
+        
         st.plotly_chart(fig, use_container_width=True, key=f"kline_{stock_id}")
         
     except Exception as e:
-        import streamlit as st
         st.error(f"❌ 繪製 K 線圖時發生錯誤: {str(e)}")
 
 #===================================
@@ -211,22 +241,25 @@ def scan_and_display(title, session_key, query):
 #==========================================
 search_query = st.text_input("請輸入想觀測的股票代號或名稱 (例如: 3231 或 緯創，未顯示任何資料代表你的標的可能太弱了)：", key="global_search_final")
 
+if search_query:
+    st.write(f"### 🎯 綜合診斷標的：{search_query}")
+
     # ==========================================
     # 📈 K 線圖按鈕 (yfinance 即時記憶開關版)
     # ==========================================
     st.write("---")
     
-    # 1. 建立狀態開關
+    # 1. 建立一個專屬的狀態開關 (預設為 False 關閉)
     if 'show_kline' not in st.session_state:
         st.session_state.show_kline = False
 
-    # 2. 顯示按鈕
+    # 2. 顯示按鈕，點擊時反轉狀態
     button_label = "❌ 關閉技術 K 線圖" if st.session_state.show_kline else "📊 載入最新技術 K 線圖"
     if st.button(button_label, use_container_width=True):
         st.session_state.show_kline = not st.session_state.show_kline
-        st.rerun()
+        st.rerun() # 強制網頁刷新以改變按鈕文字與顯示狀態
 
-    # 3. 按下開啟後，直接呼叫引擎
+    # 3. 只有當狀態為 True (開啟) 時，才呼叫 yfinance 引擎
     if st.session_state.show_kline:
         import re
         stock_id_match = re.search(r'\d+', search_query)
@@ -234,7 +267,7 @@ search_query = st.text_input("請輸入想觀測的股票代號或名稱 (例如
         if stock_id_match:
             pure_stock_id = stock_id_match.group(0)
             with st.spinner(f"正在從 Yahoo Finance 即時擷取 {pure_stock_id} 的最新 K 線資料..."):
-                # 直接呼叫引擎，它會自己抓資料+畫圖！
+                # 直接呼叫放在上半部的 yfinance 繪圖引擎！
                 render_technical_chart(pure_stock_id)
         else:
             st.warning("⚠️ 請輸入確切的股票代號 (例如 2330)。")
