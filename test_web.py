@@ -282,6 +282,102 @@ if search_query:
     st.write("---")
     st.write("#### 💰 區塊 5：大股東動向")
     scan_and_display("400張以上大戶動向", 'df_blk5', search_query)
+    # ==========================================
+    # 📈 區塊 6：技術面 K 線與動能指標 (全自動防呆版)
+    # ==========================================
+    st.write("---")
+    st.markdown("<div id='section-6'></div>", unsafe_allow_html=True)
+    st.write("#### 📈 區塊 6：技術面 K 線與動能指標")
+    
+    # ------------------------------------------
+    # 1. 內建 K 線繪圖引擎 (放在這裡保證絕對找得到！)
+    # ------------------------------------------
+    def render_technical_chart(df, stock_id):
+        import plotly.graph_objects as go
+        from plotly.subplots import make_subplots
+        try:
+            # 轉換時間
+            df['Datetime'] = pd.to_datetime(df['Datetime'], utc=True).dt.tz_convert('Asia/Taipei')
+            df = df.set_index('Datetime')
+
+            # 將 5分K 濃縮為 日K
+            daily_df = df.resample('D').agg({
+                'Open': 'first',
+                'High': 'max',
+                'Low': 'min',
+                'Close': 'last',
+                'Volume': 'sum'
+            }).dropna()
+
+            # 計算均線
+            daily_df['5MA'] = daily_df['Close'].rolling(window=5).mean()
+            daily_df['20MA'] = daily_df['Close'].rolling(window=20).mean()
+
+            # 建立畫布
+            fig = make_subplots(rows=2, cols=1, shared_xaxes=True, 
+                                vertical_spacing=0.03, row_heights=[0.7, 0.3])
+
+            # 畫 K 線
+            fig.add_trace(go.Candlestick(x=daily_df.index,
+                                         open=daily_df['Open'], high=daily_df['High'],
+                                         low=daily_df['Low'], close=daily_df['Close'],
+                                         name='K線',
+                                         increasing_line_color='red', increasing_fillcolor='red',
+                                         decreasing_line_color='green', decreasing_fillcolor='green'),
+                          row=1, col=1)
+
+            # 畫均線
+            fig.add_trace(go.Scatter(x=daily_df.index, y=daily_df['5MA'], mode='lines', name='5MA', line=dict(color='orange', width=1.5)), row=1, col=1)
+            fig.add_trace(go.Scatter(x=daily_df.index, y=daily_df['20MA'], mode='lines', name='20MA', line=dict(color='blue', width=1.5)), row=1, col=1)
+
+            # 畫成交量
+            colors = ['red' if row['Close'] >= row['Open'] else 'green' for _, row in daily_df.iterrows()]
+            fig.add_trace(go.Bar(x=daily_df.index, y=daily_df['Volume'], name='成交量', marker_color=colors), row=2, col=1)
+
+            # 版面設定
+            fig.update_layout(
+                title=f'📊 {stock_id} 歷史日 K 線與成交量 (含 5MA, 20MA)',
+                yaxis_title='股價 (TWD)',
+                xaxis_rangeslider_visible=False,
+                height=550,
+                template='plotly_white',
+                margin=dict(l=10, r=10, t=40, b=10),
+                hovermode='x unified'
+            )
+            
+            st.plotly_chart(fig, use_container_width=True)
+            
+        except Exception as e:
+            st.error(f"❌ 繪製 K 線圖時發生錯誤: {str(e)}")
+
+    # ------------------------------------------
+    # 2. 抓取資料庫與呼叫引擎
+    # ------------------------------------------
+    import re
+    stock_id_match = re.search(r'\d+', search_query)
+    
+    if stock_id_match:
+        pure_stock_id = stock_id_match.group(0)
+        # 🔗 正確的 GitHub Raw 網址 (修正為 tw_stocker，不帶 _Dong)
+        github_csv_url = f"https://raw.githubusercontent.com/voidful/tw_stocker/main/data/{pure_stock_id}.csv"
+        
+        try:
+            with st.spinner(f"正在從 GitHub 載入 {pure_stock_id} 的歷史 K 線數據..."):
+                # 從網路讀取
+                df_kline = pd.read_csv(github_csv_url)
+                
+                if not df_kline.empty:
+                    # 呼叫就在上面剛剛定義的繪圖引擎！
+                    render_technical_chart(df_kline, pure_stock_id)
+                else:
+                    st.warning(f"⚠️ 在資料庫中找到了 {pure_stock_id}，但內容為空。")
+                    
+        except Exception as e:
+            st.error(f"❌ 讀取失敗！系統偵測到的錯誤原因： `{str(e)}`")
+            st.info(f"💡 測試連結：[點擊這裡檢查 GitHub 裡面有沒有 {pure_stock_id}.csv]({github_csv_url})")
+            st.info("*(如果點擊連結顯示 404 Not Found，代表資料庫裡還沒有這檔股票的 CSV)*")
+    else:
+        st.warning("⚠️ 請在搜尋框輸入確切的股票代號 (例如 2330)，才能抓取 K 線資料。")
         
  
 # ==========================================
