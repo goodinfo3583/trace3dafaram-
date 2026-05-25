@@ -1489,14 +1489,7 @@ with top_pool_container:
     st.write("---")
     st.markdown("<div id='section-top-pool'></div>", unsafe_allow_html=True)
     st.header("🏆 數據分析觀察名單 (全區塊綜合評比)")
-    st.info("""
-    💡 **權重評分規則**：
-    * **基底**：需符合區塊1動能(趨緩/上升/持平)。
-    * **區塊2**：進榜且無衰退動態(+1分)。
-    * **區塊3**：日連買(依天數 +0.5~1分)；週連買(依週數 +1~2分)。
-    * **區塊4**：幅度進榜(+1分)；張數進榜(+0.5分)。
-    * **區塊5**：大股東微增(+1) / 大增(+2) / 減(-0.5) / 大減(-1)。
-    """)
+    st.info("💡 **權重評分**：法人持股上榜搭配其他數據分析積分。")
 
     if 'my_final_df' not in st.session_state or st.session_state['my_final_df'].empty:
         st.warning("⚠️ 尚未載入區塊 1 資料，無法進行選股池評比。")
@@ -1508,7 +1501,7 @@ with top_pool_container:
         rank_col = next((c for c in df_b1.columns if '今日上榜' in c or '上榜' in c), None)
         
         if dyn_col:
-            mask = df_b1[dyn_col].astype(str).str.contains('趨緩|上升|升|持平|加碼|延續', na=False)
+            mask = df_b1[dyn_col].astype(str).str.contains('趨緩|上升|升|持平|加碼|延續|下降|降', na=False)
             pool_df = df_b1[mask].copy()
         else:
             pool_df = df_b1.copy()
