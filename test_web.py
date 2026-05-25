@@ -207,24 +207,44 @@ def scan_and_display(title, session_key, query):
         st.write(f"⚪ **{title}**：未進榜")
 
 # 🎯 搜尋輸入框
+# 🎯 搜尋輸入框
 search_query = st.text_input("請輸入想觀測的股票代號或名稱 (例如: 3231 或 緯創，未顯示任何資料代表你的標的可能太弱了)：", key="global_search_final")
 
 if search_query:
     st.write(f"### 🎯 綜合診斷標的：{search_query}")
 
     # ==========================================
-    # 🤖 呼叫 AI 量化評語
+    # 📈 K 線圖按鈕 (yfinance 即時記憶開關版)
     # ==========================================
-    # ... (這裡保留您原本寫的 AI 評語區塊) ...
+    st.write("---")
+    
+    # 1. 建立一個專屬的狀態開關 (預設為 False 關閉)
+    if 'show_kline' not in st.session_state:
+        st.session_state.show_kline = False
+
+    # 2. 顯示按鈕，點擊時反轉狀態
+    button_label = "❌ 關閉技術 K 線圖" if st.session_state.show_kline else "📊 載入最新技術 K 線圖"
+    if st.button(button_label, use_container_width=True):
+        st.session_state.show_kline = not st.session_state.show_kline
+        st.rerun() # 強制網頁刷新以改變按鈕文字與顯示狀態
+
+    # 3. 只有當狀態為 True (開啟) 時，才呼叫 yfinance 引擎
+    if st.session_state.show_kline:
+        import re
+        stock_id_match = re.search(r'\d+', search_query)
+        
+        if stock_id_match:
+            pure_stock_id = stock_id_match.group(0)
+            with st.spinner(f"正在從 Yahoo Finance 即時擷取 {pure_stock_id} 的最新 K 線資料..."):
+                # 直接呼叫放在上半部的 yfinance 繪圖引擎！
+                render_technical_chart(pure_stock_id)
+        else:
+            st.warning("⚠️ 請輸入確切的股票代號 (例如 2330)。")
 
     # ==========================================
-    # 👑 區塊 1：短中長線三大法人持股變化
-    # ==========================================
-    # ... (這裡保留原本的區塊 1 內容) ...
-    
-    # ==========================================
     # 🤖 呼叫 AI 量化評語
     # ==========================================
+    st.write("---")
     if 'top_pool_df' in st.session_state:
         # 從計分總表中搜尋這檔股票
         ai_target = robust_search_engine(st.session_state['top_pool_df'], search_query)
@@ -238,47 +258,7 @@ if search_query:
             st.markdown("#### 🤖 系統綜合診斷評語")
             st.info("❄️ 【弱勢整理】該標的未能進入綜合評分池，籌碼處於流失或無主力認養狀態。若無特殊題材發酵，短期內建議暫不考量。")
 
-
-    # ==========================================
-    # 📈 K 線圖按鈕 (狀態記憶切換版)
-    # ==========================================
-    st.write("---")
-    
-    # 1. 建立一個專屬的狀態開關 (預設為 False 關閉)
-    if 'show_kline' not in st.session_state:
-        st.session_state.show_kline = False
-
-    # 2. 顯示按鈕，點擊時反轉狀態
-    button_label = "❌ 關閉技術 K 線圖" if st.session_state.show_kline else "📊 載入技術 K 線圖"
-    if st.button(button_label, use_container_width=True):
-        st.session_state.show_kline = not st.session_state.show_kline
-        st.rerun() # 強制網頁刷新以改變按鈕文字與顯示狀態
-
-    # 3. 只有當狀態為 True (開啟) 時，才執行抓資料與畫圖
-    if st.session_state.show_kline:
-        import re
-        stock_id_match = re.search(r'\d+', search_query)
-        
-        if stock_id_match:
-            pure_stock_id = stock_id_match.group(0)
-            github_csv_url = f"https://raw.githubusercontent.com/voidful/tw_stocker/main/data/{pure_stock_id}.csv"
-            
-            try:
-                with st.spinner(f"正在從遠端載入 {pure_stock_id} 的歷史 K 線數據..."):
-                    df_kline = pd.read_csv(github_csv_url)
-                    if not df_kline.empty:
-                        render_technical_chart(df_kline, pure_stock_id)
-                    else:
-                        st.warning(f"⚠️ 找到了 {pure_stock_id}，但內容為空。")
-            except Exception as e:
-                st.info(f"⚪ 目前遠端資料庫尚未收錄 `{pure_stock_id}` 的歷史 K 線資料。")
-        else:
-            st.warning("⚠️ 請輸入確切的股票代號 (例如 2330)。")
-    # ==========================================
-    # 👑 區塊 1：短中長線三大法人持股變化
-    # ==========================================
-    # ... (下方保留您原本寫的區塊 1 到 區塊 5 的程式碼，完全不用動！) ...
-    
+ 
     # ==========================================
     # 👑 區塊 1：中長線三大法人持股
     # ==========================================
