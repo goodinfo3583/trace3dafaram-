@@ -161,7 +161,7 @@ def render_technical_chart(stock_id, timeframe="日線"):
         ), row=1, col=1)
 
         # 7. 繪製均線
-        colors = ['#FEF143', 'purple', 'blue', 'green', 'brown', '#D2691E']
+        colors = ['#FFA500', '#0033FF', '#8B00FF', '#808080', '#FF69B4', '#D2691E']
         for idx, ma in enumerate(ma_windows):
             latest_val = get_latest_price(f'{ma}MA')
             fig.add_trace(go.Scatter(
@@ -178,7 +178,7 @@ def render_technical_chart(stock_id, timeframe="日線"):
         # 9. 版面美化 (🔥 修正重疊：加大頂部 margin，精準定位圖例)
         fig.update_layout(
             title=dict(
-                text=f'📊 {stock_id} 最新 {timeframe} 與成交量 (資料來源: Yahoo Finance)',
+                text=f'📊 {stock_id} 最新 {timeframe} 與成交量 ',
                 y=0.98, x=0.01, xanchor='left', yanchor='top' # 標題靠左上
             ),
             yaxis_title='股價 (TWD)',
