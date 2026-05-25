@@ -1623,7 +1623,7 @@ with top_pool_container:
         rank_col = next((c for c in df_b1.columns if '今日上榜' in c or '上榜' in c), None)
         
         if dyn_col:
-            mask = df_b1[dyn_col].astype(str).str.contains('趨緩|上升|升|持平|加碼|延續, na=False)
+            mask = df_b1[dyn_col].astype(str).str.contains('趨緩|上升|升|持平|加碼', na=False)
             pool_df = df_b1[mask].copy()
         else:
             pool_df = df_b1.copy()
