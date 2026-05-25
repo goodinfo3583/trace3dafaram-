@@ -211,11 +211,6 @@ search_query = st.text_input("請輸入想觀測的股票代號或名稱 (例如
 if search_query:
     st.write(f"### 🎯 綜合診斷標的：{search_query}")
 
-
-    if search_query:
-    st.write(f"### 🎯 綜合診斷標的：{search_query}")
-    
-
     # ==========================================
     # 🤖 呼叫 AI 量化評語
     # ==========================================
