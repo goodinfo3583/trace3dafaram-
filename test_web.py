@@ -516,7 +516,7 @@ st.sidebar.markdown("[💰 區塊5：大股東動向](#section-5)")
 # ==========================================
 
 # ==========================================
-# 🏠 區塊1：中長線 三大法人 持股比例 追蹤 (字串精確比對+柔和護眼版)
+# 🏠 區塊1：中長線 三大法人 持股比例 追蹤 (量化動態升級+暗黑專業版)
 # ==========================================
 st.write("---")
 st.markdown("<div id='section-1'></div>", unsafe_allow_html=True)
@@ -546,14 +546,13 @@ def parse_special_txt(file_path, date_label):
                 
                 # 💡 【區塊開關】：讀到對應標題才開啟
                 if "三大法人持股變化排名" in line_str or ("排名" in line_str and "日)" in line_str):
-                    # 必須先比對 120日 再比對 20日
                     if "120日" in line_str: current_section = "120日"
                     elif "20日" in line_str: current_section = "20日"
                     elif "5日" in line_str: current_section = "5日"
                     elif "60日" in line_str: current_section = "60日"
                     continue
                 
-                # 抓取資料：必須在開啟狀態，且該行是資料(數字開頭)才抓
+                # 抓取資料
                 parts = line_str.split('\t')
                 if current_section and len(parts) >= 5 and parts[0].isdigit():
                     try: holding_pct = float(parts[-2])
@@ -586,7 +585,6 @@ def agg_sections_func(x):
 txt_pattern = os.path.join(DATA_DIR, "*持股排名變化*.txt")
 all_txt_files = glob.glob(txt_pattern)
 
-# 依日期分群
 date_files = defaultdict(list)
 for f in all_txt_files:
     date_label = os.path.basename(f)[:8]
@@ -612,25 +610,26 @@ if sorted_dates:
         df_day_raw = pd.concat(day_dfs, ignore_index=True)
         target_col = f"{date_label}持股%"
         
-        if is_latest:
-            df_day = df_day_raw.groupby(['股票代號', '股票名稱']).agg({
-                target_col: 'max',  
-                '上榜區塊': agg_sections_func
-            }).reset_index()
-        else:
-            df_day = df_day_raw.groupby(['股票代號', '股票名稱']).agg({
-                target_col: 'max'
-            }).reset_index()
+        # 🔥 【邏輯重構】：歷史每一天的上榜榜單全部予以保留，以便比對「洗盤回歸」與「衝進榜單」
+        df_day = df_day_raw.groupby(['股票代號', '股票名稱']).agg({
+            target_col: 'max',  
+            '上榜區塊': agg_sections_func
+        }).reset_index()
+        
+        # 將上榜區塊重新命名以區分日期
+        df_day = df_day.rename(columns={'上榜區塊': f"{date_label}_區塊"})
             
-        if final_df is None: final_df = df_day
-        else: final_df = pd.merge(final_df, df_day, on=['股票代號', '股票名稱'], how='outer')
+        if final_df is None: 
+            final_df = df_day
+        else: 
+            final_df = pd.merge(final_df, df_day, on=['股票代號', '股票名稱'], how='outer')
             
     if final_df is not None and not final_df.empty:
         date_cols = sorted([c for c in final_df.columns if '持股%' in c], reverse=True)
         for c in date_cols:
             final_df[c] = pd.to_numeric(final_df[c], errors='coerce').fillna(0)
             
-        # 🔥 【終極修正】：改成絕對陣列比對，避免 "20日" 吃到 "120日" 的豆腐
+        # 今日上榜欄位標籤化
         def generate_tags(sections):
             if pd.isna(sections) or not sections: return ""
             sec_list = str(sections).split(',')
@@ -641,15 +640,50 @@ if sorted_dates:
             if '120日' in sec_list: tags.append('🔵120日')
             return " ".join(tags)
             
-        if '上榜區塊' not in final_df.columns:
-            final_df['上榜區塊'] = ""
+        latest_sect_col = f"{sorted_dates[0]}_區塊"
+        if latest_sect_col not in final_df.columns:
+            final_df[latest_sect_col] = ""
             
-        final_df['今日上榜'] = final_df['上榜區塊'].apply(generate_tags)
+        final_df['今日上榜'] = final_df[latest_sect_col].apply(generate_tags)
         final_df['上榜數量'] = final_df['今日上榜'].apply(lambda x: str(x).count('日'))
             
+        # 🧠 量化動態判定邏輯核心 (洗盤回歸 與 衝進新榜單 整合版)
         def evaluate_trend(row):
             if len(date_cols) < 2: return "⚪ 資料不足"
+            
+            # 讀取今日與昨日的上榜區塊明細
+            today_sec_str = str(row.get(f"{sorted_dates[0]}_區塊", ""))
+            yesterday_sec_str = str(row.get(f"{sorted_dates[1]}_區塊", ""))
+            
+            today_list = [s for s in today_sec_str.split(',') if s]
+            yesterday_list = [s for s in yesterday_sec_str.split(',') if s]
+            
             v0, v1 = row[date_cols[0]], row[date_cols[1]]
+            
+            # 1. 🔍 【判定：洗盤回歸】 -> 今日重新上榜，但昨日完全不見，且更早之前曾經在榜內
+            if v0 > 0 and v1 == 0:
+                has_past_record = False
+                for c in date_cols[2:]:
+                    if row[c] > 0:
+                        has_past_record = True
+                        break
+                if has_past_record:
+                    return "🔄 洗盤回歸"
+            
+            # 2. 🚀 【判定：衝進新榜單】 -> 原本已有1~3個榜單，今日數量增加且有新成員
+            if 1 <= len(yesterday_list) <= 3 and len(today_list) > len(yesterday_list):
+                new_entries = [item for item in today_list if item not in yesterday_list]
+                if new_entries:
+                    mapped_labels = []
+                    for item in new_entries:
+                        if '5日' in item: mapped_labels.append('🔴5日')
+                        elif '20日' in item: mapped_labels.append('🟡20日')
+                        elif '60日' in item: mapped_labels.append('🟢60日')
+                        elif '120日' in item: mapped_labels.append('🔵120日')
+                    if mapped_labels:
+                        return f"🚀 衝進{'、'.join(mapped_labels)}榜單"
+            
+            # 3. 常規趨勢判定
             diff1 = v0 - v1  
             if diff1 > 0:
                 if len(date_cols) >= 3:
@@ -658,8 +692,10 @@ if sorted_dates:
                         diff2 = v1 - v2
                         if diff2 > 0 and diff1 < diff2: return "⚠️ 趨緩"
                 return "📈 上升"
-            elif diff1 < 0: return "📉 下降"
-            else: return "🔄 持平"
+            elif diff1 < 0: 
+                return "📉 下降"
+            else: 
+                return "🔄 持平"
                 
         final_df['最新動態'] = final_df.apply(evaluate_trend, axis=1)
         
@@ -671,12 +707,10 @@ if sorted_dates:
         final_df = final_df[cols]
         
         # ==========================================
-        # 🔧 UI 顯示與底色渲染
+        # 🔧 UI 顯示與底色渲染 (移除過濾拉條，預設全開)
         # ==========================================
-        st.write("🔧 **自訂標的顯示過濾：**")
-        c1, c2 = st.columns(2)
-        show_etf = c1.checkbox("顯示 ETF", value=True, key="blk1_etf_sync")
-        show_bond = c2.checkbox("顯示 債券/債券ETF", value=True, key="blk1_bond_sync")
+        show_etf = True
+        show_bond = True
         
         is_bond = final_df['股票代號'].str.endswith('B')
         is_etf = (final_df['股票代號'].str.len() >= 5) & (~is_bond)
@@ -692,20 +726,20 @@ if sorted_dates:
             filtered_df[c] = filtered_df[c].apply(lambda x: f"{x:.2f}" if x != 0 else "-")
         filtered_df.index = range(1, len(filtered_df) + 1)
         
-        # 🎨 護眼淺色系底色
+        # 🎨 暗黑專業版高亮色系設定 (調高透明度以適配黑底，不破壞原設計)
         def highlight_row(row):
             cnt = color_ref.get(row['股票代號'], 0)
-            if cnt == 4: bg = 'background-color: rgba(255, 0, 0, 0.15)'     
-            elif cnt == 3: bg = 'background-color: rgba(255, 165, 0, 0.15)'    
-            elif cnt == 2: bg = 'background-color: rgba(0, 128, 0, 0.15)'    
-            elif cnt == 1: bg = 'background-color: rgba(0, 127, 255, 0.15)'    
+            if cnt == 4: bg = 'background-color: rgba(240, 90, 90, 0.25)'     
+            elif cnt == 3: bg = 'background-color: rgba(255, 165, 0, 0.25)'    
+            elif cnt == 2: bg = 'background-color: rgba(80, 200, 120, 0.25)'    
+            elif cnt == 1: bg = 'background-color: rgba(0, 127, 255, 0.25)'    
             else: bg = ''                                                   
             return [bg] * len(row)
 
         styled_df = filtered_df.style.apply(highlight_row, axis=1)
         
         st.info("**今日上榜說明：** 5/20/60/120日，代表法人持股變化數據分析後於5/20/60/120日前段班，多榜單共振籌碼集中度高，長線具備底氣。")
-        st.success(f"已成功串聯{len(date_cols)}個交易日的持股數據 (今日上榜共振數量排序優先")
+        st.success(f"已成功串聯 {len(date_cols)} 個交易日的持股數據 (今日上榜共振數量排序優先)")
         st.session_state['my_final_df'] = final_df
         st.dataframe(styled_df, use_container_width=True)
     else:
