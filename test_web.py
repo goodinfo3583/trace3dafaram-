@@ -1644,7 +1644,7 @@ with top_pool_container:
     if stock_id_match:
         pure_stock_id = stock_id_match.group(0)
         # 🔗 動態生成 GitHub Raw CSV 網址
-        github_csv_url = f"https://raw.githubusercontent.com/voidful/tw_stocker/main/data/{pure_stock_id}.csv"
+        github_csv_url = f"https://raw.githubusercontent.com/goodinfo3583/tw_stocker/main/data/{pure_stock_id}.csv"
         
         try:
             with st.spinner(f"正在從 GitHub 載入 {pure_stock_id} 的歷史 K 線數據..."):
