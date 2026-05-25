@@ -1236,8 +1236,7 @@ c1, c2 = st.columns(2)
 with c1:
     df_pct, msg_pct = get_specific_margin_data("融資減少幅度")
     date_str = re.search(r'\d{8}', msg_pct).group(0) if re.search(r'\d{8}', msg_pct) else "未知"
-    # 👈 替換為 st.markdown，使用一般大小粗體
-    st.markdown(f"**📉 融資減少比例排名 (最新日期: {date_str})**") 
+    st.subheader(f"📉 融資減少比例排名 (最新日期: {date_str})") # 👈 直接把日期接在標題後
     df_pct_clean = process_margin_df(df_pct, "幅度", show_etf_41, show_bond_41)
     
     if not df_pct_clean.empty:
@@ -1248,8 +1247,7 @@ with c1:
 with c2:
     df_vol, msg_vol = get_specific_margin_data("融資減少張數")
     date_str = re.search(r'\d{8}', msg_vol).group(0) if re.search(r'\d{8}', msg_vol) else "未知"
-    # 👈 替換為 st.markdown，使用一般大小粗體
-    st.markdown(f"**📉 融資減少張數排名 (最新日期: {date_str})**")
+    st.subheader(f"📉 融資減少張數排名 (最新日期: {date_str})") # 👈 直接把日期接在標題後
     df_vol_clean = process_margin_df(df_vol, "張數", show_etf_41, show_bond_41)
     
     if not df_vol_clean.empty:
@@ -1283,7 +1281,7 @@ with c1:
     if not df_pct_clean.empty:
         # 👈 核心修改：只過濾出 8 碼日期字串
         date_str = re.search(r'\d{8}', msg_pct).group(0) if re.search(r'\d{8}', msg_pct) else "未知"
-        st.write(f"**{date_str}**")
+        st.write(f"📅 **最新檔案日期: {date_str}**")
         st.dataframe(df_pct_clean, use_container_width=True, hide_index=True)
     else:
         st.warning("⚠️ 無相符資料")
@@ -1295,7 +1293,7 @@ with c2:
     
     if not df_vol_clean.empty:
         date_str = re.search(r'\d{8}', msg_vol).group(0) if re.search(r'\d{8}', msg_vol) else "未知"
-        st.write(f"{date_str}**")
+        st.write(f"📅 **最新檔案日期: {date_str}**")
         st.dataframe(df_vol_clean, use_container_width=True, hide_index=True)
     else:
         st.warning("⚠️ 無相符資料")
