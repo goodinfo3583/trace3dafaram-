@@ -188,14 +188,16 @@ def render_technical_chart(stock_id, timeframe="日線"):
         low_p, close_p = daily_df['Low'].squeeze(), daily_df['Close'].squeeze()
         vol = daily_df['Volume'].squeeze()
 
+        # 6. 繪製 K 線 (🔥 移除 hovertemplate 內重複的日期，讓它只顯示在標題)
         fig.add_trace(go.Candlestick(
             x=daily_df.index, open=open_p, high=high_p, low=low_p, close=close_p, name='K線',
             increasing=dict(line=dict(color=up_color, width=1.5), fillcolor=up_color),
             decreasing=dict(line=dict(color=down_color, width=1.5), fillcolor=down_color),
-            hovertemplate="<b>%{x|%Y-%m-%d}</b><br><br>開：%{open:.2f}<br>高：%{high:.2f}<br>低：%{low:.2f}<br>收：%{close:.2f}<extra></extra>"
+            # 👇 就是改了這下面這一行，把原本的 <b>%{x|%Y-%m-%d}</b> 刪掉了！
+            hovertemplate="開：%{open:.2f}<br>高：%{high:.2f}<br>低：%{low:.2f}<br>收：%{close:.2f}<extra></extra>"
         ), row=1, col=1)
 
-        colors = ['#FFCC00', '#CC66FF', '#00CCFF', '#33FF33', '#FF3333', '#FFFF33']
+        colors = ['#F4B400', '#CC66FF', '#00CCFF', '#33FF33', '#FF3333', '#FFFF33']
         for idx, ma in enumerate(ma_windows):
             latest_val = get_latest_price(f'{ma}MA')
             fig.add_trace(go.Scatter(
@@ -307,7 +309,7 @@ if search_query:
     if 'show_kline' not in st.session_state:
         st.session_state.show_kline = False
 
-    button_label = "❌ 關閉技術 K 線圖" if st.session_state.show_kline else "📊 載入最新技術 K 線圖"
+    button_label = " 關閉技術 K 線圖" if st.session_state.show_kline else "📊 載入最新技術 K 線圖"
     if st.button(button_label, use_container_width=True):
         st.session_state.show_kline = not st.session_state.show_kline
         st.rerun()
@@ -320,10 +322,10 @@ if search_query:
         if stock_id_match:
             pure_stock_id = stock_id_match.group(0)
             selected_tf = st.radio("⏳ 選擇 K 線週期：", ["日線", "週線", "月線"], horizontal=True)
-            with st.spinner(f"正在從 Yahoo Finance 擷取 {pure_stock_id} 的 {selected_tf} 資料..."):
+            with st.spinner(f"正在擷取 {pure_stock_id} 的 {selected_tf} 資料..."):
                 render_technical_chart(pure_stock_id, selected_tf)
         else:
-            st.warning("⚠️ 技術 K 線圖目前僅支援「數字代號」查詢。請在上方輸入框加入股票代號 (例如: 2330)，再點選此按鈕。")
+            st.warning("⚠️ 技術 K 線圖目前僅支援代號查詢。請在上方輸入框加入股票代號。")
 
     # ==========================================
     # 🤖 呼叫 AI 量化評語
@@ -727,7 +729,7 @@ if sorted_dates:
             elif cnt == 3: bg = 'background-color: rgba(255, 165, 0, 0.25)'    
             elif cnt == 2: bg = 'background-color: rgba(80, 200, 120, 0.25)'    
             elif cnt == 1: bg = 'background-color: rgba(0, 127, 255, 0.25)'    
-            else: bg = ''                                                   
+            else: bg = 'background-color: #111622; color: #E2E8F0'                                                   
             return [bg] * len(row)
 
         styled_df = filtered_df.style.apply(highlight_row, axis=1)
