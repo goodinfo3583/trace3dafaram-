@@ -930,7 +930,6 @@ else:
         """)
         
         # 篩選邏輯
-        st.write("🔧 **自訂標的顯示過濾：**")
         c1, c2 = st.columns(2)
         show_etf = c1.checkbox("顯示 ETF", value=True, key="sitc_etf_v9")
         show_bond = c2.checkbox("顯示 債券/債券ETF", value=True, key="sitc_bond_v9")
@@ -1023,7 +1022,6 @@ else:
 
         csv_display['今日短動態'] = csv_display.apply(judge_today_alert_fo, axis=1)
         
-        st.write("🔧 **自訂標的顯示過濾：**")
         c1, c2 = st.columns(2)
         show_etf = c1.checkbox("顯示 ETF", value=True, key="foreign_etf_final_v3")
         show_bond = c2.checkbox("顯示 債券/債券ETF", value=True, key="foreign_bond_final_v3")
@@ -1115,7 +1113,7 @@ else:
 
         csv_display['今日短動態'] = csv_display.apply(judge_today_alert_sitc, axis=1)
         
-        st.write("🔧 **自訂標的顯示過濾：**")
+        
         c1, c2 = st.columns(2)
         show_etf = c1.checkbox("顯示 ETF", value=True, key="sitc_etf_final_v3")
         show_bond = c2.checkbox("顯示 債券/債券ETF", value=True, key="sitc_bond_final_v3")
@@ -1451,7 +1449,7 @@ st.write("---")
 st.markdown("<div id='section-4-1'></div>", unsafe_allow_html=True)
 st.header("📅 區塊 4-1：融資減少動向")
 
-st.write("🔧 **自訂標的顯示過濾：**")
+
 f_col1, f_col2, _ = st.columns([1, 1, 2])
 with f_col1: show_etf_41 = st.checkbox("顯示 ETF", value=True, key="margin_show_etf")
 with f_col2: show_bond_41 = st.checkbox("顯示債券/債券ETF", value=True, key="margin_show_bond")
@@ -1494,7 +1492,7 @@ st.write("---")
 st.markdown("<div id='section-4-2'></div>", unsafe_allow_html=True)
 st.header("📅 區塊 4-2：借券賣出減少動向")
 
-st.write("🔧 **自訂標的顯示過濾：**")
+
 f_col1, f_col2, _ = st.columns([1, 1, 2])
 with f_col1: show_etf_42 = st.checkbox("顯示 ETF", value=True, key="stock_show_etf_42")
 with f_col2: show_bond_42 = st.checkbox("顯示債券/債券ETF", value=True, key="stock_show_bond_42")
@@ -1537,7 +1535,7 @@ st.write("---")
 st.markdown("<div id='section-4-3'></div>", unsafe_allow_html=True)
 st.header("📅 區塊 4-3：融券增加動向 (5日累計)")
 
-st.write("🔧 **自訂標的顯示過濾：**")
+
 f_col1, f_col2, _ = st.columns([1, 1, 2])
 with f_col1: show_etf_43 = st.checkbox("顯示 ETF", value=True, key="stock_show_etf_43")
 with f_col2: show_bond_43 = st.checkbox("顯示債券/債券ETF", value=True, key="stock_show_bond_43")
