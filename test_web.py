@@ -33,25 +33,32 @@ def extract_date_from_name(filepath):
 top_pool_container = st.container()
 
 # ==========================================
-# 🧠 AI 量化評語生成引擎
+# 🧠 AI 量化評語生成引擎 (土洋對作/換手升級版)
 # ==========================================
 def generate_stock_commentary(row):
     """
     根據選股池的綜合數據，自動生成一段人話評語
-    傳入參數 row 為 DataFrame 中的一筆資料 (Series)
     """
     score = row.get('總分', 0)
     warns = str(row.get('法人賣出警示', ''))
     b5_trend = str(row.get('大股東動向', ''))
     
-    # 1. 致命風險優先判定 (最高指導原則)
-    if "⚠️" in warns:
-        return "🚨 【風險警示】目前法人主力正在進行倒貨調節，籌碼結構面臨鬆動。即使有技術面支撐，亦建議暫避風頭，嚴控資金水位。"
+    # 判斷是否帶有賣出警示與高分
+    has_warning = "⚠️" in warns
+    high_score = score >= 3
+    
+    # 1. 矛盾訊號判定：土洋對作 / 主力強勢吃籌碼
+    if has_warning and high_score:
+        return f"⚔️ 【土洋對作 / 激烈換手】系統偵測到法人分歧 ({warns})，但該股依然獲得 {score} 分的高評估！這代表『一方的倒貨正被另一方(或大戶)強勢吃下』。籌碼換手後若能維持強勢(如大漲/漲停)，代表承接方實力極強，可沿短均線偏多操作，但需嚴設停損。"
+        
+    # 2. 致命風險判定：真倒貨、無買盤
+    if has_warning and not high_score:
+        return f"🚨 【風險警示】目前法人主力正在進行倒貨調節 ({warns})，且無強大買盤承接，籌碼結構面臨鬆動。建議暫避風頭，嚴控資金水位。"
     
     if "大減" in b5_trend:
         return "⚠️ 【大戶撤退】400張以上大戶出現明顯減碼跡象，主力籌碼渙散，建議先行觀望，等待籌碼沉澱。"
 
-    # 2. 綜合分數判定
+    # 3. 綜合分數常規判定
     if score >= 6:
         base_comment = "🔥 【強勢噴發】籌碼面極度優異！內外資法人與大戶同步共振做多，具備強大的波段上攻潛力。"
         if "大增" in b5_trend:
