@@ -80,6 +80,92 @@ st.write("---")
 st.markdown("<div id='section-search'></div>", unsafe_allow_html=True)
 st.subheader("🔍 個股籌碼快搜 (全方位診斷)")
 
+# ==========================================
+# 📈 專業 K 線圖與技術分析繪製引擎 (升級版)
+# ==========================================
+def render_technical_chart(df, stock_id):
+    import plotly.graph_objects as go
+    from plotly.subplots import make_subplots
+    import pandas as pd
+    try:
+        # 1. 時間格式轉換與設置索引 (處理時區)
+        df['Datetime'] = pd.to_datetime(df['Datetime'], utc=True).dt.tz_convert('Asia/Taipei')
+        df = df.set_index('Datetime')
+
+        # 2. 智慧壓縮：5分K 轉 日K
+        daily_df = df.resample('D').agg({
+            'Open': 'first', 'High': 'max', 'Low': 'min', 'Close': 'last', 'Volume': 'sum'
+        }).dropna()
+
+        # 3. 計算多週期均線 (MA)
+        ma_windows = [5, 10, 20, 60, 120, 240]
+        for ma in ma_windows:
+            daily_df[f'{ma}MA'] = daily_df['Close'].rolling(window=ma).mean()
+
+        # 安全取得最新有效均價 (用來顯示在圖例上)
+        def get_latest_price(col):
+            valid_data = daily_df[col].dropna()
+            return f"{valid_data.iloc[-1]:.2f}" if not valid_data.empty else "-"
+
+        # 4. 建立上下分割畫布
+        fig = make_subplots(rows=2, cols=1, shared_xaxes=True, 
+                            vertical_spacing=0.03, row_heights=[0.7, 0.3])
+
+        # 5. 自訂 K 線顏色 (紅K/黑K)
+        up_color = 'rgb(205,92,92)'    # 莫蘭迪紅
+        down_color = 'rgb(0,161,92)'   # 沉穩綠 (黑K)
+
+        # 6. 繪製 K 線
+        fig.add_trace(go.Candlestick(
+            x=daily_df.index, open=daily_df['Open'], high=daily_df['High'],
+            low=daily_df['Low'], close=daily_df['Close'], name='K線',
+            increasing_line_color=up_color, increasing_fillcolor=up_color,
+            decreasing_line_color=down_color, decreasing_fillcolor=down_color
+        ), row=1, col=1)
+
+        # 7. 繪製均線與標示最新均價
+        colors = ['orange', 'purple', 'blue', 'green', 'brown', 'pink']
+        for idx, ma in enumerate(ma_windows):
+            latest_val = get_latest_price(f'{ma}MA')
+            fig.add_trace(go.Scatter(
+                x=daily_df.index, y=daily_df[f'{ma}MA'], mode='lines', 
+                name=f'{ma}MA ({latest_val})',  # 圖例加上最新均價
+                line=dict(color=colors[idx], width=1.2)
+            ), row=1, col=1)
+
+        # 8. 繪製成交量 (顏色與當日K線同步)
+        vol_colors = [up_color if row['Close'] >= row['Open'] else down_color for _, row in daily_df.iterrows()]
+        fig.add_trace(go.Bar(
+            x=daily_df.index, y=daily_df['Volume'], name='成交量', marker_color=vol_colors
+        ), row=2, col=1)
+
+        # 9. 版面美化與 X 軸日期格式修改
+        fig.update_layout(
+            title=f'📊 {stock_id} 歷史日 K 線與成交量',
+            yaxis_title='股價 (TWD)',
+            xaxis_rangeslider_visible=False,
+            height=600,
+            template='plotly_white',
+            margin=dict(l=10, r=10, t=40, b=10),
+            hovermode='x unified',
+            legend=dict(orientation="h", yanchor="bottom", y=1.02, xanchor="right", x=1) # 讓圖例排在上方
+        )
+        
+        # 強制 X 軸顯示為數字格式 (例如 2026-05-25)
+        fig.update_xaxes(tickformat="%Y-%m-%d", row=1, col=1)
+        fig.update_xaxes(tickformat="%Y-%m-%d", row=2, col=1)
+        
+        # 使用 unique key 徹底防止 ID 重複報錯
+        import streamlit as st
+        st.plotly_chart(fig, use_container_width=True, key=f"kline_{stock_id}")
+        
+    except Exception as e:
+        import streamlit as st
+        st.error(f"❌ 繪製 K 線圖時發生錯誤: {str(e)}")
+
+#===================================
+#以上技術線圖
+#===================================       
 # 🛠️ 定義強韌的搜尋函式
 def robust_search_engine(df, query):
     if df is None or df.empty:
@@ -282,104 +368,7 @@ if search_query:
     st.write("---")
     st.write("#### 💰 區塊 5：大股東動向")
     scan_and_display("400張以上大戶動向", 'df_blk5', search_query)
-    # ==========================================
-    # 📈 區塊 6：技術面 K 線與動能指標 (全自動防呆版)
-    # ==========================================
-    st.write("---")
-    st.markdown("<div id='section-6'></div>", unsafe_allow_html=True)
-    st.write("#### 📈 區塊 6：技術面 K 線與動能指標")
-    
-    # ------------------------------------------
-    # 1. 內建 K 線繪圖引擎 (放在這裡保證絕對找得到！)
-    # ------------------------------------------
-    def render_technical_chart(df, stock_id):
-        import plotly.graph_objects as go
-        from plotly.subplots import make_subplots
-        try:
-            # 轉換時間
-            df['Datetime'] = pd.to_datetime(df['Datetime'], utc=True).dt.tz_convert('Asia/Taipei')
-            df = df.set_index('Datetime')
 
-            # 將 5分K 濃縮為 日K
-            daily_df = df.resample('D').agg({
-                'Open': 'first',
-                'High': 'max',
-                'Low': 'min',
-                'Close': 'last',
-                'Volume': 'sum'
-            }).dropna()
-
-            # 計算均線
-            daily_df['5MA'] = daily_df['Close'].rolling(window=5).mean()
-            daily_df['20MA'] = daily_df['Close'].rolling(window=20).mean()
-
-            # 建立畫布
-            fig = make_subplots(rows=2, cols=1, shared_xaxes=True, 
-                                vertical_spacing=0.03, row_heights=[0.7, 0.3])
-
-            # 畫 K 線
-            fig.add_trace(go.Candlestick(x=daily_df.index,
-                                         open=daily_df['Open'], high=daily_df['High'],
-                                         low=daily_df['Low'], close=daily_df['Close'],
-                                         name='K線',
-                                         increasing_line_color='red', increasing_fillcolor='red',
-                                         decreasing_line_color='green', decreasing_fillcolor='green'),
-                          row=1, col=1)
-
-            # 畫均線
-            fig.add_trace(go.Scatter(x=daily_df.index, y=daily_df['5MA'], mode='lines', name='5MA', line=dict(color='orange', width=1.5)), row=1, col=1)
-            fig.add_trace(go.Scatter(x=daily_df.index, y=daily_df['20MA'], mode='lines', name='20MA', line=dict(color='blue', width=1.5)), row=1, col=1)
-
-            # 畫成交量
-            colors = ['red' if row['Close'] >= row['Open'] else 'green' for _, row in daily_df.iterrows()]
-            fig.add_trace(go.Bar(x=daily_df.index, y=daily_df['Volume'], name='成交量', marker_color=colors), row=2, col=1)
-
-            # 版面設定
-            fig.update_layout(
-                title=f'📊 {stock_id} 歷史日 K 線與成交量 (含 5MA, 20MA)',
-                yaxis_title='股價 (TWD)',
-                xaxis_rangeslider_visible=False,
-                height=550,
-                template='plotly_white',
-                margin=dict(l=10, r=10, t=40, b=10),
-                hovermode='x unified'
-            )
-            
-            st.plotly_chart(fig, use_container_width=True)
-            
-        except Exception as e:
-            st.error(f"❌ 繪製 K 線圖時發生錯誤: {str(e)}")
-
-    # ------------------------------------------
-    # 2. 抓取資料庫與呼叫引擎
-    # ------------------------------------------
-    import re
-    stock_id_match = re.search(r'\d+', search_query)
-    
-    if stock_id_match:
-        pure_stock_id = stock_id_match.group(0)
-        # 🔗 正確的 GitHub Raw 網址 (修正為 tw_stocker，不帶 _Dong)
-        github_csv_url = f"https://raw.githubusercontent.com/voidful/tw_stocker/main/data/{pure_stock_id}.csv"
-        
-        try:
-            with st.spinner(f"正在從 GitHub 載入 {pure_stock_id} 的歷史 K 線數據..."):
-                # 從網路讀取
-                df_kline = pd.read_csv(github_csv_url)
-                
-                if not df_kline.empty:
-                    # 呼叫就在上面剛剛定義的繪圖引擎！
-                    render_technical_chart(df_kline, pure_stock_id)
-                else:
-                    st.warning(f"⚠️ 在資料庫中找到了 {pure_stock_id}，但內容為空。")
-                    
-        except Exception as e:
-            st.error(f"❌ 讀取失敗！系統偵測到的錯誤原因： `{str(e)}`")
-            st.info(f"💡 測試連結：[點擊這裡檢查 GitHub 裡面有沒有 {pure_stock_id}.csv]({github_csv_url})")
-            st.info("*(如果點擊連結顯示 404 Not Found，代表資料庫裡還沒有這檔股票的 CSV)*")
-    else:
-        st.warning("⚠️ 請在搜尋框輸入確切的股票代號 (例如 2330)，才能抓取 K 線資料。")
-        
- 
 # ==========================================
 # 🧭 側邊欄導航 (無感互動+視覺特效版)
 # ==========================================
@@ -1725,41 +1714,6 @@ with top_pool_container:
             st.dataframe(res_df, use_container_width=True, hide_index=True)
             st.success(f"🎯 頂級選股池掃描完成！共過濾出 {len(res_df)} 檔潛力標的。")
             st.session_state['top_pool_df'] = res_df
-
-
-# ==========================================
-# 📈 區塊 6：技術面 K 線與動能指標 (連線 GitHub 資料庫)
-# ==========================================
-st.write("---")
-st.markdown("<div id='section-6'></div>", unsafe_allow_html=True)
-st.write("#### 📈 區塊 6：技術面 K 線與動能指標")
-    
-import re
-stock_id_match = re.search(r'\d+', search_query)
-    
-if stock_id_match:
-    pure_stock_id = stock_id_match.group(0)
-    # 🔗 修正網址：根據您的清單，原始 K 線資料應該在 tw_stocker 這個專案裡
-    github_csv_url = f"https://raw.githubusercontent.com/goodinfo3583/tw_stocker/main/data/{pure_stock_id}.csv"
-        
-    try:
-        with st.spinner(f"正在從 GitHub 載入 {pure_stock_id} 的歷史 K 線數據..."):
-            # 直接從網路讀取 CSV
-            df_kline = pd.read_csv(github_csv_url)
-                
-            if not df_kline.empty:
-                # 呼叫繪圖引擎！(⚠️ 請確保程式碼上方有貼上 def render_technical_chart)
-                render_technical_chart(df_kline, pure_stock_id)
-            else:
-                st.warning(f"⚠️ 在資料庫中找到了 {pure_stock_id}，但內容為空。")
-                    
-    except Exception as e:
-        # 🔥 【除錯升級】：把真實錯誤印出來，讓我們知道到底是 404 還是程式寫錯
-        st.error(f"❌ 讀取失敗！系統偵測到的錯誤原因： `{str(e)}`")
-        st.info(f"💡 請檢查網址是否有效：[點擊測試 GitHub 檔案連結]({github_csv_url})")
-        st.info("*(如果點擊連結顯示 404 Not Found，代表您的 GitHub 資料庫裡還沒有這檔股票的 CSV)*")
-else:
-    st.warning("⚠️ 請在搜尋框輸入確切的股票代號 (例如 2330)，才能抓取 K 線資料。")
 
 # ==========================================
 # 📊 【蜂蜜計數器】本站累計觀測人次統計
