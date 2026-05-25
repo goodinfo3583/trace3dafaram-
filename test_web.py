@@ -26,7 +26,41 @@ def extract_date_from_name(filepath):
     filename = os.path.basename(filepath)
     date_match = re.search(r'(\d+)', filename)
     return date_match.group(1) if date_match else "00000000"
-
+# ==========================================
+# 🌌 注入極致黑看盤軟體專屬風格樣式 (全站深色化)
+# ==========================================
+st.markdown(
+    """
+    <style>
+    /* 1. 變更全站主背景色為深邃黑、文字為洗鍊白 */
+    .stApp {
+        background-color: #0A0D14 !important;
+        color: #E2E8F0 !important;
+    }
+    
+    /* 2. 變更側邊欄目錄背景色與邊框 */
+    [data-testid="stSidebar"] {
+        background-color: #111622 !important;
+        border-right: 1px solid #1E293B;
+    }
+    
+    /* 3. 優化輸入框、表格等元件在深色背景下的對比度 */
+    .stTextInput>div>div>input {
+        background-color: #1A202C !important;
+        color: #FFFFFF !important;
+        border: 1px solid #4A5568 !important;
+    }
+    
+    /* 4. 移除資訊區塊的刺眼背景，改為低調沉穩的深灰色 */
+    .stAlert {
+        background-color: #1A202C !important;
+        color: #E2E8F0 !important;
+        border: 1px solid #2D3748 !important;
+    }
+    </style>
+    """,
+    unsafe_allow_html=True
+)
 # ==========================================
 # 🏆 預留置頂空間：頂級選股池容器
 # ==========================================
@@ -80,7 +114,7 @@ st.write("---")
 st.markdown("<div id='section-search'></div>", unsafe_allow_html=True)
 st.subheader("🔍 個股籌碼快搜 (全方位診斷)")
 # ==========================================
-# 📈 專業 K 線圖與技術分析引擎 (多週期與完美排版版)
+# 📈 專業 K 線圖與技術分析引擎 (yfinance 終極暗黑專業版)
 # ==========================================
 def render_technical_chart(stock_id, timeframe="日線"):
     import yfinance as yf
@@ -90,7 +124,7 @@ def render_technical_chart(stock_id, timeframe="日線"):
     import streamlit as st
 
     try:
-        # 1. 智慧連線：擴大下載範圍為 5 年，確保週線/月線能算出長天期均線
+        # 1. 智慧連線：下載 5 年歷史資料，確保長天期均線 (如 240MA) 能夠被精確計算
         ticker_tw = f"{stock_id}.TW"
         ticker_two = f"{stock_id}.TWO"
         
@@ -117,12 +151,10 @@ def render_technical_chart(stock_id, timeframe="日線"):
 
         # 2. 週期切換引擎 (Resampling)
         if timeframe == "週線":
-            # 依每週五 (W-FRI) 壓縮 K 線
             daily_df = daily_df.resample('W-FRI').agg({
                 'Open': 'first', 'High': 'max', 'Low': 'min', 'Close': 'last', 'Volume': 'sum'
             }).dropna()
         elif timeframe == "月線":
-            # 依月底 (ME) 壓縮 K 線
             daily_df = daily_df.resample('ME').agg({
                 'Open': 'first', 'High': 'max', 'Low': 'min', 'Close': 'last', 'Volume': 'sum'
             }).dropna()
@@ -144,15 +176,15 @@ def render_technical_chart(stock_id, timeframe="日線"):
         fig = make_subplots(rows=2, cols=1, shared_xaxes=True, 
                             vertical_spacing=0.03, row_heights=[0.7, 0.3])
 
-        # 5. 自訂 K 線顏色 (紅K/黑K)
-        up_color = 'rgb(205,92,92)'    # 莫蘭迪紅
-        down_color = 'rgb(80,200,120)' # 護眼綠
+        # 5. 自訂 K 線顏色 (深色背景下調亮紅綠對比，更易判讀)
+        up_color = 'rgb(240, 90, 90)'     # 明亮莫蘭迪紅
+        down_color = 'rgb(80, 200, 120)'  # 經典翡翠綠
 
         open_p, high_p = daily_df['Open'].squeeze(), daily_df['High'].squeeze()
         low_p, close_p = daily_df['Low'].squeeze(), daily_df['Close'].squeeze()
         vol = daily_df['Volume'].squeeze()
 
-        # 6. 繪製 K 線 (🔥 加入 width=1.5 強制畫出上下影線)
+        # 6. 繪製 K 線 (強制畫出影線)
         fig.add_trace(go.Candlestick(
             x=daily_df.index, 
             open=open_p, high=high_p, low=low_p, close=close_p, name='K線',
@@ -160,13 +192,14 @@ def render_technical_chart(stock_id, timeframe="日線"):
             decreasing=dict(line=dict(color=down_color, width=1.5), fillcolor=down_color)
         ), row=1, col=1)
 
-        # 7. 繪製均線
-        colors = ['#DC143C', '#0033FF', '#8B00FF', '#808080', '#FF69B4', '#D2691E']
+        # 7. 繪製均線並標示最新均價 (配合黑底優化線條配色)
+        # 對應：5MA, 10MA, 20MA, 60MA, 120MA, 240MA
+        colors = ['#FFCC00', '#CC66FF', '#00CCFF', '#33FF33', '#FF3333', '#FFFF33']
         for idx, ma in enumerate(ma_windows):
             latest_val = get_latest_price(f'{ma}MA')
             fig.add_trace(go.Scatter(
                 x=daily_df.index, y=daily_df[f'{ma}MA'].squeeze(), mode='lines', 
-                name=f'{ma}MA ({latest_val})', line=dict(color=colors[idx], width=1.2)
+                name=f'{ma}MA ({latest_val})', line=dict(color=colors[idx], width=1.3)
             ), row=1, col=1)
 
         # 8. 繪製成交量
@@ -175,25 +208,29 @@ def render_technical_chart(stock_id, timeframe="日線"):
             x=daily_df.index, y=vol, name='成交量', marker_color=vol_colors
         ), row=2, col=1)
 
-        # 9. 版面美化 (🔥 修正重疊：加大頂部 margin，精準定位圖例)
+        # 9. 版面美化 (🔥 全面更換為 plotly_dark 暗黑專業模版)
         fig.update_layout(
             title=dict(
-                text=f'📊 {stock_id} 最新 {timeframe} 與成交量 ',
-                y=0.98, x=0.01, xanchor='left', yanchor='top' # 標題靠左上
+                text=f'📊 {stock_id} 最新 {timeframe} 與成交量 (資料來源: Yahoo Finance)',
+                y=0.98, x=0.01, xanchor='left', yanchor='top'
             ),
             yaxis_title='股價 (TWD)',
             xaxis_rangeslider_visible=False,
-            height=700, # 加高圖表
-            template='plotly_white',
-            margin=dict(l=10, r=10, t=100, b=10), # 👈 t=100 給頂部騰出巨大的呼吸空間
+            height=700,
+            template='plotly_dark',       # 👈 改為暗黑主題
+            paper_bgcolor='rgba(0,0,0,0)', # 背景設為全透明，完美融入網頁底色
+            plot_bgcolor='rgba(0,0,0,0)',  # 繪圖區設為全透明
+            margin=dict(l=10, r=10, t=100, b=10),
             hovermode='x unified',
             legend=dict(
                 orientation="h", yanchor="bottom", y=1.02, xanchor="left", x=0.01
-            ) # 👈 圖例浮在圖表正上方、標題正下方，絕不重疊
+            )
         )
         
-        fig.update_xaxes(tickformat="%Y-%m-%d", row=1, col=1)
-        fig.update_xaxes(tickformat="%Y-%m-%d", row=2, col=1)
+        # 📅 👈 關鍵修改：不論日、週、月線，預設畫面直接強制放大聚焦在指定日期區間
+        zoom_range = ['2025-01-07', '2025-05-25']
+        fig.update_xaxes(range=zoom_range, tickformat="%Y-%m-%d", row=1, col=1)
+        fig.update_xaxes(range=zoom_range, tickformat="%Y-%m-%d", row=2, col=1)
         
         if timeframe == "日線":
             fig.update_xaxes(rangebreaks=[dict(bounds=["sat", "mon"])], row=1, col=1)
