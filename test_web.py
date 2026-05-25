@@ -293,6 +293,7 @@ with c_btn2:
 # 1. 戰情室快速導航
 st.sidebar.markdown("---")
 st.sidebar.header("📍 戰情室快速導航")
+st.sidebar.markdown("[🏆 頂級核心選股池](#section-top-pool)")
 st.sidebar.markdown("[🔍 個股籌碼快搜 (診斷區)](#section-search)")
 st.sidebar.markdown("[👑 區塊1：三大法人持股比追蹤](#section-1)")
 st.sidebar.markdown("[🎯 區塊2-1：外資5日淨買佔成交量](#section-2-1)")
