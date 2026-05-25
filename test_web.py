@@ -1630,37 +1630,41 @@ with top_pool_container:
             st.success(f"🎯 頂級選股池掃描完成！共過濾出 {len(res_df)} 檔潛力標的。")
             st.session_state['top_pool_df'] = res_df
 
+
 # ==========================================
 # 📈 區塊 6：技術面 K 線與動能指標 (連線 GitHub 資料庫)
 # ==========================================
 st.write("---")
+st.markdown("<div id='section-6'></div>", unsafe_allow_html=True)
 st.write("#### 📈 區塊 6：技術面 K 線與動能指標")
     
-# 這裡可以直接讀取原作者的庫，如果您 Fork 了，請把 voidful 改成您的 GitHub 帳號名稱！
-# 假設搜尋字串包含代號，我們提取純數字代號
 import re
 stock_id_match = re.search(r'\d+', search_query)
     
 if stock_id_match:
     pure_stock_id = stock_id_match.group(0)
-    # 🔗 動態生成 GitHub Raw CSV 網址
-    github_csv_url = f"https://raw.githubusercontent.com/goodinfo3583/tw_stocker_Dong/main/data/{pure_stock_id}.csv"
+    # 🔗 修正網址：根據您的清單，原始 K 線資料應該在 tw_stocker 這個專案裡
+    github_csv_url = f"https://raw.githubusercontent.com/goodinfo3583/tw_stocker/main/data/{pure_stock_id}.csv"
         
     try:
         with st.spinner(f"正在從 GitHub 載入 {pure_stock_id} 的歷史 K 線數據..."):
-        # 直接從網路讀取 CSV
+            # 直接從網路讀取 CSV
             df_kline = pd.read_csv(github_csv_url)
                 
-        if not df_kline.empty:
-            # 呼叫我們剛剛寫好的繪圖引擎！
-            render_technical_chart(df_kline, pure_stock_id)
-        else:
-            st.warning(f"⚠️ 在資料庫中找到了 {pure_stock_id}，但內容為空。")
+            if not df_kline.empty:
+                # 呼叫繪圖引擎！(⚠️ 請確保程式碼上方有貼上 def render_technical_chart)
+                render_technical_chart(df_kline, pure_stock_id)
+            else:
+                st.warning(f"⚠️ 在資料庫中找到了 {pure_stock_id}，但內容為空。")
                     
     except Exception as e:
-            st.info(f"⚪ 目前資料庫尚未收錄 `{pure_stock_id}` 的歷史 K 線資料，或網路連線失敗。")
+        # 🔥 【除錯升級】：把真實錯誤印出來，讓我們知道到底是 404 還是程式寫錯
+        st.error(f"❌ 讀取失敗！系統偵測到的錯誤原因： `{str(e)}`")
+        st.info(f"💡 請檢查網址是否有效：[點擊測試 GitHub 檔案連結]({github_csv_url})")
+        st.info("*(如果點擊連結顯示 404 Not Found，代表您的 GitHub 資料庫裡還沒有這檔股票的 CSV)*")
 else:
     st.warning("⚠️ 請在搜尋框輸入確切的股票代號 (例如 2330)，才能抓取 K 線資料。")
+
 # ==========================================
 # 📊 【蜂蜜計數器】本站累計觀測人次統計
 # ==========================================
