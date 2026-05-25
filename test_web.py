@@ -206,29 +206,27 @@ def scan_and_display(title, session_key, query):
     else:
         st.write(f"⚪ **{title}**：未進榜")
 
+#==========================================
 # 🎯 搜尋輸入框
-# 🎯 搜尋輸入框
+#==========================================
 search_query = st.text_input("請輸入想觀測的股票代號或名稱 (例如: 3231 或 緯創，未顯示任何資料代表你的標的可能太弱了)：", key="global_search_final")
-
-if search_query:
-    st.write(f"### 🎯 綜合診斷標的：{search_query}")
 
     # ==========================================
     # 📈 K 線圖按鈕 (yfinance 即時記憶開關版)
     # ==========================================
     st.write("---")
     
-    # 1. 建立一個專屬的狀態開關 (預設為 False 關閉)
+    # 1. 建立狀態開關
     if 'show_kline' not in st.session_state:
         st.session_state.show_kline = False
 
-    # 2. 顯示按鈕，點擊時反轉狀態
+    # 2. 顯示按鈕
     button_label = "❌ 關閉技術 K 線圖" if st.session_state.show_kline else "📊 載入最新技術 K 線圖"
     if st.button(button_label, use_container_width=True):
         st.session_state.show_kline = not st.session_state.show_kline
-        st.rerun() # 強制網頁刷新以改變按鈕文字與顯示狀態
+        st.rerun()
 
-    # 3. 只有當狀態為 True (開啟) 時，才呼叫 yfinance 引擎
+    # 3. 按下開啟後，直接呼叫引擎
     if st.session_state.show_kline:
         import re
         stock_id_match = re.search(r'\d+', search_query)
@@ -236,7 +234,7 @@ if search_query:
         if stock_id_match:
             pure_stock_id = stock_id_match.group(0)
             with st.spinner(f"正在從 Yahoo Finance 即時擷取 {pure_stock_id} 的最新 K 線資料..."):
-                # 直接呼叫放在上半部的 yfinance 繪圖引擎！
+                # 直接呼叫引擎，它會自己抓資料+畫圖！
                 render_technical_chart(pure_stock_id)
         else:
             st.warning("⚠️ 請輸入確切的股票代號 (例如 2330)。")
