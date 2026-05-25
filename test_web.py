@@ -304,35 +304,29 @@ if search_query:
     st.write(f"### 🎯 綜合診斷標的：{search_query}")
 
     # ==========================================
-    # 📈 K 線圖按鈕與週期切換 (日/週/月)
+    # 📈 K 線圖按鈕與週期切換 (防呆中文過濾版)
     # ==========================================
     st.write("---")
-    
     if 'show_kline' not in st.session_state:
         st.session_state.show_kline = False
 
-    # 按鈕狀態顯示
     button_label = "❌ 關閉技術 K 線圖" if st.session_state.show_kline else "📊 載入最新技術 K 線圖"
     if st.button(button_label, use_container_width=True):
         st.session_state.show_kline = not st.session_state.show_kline
         st.rerun()
 
-    # 開啟 K 線圖後的選單與繪圖
     if st.session_state.show_kline:
         import re
+        # 嚴格要求輸入內容必須含有數字代碼
         stock_id_match = re.search(r'\d+', search_query)
         
         if stock_id_match:
             pure_stock_id = stock_id_match.group(0)
-            
-            # 🔥 新增：週期切換按鈕 (橫向排列)
             selected_tf = st.radio("⏳ 選擇 K 線週期：", ["日線", "週線", "月線"], horizontal=True)
-            
             with st.spinner(f"正在從 Yahoo Finance 擷取 {pure_stock_id} 的 {selected_tf} 資料..."):
-                # 將選擇的週期傳送給引擎！
                 render_technical_chart(pure_stock_id, selected_tf)
         else:
-            st.warning("⚠️ 請輸入確切的股票代號 (例如 2330)。")
+            st.warning("⚠️ 技術 K 線圖目前僅支援「數字代號」查詢。請在上方輸入框加入股票代號 (例如: 2330)，再點選此按鈕。")
 
     # ==========================================
     # 🤖 呼叫 AI 量化評語
