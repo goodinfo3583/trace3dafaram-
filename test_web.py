@@ -99,25 +99,25 @@ def robust_search_engine(df, query):
         
     return df[mask]
 
-# 🎯 建立通用掃描與顯示工具
+# 🎯 建立通用掃描與顯示工具 (全面去藍底、保持排版左右高度對稱)
 def scan_and_display(title, session_key, query):
     if session_key not in st.session_state:
-        st.info(f"⚪ {title}：尚未載入資料表 (請確認上半部區塊已執行)")
+        st.write(f"⚪ **{title}**：尚未載入資料表")
         return
         
     df = st.session_state[session_key]
-    
     if df is None or df.empty:
-        st.info(f"⚪ {title}：該榜單無任何資料")
+        st.write(f"⚪ **{title}**：該榜單無任何資料")
         return
         
     res = robust_search_engine(df, query)
     
+    # 只要查有資料，就印出標題與表格；若無資料，改用無背景純文字以求對齊
     if not res.empty:
         st.write(f"**{title}**")
         st.dataframe(res, use_container_width=True, hide_index=True)
     else:
-        st.info(f"⚪ {title}：未進榜")
+        st.write(f"⚪ **{title}**：未進榜")
 
 # 🎯 搜尋輸入框
 search_query = st.text_input("請輸入想觀測的股票代號或名稱 (例如: 3231 或 緯創，未顯示任何資料代表你的標的可能太弱了)：", key="global_search_final")
@@ -300,7 +300,7 @@ with c_btn2:
 # 1. 戰情室快速導航
 st.sidebar.markdown("---")
 st.sidebar.header("📍 戰情室快速導航")
-st.sidebar.markdown("[🏆 頂級核心選股池](#section-top-pool)")
+st.sidebar.markdown("[🏆 🏆 數據分析觀察名單](#section-top-pool)")
 st.sidebar.markdown("[🔍 個股籌碼快搜 (診斷區)](#section-search)")
 st.sidebar.markdown("[👑 區塊1：三大法人持股比追蹤](#section-1)")
 st.sidebar.markdown("[🎯 區塊2-1：外資5日淨買佔成交量](#section-2-1)")
@@ -1239,10 +1239,12 @@ with c1:
     df_pct_clean = process_margin_df(df_pct, "幅度", show_etf_41, show_bond_41)
     
     if not df_pct_clean.empty:
-        st.info(f"💡 最新來源: {msg_pct}")
+        # 👈 核心修改：只過濾出 8 碼日期字串
+        date_str = re.search(r'\d{8}', msg_pct).group(0) if re.search(r'\d{8}', msg_pct) else "未知"
+        st.write(f"📅 **最新檔案日期: {date_str}**")
         st.dataframe(df_pct_clean, use_container_width=True, hide_index=True)
     else:
-        st.warning(f"⚠️ {msg_pct} 或 過濾後無相符資料")
+        st.warning("⚠️ 無相符資料")
 
 with c2:
     st.subheader("📉 融資減少張數排名")
@@ -1250,10 +1252,11 @@ with c2:
     df_vol_clean = process_margin_df(df_vol, "張數", show_etf_41, show_bond_41)
     
     if not df_vol_clean.empty:
-        st.info(f"💡 最新來源: {msg_vol}")
+        date_str = re.search(r'\d{8}', msg_vol).group(0) if re.search(r'\d{8}', msg_vol) else "未知"
+        st.write(f"📅 **最新檔案日期: {date_str}**")
         st.dataframe(df_vol_clean, use_container_width=True, hide_index=True)
     else:
-        st.warning(f"⚠️ {msg_vol} 或 過濾後無相符資料")
+        st.warning("⚠️ 無相符資料")
 
 st.session_state['df_margin_pct'] = df_pct_clean
 st.session_state['df_margin_vol'] = df_vol_clean
@@ -1474,15 +1477,19 @@ else:
         st.error("無法合併資料。")
 
 # ==========================================
-# 🏆 頂級選股池核心引擎 (精確量化權重版)
+# 🏆 頂級選股池核心引擎 (精確量化權重 + 欄位美化版)
 # ==========================================
 with top_pool_container:
     st.write("---")
     st.markdown("<div id='section-top-pool'></div>", unsafe_allow_html=True)
     st.header("🏆 數據分析觀察名單 (全區塊綜合評比)")
     st.info("""
-    💡 **權重評分規則**：以三大法人持股變化打底進行區區塊數據掃描。
-    
+    💡 **權重評分規則**：
+    * **基底**：需符合區塊1動能(趨緩/上升/持平)。
+    * **區塊2**：進榜且無衰退動態(+1分)。
+    * **區塊3**：日連買(依天數 +0.5~1分)；週連買(依週數 +1~2分)。
+    * **區塊4**：幅度進榜(+1分)；張數進榜(+0.5分)。
+    * **區塊5**：大股東微增(+1) / 大增(+2) / 減(-0.5) / 大減(-1)。
     """)
 
     if 'my_final_df' not in st.session_state or st.session_state['my_final_df'].empty:
@@ -1490,10 +1497,10 @@ with top_pool_container:
     else:
         df_b1 = st.session_state['my_final_df'].copy()
         
-        # 1. 尋找區塊 1 的動態欄位
+        # 尋找區塊 1 的動態欄位與今日上榜欄位
         dyn_col = next((c for c in df_b1.columns if '動態' in c or '動能' in c), None)
+        rank_col = next((c for c in df_b1.columns if '今日上榜' in c or '上榜' in c), None)
         
-        # 2. 篩選基底：動能為 趨緩、上升、持平
         if dyn_col:
             mask = df_b1[dyn_col].astype(str).str.contains('趨緩|上升|升|持平|加碼|延續', na=False)
             pool_df = df_b1[mask].copy()
@@ -1521,9 +1528,7 @@ with top_pool_container:
                     if id_c: it_sell_ids = set(df_is[id_c].astype(str).str.replace(r'\D', '', regex=True))
             except: pass
 
-            # 4. 取得區塊 2 到 4 的資料表 (保留 DataFrame 以便查詢動態與張數)
-            def get_df_safe(key):
-                return st.session_state.get(key, pd.DataFrame())
+            def get_df_safe(key): return st.session_state.get(key, pd.DataFrame())
 
             df_b2_1, df_b2_2 = get_df_safe('df_blk2_1'), get_df_safe('df_blk2_2')
             df_b2_3, df_b2_4 = get_df_safe('df_blk2_3'), get_df_safe('df_blk2_4')
@@ -1535,7 +1540,6 @@ with top_pool_container:
             
             df_b5 = get_df_safe('df_blk5')
 
-            # --- 輔助函數：區塊 2 嚴格動態過濾 ---
             def check_b2_strict(df, sid, bad_keywords):
                 if df.empty or sid not in df['股票代號'].values: return False
                 dyn = str(df[df['股票代號'] == sid].iloc[0].get('今日短動態', ''))
@@ -1545,20 +1549,17 @@ with top_pool_container:
             bad_b2_vol = ['持平', '調節洗盤', '劇烈倒貨', '觀望']
             bad_b2_iss = ['轉賣反轉', '籌碼沉澱中', '今日量縮持平']
 
-            # --- 輔助函數：區塊 3 連買天數配分 ---
             def get_b3_score(df, sid, type_keyword):
                 if df.empty: return 0, ""
                 match = df[(df['股票代號'] == sid) & (df['連買類型'].str.contains(type_keyword))]
                 if match.empty: return 0, ""
-                
                 days = pd.to_numeric(match.iloc[0].get('連買週期數', 0), errors='coerce')
                 if pd.isna(days) or days == 0: return 0, ""
-                
                 if '日' in type_keyword:
                     if days >= 10: return 1.0, f"✔️({days}日)"
                     elif days >= 5: return 0.8, f"✔️({days}日)"
                     else: return 0.5, f"✔️({days}日)"
-                else: # 週
+                else:
                     if days >= 10: return 2.0, f"✔️({days}週)"
                     elif days >= 5: return 1.5, f"✔️({days}週)"
                     else: return 1.0, f"✔️({days}週)"
@@ -1569,21 +1570,19 @@ with top_pool_container:
                 sid = str(row['股票代號']).strip()
                 sname = str(row.get('股票名稱', '')).strip()
                 b1_dyn = str(row.get(dyn_col, '')) if dyn_col else '-'
+                b1_rank = str(row.get(rank_col, '-')) if rank_col else '-'
                 score = 0.0
                 
-                # B2 計分 (嚴格過濾動態)
                 r_b2_1 = "✔️" if check_b2_strict(df_b2_1, sid, bad_b2_vol) else ""; score += 1 if r_b2_1 else 0
                 r_b2_2 = "✔️" if check_b2_strict(df_b2_2, sid, bad_b2_vol) else ""; score += 1 if r_b2_2 else 0
                 r_b2_3 = "✔️" if check_b2_strict(df_b2_3, sid, bad_b2_iss) else ""; score += 1 if r_b2_3 else 0
                 r_b2_4 = "✔️" if check_b2_strict(df_b2_4, sid, bad_b2_iss) else ""; score += 1 if r_b2_4 else 0
                 
-                # B3 計分 (天數/週數細化配分)
                 s_fd, r_b3_fd = get_b3_score(df_b3, sid, '外資日'); score += s_fd
                 s_fw, r_b3_fw = get_b3_score(df_b3, sid, '外資週'); score += s_fw
                 s_id, r_b3_id = get_b3_score(df_b3, sid, '投信日'); score += s_id
                 s_iw, r_b3_iw = get_b3_score(df_b3, sid, '投信週'); score += s_iw
                 
-                # B4 計分 (幅度 +1, 張數 +0.5)
                 r_b4_mar = ""; 
                 if sid in s_b4_mar_pct: r_b4_mar += "✔️(幅)"; score += 1
                 if sid in s_b4_mar_vol: r_b4_mar += "✔️(量)"; score += 0.5
@@ -1596,58 +1595,40 @@ with top_pool_container:
                 if sid in s_b4_mp_pct: r_b4_mp += "✔️(幅)"; score += 1
                 if sid in s_b4_mp_vol: r_b4_mp += "✔️(量)"; score += 0.5
                 
-                # B5 大股東計分 (新增扣分機制)
                 r_b5 = ""
                 if not df_b5.empty and sid in df_b5['股票代號'].values:
                     trend = str(df_b5[df_b5['股票代號'] == sid].iloc[0].get('週動態', ''))
-                    if '大增' in trend or ('增' in trend and '微' not in trend):
-                        score += 2; r_b5 = "🔥大增(+2)"
-                    elif '微增' in trend:
-                        score += 1; r_b5 = "↗️微增(+1)"
-                    elif '大減' in trend:
-                        score -= 1; r_b5 = "🚨大減(-1)"
-                    elif '減' in trend and '微' in trend:
-                        score -= 0.5; r_b5 = "↘️微減(-0.5)"
-                    elif '減' in trend:
-                        score -= 0.5; r_b5 = "📉減(-0.5)"
-                    else:
-                        r_b5 = trend
+                    if '大增' in trend or ('增' in trend and '微' not in trend): score += 2; r_b5 = "🔥大增(+2)"
+                    elif '微增' in trend: score += 1; r_b5 = "↗️微增(+1)"
+                    elif '大減' in trend: score -= 1; r_b5 = "🚨大減(-1)"
+                    elif '減' in trend and '微' in trend: score -= 0.5; r_b5 = "↘️微減(-0.5)"
+                    elif '減' in trend: score -= 0.5; r_b5 = "📉減(-0.5)"
+                    else: r_b5 = trend
                 
-                # 法人賣出警示
-                warns = []
-                if sid in fo_sell_ids: warns.append("⚠️外資")
-                if sid in it_sell_ids: warns.append("⚠️投信")
-                r_warn = "、".join(warns) if warns else "-"
+                # 🔥 【精簡文字修復】：防止表格寬度被卡到
+                is_fo_sell = sid in fo_sell_ids
+                is_it_sell = sid in it_sell_ids
+                if is_fo_sell and is_it_sell: r_warn = "🚨外投雙倒"
+                elif is_fo_sell: r_warn = "⚠️外資倒"
+                elif is_it_sell: r_warn = "⚠️投信倒"
+                else: r_warn = "-"
 
                 results.append({
                     '總分': score,
                     '股票代號': sid,
                     '股票名稱': sname,
                     'B1動態': b1_dyn,
-                    '外買佔比': r_b2_1,
-                    '投買佔比': r_b2_2,
-                    '外佔發行': r_b2_3,
-                    '投佔發行': r_b2_4,
-                    '外日連': r_b3_fd,
-                    '外週連': r_b3_fw,
-                    '投日連': r_b3_id,
-                    '投週連': r_b3_iw,
-                    '資減': r_b4_mar,
-                    '借減': r_b4_sho,
-                    '券增': r_b4_mp,
-                    '大股東動向': r_b5,
-                    '法人賣出警示': r_warn
+                    '今日上榜欄位': b1_rank,  # 👈 新增區塊 1 訊號
+                    '外買佔比': r_b2_1, '投買佔比': r_b2_2, '外佔發行': r_b2_3, '投佔發行': r_b2_4,
+                    '外日連': r_b3_fd, '外週連': r_b3_fw, '投日連': r_b3_id, '投週連': r_b3_iw,
+                    '資減': r_b4_mar, '借減': r_b4_sho, '券增': r_b4_mp,
+                    '大股東動向': r_b5, '法人賣出警示': r_warn
                 })
                 
-            # 6. 生成表格並排序
             res_df = pd.DataFrame(results)
             res_df = res_df.sort_values(by='總分', ascending=False).reset_index(drop=True)
-            
-            # 美化警示欄位 (若有警告則排在前面提醒)
             st.dataframe(res_df, use_container_width=True, hide_index=True)
             st.success(f"🎯 頂級選股池掃描完成！共過濾出 {len(res_df)} 檔潛力標的。")
-
-        # 🔥 【新增這一行】：將算好的總分表存入記憶體，讓 AI 評語可以讀取！
             st.session_state['top_pool_df'] = res_df
 # ==========================================
 # 📊 【蜂蜜計數器】本站累計觀測人次統計
