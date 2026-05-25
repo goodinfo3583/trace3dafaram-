@@ -827,7 +827,6 @@ else:
         """)
         
         # UI 與過濾
-        st.write("🔧 **自訂標的顯示過濾：**")
         c1, c2 = st.columns(2)
         show_etf = c1.checkbox("顯示 ETF", value=True, key="fo_etf_v9")
         show_bond = c2.checkbox("顯示 債券/債券ETF", value=True, key="fo_bond_v9")
