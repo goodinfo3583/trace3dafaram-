@@ -27,7 +27,7 @@ def extract_date_from_name(filepath):
     date_match = re.search(r'(\d+)', filename)
     return date_match.group(1) if date_match else "00000000"
 # ==========================================
-# 🌌 注入極致黑看盤軟體專屬風格樣式 (全站深色化 + 文字高亮)
+# 🌌 注入極致黑看盤軟體專屬風格樣式 (全站深色化 + 表格優化)
 # ==========================================
 st.markdown(
     """
@@ -38,28 +38,37 @@ st.markdown(
     }
     
     /* 2. 強制所有標題與內文變成明亮的灰白色 (解決黑底黑字問題) */
-    h1, h2, h3, h4, h5, h6, p, label, .stMarkdown {
+    h1, h2, h3, h4, h5, h6, p, label, .stMarkdown, .stText {
         color: #E2E8F0 !important;
     }
     
-    /* 3. 變更側邊欄目錄背景色與邊框 */
+    /* 3. 頂部「阿東順利畢業」高雅減震配色 (與黑底和諧共存) */
+    .stAlert p {
+        color: #FFD700 !important; /* 點綴高貴金屬黃 */
+    }
+    .stAlert {
+        background-color: #151B26 !important;
+        border: 1px solid #2E3A4E !important;
+    }
+    
+    /* 4. 變更側邊欄目錄背景色與邊框 */
     [data-testid="stSidebar"] {
         background-color: #111622 !important;
         border-right: 1px solid #1E293B;
     }
     
-    /* 4. 優化輸入框、表格等元件 */
+    /* 5. 優化輸入框、按鈕等元件 */
     .stTextInput>div>div>input {
         background-color: #1A202C !important;
         color: #FFFFFF !important;
         border: 1px solid #4A5568 !important;
     }
     
-    /* 5. 移除資訊區塊的刺眼背景 */
-    .stAlert {
-        background-color: #1A202C !important;
-        color: #E2E8F0 !important;
-        border: 1px solid #2D3748 !important;
+    /* 6. 表格與數據網格深色化修正 (防止白色突兀刺眼) */
+    div[data-testid="stDataFrame"] {
+        background-color: #111622 !important;
+        border: 1px solid #1E293B !important;
+        border-radius: 6px;
     }
     </style>
     """,
@@ -128,7 +137,6 @@ def render_technical_chart(stock_id, timeframe="日線"):
     import streamlit as st
 
     try:
-        # 1. 智慧連線：下載 5 年歷史資料，確保長天期均線 (如 240MA) 能夠被精確計算
         ticker_tw = f"{stock_id}.TW"
         ticker_two = f"{stock_id}.TWO"
         
@@ -140,7 +148,6 @@ def render_technical_chart(stock_id, timeframe="日線"):
             st.warning(f"⚠️ 無法從 Yahoo Finance 取得 {stock_id} 的即時報價，請確認代號是否正確。")
             return
 
-        # 強制清洗 yfinance 雙層欄位
         if isinstance(df.columns, pd.MultiIndex):
             df.columns = df.columns.get_level_values(0)
             
@@ -153,7 +160,6 @@ def render_technical_chart(stock_id, timeframe="日線"):
 
         daily_df = df.copy()
 
-        # 2. 週期切換引擎 (Resampling)
         if timeframe == "週線":
             daily_df = daily_df.resample('W-FRI').agg({
                 'Open': 'first', 'High': 'max', 'Low': 'min', 'Close': 'last', 'Volume': 'sum'
@@ -163,7 +169,6 @@ def render_technical_chart(stock_id, timeframe="日線"):
                 'Open': 'first', 'High': 'max', 'Low': 'min', 'Close': 'last', 'Volume': 'sum'
             }).dropna()
 
-        # 3. 計算多週期均線 (MA)
         ma_windows = [5, 10, 20, 60, 120, 240]
         for ma in ma_windows:
             daily_df[f'{ma}MA'] = daily_df['Close'].rolling(window=ma).mean()
@@ -176,73 +181,69 @@ def render_technical_chart(stock_id, timeframe="日線"):
                 return f"{float(val):.2f}"
             return "-"
 
-        # 4. 建立上下分割畫布
         fig = make_subplots(rows=2, cols=1, shared_xaxes=True, 
                             vertical_spacing=0.03, row_heights=[0.7, 0.3])
 
-        # 5. 自訂 K 線顏色 (深色背景下調亮紅綠對比，更易判讀)
-        up_color = 'rgb(240, 90, 90)'     # 明亮莫蘭迪紅
-        down_color = 'rgb(80, 200, 120)'  # 經典翡翠綠
+        up_color = 'rgb(240, 90, 90)'     
+        down_color = 'rgb(80, 200, 120)'  
 
         open_p, high_p = daily_df['Open'].squeeze(), daily_df['High'].squeeze()
         low_p, close_p = daily_df['Low'].squeeze(), daily_df['Close'].squeeze()
         vol = daily_df['Volume'].squeeze()
 
-        # 6. 繪製 K 線 (🔥 新增 hovertemplate 達成全中文、去英文日期與空行)
         fig.add_trace(go.Candlestick(
-            x=daily_df.index, 
-            open=open_p, high=high_p, low=low_p, close=close_p, name='K線',
+            x=daily_df.index, open=open_p, high=high_p, low=low_p, close=close_p, name='K線',
             increasing=dict(line=dict(color=up_color, width=1.5), fillcolor=up_color),
             decreasing=dict(line=dict(color=down_color, width=1.5), fillcolor=down_color),
-            # 👇 這裡控制滑鼠懸停顯示的文字格式 (%{x|%Y-%m-%d} 就是純數字日期)
             hovertemplate="<b>%{x|%Y-%m-%d}</b><br><br>開：%{open:.2f}<br>高：%{high:.2f}<br>低：%{low:.2f}<br>收：%{close:.2f}<extra></extra>"
         ), row=1, col=1)
 
-        # 7. 繪製均線與標示最新均價
         colors = ['#FFCC00', '#CC66FF', '#00CCFF', '#33FF33', '#FF3333', '#FFFF33']
         for idx, ma in enumerate(ma_windows):
             latest_val = get_latest_price(f'{ma}MA')
             fig.add_trace(go.Scatter(
                 x=daily_df.index, y=daily_df[f'{ma}MA'].squeeze(), mode='lines', 
                 name=f'{ma}MA ({latest_val})', line=dict(color=colors[idx], width=1.3),
-                # 👇 這裡讓滑鼠懸停時，只顯示該線的名稱跟單一數值，不再出現重複數字
                 hovertemplate=f"<b>{ma}MA</b>： %{{y:.2f}}<extra></extra>"
             ), row=1, col=1)
 
-        # 8. 繪製成交量
         vol_colors = [up_color if c >= o else down_color for c, o in zip(close_p, open_p)]
         fig.add_trace(go.Bar(
             x=daily_df.index, y=vol, name='成交量', marker_color=vol_colors,
-            # 👇 成交量也全中文化
             hovertemplate="<b>成交量</b>： %{y}<extra></extra>"
         ), row=2, col=1)
 
-        # 9. 版面美化 (🔥 新增 hoverlabel 確保游標文字清楚)
         fig.update_layout(
             title=dict(
                 text=f'📊 {stock_id} 最新 {timeframe} 與成交量 (資料來源: Yahoo Finance)',
-                y=0.98, x=0.01, xanchor='left', yanchor='top'
+                y=0.96, x=0.01, xanchor='left', yanchor='top',
+                font=dict(color='#FFFFFF', size=16)
             ),
             yaxis_title='股價 (TWD)',
             xaxis_rangeslider_visible=False,
             height=700,
-            template='plotly_dark',
-            paper_bgcolor='rgba(0,0,0,0)',
-            plot_bgcolor='rgba(0,0,0,0)',
-            font=dict(color="#E2E8F0"), # 確保圖表座標軸文字是亮的
-            # 👇 確保游標彈跳視窗的底色是深色，文字是亮的
-            hoverlabel=dict(bgcolor="#1A202C", font_size=14, font_family="Arial", font_color="#FFFFFF"), 
-            margin=dict(l=10, r=10, t=100, b=10),
+            template='plotly_dark',       
+            paper_bgcolor='rgba(0,0,0,0)', 
+            plot_bgcolor='rgba(0,0,0,0)',  
+            margin=dict(l=10, r=10, t=100, b=10), # 增加頂部間距至 100px 完美避開重疊
             hovermode='x unified',
+            hoverlabel=dict(bgcolor="#1A202C", font_size=14, font_family="Arial", font_color="#FFFFFF"),
             legend=dict(
-                orientation="h", yanchor="bottom", y=1.02, xanchor="left", x=0.01
+                orientation="h", yanchor="bottom", y=1.02, xanchor="left", x=0.01,
+                font=dict(color='#E2E8F0')
             )
         )
         
-        # 📅 👈 關鍵修改：不論日、週、月線，預設畫面直接強制放大聚焦在指定日期區間
-        zoom_range = ['2026-01-07', '2026-05-25']
-        fig.update_xaxes(range=zoom_range, tickformat="%Y-%m-%d", row=1, col=1)
-        fig.update_xaxes(range=zoom_range, tickformat="%Y-%m-%d", row=2, col=1)
+        # 強制指定 X 軸的顯示與統一全數字日期格式（徹底拔除英文月份標籤）
+        fig.update_xaxes(hoverformat="%Y-%m-%d", tickformat="%Y-%m-%d", row=1, col=1)
+        fig.update_xaxes(hoverformat="%Y-%m-%d", tickformat="%Y-%m-%d", row=2, col=1)
+        
+        if not daily_df.empty:
+            latest_date = daily_df.index[-1] 
+            start_date = latest_date - pd.Timedelta(days=140) 
+            zoom_range = [start_date.strftime('%Y-%m-%d'), latest_date.strftime('%Y-%m-%d')]
+            fig.update_xaxes(range=zoom_range, row=1, col=1)
+            fig.update_xaxes(range=zoom_range, row=2, col=1)
         
         if timeframe == "日線":
             fig.update_xaxes(rangebreaks=[dict(bounds=["sat", "mon"])], row=1, col=1)
