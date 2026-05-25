@@ -42,13 +42,10 @@ st.markdown(
         color: #E2E8F0 !important;
     }
     
-    /* 3. 頂部「阿東順利畢業」高雅減震配色 (與黑底和諧共存) */
-    .stAlert p {
-        color: #FFD700 !important; /* 點綴高貴金屬黃 */
-    }
-    .stAlert {
-        background-color: #151B26 !important;
-        border: 1px solid #2E3A4E !important;
+    /* 3. 除資訊區塊(阿東順利畢業)的刺眼背景，改為隱形融入黑底 */
+    [data-testid="stAlert"] {
+        background-color: transparent !important;
+        border: 1px solid #2D3748 !important;
     }
     
     /* 4. 變更側邊欄目錄背景色與邊框 */
@@ -707,10 +704,11 @@ if sorted_dates:
         final_df = final_df[cols]
         
         # ==========================================
-        # 🔧 UI 顯示與底色渲染 (移除過濾拉條，預設全開)
+        # 🔧 UI 顯示與過濾 (保留勾選框，隱藏文字)
         # ==========================================
-        show_etf = True
-        show_bond = True
+        c1, c2 = st.columns(2)
+        show_etf = c1.checkbox("顯示 ETF", value=True, key="blk1_etf_sync")
+        show_bond = c2.checkbox("顯示 債券/債券ETF", value=True, key="blk1_bond_sync")
         
         is_bond = final_df['股票代號'].str.endswith('B')
         is_etf = (final_df['股票代號'].str.len() >= 5) & (~is_bond)
@@ -721,10 +719,6 @@ if sorted_dates:
         if show_bond: mask |= is_bond
             
         filtered_df = final_df[mask].copy()
-        
-        for c in date_cols:
-            filtered_df[c] = filtered_df[c].apply(lambda x: f"{x:.2f}" if x != 0 else "-")
-        filtered_df.index = range(1, len(filtered_df) + 1)
         
         # 🎨 暗黑專業版高亮色系設定 (調高透明度以適配黑底，不破壞原設計)
         def highlight_row(row):
