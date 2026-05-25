@@ -1325,10 +1325,12 @@ with c1:
     df_pct_clean = process_margin_df(df_pct, "幅度", show_etf_43, show_bond_43)
     
     if not df_pct_clean.empty:
-        st.info(f"💡 最新來源: {msg_pct}")
+        # 👈 核心修改：只過濾出 8 碼日期字串
+        date_str = re.search(r'\d{8}', msg_pct).group(0) if re.search(r'\d{8}', msg_pct) else "未知"
+        st.write(f"📅 **最新檔案日期: {date_str}**")
         st.dataframe(df_pct_clean, use_container_width=True, hide_index=True)
     else:
-        st.warning(f"⚠️ {msg_pct} 或 過濾後無相符資料")
+        st.warning("⚠️ 無相符資料")
 
 with c2:
     st.subheader("📈 融券增加張數排名")
@@ -1336,10 +1338,11 @@ with c2:
     df_vol_clean = process_margin_df(df_vol, "張數", show_etf_43, show_bond_43)
     
     if not df_vol_clean.empty:
-        st.info(f"💡 最新來源: {msg_vol}")
+        date_str = re.search(r'\d{8}', msg_vol).group(0) if re.search(r'\d{8}', msg_vol) else "未知"
+        st.write(f"📅 **最新檔案日期: {date_str}**")
         st.dataframe(df_vol_clean, use_container_width=True, hide_index=True)
     else:
-        st.warning(f"⚠️ {msg_vol} 或 過濾後無相符資料")
+        st.warning("⚠️ 無相符資料")
 
 st.session_state['df_margin_plus_pct'] = df_pct_clean
 st.session_state['df_margin_plus_vol'] = df_vol_clean
