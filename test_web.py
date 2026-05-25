@@ -112,7 +112,7 @@ def render_technical_chart(df, stock_id):
 
         # 5. 自訂 K 線顏色 (紅K/黑K)
         up_color = 'rgb(205,92,92)'    # 莫蘭迪紅
-        down_color = 'rgb(0,161,92)'   # 沉穩綠 (黑K)
+        down_color = 'rgb(80,200,120)'   # 沉穩綠 (黑K)
 
         # 6. 繪製 K 線
         fig.add_trace(go.Candlestick(
@@ -143,11 +143,12 @@ def render_technical_chart(df, stock_id):
             title=f'📊 {stock_id} 歷史日 K 線與成交量',
             yaxis_title='股價 (TWD)',
             xaxis_rangeslider_visible=False,
-            height=600,
+            height=650, # 👈 稍微加高圖表，給圖例多一點空間
             template='plotly_white',
-            margin=dict(l=10, r=10, t=40, b=10),
+            margin=dict(l=10, r=10, t=60, b=10), # 👈 將上邊距 (t) 從 40 增加到 60，把圖表往下推
             hovermode='x unified',
-            legend=dict(orientation="h", yanchor="bottom", y=1.02, xanchor="right", x=1) # 讓圖例排在上方
+            # 👈 將 y=1.02 改為 y=1.05 或更高，讓圖例浮在標題上方，避免重疊
+            legend=dict(orientation="h", yanchor="bottom", y=1.08, xanchor="right", x=1) 
         )
         
         # 強制 X 軸顯示為數字格式 (例如 2026-05-25)
@@ -239,24 +240,33 @@ if search_query:
 
 
     # ==========================================
-    # 📈 K 線圖按鈕 (按需載入，點擊才呼叫引擎！)
+    # 📈 K 線圖按鈕 (狀態記憶切換版)
     # ==========================================
     st.write("---")
-    if st.button("📊 載入技術 K 線圖", use_container_width=True):
+    
+    # 1. 建立一個專屬的狀態開關 (預設為 False 關閉)
+    if 'show_kline' not in st.session_state:
+        st.session_state.show_kline = False
+
+    # 2. 顯示按鈕，點擊時反轉狀態
+    button_label = "❌ 關閉技術 K 線圖" if st.session_state.show_kline else "📊 載入技術 K 線圖"
+    if st.button(button_label, use_container_width=True):
+        st.session_state.show_kline = not st.session_state.show_kline
+        st.rerun() # 強制網頁刷新以改變按鈕文字與顯示狀態
+
+    # 3. 只有當狀態為 True (開啟) 時，才執行抓資料與畫圖
+    if st.session_state.show_kline:
         import re
         stock_id_match = re.search(r'\d+', search_query)
         
         if stock_id_match:
             pure_stock_id = stock_id_match.group(0)
-            # 🔗 自動去遠端抓取資料
             github_csv_url = f"https://raw.githubusercontent.com/voidful/tw_stocker/main/data/{pure_stock_id}.csv"
             
             try:
                 with st.spinner(f"正在從遠端載入 {pure_stock_id} 的歷史 K 線數據..."):
-                    import pandas as pd
                     df_kline = pd.read_csv(github_csv_url)
                     if not df_kline.empty:
-                        # 🔥 這裡才是真正「呼叫」您剛剛放在上半部的畫圖引擎！
                         render_technical_chart(df_kline, pure_stock_id)
                     else:
                         st.warning(f"⚠️ 找到了 {pure_stock_id}，但內容為空。")
