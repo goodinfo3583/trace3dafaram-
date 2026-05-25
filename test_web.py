@@ -1630,7 +1630,7 @@ with top_pool_container:
             st.success(f"🎯 頂級選股池掃描完成！共過濾出 {len(res_df)} 檔潛力標的。")
             st.session_state['top_pool_df'] = res_df
 
-# ==========================================
+    # ==========================================
     # 📈 區塊 6：技術面 K 線與動能指標 (連線 GitHub 資料庫)
     # ==========================================
     st.write("---")
@@ -1644,7 +1644,7 @@ with top_pool_container:
     if stock_id_match:
         pure_stock_id = stock_id_match.group(0)
         # 🔗 動態生成 GitHub Raw CSV 網址
-        github_csv_url = f"https://raw.githubusercontent.com/goodinfo3583/tw_stocker/main/data/{pure_stock_id}.csv"
+        github_csv_url = f"https://raw.githubusercontent.com/goodinfo3583/tw_stocker_Dong/main/data/{pure_stock_id}.csv"
         
         try:
             with st.spinner(f"正在從 GitHub 載入 {pure_stock_id} 的歷史 K 線數據..."):
