@@ -1860,7 +1860,24 @@ else:
 with top_pool_container:
     st.write("---")
     st.markdown("<div id='section-top-pool'></div>", unsafe_allow_html=True)
-    st.header("🏆 數據分析觀察名單 (全區塊綜合評比)")
+    
+    import os
+    import glob
+
+    # 1. 自動掃描最新資料日期
+    txt_pattern = os.path.join(DATA_DIR, "*持股排名變化*.txt") 
+    all_txt_files = glob.glob(txt_pattern)
+    latest_date_str = "未知日期"
+
+    if all_txt_files:
+        # 抓取檔名最前面日期最大的檔案
+        latest_file = max(all_txt_files, key=os.path.basename)
+        date_label = os.path.basename(latest_file)[:8]
+        if date_label.isdigit():
+            latest_date_str = f"{date_label[:4]}/{date_label[4:6]}/{date_label[6:]}"
+
+    # 2. 顯示帶有最新日期的科技感標題
+    st.markdown(f"## 🏆 數據分析觀察名單 <span style='font-size:18px; color:#00D2FF; font-weight:500;'>(最新數據: {latest_date_str})</span>", unsafe_allow_html=True)
     st.info("💡 **權重評分**：法人持股上榜搭配其他數據分析積分。")
 
     if 'my_final_df' not in st.session_state or st.session_state['my_final_df'].empty:
@@ -1873,6 +1890,7 @@ with top_pool_container:
         rank_col = next((c for c in df_b1.columns if '今日上榜' in c or '上榜' in c), None)
         
         if dyn_col:
+            # 🔥 確保「吸籌、衝進、回歸」等高級量化字眼都在白名單內
             mask = df_b1[dyn_col].astype(str).str.contains('趨緩|上升|升|持平|加碼|延續|吸籌|衝進|回歸', na=False)
             pool_df = df_b1[mask].copy()
         else:
@@ -1989,7 +2007,7 @@ with top_pool_container:
                     '股票代號': sid,
                     '股票名稱': sname,
                     'B1動態': b1_dyn,
-                    '今日上榜欄位': b1_rank,  # 👈 新增區塊 1 訊號
+                    '今日上榜欄位': b1_rank,  
                     '外買佔比': r_b2_1, '投買佔比': r_b2_2, '外佔發行': r_b2_3, '投佔發行': r_b2_4,
                     '外日連': r_b3_fd, '外週連': r_b3_fw, '投日連': r_b3_id, '投週連': r_b3_iw,
                     '資減': r_b4_mar, '借減': r_b4_sho, '券增': r_b4_mp,
@@ -2001,7 +2019,6 @@ with top_pool_container:
             st.dataframe(res_df, use_container_width=True, hide_index=True)
             st.success(f"🎯 頂級選股池掃描完成！共過濾出 {len(res_df)} 檔潛力標的。")
             st.session_state['top_pool_df'] = res_df
-
 # ==========================================
 # 📊 【蜂蜜計數器】本站累計觀測人次統計
 # ==========================================
