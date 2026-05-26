@@ -540,11 +540,11 @@ if search_query:
     st.write("---")
     st.write("#### 🎯 區塊 2：法人買超診斷")
     c1, c2 = st.columns(2)
-    with c1: scan_and_display("🌐區塊 2-1 -外資5日淨買佔標的成交量", 'df_blk2_1', search_query)
-    with c2: scan_and_display("🏦區塊 2-2 -投信5日淨買佔標的成交量", 'df_blk2_2', search_query)
+    with c1: scan_and_display("🌐區塊 2-1:外資5日淨買佔標的成交量", 'df_blk2_1', search_query)
+    with c2: scan_and_display("🌐區塊 2-2:投信5日淨買佔標的成交量", 'df_blk2_2', search_query)
     c3, c4 = st.columns(2)
-    with c3: scan_and_display("🌐區塊 2-3 -外資5日淨買佔公司發行量", 'df_blk2_3', search_query)
-    with c4: scan_and_display("🏦區塊 2-4 -投信5日淨買佔公司發行量", 'df_blk2_4', search_query)
+    with c3: scan_and_display("🌐區塊 2-3:外資5日淨買佔公司發行量", 'df_blk2_3', search_query)
+    with c4: scan_and_display("🏦區塊 2-4:投信5日淨買佔公司發行量", 'df_blk2_4', search_query)
 
     # ==========================================
     # 📊 區塊 3： (4 榜全景)
