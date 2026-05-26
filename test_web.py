@@ -116,7 +116,7 @@ st.write("---")
 st.markdown("<div id='section-search'></div>", unsafe_allow_html=True)
 st.subheader("🔍 個股籌碼快搜 (全方位診斷)")
 # ==========================================
-# 📈 繪製 K 線圖與技術分析引擎 (加入 KD、Y軸標籤與手機縮放)
+# 📈 繪製 K 線圖與技術分析引擎 (加入 KD、Y軸標籤、手機平移與極簡工具列)
 # ==========================================
 def render_technical_chart(stock_id, timeframe="日線", selected_mas=[], show_rsi=False, show_macd=False, show_kd=False):
     import yfinance as yf
@@ -207,11 +207,12 @@ def render_technical_chart(stock_id, timeframe="日線", selected_mas=[], show_r
 
         fig = make_subplots(rows=rows, cols=1, shared_xaxes=True, 
                             vertical_spacing=0.02, row_heights=row_heights)
+                            
         #繪製K線選擇顏色
         up_color = 'rgb(240, 90, 90)'     
         down_color = 'rgb(80, 200, 120)'  
 
-        # 5. 繪製主 K 線 (🔥 移除眼睛與顯示等冗餘字眼)
+        # 5. 繪製主 K 線 (乾淨名稱)
         fig.add_trace(go.Candlestick(
             x=daily_df.index, open=daily_df['Open'].squeeze(), high=daily_df['High'].squeeze(), 
             low=daily_df['Low'].squeeze(), close=daily_df['Close'].squeeze(), 
@@ -237,7 +238,7 @@ def render_technical_chart(stock_id, timeframe="日線", selected_mas=[], show_r
                     hovertemplate=f"<b>{ma_name}</b>： %{{y:.2f}}<extra></extra>"
                 ), row=1, col=1)
 
-        # 6. 繪製成交量 (🔥 showlegend=False 徹底從功能圖例中隱藏，排版最乾淨)
+        # 6. 繪製成交量 (徹底隱藏圖例)
         vol_colors = [up_color if c >= o else down_color for c, o in zip(daily_df['Close'].squeeze(), daily_df['Open'].squeeze())]
         fig.add_trace(go.Bar(
             x=daily_df.index, y=daily_df['Volume'].squeeze(), 
@@ -287,7 +288,6 @@ def render_technical_chart(stock_id, timeframe="日線", selected_mas=[], show_r
             margin=dict(l=10, r=65, t=90, b=10), 
             hovermode='x unified',
             hoverlabel=dict(bgcolor="#1A202C", font_size=13, font_color="#FFFFFF"),
-            # 🔥 修正處：將「顯示：」移動到最前方作為總標題，下方圖示乾淨不重疊
             legend=dict(
                 title_text="👉 顯示：", 
                 title_font=dict(color='#00D2FF', size=13), 
@@ -298,7 +298,7 @@ def render_technical_chart(stock_id, timeframe="日線", selected_mas=[], show_r
                 x=0.01, 
                 font=dict(color='#E2E8F0')
             ),
-            dragmode='pan' # 🔥 關鍵優化 1：手機介面開啟時，強迫優先預設為「✥ 平移 (Pan)」模式，解決誤觸放大鏡痛點！
+            dragmode='pan' # 🔥 關鍵優化 1：手機介面開啟預設為「✥ 平移 (Pan)」模式
         )
         
         fig.update_yaxes(side="right")
@@ -316,7 +316,7 @@ def render_technical_chart(stock_id, timeframe="日線", selected_mas=[], show_r
             for r in range(1, rows + 1):
                 fig.update_xaxes(rangebreaks=[dict(bounds=["sat", "mon"])], row=r, col=1)
         
-        # 🔥 關鍵優化 2：簡化 Plotly 右上角工具列，斬草除根！徹底移除不需要的按鈕，只保留 Pan 與 Reset (小房子)
+        # 🔥 關鍵優化 2：極簡工具列，只留 Pan 與 Reset
         plotly_config = {
             'scrollZoom': True,
             'displaylogo': False,
