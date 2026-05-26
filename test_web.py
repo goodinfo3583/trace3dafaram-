@@ -355,7 +355,7 @@ def robust_search_engine(df, query):
     return df[mask]
 
 # ==========================================
-# 🎯 建立通用掃描與顯示工具 (修正左右對稱、精準攔截0%未進榜假象)
+# 🎯 建立通用掃描與顯示工具 (浮點數級別終極攔截 0% 假象)
 # ==========================================
 def scan_and_display(title, session_key, query):
     # 先不管有沒有資料，標題一律用 subheader 頂固，確保左右 columns 完全對齊
@@ -373,19 +373,38 @@ def scan_and_display(title, session_key, query):
     res = robust_search_engine(df, query)
     
     if not res.empty:
-        # 🔥 終極攔截器：只要這個表格有「持股%」或「佔比」欄位，就去檢查
-        pct_cols = [c for c in res.columns if '持股%' in c or '佔比' in c]
+        # 🔥 終極攔截器：直接轉成數學小數點來驗證，消滅所有格式變形的「0」
+        # 找出所有可能是持股比例或佔比的欄位名稱
+        pct_cols = [c for c in res.columns if '持股' in c or '佔' in c or '%' in c]
+        
         if pct_cols:
             all_zero = True
             for c in pct_cols:
-                # 轉成字串並轉小寫，去除所有隱藏空白
-                val = str(res.iloc[0][c]).strip().lower()
-                # 把可能出現的「無效值」的各種變形全部列入黑名單
-                if val not in ['0', '0.0', '0.00', '0%', '0.00%', '-', '', 'nan', 'none']:
-                    all_zero = False
-                    break
+                val = res.iloc[0][c]
+                
+                # 1. 如果是 pandas 內建的空值 (NaN)，直接當作 0
+                import pandas as pd
+                if pd.isna(val):
+                    continue
+                    
+                # 2. 將數值轉為字串，並移除 % 符號與隱藏的空白
+                val_str = str(val).strip().replace('%', '')
+                
+                # 3. 如果是這些特殊無效符號，也當作 0
+                if val_str.lower() in ['', '-', 'nan', 'none', 'null']:
+                    continue
+                    
+                # 4. 強制轉換為數學浮點數進行驗證
+                try:
+                    # 只要數字的絕對值大於 0.0001，就代表這是「真實有持股」的標的
+                    if abs(float(val_str)) > 0.0001:
+                        all_zero = False
+                        break
+                except ValueError:
+                    # 如果轉不成數字 (例如遇到奇怪的文字)，直接當作無效值跳過
+                    continue
             
-            # 如果每一天的持股都落在黑名單內，強制判定為未進榜
+            # 如果所有持股比例欄位檢查完都被判定為 0 (或空值)，則強制攔截，改顯示未進榜
             if all_zero:
                 st.write("⚪ 未進榜")
                 return
