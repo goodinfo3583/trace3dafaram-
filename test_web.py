@@ -391,12 +391,12 @@ if search_query:
             pure_stock_id = stock_id_match.group(0)
             
             # 🎛️ 建立控制面板
-            st.markdown("##### ⚙️ 技術線圖與指標配置面板")
-            selected_tf = st.radio("顯示 K 線週期：", ["日線", "週線", "月線"], horizontal=True, key="tf_select")
+            st.markdown("#####技術線圖與指標配置面板")
+            selected_tf = st.radio("▍顯示 K 線週期：", ["日線", "週線", "月線"], horizontal=True, key="tf_select")
             
             # 1. 均線顯示過濾器
             chosen_mas = st.multiselect(
-                "📈 顯示技術均線：", 
+                "▍ 顯示技術均線：", 
                 ["5MA", "10MA", "20MA", "60MA", "120MA", "240MA"], 
                 default=["5MA", "10MA", "20MA", "60MA", "120MA", "240MA"],
                 key="ma_select"
