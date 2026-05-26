@@ -976,7 +976,7 @@ if sorted_dates:
             
         filtered_df = final_df[mask].copy()
         
-        # 🎨 暗黑專業版高亮色系設定 (調高透明度以適配黑底，不破壞原設計)
+        # 🎨 暗黑專業版高亮色系設定
         def highlight_row(row):
             cnt = color_ref.get(row['股票代號'], 0)
             if cnt == 4: bg = 'background-color: rgba(240, 90, 90, 0.25)'     
@@ -988,12 +988,15 @@ if sorted_dates:
 
         styled_df = filtered_df.style.apply(highlight_row, axis=1)
         
+        # 1. 先顯示表格 (資料優先)
+        st.dataframe(styled_df, use_container_width=True)
+        
+        # 2. 下方再顯示補充說明與狀態訊息
         st.info("**今日上榜說明：** 5/20/60/120日，代表法人持股變化數據分析後於5/20/60/120日前段班，多榜單共振籌碼集中度高，長線具備底氣。")
         st.success(f"已成功串聯歷史的持股數據 (今日上榜共振數量排序優先)")
         
-        # 將洗乾淨的最終表格存入 session，讓下方搜尋區塊也能用到最乾淨的數據
+        # 將資料存入 session
         st.session_state['my_final_df'] = final_df
-        st.dataframe(styled_df, use_container_width=True)
 
         
 
