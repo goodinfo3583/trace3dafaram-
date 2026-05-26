@@ -1794,7 +1794,7 @@ with c2:
         date_str = re.search(r'\d{8}', msg_vol).group(0) if re.search(r'\d{8}', msg_vol) else "未知"
         
         st.dataframe(df_vol_clean, use_container_width=True, hide_index=True)
-        st.write(f" **最新檔案日期: {date_str}**")
+        st.write(f" **最新數據: {date_str}**")
     else:
         st.warning("⚠️ 無相符資料")
 
