@@ -718,20 +718,54 @@ if sorted_dates:
         final_df['今日上榜'] = final_df[latest_sect_col].apply(generate_tags)
         final_df['上榜數量'] = final_df['今日上榜'].apply(lambda x: str(x).count('日'))
             
-        # 🧠 量化動態判定邏輯核心 (洗盤回歸 與 衝進新榜單 整合版)
+        # 🧠 量化動態判定邏輯核心 (多重訊號疊加 + 高級吸籌型態)
         def evaluate_trend(row):
             if len(date_cols) < 2: return "⚪ 資料不足"
             
-            # 讀取今日與昨日的上榜區塊明細
+            dynamics = []
+            v0, v1 = row[date_cols[0]], row[date_cols[1]]
+            
+            # --- 1. 基礎趨勢與高級吸籌型態判定 ---
+            diff1 = v0 - v1  
+            if diff1 > 0:
+                is_slowing = False
+                if len(date_cols) >= 3:
+                    v2 = row[date_cols[2]]
+                    
+                    # 【階梯吸籌】：連三日嚴格遞增 (v0 > v1 > v2)
+                    if v0 > v1 > v2 > 0:
+                        dynamics.append("🪜 階梯吸籌")
+                    else:
+                        # 【穩健吸籌】：連四日不減碼，且整體有增加
+                        if len(date_cols) >= 4:
+                            v3 = row[date_cols[3]]
+                            if v0 >= v1 >= v2 >= v3 > 0 and v0 > v3:
+                                dynamics.append("🛡️ 穩健吸籌")
+                                
+                    # 趨緩判定
+                    if v1 != 0 and v2 != 0:
+                        diff2 = v1 - v2
+                        if diff2 > 0 and diff1 < diff2:
+                            dynamics.append("⚠️ 趨緩")
+                            is_slowing = True
+                            
+                # 若沒有被判定為趨緩，則加上基礎上升標籤
+                if not is_slowing:
+                    dynamics.append("📈 上升")
+                    
+            elif diff1 < 0: 
+                dynamics.append("📉 下降")
+            else: 
+                dynamics.append("🔄 持平")
+                
+            # --- 2. 特殊籌碼事件判定 (洗盤與衝進) ---
             today_sec_str = str(row.get(f"{sorted_dates[0]}_區塊", ""))
             yesterday_sec_str = str(row.get(f"{sorted_dates[1]}_區塊", ""))
             
             today_list = [s for s in today_sec_str.split(',') if s]
             yesterday_list = [s for s in yesterday_sec_str.split(',') if s]
             
-            v0, v1 = row[date_cols[0]], row[date_cols[1]]
-            
-            # 1. 🔍 【判定：洗盤回歸】 -> 今日重新上榜，但昨日完全不見，且更早之前曾經在榜內
+            # 🔍 【洗盤回歸】
             if v0 > 0 and v1 == 0:
                 has_past_record = False
                 for c in date_cols[2:]:
@@ -739,9 +773,9 @@ if sorted_dates:
                         has_past_record = True
                         break
                 if has_past_record:
-                    return "🔄 洗盤回歸"
+                    dynamics.append("🔄 洗盤回歸")
             
-            # 2. 🚀 【判定：衝進新榜單】 -> 原本已有1~3個榜單，今日數量增加且有新成員
+            # 🚀 【衝進新榜單】
             if 1 <= len(yesterday_list) <= 3 and len(today_list) > len(yesterday_list):
                 new_entries = [item for item in today_list if item not in yesterday_list]
                 if new_entries:
@@ -752,7 +786,9 @@ if sorted_dates:
                         elif '60日' in item: mapped_labels.append('🟢60日')
                         elif '120日' in item: mapped_labels.append('🔵120日')
                     if mapped_labels:
-                        return f"🚀 衝進{'、'.join(mapped_labels)}榜單"
+                        dynamics.append(f"🚀 衝進{'、'.join(mapped_labels)}榜單")
+            
+            return " | ".join(dynamics)
             
             # 3. 常規趨勢判定
             diff1 = v0 - v1  
@@ -1799,7 +1835,7 @@ with top_pool_container:
         rank_col = next((c for c in df_b1.columns if '今日上榜' in c or '上榜' in c), None)
         
         if dyn_col:
-            mask = df_b1[dyn_col].astype(str).str.contains('趨緩|上升|升|持平|加碼|延續|衝進|回歸', na=False)
+            mask = df_b1[dyn_col].astype(str).str.contains('趨緩|上升|升|持平|加碼|延續|吸籌|衝進|回歸', na=False)
             pool_df = df_b1[mask].copy()
         else:
             pool_df = df_b1.copy()
