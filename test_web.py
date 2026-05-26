@@ -1256,7 +1256,7 @@ else:
             
             if col_5d in df.columns:
                 df_s = df[['代號', '名稱', col_5d]].copy()
-                df_s = df_s.rename(columns={col_5d: f"{d_label}買發張數%"})
+                df_s = df_s.rename(columns={col_5d: f"{d_label}外資買發張數%"})
                 
                 if base_df is None:
                     base_df = df_s
@@ -1349,7 +1349,7 @@ else:
             
             if col_5d in df.columns:
                 df_s = df[['代號', '名稱', col_5d]].copy()
-                df_s = df_s.rename(columns={col_5d: f"{d_label}買發張數%"})
+                df_s = df_s.rename(columns={col_5d: f"{d_label}投信買發張數%"})
                 
                 if base_df is None:
                     base_df = df_s
