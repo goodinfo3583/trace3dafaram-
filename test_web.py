@@ -992,7 +992,7 @@ if sorted_dates:
         st.dataframe(styled_df, use_container_width=True)
         
         # 2. 下方再顯示補充說明與狀態訊息
-        st.info("**今日上榜說明：** 5/20/60/120日，代表法人持股變化數據分析後於5/20/60/120日前段班，多榜單共振籌碼集中度高，長線具備底氣。")
+        st.info("**今日上榜：**代表法人持股變化數據分析後於5/20/60/120日前段班，多榜單共振籌碼集中度高，長線具備底氣。")
         st.success(f"已成功串聯歷史的持股數據 (今日上榜共振數量排序優先)")
         
         # 將資料存入 session
@@ -1085,7 +1085,7 @@ else:
         **動態說明：** 🔥 強延續 (買盤加速) ⚠️ 趨緩 (買盤力道減弱) 🔄 持平 📉 調節洗盤 (微幅調節) 🚨 劇烈倒貨 (強烈賣出)
         """)
         
-        # UI 與過濾
+        # 1. UI 與過濾 (先處理好數據，才能顯示)
         c1, c2 = st.columns(2)
         show_etf = c1.checkbox("顯示 ETF", value=True, key="fo_etf_v9")
         show_bond = c2.checkbox("顯示 債券/債券ETF", value=True, key="fo_bond_v9")
@@ -1095,13 +1095,29 @@ else:
         if show_bond: mask |= csv_display['股票代號'].str.endswith('B')
         csv_display = csv_display[mask]
         
-        # 調整欄位順序
+        # 2. 調整欄位順序
         cols = ["股票代號", "股票名稱", "今日短動態", "當日買佔比%"] + [c for c in csv_display.columns if "買佔比%" in c and c != "當日買佔比%"]
         csv_display = csv_display[cols]
         csv_display.index = range(1, len(csv_display) + 1)
         
-        st.success(f"📊 已成功串聯交易日，追蹤共 {len(csv_display)} 檔：")
+        # ==========================================
+        # 🔥 顯示區塊 (調整順序：先表格，後說明)
+        # ==========================================
+        
+        # 先顯示表格
         st.dataframe(csv_display, use_container_width=True)
+        
+        # 再顯示補充說明與狀態訊息
+        st.info("""
+        **動態說明：** 🔥 強延續 (買盤加速) ⚠️ 趨緩 (買盤力道減弱) 🔄 持平 📉 調節洗盤 (微幅調節) 🚨 劇烈倒貨 (強烈賣出)
+        """)
+        st.success(f"📊 已成功串聯交易日，追蹤共 {len(csv_display)} 檔：")
+        
+        # 最後存入 Session State
+        st.session_state['df_blk2_1'] = csv_display
+        
+    else:
+        st.error("❌ 無法讀取外資買超數據，請檢查 CSV 欄位名稱是否包含『5日』與『成交』關鍵字。")
         
         # ==========================================================
         # 🔥 【重點新增】：將結果存入記憶體，供搜尋區塊讀取！
