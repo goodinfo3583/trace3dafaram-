@@ -1270,7 +1270,7 @@ else:
     if base_df is not None and len(date_labels) > 0:
         csv_display = base_df.fillna("未進榜").rename(columns={"代號": "股票代號", "名稱": "股票名稱"})
         
-        latest_5d_col = f"{date_labels[0]}買發張數%"
+        latest_5d_col = f"{date_labels[0]}外資買發張數%"
         if latest_5d_col in csv_display.columns:
             csv_display[latest_5d_col] = pd.to_numeric(csv_display[latest_5d_col].replace("未進榜", 0), errors='coerce').fillna(0)
             csv_display = csv_display.sort_values(by=latest_5d_col, ascending=False)
