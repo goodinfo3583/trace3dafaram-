@@ -233,10 +233,11 @@ def render_technical_chart(stock_id, timeframe="日線", selected_mas=[], show_r
         up_color = 'rgb(240, 90, 90)'     
         down_color = 'rgb(80, 200, 120)'  
 
-        # 5. 繪製主 K 線 (Row 1)
+        # 5. 繪製主 K 線 (🔥 圖例加上「顯示」兩字)
         fig.add_trace(go.Candlestick(
             x=daily_df.index, open=daily_df['Open'].squeeze(), high=daily_df['High'].squeeze(), 
-            low=daily_df['Low'].squeeze(), close=daily_df['Close'].squeeze(), name='K線',
+            low=daily_df['Low'].squeeze(), close=daily_df['Close'].squeeze(), 
+            name='👁️ 顯示 K線', # 👈 新增直覺提示
             increasing=dict(line=dict(color=up_color, width=1.5), fillcolor=up_color),
             decreasing=dict(line=dict(color=down_color, width=1.5), fillcolor=down_color),
             hovertemplate="開：%{open:.2f}<br>高：%{high:.2f}<br>低：%{low:.2f}<br>收：%{close:.2f}<extra></extra>"
@@ -253,14 +254,17 @@ def render_technical_chart(stock_id, timeframe="日線", selected_mas=[], show_r
                 latest_val = get_latest_price(ma_name)
                 fig.add_trace(go.Scatter(
                     x=daily_df.index, y=daily_df[ma_name].squeeze(), mode='lines', 
-                    name=f'{ma_name} ({latest_val})', line=dict(color=ma_config[ma_name]['color'], width=1.3),
+                    name=f'👁️ 顯示 {ma_name} ({latest_val})', # 👈 新增直覺提示
+                    line=dict(color=ma_config[ma_name]['color'], width=1.3),
                     hovertemplate=f"<b>{ma_name}</b>： %{{y:.2f}}<extra></extra>"
                 ), row=1, col=1)
 
-        # 6. 繪製成交量 (Row 2)
+        # 6. 繪製成交量
         vol_colors = [up_color if c >= o else down_color for c, o in zip(daily_df['Close'].squeeze(), daily_df['Open'].squeeze())]
         fig.add_trace(go.Bar(
-            x=daily_df.index, y=daily_df['Volume'].squeeze(), name='成交量', marker_color=vol_colors,
+            x=daily_df.index, y=daily_df['Volume'].squeeze(), 
+            name='👁️ 顯示 成交量', # 👈 新增直覺提示
+            marker_color=vol_colors,
             hovertemplate="<b>成交量</b>： %{y}<extra></extra>"
         ), row=2, col=1)
         fig.update_yaxes(title_text="成交量", row=2, col=1, title_font=dict(size=12, color="#E2E8F0"))
@@ -291,10 +295,10 @@ def render_technical_chart(stock_id, timeframe="日線", selected_mas=[], show_r
             fig.update_yaxes(title_text="MACD", row=current_row, col=1, title_font=dict(size=11, color="#E2E8F0"))
             current_row += 1
 
-        # 8. 版面美化與防重疊 (加大 left margin 讓左側文字有空間)
+        # 8. 版面美化與防重疊
         fig.update_layout(
             title=dict(
-                text=f'📊 {stock_id} 最新 {timeframe} 與綜合技術指標',
+                text=f'📊 {stock_id} 最新 {timeframe} 與綜合技術指標 (資料來源: Yahoo Finance)',
                 y=0.97, x=0.01, xanchor='left', yanchor='top', font=dict(color='#FFFFFF', size=16)
             ),
             xaxis_rangeslider_visible=False,
@@ -302,11 +306,15 @@ def render_technical_chart(stock_id, timeframe="日線", selected_mas=[], show_r
             template='plotly_dark',       
             paper_bgcolor='rgba(0,0,0,0)', 
             plot_bgcolor='rgba(0,0,0,0)',  
-            margin=dict(l=65, r=10, t=90, b=10), # 👈 將左邊距 l 增加到 65，給 Y 軸文字足夠的空間
+            # 🔥 左右邊距大對調！將 Y 軸留白推到右邊 (r=65)
+            margin=dict(l=10, r=65, t=90, b=10), 
             hovermode='x unified',
             hoverlabel=dict(bgcolor="#1A202C", font_size=13, font_color="#FFFFFF"),
             legend=dict(orientation="h", yanchor="bottom", y=1.01, xanchor="left", x=0.01, font=dict(color='#E2E8F0'))
         )
+        
+        # 🔥 將所有的 Y 軸統一移到右側 (side="right")
+        fig.update_yaxes(side="right")
         
         for r in range(1, rows + 1):
             fig.update_xaxes(hoverformat="%Y-%m-%d", tickformat="%Y-%m-%d", row=r, col=1)
@@ -322,7 +330,6 @@ def render_technical_chart(stock_id, timeframe="日線", selected_mas=[], show_r
             for r in range(1, rows + 1):
                 fig.update_xaxes(rangebreaks=[dict(bounds=["sat", "mon"])], row=r, col=1)
         
-        # 🔥 終極奧義：加入 config={'scrollZoom': True} 啟動手機兩指縮放與電腦滾輪縮放！
         st.plotly_chart(fig, use_container_width=True, key=f"kline_{stock_id}_{timeframe}_{len(selected_mas)}_{show_rsi}_{show_macd}_{show_kd}", config={'scrollZoom': True})
         
     except Exception as e:
@@ -370,20 +377,24 @@ def scan_and_display(title, session_key, query):
     else:
         st.write(f"⚪ **{title}**：未進榜")
 
-#==========================================
+# ==========================================
 # 🎯 搜尋輸入框
-#==========================================
+# ==========================================
 search_query = st.text_input("請輸入想觀測的股票代號或名稱 (例如: 3231 或 緯創，未顯示任何資料代表你的標的可能太弱了)：", key="global_search_final")
 
 if search_query:
     st.write(f"### 🎯 綜合診斷標的：{search_query}")
 
     # ==========================================
-    # 📈 K 線圖按鈕、均線篩選與技術指標切換
+    # 📈 K 線圖按鈕、週期切換與技術指標面板
     # ==========================================
     st.write("---")
     if 'show_kline' not in st.session_state:
         st.session_state.show_kline = False
+        
+    # 🧠 新增：用來記憶當前選中週期的狀態變數 (預設為日K)
+    if 'kline_period' not in st.session_state:
+        st.session_state.kline_period = "日線"
 
     button_label = "📊 關閉技術 K 線圖" if st.session_state.show_kline else "📊 載入最新技術 K 線圖"
     if st.button(button_label, use_container_width=True):
@@ -395,22 +406,29 @@ if search_query:
         stock_id_match = re.search(r'\d+', search_query)
         
         if stock_id_match:
-            # 👇 就是這行！必須比上面的 if 再往右退 4 個空白鍵
             pure_stock_id = stock_id_match.group(0)
             
-            # 🎛️ 建立控制面板
             st.markdown("技術線圖與指標配置面板")
-            selected_tf = st.radio(["日K", "周K", "月K"], horizontal=True, key="tf_select")
             
-            # 1. 均線顯示過濾器(刪除)
-            #chosen_mas = st.multiselect(
-            #    "▍ 顯示技術均線：", 
-            #    ["5MA", "10MA", "20MA", "60MA", "120MA", "240MA"], 
-            #    default=["5MA", "10MA", "20MA", "60MA", "120MA", "240MA"],
-            #   key="ma_select"
-            #)
+            # 🔥 終極改進：將 st.radio 換成橫向 3 按鈕，點擊立刻變更週期狀態並重繪
+            tf_c1, tf_c2, tf_c3 = st.columns(3)
             
-            # 2. 技術指標開關 (改成 3 欄，加入 KD)
+            # 幫目前被選中的按鈕加上特殊符號提示，讓使用者知道現在正在看哪一種K線
+            p_day = "👉 日K" if st.session_state.kline_period == "日線" else "日K"
+            p_week = "👉 周K" if st.session_state.kline_period == "週線" else "周K"
+            p_month = "👉 月K" if st.session_state.kline_period == "月線" else "月K"
+            
+            if tf_c1.button(p_day, use_container_width=True, key="btn_p_day"):
+                st.session_state.kline_period = "日線"
+                st.rerun()
+            if tf_c2.button(p_week, use_container_width=True, key="btn_p_week"):
+                st.session_state.kline_period = "週線"
+                st.rerun()
+            if tf_c3.button(p_month, use_container_width=True, key="btn_p_month"):
+                st.session_state.kline_period = "月線"
+                st.rerun()
+            
+            # 2. 技術指標開關 (維持 3 欄，加入 KD)
             ind_c1, ind_c2, ind_c3 = st.columns(3)
             chk_kd = ind_c1.checkbox("顯示 KD (9,3,3)", value=False, key="kd_chk")
             chk_macd = ind_c2.checkbox("顯示 MACD (12,26,9)", value=False, key="macd_chk")
@@ -418,12 +436,19 @@ if search_query:
             
             st.write("") # 留白
             
-            with st.spinner(f"正在擷取 {pure_stock_id} 的最新 {selected_tf} 及指標數據..."):
-                # 將勾選狀態傳送至上半部繪圖引擎
+            # 讀取當前記憶的週期，直接秀在 Spinner 上面
+            current_tf_name = {"日線": "日K", "週線": "周K", "月線": "月K"}.get(st.session_state.kline_period, "日K")
+            
+            with st.spinner(f"正在擷取 {pure_stock_id} 的最新 {current_tf_name} 及指標數據..."):
+                
+                # 預設全開 6 條均線
+                all_mas = ["5MA", "10MA", "20MA", "60MA", "120MA", "240MA"]
+                
+                # 呼叫繪圖引擎，將記憶的週期傳入
                 render_technical_chart(
                     stock_id=pure_stock_id, 
-                    timeframe=selected_tf, 
-                    selected_mas=chosen_mas, 
+                    timeframe=st.session_state.kline_period, 
+                    selected_mas=all_mas, 
                     show_rsi=chk_rsi, 
                     show_macd=chk_macd,
                     show_kd=chk_kd
