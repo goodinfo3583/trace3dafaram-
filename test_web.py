@@ -1967,9 +1967,9 @@ else:
             
         final_df = final_df.fillna("無資料")
         
-        st.success(f"已成功串連 {len(final_df)} 筆股東數據")
-        st.dataframe(final_df, use_container_width=True, hide_index=True)
         
+        st.dataframe(final_df, use_container_width=True, hide_index=True)
+        st.success(f"已成功串連 {len(final_df)} 筆股東數據")
         # 將最終結果同步存入記憶體，供搜尋區塊聯動掃描
         st.session_state['df_blk5'] = final_df
     else:
