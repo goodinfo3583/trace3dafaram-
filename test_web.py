@@ -348,7 +348,7 @@ def scan_and_display(title, session_key, query):
     
     # 只要查有資料，就印出標題與表格；若無資料，改用無背景純文字以求對齊
     if not res.empty:
-        st.write(f"**{title}**")
+        st.subheader(title) # 👈 關鍵修改：將原本的 st.write 升級為標準的副標題 st.subheader
         st.dataframe(res, use_container_width=True, hide_index=True)
     else:
         st.write(f"⚪ **{title}**：未進榜")
@@ -502,7 +502,7 @@ if search_query:
     # 📊 區塊 2：動能與外資診斷
     # ==========================================
     st.write("---")
-    st.write("#### 📊 區塊 2：法人買超診斷")
+    st.write("#### 🎯 區塊 2：法人買超診斷")
     c1, c2 = st.columns(2)
     with c1: scan_and_display("🌐區塊 2-1 -外資5日淨買佔標的成交量", 'df_blk2_1', search_query)
     with c2: scan_and_display("🏦區塊 2-2 -投信5日淨買佔標的成交量", 'df_blk2_2', search_query)
@@ -514,7 +514,7 @@ if search_query:
     # 📊 區塊 3：特定籌碼或大戶診斷 (4 榜全景)
     # ==========================================
     st.write("---")
-    st.write("#### 📊 區塊 3：法人連買診斷")
+    st.write("#### 📅 區塊 3：法人連買診斷")
     if 'df_blk3_main' in st.session_state:
         df_b3 = st.session_state['df_blk3_main']
         res_b3 = robust_search_engine(df_b3, search_query)
@@ -540,7 +540,7 @@ if search_query:
     # 📊 區塊 4：籌碼變動排名診斷 (三榜全景 + 強制去小數點)
     # ==========================================
     st.write("---")
-    st.write("#### 📊 區塊 4：券資有利排名")
+    st.write("#### 🔄 區塊 4：券資有利排名")
     
     def render_b4_panorama(view_title, keys_and_labels, query):
         display_list = []
@@ -586,12 +586,13 @@ if search_query:
     render_b4_panorama("5日張數變動排名", [('📉 融資減少', 'df_margin_vol'), ('📉 借券減少', 'df_short_vol'), ('📈 融券增加', 'df_margin_plus_vol')], search_query)
 
     # ==========================================
-    # 💎 區塊 5：神秘金字塔大戶動向
+    # 💎 區塊 5：大戶動向
     # ==========================================
     st.write("---")
-    st.write("#### 💰 區塊 5：大戶動向診斷")
+    st.subheader("💰 區塊 5：大戶動向診斷") # 👈 將原本的 st.write("#### ...") 統一改為 st.subheader
     scan_and_display("400張以上大戶動向", 'df_blk5', search_query)
 
+    
 # ==========================================
 # 🧭 側邊欄導航 (無感互動+視覺特效版)
 # ==========================================
