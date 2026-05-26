@@ -370,9 +370,9 @@ if search_query:
             target_score = match.iloc[0].get('總分', 0)
     
     if target_score is not None:
-        st.markdown(f"#### 🏆 系統綜合評分：<span style='color:#FFD700; font-size:24px;'>**{target_score}**</span> 分 <span style='color:#FFFFFF; font-size:14px; font-weight:normal;'>(評分數據僅供參考)</span>", unsafe_allow_html=True)
+        st.markdown(f"#### 🏆 模擬權重評分：<span style='color:#FFD700; font-size:24px;'>**{target_score}**</span> 分 <span style='color:#FFFFFF; font-size:14px; font-weight:normal;'>(評分數據僅供參考)</span>", unsafe_allow_html=True)
     else:
-        st.markdown("#### 🏆 系統綜合評分：<span style='color:#718096; font-size:18px;'>未達綜合進榜標準 (0分)</span> <span style='color:#FFFFFF; font-size:14px; font-weight:normal;'>(評分數據僅供參考)</span>", unsafe_allow_html=True)
+        st.markdown("#### 🏆 模擬權重評分：<span style='color:#718096; font-size:18px;'>未達綜合進榜標準 (0分)</span> <span style='color:#FFFFFF; font-size:14px; font-weight:normal;'>(評分數據僅供參考)</span>", unsafe_allow_html=True)
 
     # ==========================================
     # 📈 K 線圖按鈕、週期切換與技術指標面板
@@ -504,17 +504,17 @@ if search_query:
     st.write("---")
     st.write("#### 📊 區塊 2：法人買超診斷")
     c1, c2 = st.columns(2)
-    with c1: scan_and_display("🔹 區塊 2-1 -外資5日淨買佔標的成交量", 'df_blk2_1', search_query)
-    with c2: scan_and_display("🔹 區塊 2-2 -投信5日淨買佔標的成交量", 'df_blk2_2', search_query)
+    with c1: scan_and_display("🌐區塊 2-1 -外資5日淨買佔標的成交量", 'df_blk2_1', search_query)
+    with c2: scan_and_display("🏦區塊 2-2 -投信5日淨買佔標的成交量", 'df_blk2_2', search_query)
     c3, c4 = st.columns(2)
-    with c3: scan_and_display("🔹 區塊 2-3 -外資5日淨買佔公司發行量", 'df_blk2_3', search_query)
-    with c4: scan_and_display("🔹 區塊 2-4 -投信5日淨買佔公司發行量", 'df_blk2_4', search_query)
+    with c3: scan_and_display("🌐區塊 2-3 -外資5日淨買佔公司發行量", 'df_blk2_3', search_query)
+    with c4: scan_and_display("🏦區塊 2-4 -投信5日淨買佔公司發行量", 'df_blk2_4', search_query)
 
     # ==========================================
     # 📊 區塊 3：特定籌碼或大戶診斷 (4 榜全景)
     # ==========================================
     st.write("---")
-    st.write("#### 📊 區塊 3：法人連買排名診斷")
+    st.write("#### 📊 區塊 3：法人連買診斷")
     if 'df_blk3_main' in st.session_state:
         df_b3 = st.session_state['df_blk3_main']
         res_b3 = robust_search_engine(df_b3, search_query)
@@ -530,7 +530,7 @@ if search_query:
             else: display_list.append({'連買類型': b_type, '股票代號': display_id, '股票名稱': display_name, '狀態動態': '⚪ 未進榜', '連買週期數': '-'})
                 
         final_b3_display = pd.DataFrame(display_list)
-        st.write("**連續買超日數與連續買超週數 **")
+        st.write("連續買超日數 與 連續買超週數")
         st.dataframe(final_b3_display, use_container_width=True, hide_index=True)
     else:
         st.info("⚪ 區塊 3：尚未載入資料表 (請確認上半部區塊已執行)")
@@ -581,15 +581,15 @@ if search_query:
         st.markdown(f"##### {view_title}")
         st.dataframe(df_panorama[final_cols], use_container_width=True, hide_index=True)
 
-    render_b4_panorama("📊 5日幅度變動排名", [('📉 融資減少', 'df_margin_pct'), ('📉 借券減少', 'df_short_pct'), ('📈 融券增加', 'df_margin_plus_pct')], search_query)
+    render_b4_panorama("5日幅度變動排名", [('📉 融資減少', 'df_margin_pct'), ('📉 借券減少', 'df_short_pct'), ('📈 融券增加', 'df_margin_plus_pct')], search_query)
     st.write("") 
-    render_b4_panorama("📊 5日張數變動排名", [('📉 融資減少', 'df_margin_vol'), ('📉 借券減少', 'df_short_vol'), ('📈 融券增加', 'df_margin_plus_vol')], search_query)
+    render_b4_panorama("5日張數變動排名", [('📉 融資減少', 'df_margin_vol'), ('📉 借券減少', 'df_short_vol'), ('📈 融券增加', 'df_margin_plus_vol')], search_query)
 
     # ==========================================
     # 💎 區塊 5：神秘金字塔大戶動向
     # ==========================================
     st.write("---")
-    st.write("#### 💰 區塊 5：大股東動向")
+    st.write("#### 💰 區塊 5：大戶動向診斷")
     scan_and_display("400張以上大戶動向", 'df_blk5', search_query)
 
 # ==========================================
