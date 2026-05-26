@@ -2127,7 +2127,7 @@ with top_pool_container:
                     '總分': score,
                     '股票代號': sid,
                     '股票名稱': sname,
-                    '動態': b1_dyn,
+                    '最新動態': b1_dyn,
                     '今日上榜': b1_rank,  
                     '外買佔比': r_b2_1, '投買佔比': r_b2_2, '外佔發行': r_b2_3, '投佔發行': r_b2_4,
                     '外日連': r_b3_fd, '外週連': r_b3_fw, '投日連': r_b3_id, '投週連': r_b3_iw,
