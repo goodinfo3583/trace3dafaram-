@@ -361,6 +361,19 @@ search_query = st.text_input("請輸入想觀測的股票代號或名稱 (例如
 if search_query:
     st.write(f"### 🎯 綜合診斷標的：{search_query}")
 
+    # 🔥 模擬置頂區塊，動態顯示該標的總分
+    pool_df = st.session_state.get('top_pool_df', pd.DataFrame())
+    target_score = None
+    if not pool_df.empty:
+        match = robust_search_engine(pool_df, search_query)
+        if not match.empty:
+            target_score = match.iloc[0].get('總分', 0)
+    
+    if target_score is not None:
+        st.markdown(f"#### 🏆 系統綜合評分：<span style='color:#FFD700; font-size:24px;'>**{target_score}**</span> 分", unsafe_allow_html=True)
+    else:
+        st.markdown("#### 🏆 系統綜合評分：<span style='color:#718096; font-size:18px;'>未達綜合進榜標準 (0分)</span>", unsafe_allow_html=True)
+
     # ==========================================
     # 📈 K 線圖按鈕、週期切換與技術指標面板
     # ==========================================
@@ -368,11 +381,10 @@ if search_query:
     if 'show_kline' not in st.session_state:
         st.session_state.show_kline = False
         
-    # 🧠 新增：用來記憶當前選中週期的狀態變數 (預設為日K)
     if 'kline_period' not in st.session_state:
         st.session_state.kline_period = "日線"
 
-    button_label = "📊 關閉技術 K 線圖" if st.session_state.show_kline else "📊 載入最新技術 K 線圖"
+    button_label = "❌ 關閉技術 K 線圖" if st.session_state.show_kline else "📊 載入最新技術 K 線圖"
     if st.button(button_label, use_container_width=True):
         st.session_state.show_kline = not st.session_state.show_kline
         st.rerun()
@@ -384,12 +396,11 @@ if search_query:
         if stock_id_match:
             pure_stock_id = stock_id_match.group(0)
             
-            st.markdown("技術線圖與指標配置面板")
+            st.markdown("##### ⚙️ 技術線圖與指標配置面板")
             
-            # 🔥 終極改進：將 st.radio 換成橫向 3 按鈕，點擊立刻變更週期狀態並重繪
-            tf_c1, tf_c2, tf_c3 = st.columns(3)
+            # 🔥 縮小按鈕魔法：將版面切成 4 塊，前面 3 塊極小，後面留白
+            tf_c1, tf_c2, tf_c3, _space = st.columns([1, 1, 1, 5])
             
-            # 幫目前被選中的按鈕加上特殊符號提示，讓使用者知道現在正在看哪一種K線
             p_day = "👉 日K" if st.session_state.kline_period == "日線" else "日K"
             p_week = "👉 周K" if st.session_state.kline_period == "週線" else "周K"
             p_month = "👉 月K" if st.session_state.kline_period == "月線" else "月K"
@@ -404,23 +415,17 @@ if search_query:
                 st.session_state.kline_period = "月線"
                 st.rerun()
             
-            # 2. 技術指標開關 (維持 3 欄，加入 KD)
             ind_c1, ind_c2, ind_c3 = st.columns(3)
             chk_kd = ind_c1.checkbox("顯示 KD (9,3,3)", value=False, key="kd_chk")
             chk_macd = ind_c2.checkbox("顯示 MACD (12,26,9)", value=False, key="macd_chk")
             chk_rsi = ind_c3.checkbox("顯示 RSI (14)", value=False, key="rsi_chk")
             
-            st.write("") # 留白
+            st.write("") 
             
-            # 讀取當前記憶的週期，直接秀在 Spinner 上面
             current_tf_name = {"日線": "日K", "週線": "周K", "月線": "月K"}.get(st.session_state.kline_period, "日K")
             
             with st.spinner(f"正在擷取 {pure_stock_id} 的最新 {current_tf_name} 及指標數據..."):
-                
-                # 預設全開 6 條均線
                 all_mas = ["5MA", "10MA", "20MA", "60MA", "120MA", "240MA"]
-                
-                # 呼叫繪圖引擎，將記憶的週期傳入
                 render_technical_chart(
                     stock_id=pure_stock_id, 
                     timeframe=st.session_state.kline_period, 
