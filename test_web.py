@@ -59,6 +59,20 @@ st.markdown(
         border: 1px solid #1E293B !important;
         border-radius: 6px;
     }
+    /* 7. 側邊欄與全站超連結顏色優化 (解決暗色背景下看不清的問題) */
+    [data-testid="stSidebar"] a {
+        color: #00D2FF !important; /* 預設改為高對比的明亮科技青藍色 */
+        text-decoration: none !important; /* 移除預設的醜陋底線 */
+        font-weight: 500 !important; /* 字體稍微加粗增加辨識度 */
+        letter-spacing: 0.5px; /* 增加一點字距讓排版更透氣 */
+        transition: all 0.3s ease; /* 加入顏色變化的平滑轉場動畫 */
+    }
+    
+    /* 當滑鼠游標移過去時的特效 */
+    [data-testid="stSidebar"] a:hover {
+        color: #FFD700 !important; /* 游標滑過瞬間變成高貴金 */
+        text-shadow: 0px 0px 8px rgba(255, 215, 0, 0.5); /* 加上輕微的金色發光效果 */
+    }
     </style>
     """,
     unsafe_allow_html=True
