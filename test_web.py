@@ -11,9 +11,9 @@ import re
 st.set_page_config(page_title="台股籌碼五大核心矩陣儀表板", layout="wide")
 
 st.markdown("""
-<div style='text-align: center; background-color: #FFFDF0; padding: 20px; border-radius: 15px; border: 2px dashed #FFB700;'>
-    <h1 style='color: #DDA400; margin-bottom: 5px;'>🐝 祝阿東順利畢業 - 每天都是美好的一天 🍯</h1>
-    <p style='color: #665220; font-size: 16px; font-weight: bold;'>🌾 論文衝刺必勝 ｜ 香臘滿滿 ｜ 加速起漲雷達 ლ(∘◕‵ƹ′◕ლ)</p>
+<div style='text-align: center; background-color: #FFFDF0; padding: 20px; border-radius: 15px; border: 2px dashed #006400;'>
+    <h1 style='color: #A52A2A; margin-bottom: 5px;'>🐝 祝阿東順利畢業 - 每天都是美好的一天 🍯</h1>
+    <p style='color: #082567; font-size: 16px; font-weight: bold;'>🌾 論文衝刺必勝 ｜ 香臘滿滿 ｜ 加速起漲雷達 ლ(∘◕‵ƹ′◕ლ)</p>
 </div>
 """, unsafe_allow_html=True)
 
