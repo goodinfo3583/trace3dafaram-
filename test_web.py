@@ -714,8 +714,8 @@ st.sidebar.markdown("[💰 區塊5：大股東動向](#section-5)")
 # ==========================================
 st.write("---")
 st.markdown("<div id='section-1'></div>", unsafe_allow_html=True)
-#st.header("👑 區塊1：三大法人短中長線持股比追蹤")
-st.markdown(f"### 👑 區塊 1：短中長線三大法人持股比追蹤 <span style='font-size:16px; color:#00D2FF; font-weight:400;'>(更新日期: {latest_date_str})</span>", unsafe_allow_html=True)
+st.header("👑 區塊1：三大法人短中長線持股比追蹤)
+
 import re
 import os
 import glob
