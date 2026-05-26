@@ -516,47 +516,72 @@ if search_query:
 
  
     # ==========================================
-    # 👑 區塊 1：中長線三大法人持股
+    # 👑 區塊 1：短中長線三大法人持股變化 (搜尋結果專屬顯示)
     # ==========================================
-    st.write("#### 👑 區塊 1：短中長線三大法人持股變化")
+    st.write("---")
+    st.subheader("👑 區塊 1：短中長線三大法人持股變化")
+    
     if 'my_final_df' in st.session_state:
-        q_blk1 = robust_search_engine(st.session_state['my_final_df'], search_query)
-        if not q_blk1.empty:
-            st.dataframe(q_blk1.drop(columns=["秘密3日斜率"], errors='ignore'), use_container_width=True, hide_index=True)
-            chart_cols = [c for c in q_blk1.columns if "持股%" in c]
-            if chart_cols:
-                target_cols = chart_cols[:30] 
-                raw_vals = pd.to_numeric(q_blk1.iloc[0][target_cols].values, errors='coerce')
-                t_ser = pd.Series(
-                    raw_vals, index=[c.split(' ')[0] for c in target_cols]
-                ).replace(0, None).dropna().iloc[::-1]
-                
-                if not t_ser.empty:
-                    st.write(f"📈 **持股 {len(t_ser)}日波段真實軌跡 ({q_blk1.iloc[0].get('股票名稱', '標的')})**")
-                    st.line_chart(t_ser, height=240)
-                    st.write("🚀 **籌碼斜率 (與最新持股相比淨增減)**")
+        df_b1 = st.session_state['my_final_df']
+        res_b1 = robust_search_engine(df_b1, search_query)
+        
+        if not res_b1.empty:
+            date_cols = [c for c in res_b1.columns if '持股%' in c or c.isdigit()]
+            
+            # 🔥 判斷是否整排全部都是 "未進榜"
+            is_all_unranked = True
+            for c in date_cols:
+                val = str(res_b1.iloc[0][c]).strip()
+                if val != "未進榜" and val not in ['0', '0.0', 'nan', '-']:
+                    is_all_unranked = False
+                    break
                     
-                    def get_slope_ui(label, n_days):
-                        if len(target_cols) >= n_days:
-                            v_new = pd.to_numeric(q_blk1.iloc[0][target_cols[0]], errors='coerce')
-                            v_old = pd.to_numeric(q_blk1.iloc[0][target_cols[n_days-1]], errors='coerce')
-                            if pd.notna(v_new) and pd.notna(v_old) and v_old != 0 and v_new != 0:
-                                diff = round(v_new - v_old, 2)
-                                color = "red" if diff > 0 else "green" if diff < 0 else "black"
-                                return f"<div style='text-align:left; padding:5px;'><div style='font-size:14px; color:gray;'>{label}</div><div style='font-size:22px; font-weight:bold; color:{color};'>{diff:+.2f} %</div></div>"
-                        return f"<div style='text-align:left; padding:5px;'><div style='font-size:14px; color:gray;'>{label}</div><div style='font-size:16px; font-weight:normal; margin-top:5px;'>無對應資料</div></div>"
-
-                    col1, col2, col3, col4 = st.columns(4)
-                    col1.markdown(get_slope_ui("2日斜率", 2), unsafe_allow_html=True)
-                    col2.markdown(get_slope_ui("3日斜率", 3), unsafe_allow_html=True)
-                    col3.markdown(get_slope_ui("5日斜率", 5), unsafe_allow_html=True)
-                    col4.markdown(get_slope_ui("20日斜率", 20), unsafe_allow_html=True)
-                else:
-                    st.info("⚪ 該標的有效數據過少，無法繪製波段圖表。")
+            if is_all_unranked:
+                # 只要全部都是未進榜，就連圖表都不畫了，乾淨俐落！
+                st.write("未進榜")
+            else:
+                # 有真實數據，印出乾淨的表格
+                st.dataframe(res_b1, use_container_width=True, hide_index=True)
+                
+                # 📊 繪製持股波段軌跡圖
+                row = res_b1.iloc[0]
+                stock_name = row.get('股票名稱', search_query)
+                
+                # 將 "未進榜" 的文字，在畫圖時默默還原成 0.0，避免圖表當機
+                x_vals = date_cols[::-1]
+                y_vals = []
+                for c in x_vals:
+                    val = row[c]
+                    if str(val) == "未進榜" or pd.isna(val):
+                        y_vals.append(0.0)
+                    else:
+                        try:
+                            y_vals.append(float(val))
+                        except:
+                            y_vals.append(0.0)
+                            
+                import plotly.graph_objects as go
+                fig_b1 = go.Figure()
+                fig_b1.add_trace(go.Bar(
+                    x=x_vals, y=y_vals,
+                    marker_color=['#FF4B4B' if i == len(y_vals)-1 else '#4B8BFF' for i in range(len(y_vals))],
+                    text=[f"{v}%" if v > 0 else "" for v in y_vals], # 只有大於0的柱子才顯示數字
+                    textposition='outside'
+                ))
+                fig_b1.update_layout(
+                    title=f"📈 持股波段真實軌跡 ({stock_name})",
+                    height=300,
+                    template='plotly_dark',
+                    margin=dict(l=20, r=20, t=40, b=20),
+                    yaxis=dict(title="持股比例 (%)", showgrid=True, gridcolor='#2D3748'),
+                    xaxis=dict(tickangle=45),
+                    dragmode='pan'
+                )
+                st.plotly_chart(fig_b1, use_container_width=True, config={'displayModeBar': False})
         else:
-            st.info("⚪ 區塊 1：未進榜 ")
+            st.write("未進榜")
     else:
-        st.error("⚠️ 尚未載入區塊 1 資料。請確認上方區塊 1 已執行。")
+        st.info("⚪ 尚未載入資料表")
 
     # ==========================================
     # 📊 區塊 2：動能與外資診斷
@@ -918,6 +943,24 @@ if sorted_dates:
         final_df = final_df[cols]
         
         # ==========================================
+        # 🧹 源頭數據清洗：整理小數點並將 0 替換為 "未進榜"
+        # ==========================================
+        if not final_df.empty:
+            import pandas as pd
+            # 抓出所有可能是歷史持股%的欄位
+            clean_cols = [c for c in final_df.columns if '持股%' in c or c.isdigit()]
+            
+            for col in clean_cols:
+                # 1. 確保全部轉為數字，無法轉換的會變成空值 NaN
+                final_df[col] = pd.to_numeric(final_df[col], errors='coerce')
+                
+                # 2. 核心清洗：如果小於 0.0001 (也就是0) 或是空值，直接寫入 "未進榜"
+                #    如果是真實持股數字，則強制四捨五入到小數點第二位，保持極度乾淨！
+                final_df[col] = final_df[col].apply(
+                    lambda x: "未進榜" if pd.isna(x) or abs(x) < 0.0001 else round(x, 2)
+                )
+
+        # ==========================================
         # 🔧 UI 顯示與過濾 (保留勾選框，隱藏文字)
         # ==========================================
         c1, c2 = st.columns(2)
@@ -941,13 +984,15 @@ if sorted_dates:
             elif cnt == 3: bg = 'background-color: rgba(255, 165, 0, 0.25)'    
             elif cnt == 2: bg = 'background-color: rgba(80, 200, 120, 0.25)'    
             elif cnt == 1: bg = 'background-color: rgba(0, 127, 255, 0.25)'    
-            else: bg = 'background-color: #111622; color: #E2E8F0'                                                   
+            else: bg = 'background-color: #111622; color: #E2E8F0'                                                                         
             return [bg] * len(row)
 
         styled_df = filtered_df.style.apply(highlight_row, axis=1)
         
         st.info("**今日上榜說明：** 5/20/60/120日，代表法人持股變化數據分析後於5/20/60/120日前段班，多榜單共振籌碼集中度高，長線具備底氣。")
-        st.success(f"已成功串聯 {len(date_cols)} 個交易日的持股數據 (今日上榜共振數量排序優先)")
+        st.success(f"已成功串聯歷史的持股數據 (今日上榜共振數量排序優先)")
+        
+        # 將洗乾淨的最終表格存入 session，讓下方搜尋區塊也能用到最乾淨的數據
         st.session_state['my_final_df'] = final_df
         st.dataframe(styled_df, use_container_width=True)
     else:
