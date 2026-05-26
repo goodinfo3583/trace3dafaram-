@@ -1515,14 +1515,14 @@ st.subheader("📅 最新單日連續買超")
 c_day1, c_day2 = st.columns(2)
 
 with c_day1:
-    st.markdown(f"🌐 **外資最新日連買** *(最新檔案日期: {date_fo_day if date_fo_day else '無資料'})*")
+    st.markdown(f"🌐 **外資最新日連買** *(最新數據: {date_fo_day if date_fo_day else '無資料'})*")
     if not live_fo_day.empty:
         st.dataframe(live_fo_day, use_container_width=True)
     else:
         st.write("無資料")
 
 with c_day2:
-    st.markdown(f"🏦 **投信最新日連買** *(最新檔案日期: {date_it_day if date_it_day else '無資料'})*")
+    st.markdown(f"🏦 **投信最新日連買** *(最新數據: {date_it_day if date_it_day else '無資料'})*")
     if not live_it_day.empty:
         st.dataframe(live_it_day, use_container_width=True)
     else:
@@ -1534,14 +1534,14 @@ st.subheader("📅 最新單週連續波段買超")
 c_wk1, c_wk2 = st.columns(2)
 
 with c_wk1:
-    st.markdown(f"🌐 **外資最新週連買** *(最新檔案日期: {date_fo_wk if date_fo_wk else '無資料'})*")
+    st.markdown(f"🌐 **外資最新週連買** *(最新數據: {date_fo_wk if date_fo_wk else '無資料'})*")
     if not live_fo_wk.empty:
         st.dataframe(live_fo_wk, use_container_width=True)
     else:
         st.write("無資料")
 
 with c_wk2:
-    st.markdown(f"🏦 **投信最新週連買** *(最新檔案日期: {date_it_wk if date_it_wk else '無資料'})*")
+    st.markdown(f"🏦 **投信最新週連買** *(最新數據: {date_it_wk if date_it_wk else '無資料'})*")
     if not live_it_wk.empty:
         st.dataframe(live_it_wk, use_container_width=True)
     else:
