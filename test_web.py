@@ -1080,11 +1080,7 @@ else:
 
         csv_display['今日短動態'] = csv_display.apply(evaluate_continuity, axis=1)
         
-        # 動態說明對照表
-        st.info("""
-        **動態說明：** 🔥 強延續 (買盤加速) ⚠️ 趨緩 (買盤力道減弱) 🔄 持平 📉 調節洗盤 (微幅調節) 🚨 劇烈倒貨 (強烈賣出)
-        """)
-        
+               
         # 1. UI 與過濾 (先處理好數據，才能顯示)
         c1, c2 = st.columns(2)
         show_etf = c1.checkbox("顯示 ETF", value=True, key="fo_etf_v9")
@@ -1107,14 +1103,14 @@ else:
         # 先顯示表格
         st.dataframe(csv_display, use_container_width=True)
         
-        # 再顯示補充說明與狀態訊息
+        # # 動態說明對照表
         st.info("""
         **動態說明：** 🔥 強延續 (買盤加速) ⚠️ 趨緩 (買盤力道減弱) 🔄 持平 📉 調節洗盤 (微幅調節) 🚨 劇烈倒貨 (強烈賣出)
         """)
         # ==========================================================
         # 🔥 【重點新增】：將結果存入記憶體，供搜尋區塊讀取！
         # ==========================================================
-        st.success(f"📊 已成功串聯交易日，追蹤共 {len(csv_display)} 檔：")
+        st.success(f"已成功串聯交易日，追蹤共 {len(csv_display)} 檔：")
         
         # 最後存入 Session State
         st.session_state['df_blk2_1'] = csv_display
