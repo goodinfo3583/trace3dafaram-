@@ -19,68 +19,46 @@ def extract_date_from_name(filepath):
     date_match = re.search(r'(\d+)', filename)
     return date_match.group(1) if date_match else "00000000"
 # ==========================================
-# 🌌 注入極致黑看盤軟體專屬風格樣式 (全站深色化 + 表格優化)
+# 🌌 注入極致黑看盤軟體專屬風格樣式 (全站深色化 + 表格與按鈕優化)
 # ==========================================
 st.markdown(
     """
     <style>
     /* 1. 變更全站主背景色 */
-    .stApp {
-        background-color: #0A0D14 !important;
-    }
+    .stApp { background-color: #0A0D14 !important; }
     
-    /* 2. 強制所有標題與內文變成明亮的灰白色 (解決黑底黑字問題) */
-    h1, h2, h3, h4, h5, h6, p, label, .stMarkdown, .stText {
-        color: #E2E8F0 !important;
-    }
+    /* 2. 強制標題與內文變成明亮的灰白 */
+    h1, h2, h3, h4, h5, h6, p, label, .stMarkdown, .stText { color: #E2E8F0 !important; }
     
-    /* 3. 除資訊區塊(阿東順利畢業)的刺眼背景，改為隱形融入黑底 */
-    [data-testid="stAlert"] {
-        background-color: transparent !important;
-        border: 1px solid #2D3748 !important;
-    }
+    /* 3. 隱藏預設的通知背景 */
+    [data-testid="stAlert"] { background-color: transparent !important; border: 1px solid #2D3748 !important; }
     
-    /* 4. 變更側邊欄目錄背景色與邊框 */
-    [data-testid="stSidebar"] {
-        background-color: #111622 !important;
-        border-right: 1px solid #1E293B;
-    }
+    /* 4. 側邊欄背景色與邊框 */
+    [data-testid="stSidebar"] { background-color: #111622 !important; border-right: 1px solid #1E293B; }
     
-    /* 5. 優化輸入框、按鈕等元件 */
-    .stTextInput>div>div>input {
-        background-color: #1A202C !important;
-        color: #FFFFFF !important;
-        border: 1px solid #4A5568 !important;
-    }
+    /* 5. 輸入框等元件 */
+    .stTextInput>div>div>input { background-color: #1A202C !important; color: #FFFFFF !important; border: 1px solid #4A5568 !important; }
     
-    /* 6. 表格與數據網格深色化修正 (防止白色突兀刺眼) */
-    div[data-testid="stDataFrame"] {
-        background-color: #111622 !important;
-        border: 1px solid #1E293B !important;
-        border-radius: 6px;
-    }
-    /* 7. 側邊欄與全站超連結顏色優化 (解決暗色背景下看不清的問題) */
-    [data-testid="stSidebar"] a {
-        color: #00D2FF !important; /* 預設改為高對比的明亮科技青藍色 */
-        text-decoration: none !important; /* 移除預設的醜陋底線 */
-        font-weight: 500 !important; /* 字體稍微加粗增加辨識度 */
-        letter-spacing: 0.5px; /* 增加一點字距讓排版更透氣 */
-        transition: all 0.3s ease; /* 加入顏色變化的平滑轉場動畫 */
-    }
+    /* 6. 表格深色化修正 */
+    div[data-testid="stDataFrame"] { background-color: #111622 !important; border: 1px solid #1E293B !important; border-radius: 6px; }
+
+    /* 7. 超連結優化 */
+    [data-testid="stSidebar"] a { color: #00D2FF !important; text-decoration: none !important; font-weight: 500 !important; letter-spacing: 0.5px; transition: all 0.3s ease; }
+    [data-testid="stSidebar"] a:hover { color: #FFD700 !important; text-shadow: 0px 0px 8px rgba(255, 215, 0, 0.5); }
     
-    /* 當滑鼠游標移過去時的特效 */
-    [data-testid="stSidebar"] a:hover {
-        color: #FFD700 !important; /* 游標滑過瞬間變成高貴金 */
-        text-shadow: 0px 0px 8px rgba(255, 215, 0, 0.5); /* 加上輕微的金色發光效果 */
+    /* 8. 🔴 全局按鈕與連結按鈕護眼暗黑化 (解決刺眼問題) */
+    .stButton > button, .stLinkButton > a {
+        background-color: #1E293B !important; /* 深石板灰 */
+        color: #94A3B8 !important; /* 低調灰字 */
+        border: 1px solid #334155 !important;
+        transition: all 0.2s ease-in-out;
     }
-    
-    /* 8. 均線 (MA) 多選標籤專屬顏色綁定 (與 K 線圖顏色完美同步) */
-    span[data-baseweb="tag"]:has(span[title="5MA"]) { background-color: #FFCC00 !important; color: #000000 !important; }
-    span[data-baseweb="tag"]:has(span[title="10MA"]) { background-color: #CC66FF !important; color: #FFFFFF !important; }
-    span[data-baseweb="tag"]:has(span[title="20MA"]) { background-color: #00CCFF !important; color: #000000 !important; }
-    span[data-baseweb="tag"]:has(span[title="60MA"]) { background-color: #33FF33 !important; color: #000000 !important; }
-    span[data-baseweb="tag"]:has(span[title="120MA"]) { background-color: #FF3333 !important; color: #FFFFFF !important; }
-    span[data-baseweb="tag"]:has(span[title="240MA"]) { background-color: #FFFF33 !important; color: #000000 !important; }
+    /* 滑鼠懸停時才亮起科技藍 */
+    .stButton > button:hover, .stLinkButton > a:hover {
+        border-color: #00D2FF !important;
+        color: #00D2FF !important;
+        box-shadow: 0 0 8px rgba(0, 210, 255, 0.2);
+    }
     </style>
     """,
     unsafe_allow_html=True
