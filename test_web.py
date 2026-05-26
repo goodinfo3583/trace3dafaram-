@@ -377,7 +377,7 @@ if search_query:
     if 'show_kline' not in st.session_state:
         st.session_state.show_kline = False
 
-    button_label = "❌ 關閉技術 K 線圖" if st.session_state.show_kline else "📊 載入最新技術 K 線圖"
+    button_label = "📊 關閉技術 K 線圖" if st.session_state.show_kline else "📊 載入最新技術 K 線圖"
     if st.button(button_label, use_container_width=True):
         st.session_state.show_kline = not st.session_state.show_kline
         st.rerun()
@@ -396,7 +396,7 @@ if search_query:
             
             # 1. 均線顯示過濾器
             chosen_mas = st.multiselect(
-                "📈 選擇欲顯示的技術均線：", 
+                "📈 顯示技術均線：", 
                 ["5MA", "10MA", "20MA", "60MA", "120MA", "240MA"], 
                 default=["5MA", "10MA", "20MA", "60MA", "120MA", "240MA"],
                 key="ma_select"
@@ -404,9 +404,9 @@ if search_query:
             
             # 2. 技術指標開關 (改成 3 欄，加入 KD)
             ind_c1, ind_c2, ind_c3 = st.columns(3)
-            chk_kd = ind_c1.checkbox("📈 顯示 KD (9,3,3)", value=False, key="kd_chk")
-            chk_macd = ind_c2.checkbox("📊 顯示 MACD (12,26,9)", value=False, key="macd_chk")
-            chk_rsi = ind_c3.checkbox("🔮 顯示 RSI (14)", value=False, key="rsi_chk")
+            chk_kd = ind_c1.checkbox("顯示 KD (9,3,3)", value=False, key="kd_chk")
+            chk_macd = ind_c2.checkbox("顯示 MACD (12,26,9)", value=False, key="macd_chk")
+            chk_rsi = ind_c3.checkbox("顯示 RSI (14)", value=False, key="rsi_chk")
             
             st.write("") # 留白
             
