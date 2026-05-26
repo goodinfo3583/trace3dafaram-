@@ -1110,7 +1110,7 @@ else:
         # ==========================================================
         # 🔥 【重點新增】：將結果存入記憶體，供搜尋區塊讀取！
         # ==========================================================
-        st.success(f"已成功串聯 {len(date_labels)} 交易日追蹤共 {len(csv_display)} 檔")
+        st.success(f"已成功串聯交易日追蹤共 {len(csv_display)} 檔")
         
         # 最後存入 Session State
         st.session_state['df_blk2_1'] = csv_display
@@ -1213,7 +1213,7 @@ else:
         
         
         st.dataframe(csv_display, use_container_width=True)
-        st.success(f"已成功串聯 {len(date_labels)} 交易日追蹤共 {len(csv_display)} 檔")
+        st.success(f"已成功串聯交易日追蹤共 {len(csv_display)} 檔")
         # 🔥 【連動儲存】：存入對應的快搜抽屜
         st.session_state['df_blk2_2'] = csv_display
     else:
@@ -1303,7 +1303,7 @@ else:
         csv_display.index = range(1, len(csv_display) + 1)
         
         #表格
-        st.dataframe(csv_display, use_container_width=True)
+        st.dataframe(csv_display, use_container_width=True) 
         #說明
         st.success(f"已成功串聯 {len(date_labels)} 個交易日追蹤共 {len(csv_display)} 檔")
         
