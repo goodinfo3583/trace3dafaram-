@@ -370,9 +370,9 @@ if search_query:
             target_score = match.iloc[0].get('總分', 0)
     
     if target_score is not None:
-        st.markdown(f"#### 🏆 系統綜合評分：<span style='color:#FFD700; font-size:24px;'>**{target_score}**</span> 分", unsafe_allow_html=True)
+        st.markdown(f"#### 🏆 系統綜合評分：<span style='color:#FFD700; font-size:24px;'>**{target_score}**</span> 分 <span style='color:#FFFFFF; font-size:14px; font-weight:normal;'>(評分數據僅供參考)</span>", unsafe_allow_html=True)
     else:
-        st.markdown("#### 🏆 系統綜合評分：<span style='color:#718096; font-size:18px;'>未達綜合進榜標準 (0分)</span>", unsafe_allow_html=True)
+        st.markdown("#### 🏆 系統綜合評分：<span style='color:#718096; font-size:18px;'>未達綜合進榜標準 (0分)</span> <span style='color:#FFFFFF; font-size:14px; font-weight:normal;'>(評分數據僅供參考)</span>", unsafe_allow_html=True)
 
     # ==========================================
     # 📈 K 線圖按鈕、週期切換與技術指標面板
@@ -1884,7 +1884,7 @@ with top_pool_container:
 
     # 2. 顯示帶有最新日期的科技感標題
     st.markdown(f"## 🏆 數據分析觀察名單 <span style='font-size:18px; color:#00D2FF; font-weight:500;'>(最新數據: {latest_date_str})</span>", unsafe_allow_html=True)
-    st.info("💡 **權重評分**：法人持股上榜搭配其他數據分析積分。")
+    st.info("💡 **權重評分**：法人持股上榜搭配其他數據分析積分。(評分數據僅供參考)")
 
     if 'my_final_df' not in st.session_state or st.session_state['my_final_df'].empty:
         st.warning("⚠️ 尚未載入區塊 1 資料，無法進行選股池評比。")
