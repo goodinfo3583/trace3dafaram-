@@ -286,7 +286,7 @@ def render_technical_chart(stock_id, timeframe="日線", selected_mas=[], show_r
         # 8. 版面美化與防重疊 (加大 left margin 讓左側文字有空間)
         fig.update_layout(
             title=dict(
-                text=f'📊 {stock_id} 最新 {timeframe} 與綜合技術指標 (資料來源: Yahoo Finance)',
+                text=f'📊 {stock_id} 最新 {timeframe} 與綜合技術指標',
                 y=0.97, x=0.01, xanchor='left', yanchor='top', font=dict(color='#FFFFFF', size=16)
             ),
             xaxis_rangeslider_visible=False,
@@ -392,7 +392,7 @@ if search_query:
             
             # 🎛️ 建立控制面板
             st.markdown("##### ⚙️ 技術線圖與指標配置面板")
-            selected_tf = st.radio("⏳ 選擇 K 線週期：", ["日線", "週線", "月線"], horizontal=True, key="tf_select")
+            selected_tf = st.radio("顯示 K 線週期：", ["日線", "週線", "月線"], horizontal=True, key="tf_select")
             
             # 1. 均線顯示過濾器
             chosen_mas = st.multiselect(
