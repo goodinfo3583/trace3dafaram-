@@ -350,27 +350,52 @@ if search_query:
     st.write(f"### 🎯 綜合診斷標的：{search_query}")
 
     # ==========================================
-    # 📈 K 線圖按鈕與週期切換 (防呆中文過濾版)
+    # 📈 K 線圖按鈕、均線篩選與技術指標切換
     # ==========================================
     st.write("---")
     if 'show_kline' not in st.session_state:
         st.session_state.show_kline = False
 
-    button_label = " 關閉技術 K 線圖" if st.session_state.show_kline else "📊 載入最新技術 K 線圖"
+    button_label = "❌ 關閉技術 K 線圖" if st.session_state.show_kline else "📊 載入最新技術 K 線圖"
     if st.button(button_label, use_container_width=True):
         st.session_state.show_kline = not st.session_state.show_kline
         st.rerun()
 
     if st.session_state.show_kline:
         import re
-        # 嚴格要求輸入內容必須含有數字代碼
         stock_id_match = re.search(r'\d+', search_query)
         
         if stock_id_match:
             pure_stock_id = stock_id_match.group(0)
-            selected_tf = st.radio("⏳ 選擇 K 線週期：", ["日線", "週線", "月線"], horizontal=True)
-            with st.spinner(f"正在擷取 {pure_stock_id} 的 {selected_tf} 資料..."):
-                render_technical_chart(pure_stock_id, selected_tf)
+            
+            # 🎛️ 建立控制面板
+            st.markdown("##### ⚙️ 技術線圖與指標配置面板")
+            selected_tf = st.radio("⏳ 選擇 K 線週期：", ["日線", "週線", "月線"], horizontal=True, key="tf_select")
+            
+            # 1. 均線顯示過濾器 (預設全選，使用者可自行取消勾選特定均線)
+            chosen_mas = st.multiselect(
+                "📈 選擇欲顯示的技術均線：", 
+                ["5MA", "10MA", "20MA", "60MA", "120MA", "240MA"], 
+                default=["5MA", "10MA", "20MA", "60MA", "120MA", "240MA"],
+                key="ma_select"
+            )
+            
+            # 2. 技術指標開關
+            ind_c1, ind_c2 = st.columns(2)
+            chk_rsi = ind_c1.checkbox("🔮 顯示 RSI 強弱指標 (14)", value=False, key="rsi_chk")
+            chk_macd = ind_c2.checkbox("📊 顯示 MACD 趨勢指標 (12, 26, 9)", value=False, key="macd_chk")
+            
+            st.write("") # 留白
+            
+            with st.spinner(f"正在擷取 {pure_stock_id} 的最新 {selected_tf} 及指標數據..."):
+                # 將勾選狀態完美傳送至上半部升級後的繪圖引擎
+                render_technical_chart(
+                    stock_id=pure_stock_id, 
+                    timeframe=selected_tf, 
+                    selected_mas=chosen_mas, 
+                    show_rsi=chk_rsi, 
+                    show_macd=chk_macd
+                )
         else:
             st.warning("⚠️ 技術 K 線圖目前僅支援代號查詢。請在上方輸入框加入股票代號。")
 
