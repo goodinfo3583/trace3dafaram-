@@ -207,15 +207,15 @@ def render_technical_chart(stock_id, timeframe="日線", selected_mas=[], show_r
 
         fig = make_subplots(rows=rows, cols=1, shared_xaxes=True, 
                             vertical_spacing=0.02, row_heights=row_heights)
-
+        #繪製K線選擇顏色
         up_color = 'rgb(240, 90, 90)'     
         down_color = 'rgb(80, 200, 120)'  
 
-        # 5. 繪製主 K 線 (🔥 圖例加上「顯示」兩字)
+        # 5. 繪製主 K 線 (乾淨名稱)
         fig.add_trace(go.Candlestick(
             x=daily_df.index, open=daily_df['Open'].squeeze(), high=daily_df['High'].squeeze(), 
             low=daily_df['Low'].squeeze(), close=daily_df['Close'].squeeze(), 
-            name='👁️ 顯示 K線', # 👈 新增直覺提示
+            name='K線',
             increasing=dict(line=dict(color=up_color, width=1.5), fillcolor=up_color),
             decreasing=dict(line=dict(color=down_color, width=1.5), fillcolor=down_color),
             hovertemplate="開：%{open:.2f}<br>高：%{high:.2f}<br>低：%{low:.2f}<br>收：%{close:.2f}<extra></extra>"
@@ -232,24 +232,24 @@ def render_technical_chart(stock_id, timeframe="日線", selected_mas=[], show_r
                 latest_val = get_latest_price(ma_name)
                 fig.add_trace(go.Scatter(
                     x=daily_df.index, y=daily_df[ma_name].squeeze(), mode='lines', 
-                    name=f'👁️ 顯示 {ma_name} ({latest_val})', # 👈 新增直覺提示
+                    name=f'{ma_name} ({latest_val})', 
                     line=dict(color=ma_config[ma_name]['color'], width=1.3),
                     hovertemplate=f"<b>{ma_name}</b>： %{{y:.2f}}<extra></extra>"
                 ), row=1, col=1)
 
-        # 6. 繪製成交量
+        # 6. 繪製成交量 (🔥 showlegend=False 徹底從圖例中隱藏)
         vol_colors = [up_color if c >= o else down_color for c, o in zip(daily_df['Close'].squeeze(), daily_df['Open'].squeeze())]
         fig.add_trace(go.Bar(
             x=daily_df.index, y=daily_df['Volume'].squeeze(), 
-            name='👁️ 顯示 成交量', # 👈 新增直覺提示
+            name='成交量', 
             marker_color=vol_colors,
+            showlegend=False, 
             hovertemplate="<b>成交量</b>： %{y}<extra></extra>"
         ), row=2, col=1)
         fig.update_yaxes(title_text="成交量", row=2, col=1, title_font=dict(size=12, color="#E2E8F0"))
 
         # 7. 動態追加技術指標畫布
         current_row = 3
-        
         if show_kd:
             fig.add_trace(go.Scatter(x=daily_df.index, y=daily_df['K'].squeeze(), mode='lines', name='K (9)', line=dict(color='#00CCFF', width=1.2), hovertemplate="<b>K</b>: %{y:.2f}<extra></extra>"), row=current_row, col=1)
             fig.add_trace(go.Scatter(x=daily_df.index, y=daily_df['D'].squeeze(), mode='lines', name='D (3)', line=dict(color='#FFCC00', width=1.2), hovertemplate="<b>D</b>: %{y:.2f}<extra></extra>"), row=current_row, col=1)
@@ -276,7 +276,7 @@ def render_technical_chart(stock_id, timeframe="日線", selected_mas=[], show_r
         # 8. 版面美化與防重疊
         fig.update_layout(
             title=dict(
-                text=f'📊 {stock_id} 最新 {timeframe} 與綜合技術指標 (資料來源: Yahoo Finance)',
+                text=f'📊 {stock_id} 最新 {timeframe} 與綜合技術指標', # 🔥 移除了 Yahoo Finance 來源字眼
                 y=0.97, x=0.01, xanchor='left', yanchor='top', font=dict(color='#FFFFFF', size=16)
             ),
             xaxis_rangeslider_visible=False,
@@ -284,16 +284,14 @@ def render_technical_chart(stock_id, timeframe="日線", selected_mas=[], show_r
             template='plotly_dark',       
             paper_bgcolor='rgba(0,0,0,0)', 
             plot_bgcolor='rgba(0,0,0,0)',  
-            # 🔥 左右邊距大對調！將 Y 軸留白推到右邊 (r=65)
             margin=dict(l=10, r=65, t=90, b=10), 
             hovermode='x unified',
             hoverlabel=dict(bgcolor="#1A202C", font_size=13, font_color="#FFFFFF"),
-            legend=dict(orientation="h", yanchor="bottom", y=1.01, xanchor="left", x=0.01, font=dict(color='#E2E8F0'))
+            # 🔥 新增 legend_title_text="顯示：" 達成您的要求
+            legend=dict(title_text="👉 顯示：", title_font=dict(color='#00D2FF', size=13), orientation="h", yanchor="bottom", y=1.01, xanchor="left", x=0.01, font=dict(color='#E2E8F0'))
         )
         
-        # 🔥 將所有的 Y 軸統一移到右側 (side="right")
         fig.update_yaxes(side="right")
-        
         for r in range(1, rows + 1):
             fig.update_xaxes(hoverformat="%Y-%m-%d", tickformat="%Y-%m-%d", row=r, col=1)
         
