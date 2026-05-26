@@ -116,9 +116,9 @@ st.write("---")
 st.markdown("<div id='section-search'></div>", unsafe_allow_html=True)
 st.subheader("🔍 個股籌碼快搜 (全方位診斷)")
 # ==========================================
-# 📈 專業 K 線圖與技術分析引擎 (yfinance 終極暗黑專業版)
+# 📈 專業 K 線圖與技術分析引擎 (多指標動態整合暗黑版)
 # ==========================================
-def render_technical_chart(stock_id, timeframe="日線"):
+def render_technical_chart(stock_id, timeframe="日線", selected_mas=[], show_rsi=False, show_macd=False):
     import yfinance as yf
     import plotly.graph_objects as go
     from plotly.subplots import make_subplots
@@ -126,6 +126,7 @@ def render_technical_chart(stock_id, timeframe="日線"):
     import streamlit as st
 
     try:
+        # 1. 智慧連線：下載歷史資料
         ticker_tw = f"{stock_id}.TW"
         ticker_two = f"{stock_id}.TWO"
         
@@ -134,12 +135,12 @@ def render_technical_chart(stock_id, timeframe="日線"):
             df = yf.download(ticker_two, period="5y", progress=False)
             
         if df is None or df.empty:
-            st.warning(f"⚠️ 無法從 Yahoo Finance 取得 {stock_id} 的即時報價，請確認代號是否正確。")
+            st.warning(f"⚠️ 無法從 Yahoo Finance 取得 {stock_id} 的即時報價。")
             return
 
+        # 清洗雙層欄位
         if isinstance(df.columns, pd.MultiIndex):
             df.columns = df.columns.get_level_values(0)
-            
         df = df.loc[:, ~df.columns.duplicated()]
 
         if df.index.tz is not None:
@@ -149,6 +150,7 @@ def render_technical_chart(stock_id, timeframe="日線"):
 
         daily_df = df.copy()
 
+        # 週線/月線轉換
         if timeframe == "週線":
             daily_df = daily_df.resample('W-FRI').agg({
                 'Open': 'first', 'High': 'max', 'Low': 'min', 'Close': 'last', 'Volume': 'sum'
@@ -158,9 +160,29 @@ def render_technical_chart(stock_id, timeframe="日線"):
                 'Open': 'first', 'High': 'max', 'Low': 'min', 'Close': 'last', 'Volume': 'sum'
             }).dropna()
 
+        # 2. 計算選定的均線
         ma_windows = [5, 10, 20, 60, 120, 240]
         for ma in ma_windows:
             daily_df[f'{ma}MA'] = daily_df['Close'].rolling(window=ma).mean()
+
+        # 3. 內建量化指標計算 (不依賴外部套件，確保雲端不報錯)
+        close_series = daily_df['Close'].squeeze()
+        
+        if show_rsi:
+            delta = close_series.diff()
+            gain = delta.clip(lower=0)
+            loss = -delta.clip(upper=0)
+            ema_gain = gain.ewm(com=13, adjust=False).mean()
+            ema_loss = loss.ewm(com=13, adjust=False).mean()
+            rs = ema_gain / ema_loss.replace(0, 1e-9)
+            daily_df['RSI'] = 100 - (100 / (1 + rs))
+
+        if show_macd:
+            ema12 = close_series.ewm(span=12, adjust=False).mean()
+            ema26 = close_series.ewm(span=26, adjust=False).mean()
+            daily_df['DIF'] = ema12 - ema26
+            daily_df['MACD_Sign'] = daily_df['DIF'].ewm(span=9, adjust=False).mean()
+            daily_df['MACD_Hist'] = daily_df['DIF'] - daily_df['MACD_Sign']
 
         def get_latest_price(col):
             valid_data = daily_df[col].dropna()
@@ -170,76 +192,109 @@ def render_technical_chart(stock_id, timeframe="日線"):
                 return f"{float(val):.2f}"
             return "-"
 
-        fig = make_subplots(rows=2, cols=1, shared_xaxes=True, 
-                            vertical_spacing=0.03, row_heights=[0.7, 0.3])
+        # 4. 智慧動態調配畫布高度
+        rows = 2
+        row_heights = [0.6, 0.15]
+        if show_rsi:
+            rows += 1
+            row_heights.append(0.12)
+        if show_macd:
+            rows += 1
+            row_heights.append(0.13)
+
+        fig = make_subplots(rows=rows, cols=1, shared_xaxes=True, 
+                            vertical_spacing=0.03, row_heights=row_heights)
 
         up_color = 'rgb(240, 90, 90)'     
         down_color = 'rgb(80, 200, 120)'  
 
-        open_p, high_p = daily_df['Open'].squeeze(), daily_df['High'].squeeze()
-        low_p, close_p = daily_df['Low'].squeeze(), daily_df['Close'].squeeze()
-        vol = daily_df['Volume'].squeeze()
-
-        # 6. 繪製 K 線 (🔥 移除 hovertemplate 內重複的日期，讓它只顯示在標題)
+        # 5. 繪製主 K 線 (Row 1)
         fig.add_trace(go.Candlestick(
-            x=daily_df.index, open=open_p, high=high_p, low=low_p, close=close_p, name='K線',
+            x=daily_df.index, open=daily_df['Open'].squeeze(), high=daily_df['High'].squeeze(), 
+            low=daily_df['Low'].squeeze(), close=daily_df['Close'].squeeze(), name='K線',
             increasing=dict(line=dict(color=up_color, width=1.5), fillcolor=up_color),
             decreasing=dict(line=dict(color=down_color, width=1.5), fillcolor=down_color),
-            # 👇 就是改了這下面這一行，把原本的 <b>%{x|%Y-%m-%d}</b> 刪掉了！
             hovertemplate="開：%{open:.2f}<br>高：%{high:.2f}<br>低：%{low:.2f}<br>收：%{close:.2f}<extra></extra>"
         ), row=1, col=1)
 
-        colors = ['#F4B400', '#CC66FF', '#00CCFF', '#33FF33', '#FF3333', '#FFFF33']
-        for idx, ma in enumerate(ma_windows):
-            latest_val = get_latest_price(f'{ma}MA')
-            fig.add_trace(go.Scatter(
-                x=daily_df.index, y=daily_df[f'{ma}MA'].squeeze(), mode='lines', 
-                name=f'{ma}MA ({latest_val})', line=dict(color=colors[idx], width=1.3),
-                hovertemplate=f"<b>{ma}MA</b>： %{{y:.2f}}<extra></extra>"
-            ), row=1, col=1)
+        # 6. 依據篩選勾選狀態，動態渲染均線
+        ma_config = {
+            '5MA': {'color': '#FFCC00'}, '10MA': {'color': '#CC66FF'},
+            '20MA': {'color': '#00CCFF'}, '60MA': {'color': '#33FF33'},
+            '120MA': {'color': '#FF3333'}, '240MA': {'color': '#FFFF33'}
+        }
+        for ma_name in selected_mas:
+            if ma_name in daily_df.columns:
+                latest_val = get_latest_price(ma_name)
+                fig.add_trace(go.Scatter(
+                    x=daily_df.index, y=daily_df[ma_name].squeeze(), mode='lines', 
+                    name=f'{ma_name} ({latest_val})', line=dict(color=ma_config[ma_name]['color'], width=1.3),
+                    hovertemplate=f"<b>{ma_name}</b>： %{{y:.2f}}<extra></extra>"
+                ), row=1, col=1)
 
-        vol_colors = [up_color if c >= o else down_color for c, o in zip(close_p, open_p)]
+        # 7. 繪製成交量 (Row 2)
+        vol_colors = [up_color if c >= o else down_color for c, o in zip(daily_df['Close'].squeeze(), daily_df['Open'].squeeze())]
         fig.add_trace(go.Bar(
-            x=daily_df.index, y=vol, name='成交量', marker_color=vol_colors,
+            x=daily_df.index, y=daily_df['Volume'].squeeze(), name='成交量', marker_color=vol_colors,
             hovertemplate="<b>成交量</b>： %{y}<extra></extra>"
         ), row=2, col=1)
 
+        # 8. 動態追加技術指標畫布
+        current_row = 3
+        if show_rsi:
+            fig.add_trace(go.Scatter(
+                x=daily_df.index, y=daily_df['RSI'].squeeze(), mode='lines', name='RSI (14)', 
+                line=dict(color='#E1BEE7', width=1.5), hovertemplate="<b>RSI</b>: %{y:.2f}<extra></extra>"
+            ), row=current_row, col=1)
+            # 繪製 20, 50, 80 超買超賣參考線
+            fig.add_hline(y=80, line_dash="dash", line_color="rgba(240,90,90,0.4)", row=current_row, col=1)
+            fig.add_hline(y=20, line_dash="dash", line_color="rgba(80,200,120,0.4)", row=current_row, col=1)
+            current_row += 1
+
+        if show_macd:
+            # 繪製 DIF 與 MACD 單線
+            fig.add_trace(go.Scatter(x=daily_df.index, y=daily_df['DIF'].squeeze(), mode='lines', name='DIF', line=dict(color='#FFF', width=1)), row=current_row, col=1)
+            fig.add_trace(go.Scatter(x=daily_df.index, y=daily_df['MACD_Sign'].squeeze(), mode='lines', name='MACD', line=dict(color='#FFCC00', width=1)), row=current_row, col=1)
+            # 繪製柱狀圖 (紅漲綠跌)
+            hist_colors = [up_color if h >= 0 else down_color for h in daily_df['MACD_Hist'].squeeze()]
+            fig.add_trace(go.Bar(x=daily_df.index, y=daily_df['MACD_Hist'].squeeze(), name='柱狀圖', marker_color=hist_colors), row=current_row, col=1)
+            current_row += 1
+
+        # 9. 版面美化與防重疊
         fig.update_layout(
             title=dict(
-                text=f'📊 {stock_id} 最新 {timeframe} 與成交量 (資料來源: Yahoo Finance)',
-                y=0.96, x=0.01, xanchor='left', yanchor='top',
-                font=dict(color='#FFFFFF', size=16)
+                text=f'📊 {stock_id} 最新 {timeframe} 與綜合技術指標 (資料來源: Yahoo Finance)',
+                y=0.97, x=0.01, xanchor='left', yanchor='top', font=dict(color='#FFFFFF', size=16)
             ),
             yaxis_title='股價 (TWD)',
             xaxis_rangeslider_visible=False,
-            height=700,
+            height=650 + (rows - 2) * 100, # 隨指標多寡動態增高圖表高度
             template='plotly_dark',       
             paper_bgcolor='rgba(0,0,0,0)', 
             plot_bgcolor='rgba(0,0,0,0)',  
-            margin=dict(l=10, r=10, t=100, b=10), # 增加頂部間距至 100px 完美避開重疊
+            margin=dict(l=10, r=10, t=90, b=10),
             hovermode='x unified',
-            hoverlabel=dict(bgcolor="#1A202C", font_size=14, font_family="Arial", font_color="#FFFFFF"),
-            legend=dict(
-                orientation="h", yanchor="bottom", y=1.02, xanchor="left", x=0.01,
-                font=dict(color='#E2E8F0')
-            )
+            hoverlabel=dict(bgcolor="#1A202C", font_size=13, font_color="#FFFFFF"),
+            legend=dict(orientation="h", yanchor="bottom", y=1.01, xanchor="left", x=0.01, font=dict(color='#E2E8F0'))
         )
         
-        # 強制指定 X 軸的顯示與統一全數字日期格式（徹底拔除英文月份標籤）
-        fig.update_xaxes(hoverformat="%Y-%m-%d", tickformat="%Y-%m-%d", row=1, col=1)
-        fig.update_xaxes(hoverformat="%Y-%m-%d", tickformat="%Y-%m-%d", row=2, col=1)
+        # 統一設定所有子圖表的 X 軸格式
+        for r in range(1, rows + 1):
+            fig.update_xaxes(hoverformat="%Y-%m-%d", tickformat="%Y-%m-%d", row=r, col=1)
         
+        # 動態對焦
         if not daily_df.empty:
             latest_date = daily_df.index[-1] 
             start_date = latest_date - pd.Timedelta(days=140) 
             zoom_range = [start_date.strftime('%Y-%m-%d'), latest_date.strftime('%Y-%m-%d')]
-            fig.update_xaxes(range=zoom_range, row=1, col=1)
-            fig.update_xaxes(range=zoom_range, row=2, col=1)
+            for r in range(1, rows + 1):
+                fig.update_xaxes(range=zoom_range, row=r, col=1)
         
         if timeframe == "日線":
-            fig.update_xaxes(rangebreaks=[dict(bounds=["sat", "mon"])], row=1, col=1)
+            for r in range(1, rows + 1):
+                fig.update_xaxes(rangebreaks=[dict(bounds=["sat", "mon"])], row=r, col=1)
         
-        st.plotly_chart(fig, use_container_width=True, key=f"kline_{stock_id}_{timeframe}")
+        st.plotly_chart(fig, use_container_width=True, key=f"kline_{stock_id}_{timeframe}_{len(selected_mas)}_{show_rsi}_{show_macd}")
         
     except Exception as e:
         st.error(f"❌ 繪製 K 線圖時發生錯誤: {str(e)}")
