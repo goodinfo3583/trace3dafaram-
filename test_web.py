@@ -566,7 +566,6 @@ if search_query:
             else: display_list.append({'連買類型': b_type, '股票代號': display_id, '股票名稱': display_name, '狀態動態': '⚪ 未進榜', '連買週期數': '-'})
                 
         final_b3_display = pd.DataFrame(display_list)
-        st.subheader("連續買超日數 與 連續買超週數") # 🔥 已經放大為副標題，與下方區塊 4 對齊
         st.dataframe(final_b3_display, use_container_width=True, hide_index=True)
     else:
         st.info("⚪ 區塊 3：尚未載入資料表 (請確認上半部區塊已執行)")
