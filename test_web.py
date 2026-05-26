@@ -110,13 +110,13 @@ def generate_stock_commentary(row):
     else:
         return "❄️ 【弱勢整理】籌碼處於流失或無主力認養狀態，資金效率低。若無特殊題材發酵，短期內建議暫不考量。"
 # ==========================================
-# 🔍 個股籌碼快搜 (全區塊聯動掃描版 - 終極全景版)
+# 🔍 個股籌碼快搜 "標題" (全區塊聯動掃描版 - 終極全景版)
 # ==========================================
 st.write("---")
 st.markdown("<div id='section-search'></div>", unsafe_allow_html=True)
 st.subheader("🔍 個股籌碼快搜 (全方位診斷)")
 # ==========================================
-# 📈 專業 K 線圖與技術分析引擎 (加入 KD、Y軸標籤與手機縮放)
+# 📈 繪製 K 線圖與技術分析引擎 (加入 KD、Y軸標籤與手機縮放)
 # ==========================================
 def render_technical_chart(stock_id, timeframe="日線", selected_mas=[], show_rsi=False, show_macd=False, show_kd=False):
     import yfinance as yf
@@ -2023,7 +2023,7 @@ with top_pool_container:
             res_df = pd.DataFrame(results)
             res_df = res_df.sort_values(by='總分', ascending=False).reset_index(drop=True)
             st.dataframe(res_df, use_container_width=True, hide_index=True)
-            st.success(f"🎯 頂級選股池掃描完成！共過濾出 {len(res_df)} 檔潛力標的。")
+            st.success(f"選股池掃描完成！共過濾出 {len(res_df)} 檔潛力標的。")
             st.session_state['top_pool_df'] = res_df
 # ==========================================
 # 📊 【蜂蜜計數器】本站累計觀測人次統計
