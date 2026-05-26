@@ -73,6 +73,14 @@ st.markdown(
         color: #FFD700 !important; /* 游標滑過瞬間變成高貴金 */
         text-shadow: 0px 0px 8px rgba(255, 215, 0, 0.5); /* 加上輕微的金色發光效果 */
     }
+    
+    /* 8. 均線 (MA) 多選標籤專屬顏色綁定 (與 K 線圖顏色完美同步) */
+    span[data-baseweb="tag"]:has(span[title="5MA"]) { background-color: #FFCC00 !important; color: #000000 !important; }
+    span[data-baseweb="tag"]:has(span[title="10MA"]) { background-color: #CC66FF !important; color: #FFFFFF !important; }
+    span[data-baseweb="tag"]:has(span[title="20MA"]) { background-color: #00CCFF !important; color: #000000 !important; }
+    span[data-baseweb="tag"]:has(span[title="60MA"]) { background-color: #33FF33 !important; color: #000000 !important; }
+    span[data-baseweb="tag"]:has(span[title="120MA"]) { background-color: #FF3333 !important; color: #FFFFFF !important; }
+    span[data-baseweb="tag"]:has(span[title="240MA"]) { background-color: #FFFF33 !important; color: #000000 !important; }
     </style>
     """,
     unsafe_allow_html=True
@@ -391,7 +399,7 @@ if search_query:
             pure_stock_id = stock_id_match.group(0)
             
             # 🎛️ 建立控制面板
-            st.markdown("#####技術線圖與指標配置面板")
+            st.markdown("技術線圖與指標配置面板")
             selected_tf = st.radio("▍顯示 K 線週期：", ["日線", "週線", "月線"], horizontal=True, key="tf_select")
             
             # 1. 均線顯示過濾器
