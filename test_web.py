@@ -354,9 +354,11 @@ def robust_search_engine(df, query):
         
     return df[mask]
 
-# 🎯 建立通用掃描與顯示工具 (修正左右高度完全對稱、未進榜排版優化)
+# ==========================================
+# 🎯 建立通用掃描與顯示工具 (修正左右對稱、精準攔截0%未進榜假象)
+# ==========================================
 def scan_and_display(title, session_key, query):
-    # 🔥 關鍵修改 1：先不管有沒有資料，標題一律用 subheader 頂固，確保左右 columns 完全對齊
+    # 先不管有沒有資料，標題一律用 subheader 頂固，確保左右 columns 完全對齊
     st.subheader(title)
     
     if session_key not in st.session_state:
@@ -371,22 +373,25 @@ def scan_and_display(title, session_key, query):
     res = robust_search_engine(df, query)
     
     if not res.empty:
-        # 🔥 關鍵修改 2：特殊處理區塊 1，如果查詢出來的歷史持股%全為 0 或 "-"，代表實際並未進榜
-        if session_key == 'my_final_df':
-            pct_cols = [c for c in res.columns if '持股%' in c]
+        # 🔥 終極攔截器：只要這個表格有「持股%」或「佔比」欄位，就去檢查
+        pct_cols = [c for c in res.columns if '持股%' in c or '佔比' in c]
+        if pct_cols:
             all_zero = True
             for c in pct_cols:
-                val = str(res.iloc[0][c]).strip()
-                if val != '0' and val != '0.00' and val != '-' and val != '':
+                # 轉成字串並轉小寫，去除所有隱藏空白
+                val = str(res.iloc[0][c]).strip().lower()
+                # 把可能出現的「無效值」的各種變形全部列入黑名單
+                if val not in ['0', '0.0', '0.00', '0%', '0.00%', '-', '', 'nan', 'none']:
                     all_zero = False
                     break
+            
+            # 如果每一天的持股都落在黑名單內，強制判定為未進榜
             if all_zero:
                 st.write("⚪ 未進榜")
                 return
                 
         st.dataframe(res, use_container_width=True, hide_index=True)
     else:
-        # 🔥 關鍵修改 3：下方統一乾淨顯示 "⚪ 未進榜"，不再包含冗長重複的標題字眼
         st.write("⚪ 未進榜")
 
 # ==========================================
@@ -550,7 +555,7 @@ if search_query:
     # 📊 區塊 3： (4 榜全景)
     # ==========================================
     st.write("---")
-    st.subheader("📅 區塊 3：法人連買診斷")
+    st.subheader("📅 區塊 3：法人連買診斷(日、週)")
     if 'df_blk3_main' in st.session_state:
         df_b3 = st.session_state['df_blk3_main']
         res_b3 = robust_search_engine(df_b3, search_query)
