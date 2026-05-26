@@ -1736,7 +1736,7 @@ with c1:
         date_str = re.search(r'\d{8}', msg_pct).group(0) if re.search(r'\d{8}', msg_pct) else "未知"
         
         st.dataframe(df_pct_clean, use_container_width=True, hide_index=True)
-        st.write(f" **最新檔案日期: {date_str}**")
+        st.write(f" **最新數據: {date_str}**")
     else:
         st.warning("⚠️ 無相符資料")
 
@@ -1747,8 +1747,9 @@ with c2:
     
     if not df_vol_clean.empty:
         date_str = re.search(r'\d{8}', msg_vol).group(0) if re.search(r'\d{8}', msg_vol) else "未知"
-        st.write(f" **最新檔案日期: {date_str}**")
+        
         st.dataframe(df_vol_clean, use_container_width=True, hide_index=True)
+        st.write(f" **最新數據: {date_str}**")
     else:
         st.warning("⚠️ 無相符資料")
 
@@ -1778,8 +1779,9 @@ with c1:
     if not df_pct_clean.empty:
         # 👈 核心修改：只過濾出 8 碼日期字串
         date_str = re.search(r'\d{8}', msg_pct).group(0) if re.search(r'\d{8}', msg_pct) else "未知"
-        st.write(f" **最新檔案日期: {date_str}**")
+        
         st.dataframe(df_pct_clean, use_container_width=True, hide_index=True)
+        st.write(f" **最新數據: {date_str}**")
     else:
         st.warning("⚠️ 無相符資料")
 
@@ -1790,8 +1792,9 @@ with c2:
     
     if not df_vol_clean.empty:
         date_str = re.search(r'\d{8}', msg_vol).group(0) if re.search(r'\d{8}', msg_vol) else "未知"
-        st.write(f" **最新檔案日期: {date_str}**")
+        
         st.dataframe(df_vol_clean, use_container_width=True, hide_index=True)
+        st.write(f" **最新檔案日期: {date_str}**")
     else:
         st.warning("⚠️ 無相符資料")
 
@@ -1821,8 +1824,9 @@ with c1:
     if not df_pct_clean.empty:
         # 👈 核心修改：只過濾出 8 碼日期字串
         date_str = re.search(r'\d{8}', msg_pct).group(0) if re.search(r'\d{8}', msg_pct) else "未知"
-        st.write(f" **最新檔案日期: {date_str}**")
+        
         st.dataframe(df_pct_clean, use_container_width=True, hide_index=True)
+        st.write(f" **最新數據: {date_str}**")
     else:
         st.warning("⚠️ 無相符資料")
 
@@ -1833,8 +1837,9 @@ with c2:
     
     if not df_vol_clean.empty:
         date_str = re.search(r'\d{8}', msg_vol).group(0) if re.search(r'\d{8}', msg_vol) else "未知"
-        st.write(f" **最新檔案日期: {date_str}**")
+        
         st.dataframe(df_vol_clean, use_container_width=True, hide_index=True)
+        st.write(f" **最新數據: {date_str}**")
     else:
         st.warning("⚠️ 無相符資料")
 
