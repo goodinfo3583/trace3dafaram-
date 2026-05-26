@@ -395,35 +395,27 @@ if search_query:
         stock_id_match = re.search(r'\d+', search_query)
         
         if stock_id_match:
-            # 👇 就是這行！必須比上面的 if 再往右退 4 個空白鍵
             pure_stock_id = stock_id_match.group(0)
             
-            # 🎛️ 建立控制面板
-            st.markdown("技術線圖與指標配置面板")
-            selected_tf = st.radio("▍顯示 K 線週期：", ["日線", "週線", "月線"], horizontal=True, key="tf_select")
+            # 🎛️ 建立控制面板 (移除多餘的均線下拉選單，介面更清爽)
+            st.markdown("##### ⚙️ 技術線圖與指標配置面板")
+            selected_tf = st.radio("⏳ 選擇 K 線週期：", ["日線", "週線", "月線"], horizontal=True, key="tf_select")
             
-            # 1. 均線顯示過濾器
-            chosen_mas = st.multiselect(
-                "▍ 顯示技術均線：", 
-                ["5MA", "10MA", "20MA", "60MA", "120MA", "240MA"], 
-                default=["5MA", "10MA", "20MA", "60MA", "120MA", "240MA"],
-                key="ma_select"
-            )
-            
-            # 2. 技術指標開關 (改成 3 欄，加入 KD)
+            # 技術指標開關
             ind_c1, ind_c2, ind_c3 = st.columns(3)
-            chk_kd = ind_c1.checkbox("顯示 KD (9,3,3)", value=False, key="kd_chk")
-            chk_macd = ind_c2.checkbox("顯示 MACD (12,26,9)", value=False, key="macd_chk")
-            chk_rsi = ind_c3.checkbox("顯示 RSI (14)", value=False, key="rsi_chk")
+            chk_kd = ind_c1.checkbox("📈 顯示 KD (9,3,3)", value=False, key="kd_chk")
+            chk_macd = ind_c2.checkbox("📊 顯示 MACD (12,26,9)", value=False, key="macd_chk")
+            chk_rsi = ind_c3.checkbox("🔮 顯示 RSI (14)", value=False, key="rsi_chk")
             
             st.write("") # 留白
             
             with st.spinner(f"正在擷取 {pure_stock_id} 的最新 {selected_tf} 及指標數據..."):
-                # 將勾選狀態傳送至上半部繪圖引擎
+                # 將 6 條均線預設全開，交由使用者在圖表內的圖例自行點擊開關！
+                all_mas = ["5MA", "10MA", "20MA", "60MA", "120MA", "240MA"]
                 render_technical_chart(
                     stock_id=pure_stock_id, 
                     timeframe=selected_tf, 
-                    selected_mas=chosen_mas, 
+                    selected_mas=all_mas, 
                     show_rsi=chk_rsi, 
                     show_macd=chk_macd,
                     show_kd=chk_kd
