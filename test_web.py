@@ -943,7 +943,7 @@ if sorted_dates:
         final_df = final_df[cols]
         
         # ==========================================
-        # 🧹 源頭數據清洗：整理小數點並將 0 替換為 "未進榜"
+        # 🧹 源頭數據清洗：強制鎖死小數點兩位，並將 0 替換為 "未進榜"
         # ==========================================
         if not final_df.empty:
             import pandas as pd
@@ -954,10 +954,9 @@ if sorted_dates:
                 # 1. 確保全部轉為數字，無法轉換的會變成空值 NaN
                 final_df[col] = pd.to_numeric(final_df[col], errors='coerce')
                 
-                # 2. 核心清洗：如果小於 0.0001 (也就是0) 或是空值，直接寫入 "未進榜"
-                #    如果是真實持股數字，則強制四捨五入到小數點第二位，保持極度乾淨！
+                # 🔥 2. 核心清洗：鎖死小數點後 2 位，徹底阻絕系統自動亂加 0
                 final_df[col] = final_df[col].apply(
-                    lambda x: "未進榜" if pd.isna(x) or abs(x) < 0.0001 else round(x, 2)
+                    lambda x: "未進榜" if pd.isna(x) or abs(x) < 0.0001 else f"{x:.2f}"
                 )
 
         # ==========================================
@@ -995,10 +994,8 @@ if sorted_dates:
         # 將洗乾淨的最終表格存入 session，讓下方搜尋區塊也能用到最乾淨的數據
         st.session_state['my_final_df'] = final_df
         st.dataframe(styled_df, use_container_width=True)
-    else:
-        st.warning("⚠️ 讀取到的檔案皆無效或無資料，請檢查 TXT 內容。")
-else:
-    st.write("⚠️ 目前暫無持股比例追蹤數據。")
+
+        
 
 
 # ==========================================
