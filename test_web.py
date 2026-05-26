@@ -679,6 +679,12 @@ for f in all_txt_files:
 sorted_dates = sorted(date_files.keys(), reverse=True)
 
 if sorted_dates:
+    # 👇 新增：自動抓取最新日期並格式化 (例如 20260526 變成 2026/05/26)
+    latest_d = sorted_dates[0]
+    fmt_date = f"{latest_d[:4]}/{latest_d[4:6]}/{latest_d[6:]}"
+    st.markdown(f"<span style='color:#00D2FF; font-size:14px; font-weight:500;'>⏳ 核心數據最新更新至：{fmt_date}</span>", unsafe_allow_html=True)
+    
+    final_df = None  # (這行是原本就有的，保留在下面)
     final_df = None
     
     for i, date_label in enumerate(sorted_dates[:30]):
