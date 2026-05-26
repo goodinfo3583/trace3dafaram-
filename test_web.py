@@ -387,9 +387,7 @@ if search_query:
         stock_id_match = re.search(r'\d+', search_query)
         
         if stock_id_match:
-            pure_stock_id = stock_id_match.group(0)
-            
-            if stock_id_match:
+            # 👇 就是這行！必須比上面的 if 再往右退 4 個空白鍵
             pure_stock_id = stock_id_match.group(0)
             
             # 🎛️ 建立控制面板
@@ -413,7 +411,7 @@ if search_query:
             st.write("") # 留白
             
             with st.spinner(f"正在擷取 {pure_stock_id} 的最新 {selected_tf} 及指標數據..."):
-                # 將勾選狀態傳送至上半部繪圖引擎 (加入 show_kd)
+                # 將勾選狀態傳送至上半部繪圖引擎
                 render_technical_chart(
                     stock_id=pure_stock_id, 
                     timeframe=selected_tf, 
