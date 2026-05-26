@@ -158,95 +158,31 @@ def render_technical_chart(stock_id, timeframe="日線", selected_mas=[], show_r
                 'Open': 'first', 'High': 'max', 'Low': 'min', 'Close': 'last', 'Volume': 'sum'
             }).dropna()
 
-        # 2. 計算均線
-        ma_windows = [5, 10, 20, 60, 120, 240]
-        for ma in ma_windows:
-            daily_df[f'{ma}MA'] = daily_df['Close'].rolling(window=ma).mean()
-
-        # 3. 內建量化指標計算 (RSI, MACD, KD)
-        close_series = daily_df['Close'].squeeze()
-        
-        if show_rsi:
-            delta = close_series.diff()
-            gain = delta.clip(lower=0)
-            loss = -delta.clip(upper=0)
-            ema_gain = gain.ewm(com=13, adjust=False).mean()
-            ema_loss = loss.ewm(com=13, adjust=False).mean()
-            rs = ema_gain / ema_loss.replace(0, 1e-9)
-            daily_df['RSI'] = 100 - (100 / (1 + rs))
-
-        if show_macd:
-            ema12 = close_series.ewm(span=12, adjust=False).mean()
-            ema26 = close_series.ewm(span=26, adjust=False).mean()
-            daily_df['DIF'] = ema12 - ema26
-            daily_df['MACD_Sign'] = daily_df['DIF'].ewm(span=9, adjust=False).mean()
-            daily_df['MACD_Hist'] = daily_df['DIF'] - daily_df['MACD_Sign']
+        # 2. 技術指標開關 (維持 3 欄，加入 KD)
+            ind_c1, ind_c2, ind_c3 = st.columns(3)
+            chk_kd = ind_c1.checkbox("顯示 KD (9,3,3)", value=False, key="kd_chk")
+            chk_macd = ind_c2.checkbox("顯示 MACD (12,26,9)", value=False, key="macd_chk")
+            chk_rsi = ind_c3.checkbox("顯示 RSI (14)", value=False, key="rsi_chk")
             
-        if show_kd:
-            # KD (9, 3, 3) 台股標準平滑演算法
-            low_9 = daily_df['Low'].rolling(window=9).min()
-            high_9 = daily_df['High'].rolling(window=9).max()
-            rsv = (close_series - low_9) / (high_9 - low_9).replace(0, 1e-9) * 100
-            daily_df['K'] = rsv.ewm(com=2, adjust=False).mean() # com=2 相當於 1/3 平滑
-            daily_df['D'] = daily_df['K'].ewm(com=2, adjust=False).mean()
-
-        def get_latest_price(col):
-            valid_data = daily_df[col].dropna()
-            if not valid_data.empty:
-                val = valid_data.iloc[-1]
-                if isinstance(val, pd.Series): val = val.iloc[0]
-                return f"{float(val):.2f}"
-            return "-"
-
-        # 4. 智慧動態調配畫布高度
-        rows = 2
-        row_heights = [0.5, 0.15]
-        if show_rsi: rows += 1; row_heights.append(0.12)
-        if show_macd: rows += 1; row_heights.append(0.14)
-        if show_kd: rows += 1; row_heights.append(0.14)
-
-        fig = make_subplots(rows=rows, cols=1, shared_xaxes=True, 
-                            vertical_spacing=0.02, row_heights=row_heights)
-        #繪製K線選擇顏色
-        up_color = 'rgb(240, 90, 90)'     
-        down_color = 'rgb(80, 200, 120)'  
-
-        # 5. 繪製主 K 線 (乾淨名稱)
-        fig.add_trace(go.Candlestick(
-            x=daily_df.index, open=daily_df['Open'].squeeze(), high=daily_df['High'].squeeze(), 
-            low=daily_df['Low'].squeeze(), close=daily_df['Close'].squeeze(), 
-            name='K線',
-            increasing=dict(line=dict(color=up_color, width=1.5), fillcolor=up_color),
-            decreasing=dict(line=dict(color=down_color, width=1.5), fillcolor=down_color),
-            hovertemplate="開：%{open:.2f}<br>高：%{high:.2f}<br>低：%{low:.2f}<br>收：%{close:.2f}<extra></extra>"
-        ), row=1, col=1)
-        fig.update_yaxes(title_text="股價 (TWD)", row=1, col=1, title_font=dict(size=12, color="#E2E8F0"))
-
-        ma_config = {
-            '5MA': {'color': '#FFCC00'}, '10MA': {'color': '#CC66FF'},
-            '20MA': {'color': '#00CCFF'}, '60MA': {'color': '#33FF33'},
-            '120MA': {'color': '#FF3333'}, '240MA': {'color': '#FFFF33'}
-        }
-        for ma_name in selected_mas:
-            if ma_name in daily_df.columns:
-                latest_val = get_latest_price(ma_name)
-                fig.add_trace(go.Scatter(
-                    x=daily_df.index, y=daily_df[ma_name].squeeze(), mode='lines', 
-                    name=f'{ma_name} ({latest_val})', 
-                    line=dict(color=ma_config[ma_name]['color'], width=1.3),
-                    hovertemplate=f"<b>{ma_name}</b>： %{{y:.2f}}<extra></extra>"
-                ), row=1, col=1)
-
-        # 6. 繪製成交量 (🔥 showlegend=False 徹底從圖例中隱藏)
-        vol_colors = [up_color if c >= o else down_color for c, o in zip(daily_df['Close'].squeeze(), daily_df['Open'].squeeze())]
-        fig.add_trace(go.Bar(
-            x=daily_df.index, y=daily_df['Volume'].squeeze(), 
-            name='成交量', 
-            marker_color=vol_colors,
-            showlegend=False, 
-            hovertemplate="<b>成交量</b>： %{y}<extra></extra>"
-        ), row=2, col=1)
-        fig.update_yaxes(title_text="成交量", row=2, col=1, title_font=dict(size=12, color="#E2E8F0"))
+            st.write("") # 留白
+            
+            # 讀取當前記憶的週期，直接秀在 Spinner 上面
+            current_tf_name = {"日線": "日K", "週線": "周K", "月線": "月K"}.get(st.session_state.kline_period, "日K")
+            
+            with st.spinner(f"正在擷取 {pure_stock_id} 的最新 {current_tf_name} 及指標數據..."):
+                
+                # 預設全開 6 條均線
+                all_mas = ["5MA", "10MA", "20MA", "60MA", "120MA", "240MA"]
+                
+                # 呼叫繪圖引擎，將記憶的週期完美傳入
+                render_technical_chart(
+                    stock_id=pure_stock_id, 
+                    timeframe=st.session_state.kline_period, 
+                    selected_mas=all_mas, 
+                    show_rsi=chk_rsi, 
+                    show_macd=chk_macd,
+                    show_kd=chk_kd
+                )
 
         # 7. 動態追加技術指標畫布
         current_row = 3
@@ -276,7 +212,7 @@ def render_technical_chart(stock_id, timeframe="日線", selected_mas=[], show_r
         # 8. 版面美化與防重疊
         fig.update_layout(
             title=dict(
-                text=f'📊 {stock_id} 最新 {timeframe} 與綜合技術指標', # 🔥 移除了 Yahoo Finance 來源字眼
+                text=f'📊 {stock_id} 最新 {timeframe} 與綜合技術指標', 
                 y=0.97, x=0.01, xanchor='left', yanchor='top', font=dict(color='#FFFFFF', size=16)
             ),
             xaxis_rangeslider_visible=False,
@@ -287,8 +223,18 @@ def render_technical_chart(stock_id, timeframe="日線", selected_mas=[], show_r
             margin=dict(l=10, r=65, t=90, b=10), 
             hovermode='x unified',
             hoverlabel=dict(bgcolor="#1A202C", font_size=13, font_color="#FFFFFF"),
-            # 🔥 新增 legend_title_text="顯示：" 達成您的要求
-            legend=dict(title_text="👉 顯示：", title_font=dict(color='#00D2FF', size=13), orientation="h", yanchor="bottom", y=1.01, xanchor="left", x=0.01, font=dict(color='#E2E8F0'))
+            # 🔥 修正處：將「顯示：」移動到最前方作為總標題，下方圖示乾淨不重疊
+            legend=dict(
+                title_text="👉 顯示：", 
+                title_font=dict(color='#00D2FF', size=13), 
+                orientation="h", 
+                yanchor="bottom", 
+                y=1.01, 
+                xanchor="left", 
+                x=0.01, 
+                font=dict(color='#E2E8F0')
+            ),
+            dragmode='pan' # 🔥 關鍵優化 1：手機介面開啟時，強迫優先預設為「✥ 平移 (Pan)」模式，解決誤觸放大鏡痛點！
         )
         
         fig.update_yaxes(side="right")
@@ -306,7 +252,18 @@ def render_technical_chart(stock_id, timeframe="日線", selected_mas=[], show_r
             for r in range(1, rows + 1):
                 fig.update_xaxes(rangebreaks=[dict(bounds=["sat", "mon"])], row=r, col=1)
         
-        st.plotly_chart(fig, use_container_width=True, key=f"kline_{stock_id}_{timeframe}_{len(selected_mas)}_{show_rsi}_{show_macd}_{show_kd}", config={'scrollZoom': True})
+        # 🔥 關鍵優化 2：簡化 Plotly 右上角工具列，斬草除根！徹底移除不需要的按鈕，只保留 Pan 與 Reset (小房子)
+        plotly_config = {
+            'scrollZoom': True,
+            'displaylogo': False,
+            'modeBarButtonsToRemove': [
+                'zoom2d', 'zoomIn2d', 'zoomOut2d', 'autoScale2d', 
+                'select2d', 'lasso2d', 'hoverClosestCartesian', 
+                'hoverCompareCartesian', 'toggleSpikelines'
+            ]
+        }
+        
+        st.plotly_chart(fig, use_container_width=True, key=f"kline_{stock_id}_{timeframe}_{len(selected_mas)}_{show_rsi}_{show_macd}_{show_kd}", config=plotly_config)
         
     except Exception as e:
         st.error(f"❌ 繪製 K 線圖時發生錯誤: {str(e)}")
@@ -333,25 +290,40 @@ def robust_search_engine(df, query):
         
     return df[mask]
 
-# 🎯 建立通用掃描與顯示工具 (全面去藍底、保持排版左右高度對稱)
+# 🎯 建立通用掃描與顯示工具 (修正左右高度完全對稱、未進榜排版優化)
 def scan_and_display(title, session_key, query):
+    # 🔥 關鍵修改 1：先不管有沒有資料，標題一律用 subheader 頂固，確保左右 columns 完全對齊
+    st.subheader(title)
+    
     if session_key not in st.session_state:
-        st.write(f"⚪ **{title}**：尚未載入資料表")
+        st.write("⚪ 尚未載入資料表")
         return
         
     df = st.session_state[session_key]
     if df is None or df.empty:
-        st.write(f"⚪ **{title}**：該榜單無任何資料")
+        st.write("⚪ 該榜單無任何資料")
         return
         
     res = robust_search_engine(df, query)
     
-    # 只要查有資料，就印出標題與表格；若無資料，改用無背景純文字以求對齊
     if not res.empty:
-        st.subheader(title) # 👈 關鍵修改：將原本的 st.write 升級為標準的副標題 st.subheader
+        # 🔥 關鍵修改 2：特殊處理區塊 1，如果查詢出來的歷史持股%全為 0 或 "-"，代表實際並未進榜
+        if session_key == 'my_final_df':
+            pct_cols = [c for c in res.columns if '持股%' in c]
+            all_zero = True
+            for c in pct_cols:
+                val = str(res.iloc[0][c]).strip()
+                if val != '0' and val != '0.00' and val != '-' and val != '':
+                    all_zero = False
+                    break
+            if all_zero:
+                st.write("⚪ 未進榜")
+                return
+                
         st.dataframe(res, use_container_width=True, hide_index=True)
     else:
-        st.write(f"⚪ **{title}**：未進榜")
+        # 🔥 關鍵修改 3：下方統一乾淨顯示 "⚪ 未進榜"，不再包含冗長重複的標題字眼
+        st.write("⚪ 未進榜")
 
 # ==========================================
 # 🎯 搜尋輸入框
@@ -511,7 +483,7 @@ if search_query:
     with c4: scan_and_display("🏦區塊 2-4 -投信5日淨買佔公司發行量", 'df_blk2_4', search_query)
 
     # ==========================================
-    # 📊 區塊 3：特定籌碼或大戶診斷 (4 榜全景)
+    # 📊 區塊 3： (4 榜全景)
     # ==========================================
     st.write("---")
     st.write("#### 📅 區塊 3：法人連買診斷")
