@@ -9,14 +9,6 @@ import re
 # 1. 網頁基本設定 & 頂部蜂蜜幸運祝福
 # ==========================================
 st.set_page_config(page_title="台股籌碼五大核心矩陣儀表板", layout="wide")
-
-st.markdown("""
-<div style='text-align: center; background-color: #FFFDF0; padding: 20px; border-radius: 15px; border: 2px dashed #006400;'>
-    <h1 style='color: #A52A2A; margin-bottom: 5px;'>🐝 祝阿東順利畢業 - 每天都是美好的一天 🍯</h1>
-    <p style='color: #082567; font-size: 16px; font-weight: bold;'>🌾 論文衝刺必勝 ｜ 香臘滿滿 ｜ 加速起漲雷達 ლ(∘◕‵ƹ′◕ლ)</p>
-</div>
-""", unsafe_allow_html=True)
-
 st.write("")
 st.write("📊 系統全數領域展開：法人持股比 ｜ 短線法人買佔成交量 ｜ 法人買佔發行量比對 (本站進行數據分析僅供參考而非推薦個股與飆股另請愛惜荷包小心騙騙)")
 
