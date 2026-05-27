@@ -184,6 +184,73 @@ def render_technical_chart(stock_id, timeframe="日線", selected_mas=[], show_r
 
         daily_df = df.copy()
 
+        # ==========================================
+        # 🧠 新增：技術型態雷達引擎 (動態掃描均線、爆量、收斂)
+        # ==========================================
+        def generate_technical_signals(df):
+            signals = []
+            if df.empty or len(df) < 20: return signals
+            
+            latest_close = df['Close'].iloc[-1]
+            latest_vol = df['Volume'].iloc[-1]
+            
+            # 1. 🧨 爆近期大量提示 (今日成交量 > 20日均量 2.5倍)
+            vol_20ma = df['Volume'].rolling(window=20).mean().iloc[-2] # 拿昨天的均量來比
+            if pd.notna(vol_20ma) and vol_20ma > 0 and latest_vol > (vol_20ma * 2.5):
+                signals.append(f"🧨 **爆量出擊**：今日成交量達 20 日均量的 {latest_vol/vol_20ma:.1f} 倍！")
+
+            # 2. 🎯 均線回測與關鍵支撐 (差距 1.5% 內視為回測)
+            mas = {'5MA': 5, '10MA': 10, '20MA': 20, '60MA': 60, '120MA': 120, '240MA': 240}
+            for ma_name, period in mas.items():
+                if len(df) >= period:
+                    ma_val = df['Close'].rolling(window=period).mean().iloc[-1]
+                    # 股價在均線上，且距離均線極近 (大於 0 但小於 1.5%)
+                    if 0 < (latest_close - ma_val) / ma_val < 0.015:
+                        signals.append(f"🎯 **回測支撐**：股價目前極度貼近 {ma_name} ({ma_val:.2f}) 關鍵支撐線。")
+
+            # 3. 🌀 短中長均線糾結提示 (5, 10, 20MA 極度壓縮在 2% 空間內)
+            if len(df) >= 20:
+                ma5 = df['Close'].rolling(5).mean().iloc[-1]
+                ma10 = df['Close'].rolling(10).mean().iloc[-1]
+                ma20 = df['Close'].rolling(20).mean().iloc[-1]
+                ma_max, ma_min = max(ma5, ma10, ma20), min(ma5, ma10, ma20)
+                if pd.notna(ma_max) and (ma_max - ma_min) / ma_min < 0.02:
+                    signals.append("🌀 **均線糾結**：短天期 (5/10/20MA) 成本線高度重合壓縮，醞釀表態！")
+
+            # 4. 📐 三角收斂 / 波動壓縮提示 (近20日高低落差，比前一個20日縮小40%以上)
+            if len(df) >= 60:
+                recent_high = df['High'].iloc[-20:].max()
+                recent_low = df['Low'].iloc[-20:].min()
+                prev_high = df['High'].iloc[-40:-20].max()
+                prev_low = df['Low'].iloc[-40:-20].min()
+                
+                recent_volatility = recent_high - recent_low
+                prev_volatility = prev_high - prev_low
+                if prev_volatility > 0 and recent_volatility < (prev_volatility * 0.6):
+                    signals.append("📐 **型態壓縮**：近一個月股價高低波幅急遽收斂，疑似三角收斂末端。")
+
+            return signals
+
+        # 執行雷達掃描
+        tech_signals = generate_technical_signals(daily_df)
+
+
+        # ==========================================
+        # 🔥 顯示技術雷達面板
+        # ==========================================
+        if tech_signals:
+            # 建立一個暗黑風格的雷達警告框
+            signal_html = "<div style='background-color: rgba(0, 210, 255, 0.1); border-left: 4px solid #00D2FF; padding: 10px; border-radius: 5px; margin-bottom: 15px;'>"
+            signal_html += "<h5 style='color: #00D2FF; margin-top:0px; margin-bottom: 10px;'>📡 AI 盤中技術型態雷達</h5>"
+            for sig in tech_signals:
+                signal_html += f"<p style='color: #E2E8F0; margin: 5px 0px; font-size: 15px;'>{sig}</p>"
+            signal_html += "</div>"
+            st.markdown(signal_html, unsafe_allow_html=True)
+
+        # 下方是您原本的 resampling 邏輯
+        if timeframe == "週線":
+            daily_df = daily_df.resample('W-FRI').agg({ ...
+
         if timeframe == "週線":
             daily_df = daily_df.resample('W-FRI').agg({
                 'Open': 'first', 'High': 'max', 'Low': 'min', 'Close': 'last', 'Volume': 'sum'
