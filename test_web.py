@@ -2178,7 +2178,7 @@ with top_pool_container:
                 return 0.0
 
             # ==========================================
-            # 5. 計分迴圈 (含換手防禦與當日重扣機制)
+            # 5. 計分迴圈 (含換手防禦、當日重扣與【計分明細追蹤】)
             # ==========================================
             results = []
             for _, row in pool_df.iterrows():
@@ -2188,43 +2188,68 @@ with top_pool_container:
                 b1_rank = str(row.get(rank_col, '-')) if rank_col else '-'
                 score = 0.0
                 
+                # 📝 建立一個追蹤清單，用來記錄這檔股票所有加扣分軌跡
+                details = [] 
+                
                 # 📈 原有加分機制
-                r_b2_1 = "✔️" if check_b2_strict(df_b2_1, sid, bad_b2_vol) else ""; score += 1 if r_b2_1 else 0
-                r_b2_2 = "✔️" if check_b2_strict(df_b2_2, sid, bad_b2_vol) else ""; score += 1 if r_b2_2 else 0
-                r_b2_3 = "✔️" if check_b2_strict(df_b2_3, sid, bad_b2_iss) else ""; score += 1 if r_b2_3 else 0
-                r_b2_4 = "✔️" if check_b2_strict(df_b2_4, sid, bad_b2_iss) else ""; score += 1 if r_b2_4 else 0
+                r_b2_1 = "✔️" if check_b2_strict(df_b2_1, sid, bad_b2_vol) else ""
+                if r_b2_1: score += 1; details.append("外買佔: +1")
                 
-                # 🚨 【當日轉賣扣分引擎】：過濾微幅震盪，單日 <-10% 視為真實倒貨重扣
-                if get_today_ratio(df_b2_1, sid, '當日買佔比%') <= -10: score -= 0.5
-                if get_today_ratio(df_b2_2, sid, '當日買佔比%') <= -10: score -= 0.5
-                if get_today_ratio(df_b2_3, sid, '當日買發比%') <= -10: score -= 0.5
-                if get_today_ratio(df_b2_4, sid, '當日買發比%') <= -10: score -= 0.5
+                r_b2_2 = "✔️" if check_b2_strict(df_b2_2, sid, bad_b2_vol) else ""
+                if r_b2_2: score += 1; details.append("投買佔: +1")
                 
-                s_fd, r_b3_fd = get_b3_score(df_b3, sid, '外資日'); score += s_fd
-                s_fw, r_b3_fw = get_b3_score(df_b3, sid, '外資週'); score += s_fw
-                s_id, r_b3_id = get_b3_score(df_b3, sid, '投信日'); score += s_id
-                s_iw, r_b3_iw = get_b3_score(df_b3, sid, '投信週'); score += s_iw
+                r_b2_3 = "✔️" if check_b2_strict(df_b2_3, sid, bad_b2_iss) else ""
+                if r_b2_3: score += 1; details.append("外佔發行: +1")
                 
+                r_b2_4 = "✔️" if check_b2_strict(df_b2_4, sid, bad_b2_iss) else ""
+                if r_b2_4: score += 1; details.append("投佔發行: +1")
+                
+                # 🚨 【當日轉賣扣分引擎】
+                if get_today_ratio(df_b2_1, sid, '當日買佔比%') <= -10: score -= 0.5; details.append("當日外買佔(<-10%): -0.5")
+                if get_today_ratio(df_b2_2, sid, '當日買佔比%') <= -10: score -= 0.5; details.append("當日投買佔(<-10%): -0.5")
+                if get_today_ratio(df_b2_3, sid, '當日買發比%') <= -10: score -= 0.5; details.append("當日外佔發行(<-10%): -0.5")
+                if get_today_ratio(df_b2_4, sid, '當日買發比%') <= -10: score -= 0.5; details.append("當日投佔發行(<-10%): -0.5")
+                
+                # 📈 連買加分
+                s_fd, r_b3_fd = get_b3_score(df_b3, sid, '外資日')
+                if s_fd > 0: score += s_fd; details.append(f"外資日連: +{s_fd}")
+                
+                s_fw, r_b3_fw = get_b3_score(df_b3, sid, '外資週')
+                if s_fw > 0: score += s_fw; details.append(f"外資週連: +{s_fw}")
+                
+                s_id, r_b3_id = get_b3_score(df_b3, sid, '投信日')
+                if s_id > 0: score += s_id; details.append(f"投信日連: +{s_id}")
+                
+                s_iw, r_b3_iw = get_b3_score(df_b3, sid, '投信週')
+                if s_iw > 0: score += s_iw; details.append(f"投信週連: +{s_iw}")
+                
+                # 📈 資券加分
                 r_b4_mar = ""; 
-                if sid in s_b4_mar_pct: r_b4_mar += "✔️(幅)"; score += 1
-                if sid in s_b4_mar_vol: r_b4_mar += "✔️(量)"; score += 0.5
+                if sid in s_b4_mar_pct: r_b4_mar += "✔️(幅)"; score += 1; details.append("資減(幅): +1")
+                if sid in s_b4_mar_vol: r_b4_mar += "✔️(量)"; score += 0.5; details.append("資減(量): +0.5")
                 
                 r_b4_sho = ""; 
-                if sid in s_b4_sho_pct: r_b4_sho += "✔️(幅)"; score += 1
-                if sid in s_b4_sho_vol: r_b4_sho += "✔️(量)"; score += 0.5
+                if sid in s_b4_sho_pct: r_b4_sho += "✔️(幅)"; score += 1; details.append("借減(幅): +1")
+                if sid in s_b4_sho_vol: r_b4_sho += "✔️(量)"; score += 0.5; details.append("借減(量): +0.5")
                 
                 r_b4_mp = ""; 
-                if sid in s_b4_mp_pct: r_b4_mp += "✔️(幅)"; score += 1
-                if sid in s_b4_mp_vol: r_b4_mp += "✔️(量)"; score += 0.5
+                if sid in s_b4_mp_pct: r_b4_mp += "✔️(幅)"; score += 1; details.append("券增(幅): +1")
+                if sid in s_b4_mp_vol: r_b4_mp += "✔️(量)"; score += 0.5; details.append("券增(量): +0.5")
                 
+                # 📊 大股東動向
                 r_b5 = ""
                 if not df_b5.empty and sid in df_b5['股票代號'].values:
                     trend = str(df_b5[df_b5['股票代號'] == sid].iloc[0].get('週動態', ''))
-                    if '大增' in trend or ('增' in trend and '微' not in trend): score += 2; r_b5 = "🔥大增(+2)"
-                    elif '微增' in trend: score += 1; r_b5 = "↗️微增(+1)"
-                    elif '大減' in trend: score -= 1; r_b5 = "🚨大減(-1)"
-                    elif '減' in trend and '微' in trend: score -= 0.5; r_b5 = "↘️微減(-0.5)"
-                    elif '減' in trend: score -= 0.5; r_b5 = "📉減(-0.5)"
+                    if '大增' in trend or ('增' in trend and '微' not in trend): 
+                        score += 2; r_b5 = "🔥大增(+2)"; details.append("大股東大增: +2")
+                    elif '微增' in trend: 
+                        score += 1; r_b5 = "↗️微增(+1)"; details.append("大股東微增: +1")
+                    elif '大減' in trend: 
+                        score -= 1; r_b5 = "🚨大減(-1)"; details.append("大股東大減: -1")
+                    elif '減' in trend and '微' in trend: 
+                        score -= 0.5; r_b5 = "↘️微減(-0.5)"; details.append("大股東微減: -0.5")
+                    elif '減' in trend: 
+                        score -= 0.5; r_b5 = "📉減(-0.5)"; details.append("大股東減: -0.5")
                     else: r_b5 = trend
                 
                 # 🚨 【換手防禦版】轉賣警示與扣分引擎
@@ -2232,24 +2257,29 @@ with top_pool_container:
                 is_it_sell = sid in it_sell_ids
                 if is_fo_sell and is_it_sell: 
                     r_warn = "🚨外投雙倒"
-                    score -= 2.0  # 發生踩踏，無情重扣 2 分
+                    score -= 2.0; details.append("外投雙倒: -2")
                 elif is_fo_sell: 
-                    r_warn = "⚠️外資倒(換手?)" # 不扣分，保留投信接手空間
+                    r_warn = "⚠️外資倒(換手?)"
                 elif is_it_sell: 
-                    r_warn = "⚠️投信倒(換手?)" # 不扣分，保留外資接手空間
+                    r_warn = "⚠️投信倒(換手?)"
                 else: 
                     r_warn = "-"
+
+                # 📝 將明細清單組合成多行文字 (換行符號 \n，讓系統能產生 Tooltip 排版)
+                score_breakdown = " \n".join(details) if details else "無加扣分"
 
                 results.append({
                     '總分': score,
                     '股票代號': sid,
                     '股票名稱': sname,
+                    '評分明細': score_breakdown, # 🔥 新增：將算好的明細字串放入欄位
                     '最新動態': b1_dyn,
                     '今日上榜': b1_rank,  
                     '外買佔比': r_b2_1, '投買佔比': r_b2_2, '外佔發行': r_b2_3, '投佔發行': r_b2_4,
                     '外日連': r_b3_fd, '外週連': r_b3_fw, '投日連': r_b3_id, '投週連': r_b3_iw,
                     '資減': r_b4_mar, '借減': r_b4_sho, '券增': r_b4_mp,
                     '大股東動向': r_b5, '法人賣出警示': r_warn
+                })
                 })
                 
                 # ==========================================
@@ -2332,11 +2362,20 @@ with top_pool_container:
             if not res_df.empty and '總分' in res_df.columns:
                 res_df['Delta'] = res_df.apply(calc_table_delta, axis=1)
 
-                # 完美排版：把 Delta 欄位硬塞到「總分」的正後方
-                cols = res_df.columns.tolist()
-                cols.remove('Delta')
+                # ==========================================
+                # 🔥 完美排版：將 Delta 與評分明細，安插在最順眼的位置
+                # ==========================================
+                # 先把這兩個特殊欄位抽出來
+                cols = [c for c in res_df.columns if c not in ['Delta', '評分明細']]
+                
+                # 1. 將 Delta 插在「總分」的正右邊
                 score_idx = cols.index('總分')
                 cols.insert(score_idx + 1, 'Delta')
+                
+                # 2. 將 評分明細 插在「股票名稱」的正右邊
+                name_idx = cols.index('股票名稱')
+                cols.insert(name_idx + 1, '評分明細')
+                
                 res_df = res_df[cols]
 
             # ==========================================
