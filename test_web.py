@@ -5,50 +5,60 @@ import os
 import glob
 import re
 import datetime
+import requests  # 👈 只要多加這個，用來免安裝抓 FinMind 資料
 
-# 加入
-from FinMind.data import DataLoader
-import datetime
-
-# 加入 @st.cache_data 魔法，這樣搜尋同一檔股票時，網頁不會重複抓取，速度會瞬間變快！
+# ==========================================
+# 📡 免安裝 FinMind 籌碼連續抓取引擎
+# ==========================================
 @st.cache_data(ttl=3600)
 def get_continuous_institutional_data(stock_id, days=20):
     """
-    從 FinMind 抓取連續不斷線的法人買賣超資料，徹底解決破洞問題。
+    免安裝 FinMind 套件！直接透過 API 網址抓取連續法人買賣超資料。
     """
     try:
-        api = DataLoader()
-        # 抓過去 40 天，確保扣除假日後，能有完整的 20 個交易日
+        url = "https://api.finmindtrade.com/api/v4/data"
         start_date = (datetime.date.today() - datetime.timedelta(days=40)).strftime("%Y-%m-%d")
-        df = api.taiwan_stock_institutional_investors(stock_id=str(stock_id).strip(), start_date=start_date)
         
-        if df is None or df.empty:
-            return pd.DataFrame()
-
-        # 整理三大法人買賣超 (將股數除以 1000 換算成「張」)
-        df['net_buy'] = (df['buy'] - df['sell']) / 1000
+        parameter = {
+            "dataset": "TaiwanStockInstitutionalInvestorsBuySell",
+            "data_id": str(stock_id).strip(),
+            "start_date": start_date,
+        }
         
-        # 將外資、投信、自營商的資料依照日期攤平
-        df_pivot = df.groupby(['date', 'name'])['net_buy'].sum().unstack().fillna(0)
-        
-        # 轉換英文欄位名稱
-        if 'Foreign_Investor' in df_pivot: df_pivot.rename(columns={'Foreign_Investor': '外資'}, inplace=True)
-        if 'Investment_Trust' in df_pivot: df_pivot.rename(columns={'Investment_Trust': '投信'}, inplace=True)
-        if 'Dealer' in df_pivot: df_pivot.rename(columns={'Dealer': '自營商'}, inplace=True)
-        
-        # 計算「三大法人合計買賣超」
-        cols_to_sum = [c for c in ['外資', '投信', '自營商'] if c in df_pivot.columns]
-        df_pivot['法人合計'] = df_pivot[cols_to_sum].sum(axis=1)
-        
-        # 將日期變成欄位，並把日期格式改為 MMDD (例如 0522)
-        df_pivot = df_pivot.reset_index()
-        df_pivot['乾淨日期'] = pd.to_datetime(df_pivot['date']).dt.strftime('%m%d')
-        
-        # 回傳最後指定的交易日天數
-        return df_pivot.tail(days)
+        # 直接發送網路請求拿資料
+        resp = requests.get(url, params=parameter, timeout=10)
+        if resp.status_code == 200:
+            json_data = resp.json()
+            if json_data.get("status") == 200 and json_data.get("data"):
+                df = pd.DataFrame(json_data.get("data"))
+                
+                if not df.empty:
+                    # 整理三大法人買賣超 (將股數除以 1000 換算成「張」)
+                    df['net_buy'] = (df['buy'] - df['sell']) / 1000
+                    
+                    # 將外資、投信、自營商的資料依照日期攤平
+                    df_pivot = df.groupby(['date', 'name'])['net_buy'].sum().unstack().fillna(0)
+                    
+                    # 轉換英文欄位名稱
+                    if 'Foreign_Investor' in df_pivot: df_pivot.rename(columns={'Foreign_Investor': '外資'}, inplace=True)
+                    if 'Investment_Trust' in df_pivot: df_pivot.rename(columns={'Investment_Trust': '投信'}, inplace=True)
+                    if 'Dealer' in df_pivot: df_pivot.rename(columns={'Dealer': '自營商'}, inplace=True)
+                    
+                    # 計算「三大法人合計買賣超」
+                    cols_to_sum = [c for c in ['外資', '投信', '自營商'] if c in df_pivot.columns]
+                    df_pivot['法人合計'] = df_pivot[cols_to_sum].sum(axis=1)
+                    
+                    # 將日期變成欄位，並把日期格式改為 MMDD
+                    df_pivot = df_pivot.reset_index()
+                    df_pivot['乾淨日期'] = pd.to_datetime(df_pivot['date']).dt.strftime('%m%d')
+                    
+                    # 回傳最後指定的交易日天數
+                    return df_pivot.tail(days)
+                    
     except Exception as e:
-        return pd.DataFrame()
-# ---------------------------------
+        pass
+        
+    return pd.DataFrame()
 
 # ==========================================
 # 1. 網頁基本設定 & 目錄路徑初始化
