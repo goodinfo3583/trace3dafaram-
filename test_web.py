@@ -605,10 +605,35 @@ if search_query:
 
     if st.session_state.show_kline:
         import re
-        stock_id_match = re.search(r'\d+', search_query)
+        pure_stock_id = ""
         
-        if stock_id_match:
-            pure_stock_id = stock_id_match.group(0)
+        # 🔥 智慧救援 1：優先使用剛剛上方計分區已經成功查到的股票代號
+        if 'current_stock_id' in locals() and current_stock_id != "":
+            pure_stock_id = current_stock_id
+        else:
+            # 🔥 智慧救援 2：如果沒進榜，但資料庫(區塊1)有這檔股票，用中文名稱反查代號
+            if 'my_final_df' in st.session_state:
+                fallback_df = st.session_state['my_final_df']
+                fallback_match = robust_search_engine(fallback_df, search_query)
+                if not fallback_match.empty:
+                    pure_stock_id = str(fallback_match.iloc[0].get('股票代號', '')).strip()
+            
+            # 🔥 智慧救援 3：如果真的都找不到，才試著從輸入字串抓數字
+            if pure_stock_id == "":
+                stock_id_match = re.search(r'\d+', search_query)
+                if stock_id_match:
+                    pure_stock_id = stock_id_match.group(0)
+        
+        # 只要 pure_stock_id 有抓到東西，就畫圖！
+        if pure_stock_id != "":
+            st.markdown("##### ⚙️ 技術線圖與指標配置面板")
+            
+            # 🔥 縮小按鈕魔法：將版面切成 4 塊，前面 3 塊極小，後面留白
+            tf_c1, tf_c2, tf_c3, _space = st.columns([1, 1, 1, 5])
+            
+            p_day = "日K" if st.session_state.kline_period == "日線" else "日K"
+            p_week = "週K" if st.session_state.kline_period == "週線" else "週K"
+            p_month = "月K" if st.session_state.kline_period == "月線" else "月K"
             
             st.markdown("##### ⚙️ 技術線圖與指標配置面板")
             
@@ -723,7 +748,7 @@ if search_query:
                     textposition='outside'
                 ))
                 fig_b1.update_layout(
-                    title=f"📈 持股波段真實軌跡 ({stock_name})",
+                    title=f"📈 持股波段軌跡(未進榜不顯示)({stock_name})",
                     height=300,
                     template='plotly_dark',
                     margin=dict(l=20, r=20, t=40, b=20),
