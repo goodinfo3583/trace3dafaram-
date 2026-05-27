@@ -322,21 +322,35 @@ def render_technical_chart(stock_id, timeframe="日線", selected_mas=[], show_r
             plot_bgcolor='rgba(0,0,0,0)',  
             margin=dict(l=10, r=65, t=90, b=10), 
             hovermode='x unified',
-            hoverlabel=dict(bgcolor="#1A202C", font_size=13, font_color="#FFFFFF"),
+            # 🔥 升級 1：稍微放大浮動資訊框 (Tooltip) 的字體，閱讀更清晰
+            hoverlabel=dict(bgcolor="#1A202C", font_size=15, font_color="#FFFFFF"),
             legend=dict(
                 title_text="👉 顯示：", 
-                title_font=dict(color='#00D2FF', size=13), 
+                title_font=dict(color='#00D2FF', size=16), 
                 orientation="h", 
                 yanchor="bottom", 
                 y=1.01, 
                 xanchor="left", 
                 x=0.01, 
-                font=dict(color='#E2E8F0')
+                # 🔥 升級 2：放大 K線、均線等圖例字體至 16px
+                font=dict(color='#E2E8F0', size=16),
+                # 🔥 升級 3：強制放大圖示的線條寬度，不再是一條細細看不見的線
+                itemsizing='constant'
             ),
-            dragmode='pan' # 🔥 關鍵優化 1：手機介面開啟預設為「✥ 平移 (Pan)」模式
+            dragmode='pan' 
         )
         
-        fig.update_yaxes(side="right")
+        # 🔥 升級 4：十字游標 (Crosshair) 核心設定
+        # 同時開啟 X 軸與 Y 軸的切線，並設定為跟隨游標 (cursor)、貫穿全圖 (across)、樣式為專業虛線 (dash)
+        fig.update_xaxes(
+            showspikes=True, spikecolor="#64748B", spikesnap="cursor", 
+            spikemode="across", spikethickness=1, spikedash="dash"
+        )
+        fig.update_yaxes(
+            showspikes=True, spikecolor="#64748B", spikesnap="cursor", 
+            spikemode="across", spikethickness=1, spikedash="dash", side="right"
+        )
+        
         for r in range(1, rows + 1):
             fig.update_xaxes(hoverformat="%Y-%m-%d", tickformat="%Y-%m-%d", row=r, col=1)
         
@@ -351,7 +365,6 @@ def render_technical_chart(stock_id, timeframe="日線", selected_mas=[], show_r
             for r in range(1, rows + 1):
                 fig.update_xaxes(rangebreaks=[dict(bounds=["sat", "mon"])], row=r, col=1)
         
-        # 🔥 關鍵優化 2：極簡工具列，只留 Pan 與 Reset
         plotly_config = {
             'scrollZoom': True,
             'displaylogo': False,
