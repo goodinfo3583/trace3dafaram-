@@ -5,12 +5,49 @@ import os
 import glob
 import re
 import datetime
-# --- 測試 FinMind 是否成功安裝 ---
-try:
-    import FinMind
-    st.sidebar.success("✅ 恭喜阿東！FinMind 雲端安裝成功！")
-except ImportError:
-    st.sidebar.error("❌ FinMind 還沒裝好喔，請檢查 requirements.txt")
+
+# 加入
+from FinMind.data import DataLoader
+import datetime
+
+# 加入 @st.cache_data 魔法，這樣搜尋同一檔股票時，網頁不會重複抓取，速度會瞬間變快！
+@st.cache_data(ttl=3600)
+def get_continuous_institutional_data(stock_id, days=20):
+    """
+    從 FinMind 抓取連續不斷線的法人買賣超資料，徹底解決破洞問題。
+    """
+    try:
+        api = DataLoader()
+        # 抓過去 40 天，確保扣除假日後，能有完整的 20 個交易日
+        start_date = (datetime.date.today() - datetime.timedelta(days=40)).strftime("%Y-%m-%d")
+        df = api.taiwan_stock_institutional_investors(stock_id=str(stock_id).strip(), start_date=start_date)
+        
+        if df is None or df.empty:
+            return pd.DataFrame()
+
+        # 整理三大法人買賣超 (將股數除以 1000 換算成「張」)
+        df['net_buy'] = (df['buy'] - df['sell']) / 1000
+        
+        # 將外資、投信、自營商的資料依照日期攤平
+        df_pivot = df.groupby(['date', 'name'])['net_buy'].sum().unstack().fillna(0)
+        
+        # 轉換英文欄位名稱
+        if 'Foreign_Investor' in df_pivot: df_pivot.rename(columns={'Foreign_Investor': '外資'}, inplace=True)
+        if 'Investment_Trust' in df_pivot: df_pivot.rename(columns={'Investment_Trust': '投信'}, inplace=True)
+        if 'Dealer' in df_pivot: df_pivot.rename(columns={'Dealer': '自營商'}, inplace=True)
+        
+        # 計算「三大法人合計買賣超」
+        cols_to_sum = [c for c in ['外資', '投信', '自營商'] if c in df_pivot.columns]
+        df_pivot['法人合計'] = df_pivot[cols_to_sum].sum(axis=1)
+        
+        # 將日期變成欄位，並把日期格式改為 MMDD (例如 0522)
+        df_pivot = df_pivot.reset_index()
+        df_pivot['乾淨日期'] = pd.to_datetime(df_pivot['date']).dt.strftime('%m%d')
+        
+        # 回傳最後指定的交易日天數
+        return df_pivot.tail(days)
+    except Exception as e:
+        return pd.DataFrame()
 # ---------------------------------
 
 # ==========================================
@@ -760,27 +797,41 @@ if search_query:
                             y_vals.append(0.0)
                             
                 import plotly.graph_objects as go
-                fig_b1 = go.Figure()
-                fig_b1.add_trace(go.Bar(
-                    x=clean_x_labels, y=y_vals,  # 👈 這裡換成乾淨的 X 軸標籤
-                    marker_color=['#FF4B4B' if i == len(y_vals)-1 else '#4B8BFF' for i in range(len(y_vals))],
-                    text=[f"{v}%" if v > 0 else "" for v in y_vals], # 只有大於0的柱子才顯示數字
-                    textposition='outside'
-                ))
-                fig_b1.update_layout(
-                    title=f"📈 持股波段真實軌跡 ({stock_name})",
-                    height=300,
-                    template='plotly_dark',
-                    margin=dict(l=20, r=20, t=40, b=20),
-                    yaxis=dict(title="持股比例 (%)", showgrid=True, gridcolor='#2D3748'),
-                    xaxis=dict(tickangle=45),
-                    dragmode='pan'
-                )
-                st.plotly_chart(fig_b1, use_container_width=True, config={'displayModeBar': False})
-        else:
-            st.write("未進榜")
-    else:
-        st.info("⚪ 尚未載入資料表")
+                # ==========================================
+                # 📊 繪製無破洞的法人籌碼連續軌跡圖 (FinMind 驅動)
+                # ==========================================
+                # 呼叫我們剛剛寫好的引擎，取得最近 15 個交易日的連續資料
+                live_chip_df = get_continuous_institutional_data(pure_stock_id, days=15)
+                
+                if not live_chip_df.empty:
+                    x_dates = live_chip_df['乾淨日期'].tolist()
+                    y_net_buy = live_chip_df['法人合計'].tolist() # 以三大法人合計為例
+                    
+                    # 自動配色：買超(大於0)用紅色，賣超(小於0)用綠色
+                    bar_colors = ['#FF4B4B' if val > 0 else '#00E272' for val in y_net_buy]
+                    
+                    import plotly.graph_objects as go
+                    fig_b1 = go.Figure()
+                    fig_b1.add_trace(go.Bar(
+                        x=x_dates, 
+                        y=y_net_buy,
+                        marker_color=bar_colors,
+                        text=[f"{int(v)}張" if abs(v) > 0 else "" for v in y_net_buy],
+                        textposition='outside'
+                    ))
+                    
+                    fig_b1.update_layout(
+                        title=f"📈 法人買賣超連續軌跡 - {stock_name} ({pure_stock_id})",
+                        height=300,
+                        template='plotly_dark',
+                        margin=dict(l=20, r=20, t=40, b=20),
+                        yaxis=dict(title="淨買賣超 (張)", showgrid=True, gridcolor='#2D3748'),
+                        xaxis=dict(tickangle=45),
+                        dragmode='pan'
+                    )
+                    st.plotly_chart(fig_b1, use_container_width=True, config={'displayModeBar': False})
+                else:
+                    st.warning("📡 無法取得 FinMind 籌碼資料，請稍後再試。")
 
     # ==========================================
     # 📊 區塊 2：動能與外資診斷
