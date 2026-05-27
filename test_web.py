@@ -273,7 +273,7 @@ def render_technical_chart(stock_id, timeframe="日線", selected_mas=[], show_r
             # 加上顯眼的價格標籤牌
             fig.add_annotation(
                 x=max_date, y=max_price,
-                text=f"<b>歷史高點: {max_price:.2f}</b>",
+                text=f"<b>前高: {max_price:.2f}</b>",
                 showarrow=True, arrowhead=2, arrowsize=1, arrowwidth=1.5, arrowcolor="#FFD700",
                 ax=0, ay=-40, # 箭頭往上偏移，讓標籤浮在 K 線正上方不擋圖
                 font=dict(size=13, color="#FFD700"),
@@ -282,9 +282,9 @@ def render_technical_chart(stock_id, timeframe="日線", selected_mas=[], show_r
             )
 
         ma_config = {
-            '5MA': {'color': '#FFCC00'}, '10MA': {'color': '#00FFFF'},
-            '20MA': {'color': '#CC66FF'}, '60MA': {'color': '#33FF33'},
-            '120MA': {'color': '#FF3333'}, '240MA': {'color': '#FFFF33'}
+            '5MA': {'color': '#F9F900'}, '10MA': {'color': '#00FFFF'},
+            '20MA': {'color': '#5B00AE'}, '60MA': {'color': '#8E8E8E'},
+            '120MA': {'color': '#D200D2'}, '240MA': {'color': '#BB3D00'}
         }
         for ma_name in selected_mas:
             if ma_name in daily_df.columns:
