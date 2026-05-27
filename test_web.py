@@ -247,7 +247,9 @@ def render_technical_chart(stock_id, timeframe="日線", selected_mas=[], show_r
         up_color = 'rgb(240, 90, 90)'     
         down_color = 'rgb(80, 200, 120)'  
 
-        # 5. 繪製主 K 線 (乾淨名稱)
+        # ==========================================
+        # 5. 繪製主 K 線 (乾淨名稱 + 歷史高點標註)
+        # ==========================================
         fig.add_trace(go.Candlestick(
             x=daily_df.index, open=daily_df['Open'].squeeze(), high=daily_df['High'].squeeze(), 
             low=daily_df['Low'].squeeze(), close=daily_df['Close'].squeeze(), 
@@ -256,7 +258,28 @@ def render_technical_chart(stock_id, timeframe="日線", selected_mas=[], show_r
             decreasing=dict(line=dict(color=down_color, width=1.5), fillcolor=down_color),
             hovertemplate="開：%{open:.2f}<br>高：%{high:.2f}<br>低：%{low:.2f}<br>收：%{close:.2f}<extra></extra>"
         ), row=1, col=1)
-        fig.update_yaxes(title_text="股價 (TWD)", row=1, col=1, title_font=dict(size=12, color="#E2E8F0"))
+        
+        # 🔥 升級 1：鎖死 Y 軸底線，徹底消滅負數股價 (-50)
+        fig.update_yaxes(title_text="股價 (TWD)", row=1, col=1, title_font=dict(size=12, color="#E2E8F0"), rangemode="nonnegative")
+
+        # 🔥 升級 2：自動抓取 5 年內歷史最高價，並繪製黃金天花板標示線
+        if not daily_df.empty:
+            max_price = daily_df['High'].max()
+            max_date = daily_df['High'].idxmax()
+            
+            # 畫一條橫貫全圖的金色微透明虛線
+            fig.add_hline(y=max_price, line_dash="dot", line_color="rgba(255, 215, 0, 0.4)", row=1, col=1)
+            
+            # 加上顯眼的價格標籤牌
+            fig.add_annotation(
+                x=max_date, y=max_price,
+                text=f"<b>👑 歷史高點: {max_price:.2f}</b>",
+                showarrow=True, arrowhead=2, arrowsize=1, arrowwidth=1.5, arrowcolor="#FFD700",
+                ax=0, ay=-40, # 箭頭往上偏移，讓標籤浮在 K 線正上方不擋圖
+                font=dict(size=13, color="#FFD700"),
+                bgcolor="rgba(17, 22, 34, 0.85)", bordercolor="#FFD700", borderwidth=1, borderpad=4,
+                row=1, col=1
+            )
 
         ma_config = {
             '5MA': {'color': '#FFCC00'}, '10MA': {'color': '#CC66FF'},
@@ -273,7 +296,9 @@ def render_technical_chart(stock_id, timeframe="日線", selected_mas=[], show_r
                     hovertemplate=f"<b>{ma_name}</b>： %{{y:.2f}}<extra></extra>"
                 ), row=1, col=1)
 
-        # 6. 繪製成交量 (徹底隱藏圖例)
+        # ==========================================
+        # 6. 繪製成交量 (🔥 同步防禦負數成交量)
+        # ==========================================
         vol_colors = [up_color if c >= o else down_color for c, o in zip(daily_df['Close'].squeeze(), daily_df['Open'].squeeze())]
         fig.add_trace(go.Bar(
             x=daily_df.index, y=daily_df['Volume'].squeeze(), 
@@ -282,7 +307,7 @@ def render_technical_chart(stock_id, timeframe="日線", selected_mas=[], show_r
             showlegend=False, 
             hovertemplate="<b>成交量</b>： %{y}<extra></extra>"
         ), row=2, col=1)
-        fig.update_yaxes(title_text="成交量", row=2, col=1, title_font=dict(size=12, color="#E2E8F0"))
+        fig.update_yaxes(title_text="成交量", row=2, col=1, title_font=dict(size=12, color="#E2E8F0"), rangemode="nonnegative")
 
         # 7. 動態追加技術指標畫布
         current_row = 3
