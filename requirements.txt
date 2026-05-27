@@ -6,3 +6,4 @@ yfinance
 FinMind
 tqdm
 requests
+anyio==4.3.0
