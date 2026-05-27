@@ -309,46 +309,43 @@ def render_technical_chart(stock_id, timeframe="日線", selected_mas=[], show_r
             fig.update_yaxes(title_text="MACD", row=current_row, col=1, title_font=dict(size=11, color="#E2E8F0"))
             current_row += 1
 
-        # 8. 版面美化與防重疊
+        # ==========================================
+        # 8. 版面美化與防重疊 (終極淨化版)
+        # ==========================================
         fig.update_layout(
-            title=dict(
-                text=f'📊 {stock_id} 最新 {timeframe} 與綜合技術指標', 
-                y=0.97, x=0.01, xanchor='left', yanchor='top', font=dict(color='#FFFFFF', size=16)
-            ),
+            # 🔥 升級 1：徹底移除上方標題，不再顯示「股票代號 日線與綜合技術指標」
             xaxis_rangeslider_visible=False,
             height=500 + (rows - 1) * 110, 
             template='plotly_dark',       
             paper_bgcolor='rgba(0,0,0,0)', 
             plot_bgcolor='rgba(0,0,0,0)',  
-            margin=dict(l=10, r=65, t=90, b=10), 
+            # 🔥 升級 2：標題移除後，將上方留白(t)從 90 縮小至 30，讓圖表更緊湊
+            margin=dict(l=10, r=65, t=30, b=10), 
             hovermode='x unified',
-            # 🔥 升級 1：稍微放大浮動資訊框 (Tooltip) 的字體，閱讀更清晰
             hoverlabel=dict(bgcolor="#1A202C", font_size=15, font_color="#FFFFFF"),
             legend=dict(
-                title_text="👉 顯示：", 
-                title_font=dict(color='#00D2FF', size=16), 
+                # 🔥 升級 3：移除「顯示：」字眼，只保留乾淨的按鈕
                 orientation="h", 
                 yanchor="bottom", 
                 y=1.01, 
                 xanchor="left", 
                 x=0.01, 
-                # 🔥 升級 2：放大 K線、均線等圖例字體至 16px
                 font=dict(color='#E2E8F0', size=16),
-                # 🔥 升級 3：強制放大圖示的線條寬度，不再是一條細細看不見的線
                 itemsizing='constant'
             ),
             dragmode='pan' 
         )
         
-        # 🔥 升級 4：十字游標 (Crosshair) 核心設定
-        # 同時開啟 X 軸與 Y 軸的切線，並設定為跟隨游標 (cursor)、貫穿全圖 (across)、樣式為專業虛線 (dash)
+        # 🔥 升級 4：十字游標變細 (0.5)、微黃色，並將背景分隔網格線 (gridcolor) 極度透明化 (0.05)
         fig.update_xaxes(
-            showspikes=True, spikecolor="#64748B", spikesnap="cursor", 
-            spikemode="across", spikethickness=1, spikedash="dash"
+            showspikes=True, spikecolor="rgba(255, 235, 100, 0.5)", spikesnap="cursor", 
+            spikemode="across", spikethickness=0.5, spikedash="dash",
+            gridcolor="rgba(255, 255, 255, 0.05)"
         )
         fig.update_yaxes(
-            showspikes=True, spikecolor="#64748B", spikesnap="cursor", 
-            spikemode="across", spikethickness=1, spikedash="dash", side="right"
+            showspikes=True, spikecolor="rgba(255, 235, 100, 0.5)", spikesnap="cursor", 
+            spikemode="across", spikethickness=0.5, spikedash="dash", side="right",
+            gridcolor="rgba(255, 255, 255, 0.05)"
         )
         
         for r in range(1, rows + 1):
