@@ -231,9 +231,8 @@ def render_technical_chart(stock_id, timeframe="日線", selected_mas=[], show_r
 
             return signals
 
-        # 執行雷達掃描
+        # 執行雷達掃描 (固定用日線資料來掃描最精確，避免切換週線時失真)
         tech_signals = generate_technical_signals(daily_df)
-
 
         # ==========================================
         # 🔥 顯示技術雷達面板
@@ -247,10 +246,9 @@ def render_technical_chart(stock_id, timeframe="日線", selected_mas=[], show_r
             signal_html += "</div>"
             st.markdown(signal_html, unsafe_allow_html=True)
 
-        # 下方是您原本的 resampling 邏輯
-        if timeframe == "週線":
-            daily_df = daily_df.resample('W-FRI').agg({ ...
-
+        # ==========================================
+        # 轉換 K 線週期 (這裡有把括號寫完整了！)
+        # ==========================================
         if timeframe == "週線":
             daily_df = daily_df.resample('W-FRI').agg({
                 'Open': 'first', 'High': 'max', 'Low': 'min', 'Close': 'last', 'Volume': 'sum'
@@ -259,6 +257,7 @@ def render_technical_chart(stock_id, timeframe="日線", selected_mas=[], show_r
             daily_df = daily_df.resample('ME').agg({
                 'Open': 'first', 'High': 'max', 'Low': 'min', 'Close': 'last', 'Volume': 'sum'
             }).dropna()
+
 
         # 2. 計算均線
         ma_windows = [5, 10, 20, 60, 120, 240]
@@ -2173,7 +2172,7 @@ with top_pool_container:
         
         if dyn_col:
             # 🔥 確保「吸籌、衝進、回歸」等高級量化字眼都在白名單內
-            mask = df_b1[dyn_col].astype(str).str.contains('趨緩|上升|升|持平|加碼|延續|吸籌|衝進|回歸', na=False)
+            mask = df_b1[dyn_col].astype(str).str.contains('趨緩|上升|升|吸籌|衝進|回歸', na=False)
             pool_df = df_b1[mask].copy()
         else:
             pool_df = df_b1.copy()
