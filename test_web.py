@@ -2168,7 +2168,7 @@ with top_pool_container:
                     elif days >= 5: return 1.5, f"✔️({days}週)"
                     else: return 1.0, f"✔️({days}週)"
 
-# 🔥 新增：微型抓取器，專門用來偷看 DataFrame 裡面的當日數據是否為負
+            # 🔥 新增：微型抓取器，專門用來偷看 DataFrame 裡面的當日數據是否為負
             def get_today_ratio(df, stock_id, col_name):
                 if df is not None and not df.empty and stock_id in df['股票代號'].values:
                     try:
@@ -2281,7 +2281,6 @@ with top_pool_container:
                     '資減': r_b4_mar, '借減': r_b4_sho, '券增': r_b4_mp,
                     '大股東動向': r_b5, '法人賣出警示': r_warn
                 })
-
                 
             # ==========================================
             # 1. 先將結果轉成 DataFrame、排序並【剃除重複分身】
@@ -2338,15 +2337,6 @@ with top_pool_container:
                 cols.insert(name_idx + 1, '評分明細')
                 
                 res_df = res_df[cols]
-
-            # ==========================================
-            # 💾 3. 存檔與最終 UI 唯一顯示
-            # ==========================================
-            # 掃描完成後，自動存檔 (含最新的總分，供明天相減使用)
-            save_daily_score(res_df)
-
-            # 將結果存入記憶體供下方搜尋區塊使用
-            st.session_state['top_pool_df'] = res_df
 
             # ==========================================
             # 💾 3. 存檔與最終 UI 唯一顯示 (含懸浮視窗魔法)
