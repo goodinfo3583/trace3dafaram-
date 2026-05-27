@@ -2387,9 +2387,31 @@ with top_pool_container:
             # 將結果存入記憶體供下方搜尋區塊使用
             st.session_state['top_pool_df'] = res_df
 
+            # ==========================================
+            # 💾 3. 存檔與最終 UI 唯一顯示 (含懸浮視窗魔法)
+            # ==========================================
+            # 掃描完成後，自動存檔 (含最新的總分，供明天相減使用)
+            save_daily_score(res_df)
+
+            # 將結果存入記憶體供下方搜尋區塊使用
+            st.session_state['top_pool_df'] = res_df
+
             # 🔥 這裡才是「唯一一次」印出訊息與表格的地方！
             st.success(f"選股池掃描完成！共過濾出 {len(res_df)} 檔潛力標的。")
-            st.dataframe(res_df, use_container_width=True, hide_index=True)
+            
+            # 使用 column_config 開啟「評分明細」的 Tooltip 懸浮功能，並限制寬度避免佔用太多版面
+            st.dataframe(
+                res_df, 
+                use_container_width=True, 
+                hide_index=True,
+                column_config={
+                    "評分明細": st.column_config.TextColumn(
+                        "評分明細",
+                        help="滑鼠游標停留在這裡，查看完整加扣分明細",
+                        max_chars=12, # 欄位平常只顯示前幾個字，保持版面乾淨
+                    )
+                }
+            )
 # ==========================================
 # 📊 【蜂蜜計數器】本站累計觀測人次統計
 # ==========================================
