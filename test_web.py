@@ -514,9 +514,9 @@ if search_query:
             # 🔥 縮小按鈕魔法：將版面切成 4 塊，前面 3 塊極小，後面留白
             tf_c1, tf_c2, tf_c3, _space = st.columns([1, 1, 1, 5])
             
-            p_day = "👉 日K" if st.session_state.kline_period == "日線" else "日K"
-            p_week = "👉 周K" if st.session_state.kline_period == "週線" else "周K"
-            p_month = "👉 月K" if st.session_state.kline_period == "月線" else "月K"
+            p_day = "日K" if st.session_state.kline_period == "日線" else "日K"
+            p_week = "周K" if st.session_state.kline_period == "週線" else "周K"
+            p_month = "月K" if st.session_state.kline_period == "月線" else "月K"
             
             if tf_c1.button(p_day, use_container_width=True, key="btn_p_day"):
                 st.session_state.kline_period = "日線"
