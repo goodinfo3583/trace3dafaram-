@@ -464,11 +464,20 @@ if search_query:
         if not match.empty:
             target_score = match.iloc[0].get('總分', 0)
     
+    # 🔥 搜尋區塊新增：Delta 分數與進階籌碼指標***
     if target_score is not None:
-        st.markdown(f"#### 🏆 模擬權重評分：<span style='color:#FFD700; font-size:24px;'>**{target_score}**</span> 分 <span style='color:#FFFFFF; font-size:14px; font-weight:normal;'>(評分數據僅供參考)</span>", unsafe_allow_html=True)
-    else:
-        st.markdown("#### 🏆 模擬權重評分：<span style='color:#718096; font-size:18px;'>未達綜合進榜標準 (0分)</span> <span style='color:#FFFFFF; font-size:14px; font-weight:normal;'>(評分數據僅供參考)</span>", unsafe_allow_html=True)
-
+        delta = get_delta_score(pure_stock_id, target_score)
+        delta_color = "red" if delta > 0 else "green" if delta < 0 else "white"
+        delta_symbol = "📈" if delta > 0 else "📉" if delta < 0 else "🔄"
+        
+        st.markdown(f"""
+        #### 🏆 綜合評分：<span style='color:#FFD700; font-size:24px;'>**{target_score}**</span> 分 
+        <span style='color:{delta_color}; font-size:18px;'>{delta_symbol} Delta: {delta}</span>
+        <span style='color:#FFFFFF; font-size:14px;'>(評分數據僅供參考)</span>
+        """, unsafe_allow_html=True)
+        
+        # 在這裡呼叫您想顯示的籌碼集中度計算函數...
+        # 例如：st.write(f"📊 主力籌碼集中度：{calculate_chip_conc(pure_stock_id)}%")
     # ==========================================
     # 📈 K 線圖按鈕、週期切換與技術指標面板
     # ==========================================
