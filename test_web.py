@@ -625,16 +625,7 @@ if search_query:
                     pure_stock_id = stock_id_match.group(0)
         
         # 只要 pure_stock_id 有抓到東西，就畫圖！
-        if pure_stock_id != "":
-            st.markdown("##### ⚙️ 技術線圖與指標配置面板")
-            
-            # 🔥 縮小按鈕魔法：將版面切成 4 塊，前面 3 塊極小，後面留白
-            tf_c1, tf_c2, tf_c3, _space = st.columns([1, 1, 1, 5])
-            
-            p_day = "日K" if st.session_state.kline_period == "日線" else "日K"
-            p_week = "週K" if st.session_state.kline_period == "週線" else "週K"
-            p_month = "月K" if st.session_state.kline_period == "月線" else "月K"
-            
+        if pure_stock_id != "":          
             st.markdown("##### ⚙️ 技術線圖與指標配置面板")
             
             # 🔥 縮小按鈕魔法：將版面切成 4 塊，前面 3 塊極小，後面留白
@@ -661,7 +652,7 @@ if search_query:
             
             st.write("") 
             
-            current_tf_name = {"日線": "日K", "週線": "周K", "月線": "月K"}.get(st.session_state.kline_period, "日K")
+            current_tf_name = {"日線": "日K", "週線": "週K", "月線": "月K"}.get(st.session_state.kline_period, "日K")
             
             with st.spinner(f"正在擷取 {pure_stock_id} 的最新 {current_tf_name} 及指標數據..."):
                 all_mas = ["5MA", "10MA", "20MA", "60MA", "120MA", "240MA"]
