@@ -515,7 +515,7 @@ if search_query:
             tf_c1, tf_c2, tf_c3, _space = st.columns([1, 1, 1, 5])
             
             p_day = "日K" if st.session_state.kline_period == "日線" else "日K"
-            p_week = "周K" if st.session_state.kline_period == "週線" else "周K"
+            p_week = "週K" if st.session_state.kline_period == "週線" else "周K"
             p_month = "月K" if st.session_state.kline_period == "月線" else "月K"
             
             if tf_c1.button(p_day, use_container_width=True, key="btn_p_day"):
