@@ -2169,6 +2169,16 @@ with top_pool_container:
                     else: return 1.0, f"✔️({days}週)"
 
             # 5. 計分迴圈
+           # 🔥 新增：微型抓取器，專門用來偷看 DataFrame 裡面的當日數據是否為負
+            def get_today_ratio(df, stock_id, col_name):
+                if df is not None and not df.empty and stock_id in df['股票代號'].values:
+                    try:
+                        return float(df.loc[df['股票代號'] == stock_id, col_name].iloc[0])
+                    except:
+                        return 0.0
+                return 0.0
+
+            # 5. 計分迴圈(扣分懲罰"當日買佔及買發")
             results = []
             for _, row in pool_df.iterrows():
                 sid = str(row['股票代號']).strip()
@@ -2177,37 +2187,25 @@ with top_pool_container:
                 b1_rank = str(row.get(rank_col, '-')) if rank_col else '-'
                 score = 0.0
                 
+                # ==========================================
+                # 📈 原有加分機制 (進榜就加分)
+                # ==========================================
                 r_b2_1 = "✔️" if check_b2_strict(df_b2_1, sid, bad_b2_vol) else ""; score += 1 if r_b2_1 else 0
                 r_b2_2 = "✔️" if check_b2_strict(df_b2_2, sid, bad_b2_vol) else ""; score += 1 if r_b2_2 else 0
                 r_b2_3 = "✔️" if check_b2_strict(df_b2_3, sid, bad_b2_iss) else ""; score += 1 if r_b2_3 else 0
                 r_b2_4 = "✔️" if check_b2_strict(df_b2_4, sid, bad_b2_iss) else ""; score += 1 if r_b2_4 else 0
                 
+                # ==========================================
+                # 🚨 【當日轉賣扣分引擎】：只要今日數據是負數，立刻扣分！
+                # (您可以自行將 0.5 改成 1.0 來加重懲罰力道)
+                # ==========================================
+                if get_today_ratio(df_b2_1, sid, '當日買佔比%') < 0: score -= 0.5
+                if get_today_ratio(df_b2_2, sid, '當日買佔比%') < 0: score -= 0.5
+                if get_today_ratio(df_b2_3, sid, '當日買發比%') < 0: score -= 0.5
+                if get_today_ratio(df_b2_4, sid, '當日買發比%') < 0: score -= 0.5
+                
+                # ... (下方繼續接您原本的 r_b3 外資日連買... 等程式碼) ...
                 s_fd, r_b3_fd = get_b3_score(df_b3, sid, '外資日'); score += s_fd
-                s_fw, r_b3_fw = get_b3_score(df_b3, sid, '外資週'); score += s_fw
-                s_id, r_b3_id = get_b3_score(df_b3, sid, '投信日'); score += s_id
-                s_iw, r_b3_iw = get_b3_score(df_b3, sid, '投信週'); score += s_iw
-                
-                r_b4_mar = ""; 
-                if sid in s_b4_mar_pct: r_b4_mar += "✔️(幅)"; score += 1
-                if sid in s_b4_mar_vol: r_b4_mar += "✔️(量)"; score += 0.5
-                
-                r_b4_sho = ""; 
-                if sid in s_b4_sho_pct: r_b4_sho += "✔️(幅)"; score += 1
-                if sid in s_b4_sho_vol: r_b4_sho += "✔️(量)"; score += 0.5
-                
-                r_b4_mp = ""; 
-                if sid in s_b4_mp_pct: r_b4_mp += "✔️(幅)"; score += 1
-                if sid in s_b4_mp_vol: r_b4_mp += "✔️(量)"; score += 0.5
-                
-                r_b5 = ""
-                if not df_b5.empty and sid in df_b5['股票代號'].values:
-                    trend = str(df_b5[df_b5['股票代號'] == sid].iloc[0].get('週動態', ''))
-                    if '大增' in trend or ('增' in trend and '微' not in trend): score += 2; r_b5 = "🔥大增(+2)"
-                    elif '微增' in trend: score += 1; r_b5 = "↗️微增(+1)"
-                    elif '大減' in trend: score -= 1; r_b5 = "🚨大減(-1)"
-                    elif '減' in trend and '微' in trend: score -= 0.5; r_b5 = "↘️微減(-0.5)"
-                    elif '減' in trend: score -= 0.5; r_b5 = "📉減(-0.5)"
-                    else: r_b5 = trend
                 
                 # 🔥 【精簡文字修復】：防止表格寬度被卡到
                 is_fo_sell = sid in fo_sell_ids
