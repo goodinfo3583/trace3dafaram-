@@ -5,60 +5,13 @@ import os
 import glob
 import re
 import datetime
-import requests  # 👈 只要多加這個，用來免安裝抓 FinMind 資料
-
-# ==========================================
-# 📡 免安裝 FinMind 籌碼連續抓取引擎
-# ==========================================
-@st.cache_data(ttl=3600)
-def get_continuous_institutional_data(stock_id, days=20):
-    """
-    免安裝 FinMind 套件！直接透過 API 網址抓取連續法人買賣超資料。
-    """
-    try:
-        url = "https://api.finmindtrade.com/api/v4/data"
-        start_date = (datetime.date.today() - datetime.timedelta(days=40)).strftime("%Y-%m-%d")
-        
-        parameter = {
-            "dataset": "TaiwanStockInstitutionalInvestorsBuySell",
-            "data_id": str(stock_id).strip(),
-            "start_date": start_date,
-        }
-        
-        # 直接發送網路請求拿資料
-        resp = requests.get(url, params=parameter, timeout=10)
-        if resp.status_code == 200:
-            json_data = resp.json()
-            if json_data.get("status") == 200 and json_data.get("data"):
-                df = pd.DataFrame(json_data.get("data"))
-                
-                if not df.empty:
-                    # 整理三大法人買賣超 (將股數除以 1000 換算成「張」)
-                    df['net_buy'] = (df['buy'] - df['sell']) / 1000
-                    
-                    # 將外資、投信、自營商的資料依照日期攤平
-                    df_pivot = df.groupby(['date', 'name'])['net_buy'].sum().unstack().fillna(0)
-                    
-                    # 轉換英文欄位名稱
-                    if 'Foreign_Investor' in df_pivot: df_pivot.rename(columns={'Foreign_Investor': '外資'}, inplace=True)
-                    if 'Investment_Trust' in df_pivot: df_pivot.rename(columns={'Investment_Trust': '投信'}, inplace=True)
-                    if 'Dealer' in df_pivot: df_pivot.rename(columns={'Dealer': '自營商'}, inplace=True)
-                    
-                    # 計算「三大法人合計買賣超」
-                    cols_to_sum = [c for c in ['外資', '投信', '自營商'] if c in df_pivot.columns]
-                    df_pivot['法人合計'] = df_pivot[cols_to_sum].sum(axis=1)
-                    
-                    # 將日期變成欄位，並把日期格式改為 MMDD
-                    df_pivot = df_pivot.reset_index()
-                    df_pivot['乾淨日期'] = pd.to_datetime(df_pivot['date']).dt.strftime('%m%d')
-                    
-                    # 回傳最後指定的交易日天數
-                    return df_pivot.tail(days)
-                    
-    except Exception as e:
-        pass
-        
-    return pd.DataFrame()
+# --- 測試 FinMind 是否成功安裝 ---
+try:
+    import FinMind
+    st.sidebar.success("✅ 恭喜阿東！FinMind 雲端安裝成功！")
+except ImportError:
+    st.sidebar.error("❌ FinMind 還沒裝好喔，請檢查 requirements.txt")
+# ---------------------------------
 
 # ==========================================
 # 1. 網頁基本設定 & 目錄路徑初始化
@@ -807,41 +760,27 @@ if search_query:
                             y_vals.append(0.0)
                             
                 import plotly.graph_objects as go
-                # ==========================================
-                # 📊 繪製無破洞的法人籌碼連續軌跡圖 (FinMind 驅動)
-                # ==========================================
-                # 呼叫我們剛剛寫好的引擎，取得最近 15 個交易日的連續資料
-                live_chip_df = get_continuous_institutional_data(pure_stock_id, days=15)
-                
-                if not live_chip_df.empty:
-                    x_dates = live_chip_df['乾淨日期'].tolist()
-                    y_net_buy = live_chip_df['法人合計'].tolist() # 以三大法人合計為例
-                    
-                    # 自動配色：買超(大於0)用紅色，賣超(小於0)用綠色
-                    bar_colors = ['#FF4B4B' if val > 0 else '#00E272' for val in y_net_buy]
-                    
-                    import plotly.graph_objects as go
-                    fig_b1 = go.Figure()
-                    fig_b1.add_trace(go.Bar(
-                        x=x_dates, 
-                        y=y_net_buy,
-                        marker_color=bar_colors,
-                        text=[f"{int(v)}張" if abs(v) > 0 else "" for v in y_net_buy],
-                        textposition='outside'
-                    ))
-                    
-                    fig_b1.update_layout(
-                        title=f"📈 法人買賣超連續軌跡 - {stock_name} ({pure_stock_id})",
-                        height=300,
-                        template='plotly_dark',
-                        margin=dict(l=20, r=20, t=40, b=20),
-                        yaxis=dict(title="淨買賣超 (張)", showgrid=True, gridcolor='#2D3748'),
-                        xaxis=dict(tickangle=45),
-                        dragmode='pan'
-                    )
-                    st.plotly_chart(fig_b1, use_container_width=True, config={'displayModeBar': False})
-                else:
-                    st.warning("📡 無法取得 FinMind 籌碼資料，請稍後再試。")
+                fig_b1 = go.Figure()
+                fig_b1.add_trace(go.Bar(
+                    x=clean_x_labels, y=y_vals,  # 👈 這裡換成乾淨的 X 軸標籤
+                    marker_color=['#FF4B4B' if i == len(y_vals)-1 else '#4B8BFF' for i in range(len(y_vals))],
+                    text=[f"{v}%" if v > 0 else "" for v in y_vals], # 只有大於0的柱子才顯示數字
+                    textposition='outside'
+                ))
+                fig_b1.update_layout(
+                    title=f"📈 持股波段真實軌跡 ({stock_name})",
+                    height=300,
+                    template='plotly_dark',
+                    margin=dict(l=20, r=20, t=40, b=20),
+                    yaxis=dict(title="持股比例 (%)", showgrid=True, gridcolor='#2D3748'),
+                    xaxis=dict(tickangle=45),
+                    dragmode='pan'
+                )
+                st.plotly_chart(fig_b1, use_container_width=True, config={'displayModeBar': False})
+        else:
+            st.write("未進榜")
+    else:
+        st.info("⚪ 尚未載入資料表")
 
     # ==========================================
     # 📊 區塊 2：動能與外資診斷
@@ -2265,7 +2204,7 @@ with top_pool_container:
 
     # 2. 顯示帶有最新日期的科技感標題
     st.markdown(f"## 🏆 數據分析觀察名單 <span style='font-size:18px; color:#00D2FF; font-weight:500;'>(最新數據: {latest_date_str})</span>", unsafe_allow_html=True)
-    st.info("💡 **權重評分**：法人持股上榜搭配其他數據分析積分,請確認今日短動態。(評分數據僅供參考)")
+    st.info("💡 **權重評分**：法人持股上榜搭配其他數據分析積分。(評分數據僅供參考)")
 
     if 'my_final_df' not in st.session_state or st.session_state['my_final_df'].empty:
         st.warning("⚠️ 尚未載入區塊 1 資料，無法進行選股池評比。")
