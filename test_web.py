@@ -717,10 +717,13 @@ if search_query:
                 row = res_b1.iloc[0]
                 stock_name = row.get('股票名稱', search_query)
                 
-                # 將 "未進榜" 的文字，在畫圖時默默還原成 0.0，避免圖表當機
-                x_vals = date_cols[::-1]
+                raw_x_vals = date_cols[::-1]
+                
+                # 🔥 【修正】：把 '20260522持股%' 去除文字並只取最後 4 碼 (0522)
+                clean_x_labels = [c.replace('持股%', '')[-4:] for c in raw_x_vals]
+                
                 y_vals = []
-                for c in x_vals:
+                for c in raw_x_vals:
                     val = row[c]
                     if str(val) == "未進榜" or pd.isna(val):
                         y_vals.append(0.0)
@@ -733,13 +736,13 @@ if search_query:
                 import plotly.graph_objects as go
                 fig_b1 = go.Figure()
                 fig_b1.add_trace(go.Bar(
-                    x=x_vals, y=y_vals,
+                    x=clean_x_labels, y=y_vals,  # 👈 這裡換成乾淨的 X 軸標籤
                     marker_color=['#FF4B4B' if i == len(y_vals)-1 else '#4B8BFF' for i in range(len(y_vals))],
                     text=[f"{v}%" if v > 0 else "" for v in y_vals], # 只有大於0的柱子才顯示數字
                     textposition='outside'
                 ))
                 fig_b1.update_layout(
-                    title=f"📈 持股波段軌跡(未進榜不顯示)({stock_name})",
+                    title=f"📈 持股波段真實軌跡 ({stock_name})",
                     height=300,
                     template='plotly_dark',
                     margin=dict(l=20, r=20, t=40, b=20),
