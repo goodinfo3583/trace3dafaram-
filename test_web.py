@@ -2168,8 +2168,7 @@ with top_pool_container:
                     elif days >= 5: return 1.5, f"✔️({days}週)"
                     else: return 1.0, f"✔️({days}週)"
 
-            # 5. 計分迴圈
-           # 🔥 新增：微型抓取器，專門用來偷看 DataFrame 裡面的當日數據是否為負
+# 🔥 新增：微型抓取器，專門用來偷看 DataFrame 裡面的當日數據是否為負
             def get_today_ratio(df, stock_id, col_name):
                 if df is not None and not df.empty and stock_id in df['股票代號'].values:
                     try:
@@ -2178,7 +2177,9 @@ with top_pool_container:
                         return 0.0
                 return 0.0
 
-            # 5. 計分迴圈(扣分懲罰"當日買佔及買發")
+            # ==========================================
+            # 5. 計分迴圈 (含換手防禦與當日重扣機制)
+            # ==========================================
             results = []
             for _, row in pool_df.iterrows():
                 sid = str(row['股票代號']).strip()
@@ -2186,6 +2187,70 @@ with top_pool_container:
                 b1_dyn = str(row.get(dyn_col, '')) if dyn_col else '-'
                 b1_rank = str(row.get(rank_col, '-')) if rank_col else '-'
                 score = 0.0
+                
+                # 📈 原有加分機制
+                r_b2_1 = "✔️" if check_b2_strict(df_b2_1, sid, bad_b2_vol) else ""; score += 1 if r_b2_1 else 0
+                r_b2_2 = "✔️" if check_b2_strict(df_b2_2, sid, bad_b2_vol) else ""; score += 1 if r_b2_2 else 0
+                r_b2_3 = "✔️" if check_b2_strict(df_b2_3, sid, bad_b2_iss) else ""; score += 1 if r_b2_3 else 0
+                r_b2_4 = "✔️" if check_b2_strict(df_b2_4, sid, bad_b2_iss) else ""; score += 1 if r_b2_4 else 0
+                
+                # 🚨 【當日轉賣扣分引擎】：過濾微幅震盪，單日 <-10% 視為真實倒貨重扣
+                if get_today_ratio(df_b2_1, sid, '當日買佔比%') <= -10: score -= 0.5
+                if get_today_ratio(df_b2_2, sid, '當日買佔比%') <= -10: score -= 0.5
+                if get_today_ratio(df_b2_3, sid, '當日買發比%') <= -10: score -= 0.5
+                if get_today_ratio(df_b2_4, sid, '當日買發比%') <= -10: score -= 0.5
+                
+                s_fd, r_b3_fd = get_b3_score(df_b3, sid, '外資日'); score += s_fd
+                s_fw, r_b3_fw = get_b3_score(df_b3, sid, '外資週'); score += s_fw
+                s_id, r_b3_id = get_b3_score(df_b3, sid, '投信日'); score += s_id
+                s_iw, r_b3_iw = get_b3_score(df_b3, sid, '投信週'); score += s_iw
+                
+                r_b4_mar = ""; 
+                if sid in s_b4_mar_pct: r_b4_mar += "✔️(幅)"; score += 1
+                if sid in s_b4_mar_vol: r_b4_mar += "✔️(量)"; score += 0.5
+                
+                r_b4_sho = ""; 
+                if sid in s_b4_sho_pct: r_b4_sho += "✔️(幅)"; score += 1
+                if sid in s_b4_sho_vol: r_b4_sho += "✔️(量)"; score += 0.5
+                
+                r_b4_mp = ""; 
+                if sid in s_b4_mp_pct: r_b4_mp += "✔️(幅)"; score += 1
+                if sid in s_b4_mp_vol: r_b4_mp += "✔️(量)"; score += 0.5
+                
+                r_b5 = ""
+                if not df_b5.empty and sid in df_b5['股票代號'].values:
+                    trend = str(df_b5[df_b5['股票代號'] == sid].iloc[0].get('週動態', ''))
+                    if '大增' in trend or ('增' in trend and '微' not in trend): score += 2; r_b5 = "🔥大增(+2)"
+                    elif '微增' in trend: score += 1; r_b5 = "↗️微增(+1)"
+                    elif '大減' in trend: score -= 1; r_b5 = "🚨大減(-1)"
+                    elif '減' in trend and '微' in trend: score -= 0.5; r_b5 = "↘️微減(-0.5)"
+                    elif '減' in trend: score -= 0.5; r_b5 = "📉減(-0.5)"
+                    else: r_b5 = trend
+                
+                # 🚨 【換手防禦版】轉賣警示與扣分引擎
+                is_fo_sell = sid in fo_sell_ids
+                is_it_sell = sid in it_sell_ids
+                if is_fo_sell and is_it_sell: 
+                    r_warn = "🚨外投雙倒"
+                    score -= 2.0  # 發生踩踏，無情重扣 2 分
+                elif is_fo_sell: 
+                    r_warn = "⚠️外資倒(換手?)" # 不扣分，保留投信接手空間
+                elif is_it_sell: 
+                    r_warn = "⚠️投信倒(換手?)" # 不扣分，保留外資接手空間
+                else: 
+                    r_warn = "-"
+
+                results.append({
+                    '總分': score,
+                    '股票代號': sid,
+                    '股票名稱': sname,
+                    '最新動態': b1_dyn,
+                    '今日上榜': b1_rank,  
+                    '外買佔比': r_b2_1, '投買佔比': r_b2_2, '外佔發行': r_b2_3, '投佔發行': r_b2_4,
+                    '外日連': r_b3_fd, '外週連': r_b3_fw, '投日連': r_b3_id, '投週連': r_b3_iw,
+                    '資減': r_b4_mar, '借減': r_b4_sho, '券增': r_b4_mp,
+                    '大股東動向': r_b5, '法人賣出警示': r_warn
+                })
                 
                 # ==========================================
                 # 📈 原有加分機制 (進榜就加分)
