@@ -587,6 +587,23 @@ if search_query:
         
     else:
         st.markdown("#### 🏆 系統綜合評分：<span style='color:#718096; font-size:18px;'>未達綜合進榜標準 (0分)</span> <span style='color:#FFFFFF; font-size:14px; font-weight:normal;'>(評分數據僅供參考)</span>", unsafe_allow_html=True)
+    # ==========================================
+    # 🤖 呼叫 AI 量化評語
+    # ==========================================
+    st.write("---")
+    if 'top_pool_df' in st.session_state:
+        # 從計分總表中搜尋這檔股票
+        ai_target = robust_search_engine(st.session_state['top_pool_df'], search_query)
+        if not ai_target.empty:
+            st.markdown("#### 🤖 系統綜合診斷評語")
+            # 將找到的該筆資料 (row) 丟進我們寫好的 AI 引擎
+            commentary = generate_stock_commentary(ai_target.iloc[0])
+            st.info(f"**{commentary}**")
+        else:
+            # 如果這檔股票沒有在計分表裡 (代表它可能連基本條件都沒達到)
+            st.markdown("#### 🤖 系統綜合診斷評語")
+            st.info("❄️ 【弱勢整理】該標的未能進入綜合評分池，籌碼處於流失或無主力認養狀態。若無特殊題材發酵，短期內建議暫不考量。")
+
 
     # ==========================================
     # 📈 K 線圖按鈕、週期切換與技術指標面板
@@ -607,7 +624,7 @@ if search_query:
         import re
         pure_stock_id = ""
         
-        # 🔥 智慧救援 1：優先使用剛剛上方計分區已經成功查到的股票代號
+        # 🔥 智慧救援 1：優先使用剛剛上方計分區已經成功查到的股票代號反查股票名稱
         if 'current_stock_id' in locals() and current_stock_id != "":
             pure_stock_id = current_stock_id
         else:
@@ -666,23 +683,6 @@ if search_query:
                 )
         else:
             st.warning("⚠️ 技術 K 線圖目前僅支援代號查詢。請在上方輸入框加入股票代號。")
-
-    # ==========================================
-    # 🤖 呼叫 AI 量化評語
-    # ==========================================
-    st.write("---")
-    if 'top_pool_df' in st.session_state:
-        # 從計分總表中搜尋這檔股票
-        ai_target = robust_search_engine(st.session_state['top_pool_df'], search_query)
-        if not ai_target.empty:
-            st.markdown("#### 🤖 系統綜合診斷評語")
-            # 將找到的該筆資料 (row) 丟進我們寫好的 AI 引擎
-            commentary = generate_stock_commentary(ai_target.iloc[0])
-            st.info(f"**{commentary}**")
-        else:
-            # 如果這檔股票沒有在計分表裡 (代表它可能連基本條件都沒達到)
-            st.markdown("#### 🤖 系統綜合診斷評語")
-            st.info("❄️ 【弱勢整理】該標的未能進入綜合評分池，籌碼處於流失或無主力認養狀態。若無特殊題材發酵，短期內建議暫不考量。")
 
  
     # ==========================================
