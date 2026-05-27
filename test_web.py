@@ -5,6 +5,13 @@ import os
 import glob
 import re
 import datetime
+# --- 測試 FinMind 是否成功安裝 ---
+try:
+    import FinMind
+    st.sidebar.success("✅ 恭喜阿東！FinMind 雲端安裝成功！")
+except ImportError:
+    st.sidebar.error("❌ FinMind 還沒裝好喔，請檢查 requirements.txt")
+# ---------------------------------
 
 # ==========================================
 # 1. 網頁基本設定 & 目錄路徑初始化
