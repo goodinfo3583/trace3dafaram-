@@ -459,25 +459,34 @@ if search_query:
     # 🔥 模擬置頂區塊，動態顯示該標的總分
     pool_df = st.session_state.get('top_pool_df', pd.DataFrame())
     target_score = None
+    current_stock_id = "" # 預先準備好一個空變數來裝股票代號
+    
     if not pool_df.empty:
         match = robust_search_engine(pool_df, search_query)
         if not match.empty:
             target_score = match.iloc[0].get('總分', 0)
+            # 💡 聰明抓取：直接從榜單結果中抽出純代號，解決名稱搜尋的問題
+            current_stock_id = str(match.iloc[0].get('股票代號', '')).strip()
     
-    # 🔥 搜尋區塊新增：Delta 分數與進階籌碼指標***
-    if target_score is not None:
-        delta = get_delta_score(pure_stock_id, target_score)
-        delta_color = "red" if delta > 0 else "green" if delta < 0 else "white"
-        delta_symbol = "📈" if delta > 0 else "📉" if delta < 0 else "🔄"
+    # 🔥 搜尋區塊新增：Delta 分數與進階指標
+    if target_score is not None and current_stock_id != "":
+        # 把剛抓到的 current_stock_id 餵給 Delta 計算機
+        delta = get_delta_score(current_stock_id, target_score)
+        
+        # 配合台股習慣：正數紅色(轉強)，負數綠色(轉弱)
+        delta_color = "#FF4B4B" if delta > 0 else "#00CC66" if delta < 0 else "#E2E8F0"
+        delta_symbol = "🔥" if delta > 0 else "🚨" if delta < 0 else "🔄"
+        delta_str = f"+{delta}" if delta > 0 else f"{delta}" # 正數加上加號
         
         st.markdown(f"""
-        #### 🏆 綜合評分：<span style='color:#FFD700; font-size:24px;'>**{target_score}**</span> 分 
-        <span style='color:{delta_color}; font-size:18px;'>{delta_symbol} Delta: {delta}</span>
-        <span style='color:#FFFFFF; font-size:14px;'>(評分數據僅供參考)</span>
+        #### 🏆 系統綜合評分：<span style='color:#FFD700; font-size:24px;'>**{target_score}**</span> 分 
+        <span style='color:{delta_color}; font-size:16px; margin-left:15px;'>{delta_symbol} Delta變化: **{delta_str}**</span>
+        <span style='color:#FFFFFF; font-size:14px; font-weight:normal; margin-left:10px;'>(評分數據僅供參考)</span>
         """, unsafe_allow_html=True)
         
-        # 在這裡呼叫您想顯示的籌碼集中度計算函數...
-        # 例如：st.write(f"📊 主力籌碼集中度：{calculate_chip_conc(pure_stock_id)}%")
+    else:
+        st.markdown("#### 🏆 系統綜合評分：<span style='color:#718096; font-size:18px;'>未達綜合進榜標準 (0分)</span> <span style='color:#FFFFFF; font-size:14px; font-weight:normal;'>(評分數據僅供參考)</span>", unsafe_allow_html=True)
+
     # ==========================================
     # 📈 K 線圖按鈕、週期切換與技術指標面板
     # ==========================================
