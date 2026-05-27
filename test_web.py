@@ -282,8 +282,8 @@ def render_technical_chart(stock_id, timeframe="日線", selected_mas=[], show_r
             )
 
         ma_config = {
-            '5MA': {'color': '#F9F900'}, '10MA': {'color': '#00FFFF'},
-            '20MA': {'color': '#8600FF'}, '60MA': {'color': '#D0D0D0'},
+            '5MA': {'color': '#FFFF37'}, '10MA': {'color': '#00FFFF'},
+            '20MA': {'color': '#921AFF'}, '60MA': {'color': '#D0D0D0'},
             '120MA': {'color': '#D200D2'}, '240MA': {'color': '#BB3D00'}
         }
         for ma_name in selected_mas:
