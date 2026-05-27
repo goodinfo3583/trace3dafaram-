@@ -2194,62 +2194,60 @@ with top_pool_container:
                     '大股東動向': r_b5, '法人賣出警示': r_warn
                 })
                 
+            # ==========================================
+            # 1. 先將結果轉成 DataFrame 並排序
+            # ==========================================
             res_df = pd.DataFrame(results)
             res_df = res_df.sort_values(by='總分', ascending=False).reset_index(drop=True)
-            st.dataframe(res_df, use_container_width=True, hide_index=True)
-            st.success(f"選股池掃描完成！共過濾出 {len(res_df)} 檔潛力標的。")
+
+            # ==========================================
+            # 🔥 2. 批次計算全表的 Delta 分數並精準插入欄位
+            # ==========================================
+            # 讀取「昨日」的歷史檔案建立對照表
+            history_files = sorted(glob.glob(os.path.join(SCORE_HISTORY_DIR, "scores_*.csv")), reverse=True)
+            prev_scores_dict = {}
+            if len(history_files) >= 2:
+                try:
+                    prev_df = pd.read_csv(history_files[1])
+                    # 建立 { '代號': 總分 } 的極速對照字典
+                    prev_scores_dict = dict(zip(prev_df['股票代號'].astype(str), prev_df['總分']))
+                except Exception:
+                    pass
+
+            # 定義表格每一列的 Delta 運算邏輯
+            def calc_table_delta(row):
+                sid = str(row['股票代號'])
+                curr_score = row.get('總分', 0)
+                # 如果昨天沒有這檔的資料，Delta 預設為 0
+                prev_score = prev_scores_dict.get(sid, curr_score) 
+                delta = round(curr_score - prev_score, 2)
+                
+                # 格式化為純數值文字：正數補上+號，0或負數維持原樣
+                return f"+{delta}" if delta > 0 else str(delta)
+
+            # 瞬間產生整條 Delta 欄位
+            if not res_df.empty and '總分' in res_df.columns:
+                res_df['Delta'] = res_df.apply(calc_table_delta, axis=1)
+
+                # 完美排版：把 Delta 欄位硬塞到「總分」的正後方
+                cols = res_df.columns.tolist()
+                cols.remove('Delta')
+                score_idx = cols.index('總分')
+                cols.insert(score_idx + 1, 'Delta')
+                res_df = res_df[cols]
+
+            # ==========================================
+            # 💾 3. 存檔與最終 UI 唯一顯示
+            # ==========================================
+            # 掃描完成後，自動存檔 (含最新的總分，供明天相減使用)
+            save_daily_score(res_df)
+
+            # 將結果存入記憶體供下方搜尋區塊使用
             st.session_state['top_pool_df'] = res_df
-            # 🔥 在選股池掃描完成後，自動存檔
-        save_daily_score(res_df)
 
-        # ==========================================
-        # 🔥 新增：批次計算全表的 Delta 分數並精準插入欄位
-        # ==========================================
-        # 1. 為了效能，只讀取一次「昨日」的歷史檔案建立對照表
-        history_files = sorted(glob.glob(os.path.join(SCORE_HISTORY_DIR, "scores_*.csv")), reverse=True)
-        prev_scores_dict = {}
-        if len(history_files) >= 2:
-            try:
-                prev_df = pd.read_csv(history_files[1])
-                # 建立 { '代號': 總分 } 的極速對照字典
-                prev_scores_dict = dict(zip(prev_df['股票代號'].astype(str), prev_df['總分']))
-            except Exception:
-                pass
-
-        # 2. 定義表格每一列的 Delta 運算邏輯
-        def calc_table_delta(row):
-            sid = str(row['股票代號'])
-            curr_score = row.get('總分', 0)
-            # 如果昨天沒有這檔的資料，Delta 預設為 0
-            prev_score = prev_scores_dict.get(sid, curr_score) 
-            delta = round(curr_score - prev_score, 2)
-            
-            # 格式化為純數值文字：正數補上+號，0或負數維持原樣
-            return f"+{delta}" if delta > 0 else str(delta)
-
-        # 3. 瞬間產生整條 Delta 欄位
-        if not res_df.empty and '總分' in res_df.columns:
-            res_df['Delta'] = res_df.apply(calc_table_delta, axis=1)
-
-            # 4. 完美排版：把 Delta 欄位硬塞到「總分」的正後方
-            cols = res_df.columns.tolist()
-            cols.remove('Delta')
-            score_idx = cols.index('總分')
-            cols.insert(score_idx + 1, 'Delta')
-            res_df = res_df[cols]
-
-        # ==========================================
-        # 💾 存檔與最終 UI 顯示
-        # ==========================================
-        # 掃描完成後，自動存檔 (含最新的總分)
-        save_daily_score(res_df)
-
-        # 將結果存入記憶體供下方搜尋區塊使用
-        st.session_state['top_pool_df'] = res_df
-
-        # 顯示最終包含 Delta 的大表
-        st.dataframe(res_df, use_container_width=True, hide_index=True)
-
+            # 🔥 這裡才是「唯一一次」印出訊息與表格的地方！
+            st.success(f"選股池掃描完成！共過濾出 {len(res_df)} 檔潛力標的。")
+            st.dataframe(res_df, use_container_width=True, hide_index=True)
 # ==========================================
 # 📊 【蜂蜜計數器】本站累計觀測人次統計
 # ==========================================
