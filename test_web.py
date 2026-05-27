@@ -2191,7 +2191,7 @@ with top_pool_container:
                 # 📝 建立一個追蹤清單，用來記錄這檔股票所有加扣分軌跡
                 details = [] 
                 
-                # 📈 原有加分機制
+                # 📈 區塊 2 加分機制
                 r_b2_1 = "✔️" if check_b2_strict(df_b2_1, sid, bad_b2_vol) else ""
                 if r_b2_1: score += 1; details.append("外買佔: +1")
                 
@@ -2210,7 +2210,7 @@ with top_pool_container:
                 if get_today_ratio(df_b2_3, sid, '當日買發比%') <= -10: score -= 0.5; details.append("當日外佔發行(<-10%): -0.5")
                 if get_today_ratio(df_b2_4, sid, '當日買發比%') <= -10: score -= 0.5; details.append("當日投佔發行(<-10%): -0.5")
                 
-                # 📈 連買加分
+                # 📈 區塊 3 連買加分
                 s_fd, r_b3_fd = get_b3_score(df_b3, sid, '外資日')
                 if s_fd > 0: score += s_fd; details.append(f"外資日連: +{s_fd}")
                 
@@ -2223,7 +2223,7 @@ with top_pool_container:
                 s_iw, r_b3_iw = get_b3_score(df_b3, sid, '投信週')
                 if s_iw > 0: score += s_iw; details.append(f"投信週連: +{s_iw}")
                 
-                # 📈 資券加分
+                # 📈 區塊 4 資券加分
                 r_b4_mar = ""; 
                 if sid in s_b4_mar_pct: r_b4_mar += "✔️(幅)"; score += 1; details.append("資減(幅): +1")
                 if sid in s_b4_mar_vol: r_b4_mar += "✔️(量)"; score += 0.5; details.append("資減(量): +0.5")
@@ -2236,7 +2236,7 @@ with top_pool_container:
                 if sid in s_b4_mp_pct: r_b4_mp += "✔️(幅)"; score += 1; details.append("券增(幅): +1")
                 if sid in s_b4_mp_vol: r_b4_mp += "✔️(量)"; score += 0.5; details.append("券增(量): +0.5")
                 
-                # 📊 大股東動向
+                # 📊 區塊 5 大股東動向
                 r_b5 = ""
                 if not df_b5.empty and sid in df_b5['股票代號'].values:
                     trend = str(df_b5[df_b5['股票代號'] == sid].iloc[0].get('週動態', ''))
@@ -2268,11 +2268,12 @@ with top_pool_container:
                 # 📝 將明細清單組合成多行文字 (換行符號 \n，讓系統能產生 Tooltip 排版)
                 score_breakdown = " \n".join(details) if details else "無加扣分"
 
+                # 🔥 唯一的一次儲存！沒有其他分身！
                 results.append({
                     '總分': score,
                     '股票代號': sid,
                     '股票名稱': sname,
-                    '評分明細': score_breakdown, # 🔥 新增：將算好的明細字串放入欄位
+                    '評分明細': score_breakdown, 
                     '最新動態': b1_dyn,
                     '今日上榜': b1_rank,  
                     '外買佔比': r_b2_1, '投買佔比': r_b2_2, '外佔發行': r_b2_3, '投佔發行': r_b2_4,
@@ -2280,47 +2281,7 @@ with top_pool_container:
                     '資減': r_b4_mar, '借減': r_b4_sho, '券增': r_b4_mp,
                     '大股東動向': r_b5, '法人賣出警示': r_warn
                 })
-                
-                
-                # ==========================================
-                # 📈 原有加分機制 (進榜就加分)
-                # ==========================================
-                r_b2_1 = "✔️" if check_b2_strict(df_b2_1, sid, bad_b2_vol) else ""; score += 1 if r_b2_1 else 0
-                r_b2_2 = "✔️" if check_b2_strict(df_b2_2, sid, bad_b2_vol) else ""; score += 1 if r_b2_2 else 0
-                r_b2_3 = "✔️" if check_b2_strict(df_b2_3, sid, bad_b2_iss) else ""; score += 1 if r_b2_3 else 0
-                r_b2_4 = "✔️" if check_b2_strict(df_b2_4, sid, bad_b2_iss) else ""; score += 1 if r_b2_4 else 0
-                
-                # ==========================================
-                # 🚨 【當日轉賣扣分引擎】：只要今日數據是負數，立刻扣分！
-                # (您可以自行將 0.5 改成 1.0 來加重懲罰力道)
-                # ==========================================
-                if get_today_ratio(df_b2_1, sid, '當日買佔比%') < 0: score -= 0.5
-                if get_today_ratio(df_b2_2, sid, '當日買佔比%') < 0: score -= 0.5
-                if get_today_ratio(df_b2_3, sid, '當日買發比%') < 0: score -= 0.5
-                if get_today_ratio(df_b2_4, sid, '當日買發比%') < 0: score -= 0.5
-                
-                # ... (下方繼續接您原本的 r_b3 外資日連買... 等程式碼) ...
-                s_fd, r_b3_fd = get_b3_score(df_b3, sid, '外資日'); score += s_fd
-                
-                # 🔥 【精簡文字修復】：防止表格寬度被卡到
-                is_fo_sell = sid in fo_sell_ids
-                is_it_sell = sid in it_sell_ids
-                if is_fo_sell and is_it_sell: r_warn = "🚨外投雙倒"
-                elif is_fo_sell: r_warn = "⚠️外資倒"
-                elif is_it_sell: r_warn = "⚠️投信倒"
-                else: r_warn = "-"
 
-                results.append({
-                    '總分': score,
-                    '股票代號': sid,
-                    '股票名稱': sname,
-                    '最新動態': b1_dyn,
-                    '今日上榜': b1_rank,  
-                    '外買佔比': r_b2_1, '投買佔比': r_b2_2, '外佔發行': r_b2_3, '投佔發行': r_b2_4,
-                    '外日連': r_b3_fd, '外週連': r_b3_fw, '投日連': r_b3_id, '投週連': r_b3_iw,
-                    '資減': r_b4_mar, '借減': r_b4_sho, '券增': r_b4_mp,
-                    '大股東動向': r_b5, '法人賣出警示': r_warn
-                })
                 
             # ==========================================
             # 1. 先將結果轉成 DataFrame、排序並【剃除重複分身】
