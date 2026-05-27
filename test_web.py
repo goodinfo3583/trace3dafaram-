@@ -228,6 +228,25 @@ def render_technical_chart(stock_id, timeframe="日線", selected_mas=[], show_r
                 prev_volatility = prev_high - prev_low
                 if prev_volatility > 0 and recent_volatility < (prev_volatility * 0.6):
                     signals.append("📐 **型態壓縮**：近一個月股價高低波幅急遽收斂，疑似三角收斂末端。")
+            # 5. 🚀 股價創波段新高提示 (創 60 日新高)
+            if len(df) >= 60:
+                # 找出過去 60 天的最高價
+                highest_60d = df['High'].iloc[-60:].max()
+                # 如果今天的最高價，等於或突破過去 60 天的最高價
+                if df['High'].iloc[-1] >= highest_60d:
+                    signals.append("🚀 **波段創高**：今日股價突破 60 日 (約一季) 以來新高點，上攻動能極強！")
+
+            # 6. 📈 均線多頭排列提示 (5MA > 10MA > 20MA > 60MA 且季線上揚)
+            if len(df) >= 60:
+                ma5 = df['Close'].rolling(5).mean().iloc[-1]
+                ma10 = df['Close'].rolling(10).mean().iloc[-1]
+                ma20 = df['Close'].rolling(20).mean().iloc[-1]
+                ma60 = df['Close'].rolling(60).mean().iloc[-1]
+                ma60_prev = df['Close'].rolling(60).mean().iloc[-2] # 昨天的 60MA
+                
+                # 嚴格定義：收盤價站上所有均線，且均線照順序排列，外加 60MA 必須是向上的
+                if pd.notna(ma60) and (latest_close > ma5 > ma10 > ma20 > ma60) and (ma60 > ma60_prev):
+                    signals.append("📈 **多頭排列**：短中長期均線 (5/10/20/60MA) 呈現完美多頭發散，趨勢明確翻多！")
 
             return signals
 
