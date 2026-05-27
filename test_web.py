@@ -2293,11 +2293,16 @@ with top_pool_container:
                 })
                 
             # ==========================================
-            # 1. 先將結果轉成 DataFrame 並排序
+            # 1. 先將結果轉成 DataFrame、排序並【剃除重複分身】
             # ==========================================
             res_df = pd.DataFrame(results)
-            res_df = res_df.sort_values(by='總分', ascending=False).reset_index(drop=True)
-
+            
+            # 先依照總分由高到低排序
+            res_df = res_df.sort_values(by='總分', ascending=False)
+            
+            # 🔥 新增核心機制：同一個股票代號只保留第一筆 (最高分)，並重新整理序號
+            res_df = res_df.drop_duplicates(subset=['股票代號'], keep='first').reset_index(drop=True)
+            
             # ==========================================
             # 🔥 2. 批次計算全表的 Delta 分數並精準插入欄位
             # ==========================================
