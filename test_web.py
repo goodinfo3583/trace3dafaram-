@@ -1667,10 +1667,6 @@ def read_live_ln_report(file_keyword, strict_type, exact_field_name, prefix_keyw
         output_df.index = range(1, len(output_df) + 1)
         return output_df, date_str
     except Exception as e:
-
-        c1, c2 = st.columns(2)
-        show_etf = c1.checkbox("顯示 ETF", value=True, key="sitc_etf_final_v3")
-        show_bond = c2.checkbox("顯示 債券/債券ETF", value=True, key="sitc_bond_final_v3")
         return pd.DataFrame(), f"解讀失敗: {str(e)}"
 
 # 執行排程與渲染 (與您原先邏輯相同)
