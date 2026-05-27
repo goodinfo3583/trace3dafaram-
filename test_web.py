@@ -1,23 +1,58 @@
-﻿import streamlit as st
+import streamlit as st
 import pandas as pd
 import numpy as np
 import os
 import glob
 import re
+import datetime
 
 # ==========================================
-# 1. 網頁基本設定 & 頂部蜂蜜幸運祝福
+# 1. 網頁基本設定 & 目錄路徑初始化
 # ==========================================
 st.set_page_config(page_title="台股籌碼五大核心矩陣儀表板", layout="wide")
-st.write("")
-st.write("📊 本站進行數據分析僅供參考而非推薦個股與飆股另請愛惜荷包小心騙騙")
 
+# 設定路徑 (一定要先定義 DATA_DIR，後面才能用它來串接)
 DATA_DIR = "./Goodinfo_Rankings"
+SCORE_HISTORY_DIR = os.path.join(DATA_DIR, "ScoreHistory")
+
+if not os.path.exists(SCORE_HISTORY_DIR):
+    os.makedirs(SCORE_HISTORY_DIR)
+
+# ==========================================
+# 2. Delta 分數與歷史存檔工具函數
+# ==========================================
+def save_daily_score(df):
+    """將今日總分存入 CSV"""
+    today_str = datetime.datetime.now().strftime("%Y%m%d")
+    filepath = os.path.join(SCORE_HISTORY_DIR, f"scores_{today_str}.csv")
+    df[['股票代號', '總分']].to_csv(filepath, index=False)
+
+def get_delta_score(sid, current_score):
+    """計算與昨日分數的 Delta"""
+    history_files = sorted(glob.glob(os.path.join(SCORE_HISTORY_DIR, "scores_*.csv")), reverse=True)
+    if len(history_files) < 2: return 0.0 # 沒有歷史紀錄則為 0
+    
+    try:
+        # 讀取上一筆 (歷史第二新的檔案，最新的那份是今天剛存的)
+        prev_df = pd.read_csv(history_files[1])
+        prev_score = prev_df.loc[prev_df['股票代號'] == str(sid), '總分']
+        
+        if not prev_score.empty:
+            return round(current_score - prev_score.iloc[0], 2)
+    except Exception:
+        return 0.0
+    return 0.0
 
 def extract_date_from_name(filepath):
     filename = os.path.basename(filepath)
     date_match = re.search(r'(\d+)', filename)
     return date_match.group(1) if date_match else "00000000"
+
+# ==========================================
+# 3. 頁面開頭訊息
+# ==========================================
+st.write("")
+st.write("📊 本站進行數據分析僅供參考而非推薦個股與飆股另請愛惜荷包小心騙騙")
 # ==========================================
 # 🌌 注入極致黑看盤軟體專屬風格樣式 (全站深色化 + 表格與按鈕優化)
 # ==========================================
@@ -2146,6 +2181,10 @@ with top_pool_container:
             st.dataframe(res_df, use_container_width=True, hide_index=True)
             st.success(f"選股池掃描完成！共過濾出 {len(res_df)} 檔潛力標的。")
             st.session_state['top_pool_df'] = res_df
+            # 🔥 在選股池掃描完成後，自動存檔
+        save_daily_score(res_df)
+
+
 # ==========================================
 # 📊 【蜂蜜計數器】本站累計觀測人次統計
 # ==========================================
