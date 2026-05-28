@@ -1838,7 +1838,7 @@ live_it_wk = apply_b3_filter(live_it_wk)
 # 🔥 修正點 1：刪除標題的日曆圖案
 st.subheader("最新單日連續買超")
 
-st.markdown("<div style='color: white; margin-bottom: 16px; font-size: 16px;'>💡 <b>日動態說明：</b> 🔥 波段認養 (連買10天以上) | ⚡ 買盤點火 (連買5~9天) | 🆕 試單觀察 (連買1~4天)</div>", unsafe_allow_html=True)
+st.markdown("<div style='color: white; margin-bottom: 16px; font-size: 16px;'>💡 <b>日動態說明：</b> 🔥 波段認養 (連買10天以上)   ⚡ 買盤點火 (連買5~9天)   🆕 試單觀察 (連買1~4天)</div>", unsafe_allow_html=True)
 
 c_day1, c_day2 = st.columns(2)
 
@@ -1867,7 +1867,7 @@ st.write(" ")
 # 🔥 修正點 1：刪除標題的日曆圖案
 st.subheader("最新單週連續波段買超")
 
-st.markdown("<div style='color: white; margin-bottom: 15px; font-size: 14px;'>💡 <b>週動態說明：</b> 👑 長線主控 (連買10週以上) | 🚀 趨勢加溫 (連買5~9週) | 🌱 週線發動 (連買1~4週)</div>", unsafe_allow_html=True)
+st.markdown("<div style='color: white; margin-bottom: 15px; font-size: 14px;'>💡 <b>週動態說明：</b> 👑 長線主控 (連買10週以上)   🚀 趨勢加溫 (連買5~9週)   🌱 週線發動 (連買1~4週)</div>", unsafe_allow_html=True)
 
 c_wk1, c_wk2 = st.columns(2)
 
