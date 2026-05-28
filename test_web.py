@@ -2251,7 +2251,7 @@ with top_pool_container:
 
     # 2. 顯示帶有最新日期的科技感標題
     st.markdown(f"## 🏆 數據分析觀察名單 <span style='font-size:18px; color:#00D2FF; font-weight:500;'>(最新數據: {latest_date_str})</span>", unsafe_allow_html=True)
-    st.info("💡 **權重評分**：法人持股上榜搭配其他數據分析積分f。(評分數據僅供參考)")
+    st.info("💡 **權重評分**：法人持股上榜搭配其他數據分析積分,請參考短動態。(評分數據僅供參考)")
 
     if 'my_final_df' not in st.session_state or st.session_state['my_final_df'].empty:
         st.warning("⚠️ 尚未載入區塊 1 資料，無法進行選股池評比。")
