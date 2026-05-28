@@ -1364,7 +1364,9 @@ else:
         # ==========================================================
         # 🔥 【重點新增】：將結果存入記憶體，供搜尋區塊讀取！
         # ==========================================================
-        st.success(f"已成功串聯交易日追蹤共 {len(csv_display)} 檔")
+        # 計算實際成功串聯的天數 (計算有幾個"成交比%"欄位)
+        days_count = len([c for c in csv_display.columns if "成交比%" in c])
+        st.success(f"串聯 {days_count} 個交易日追蹤，共 {len(csv_display)} 檔")
         
         # 最後存入 Session State
         st.session_state['df_blk2_1'] = csv_display
@@ -1480,7 +1482,9 @@ else:
         csv_display.index = range(1, len(csv_display) + 1)
         
         st.dataframe(csv_display, use_container_width=True)
-        st.success(f"已成功串聯交易日追蹤共 {len(csv_display)} 檔")
+        # 計算實際成功串聯的天數 (計算有幾個"成交比%"欄位)
+        days_count = len([c for c in csv_display.columns if "成交比%" in c])
+        st.success(f"串聯 {days_count} 個交易日追蹤，共 {len(csv_display)} 檔")
         
         # 🔥 【連動儲存】：存入對應的快搜抽屜
         st.session_state['df_blk2_2'] = csv_display
