@@ -1702,7 +1702,7 @@ st.markdown("<div id='section-3'></div>", unsafe_allow_html=True)
 st.header("📅 區塊3：連續買超")
 
 st.info("""
-狀態動態說明：🔥 波段認養: 連買 10以上天/週   ⚡ 買盤點火:連買 5 ~ 9 天/週   🆕 試單觀察:連買 1 ~ 4 天/週 """)
+狀態動態說明：🔥波段認養:連買10以上天/週   ⚡買盤點火:連買5~9天/週   🆕試單觀察:連買1~4天/週 """)
 
 def read_live_ln_report(file_keyword, strict_type, exact_field_name, prefix_keyword, col_label):
     if strict_type == "日":
