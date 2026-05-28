@@ -995,7 +995,7 @@ def render_sidebar_market_summary():
         m_date = "無檔案"
         card_html = f"""
         <div style='background-color: #1e293b; padding: 12px; border-radius: 8px; margin-bottom: 10px;'>
-            <div style='font-size: 13px; color: #00D2FF; margin-bottom: 8px;'>📅 數據結算日：{m_date}</div>
+            <div style='font-size: 13px; color: #00D2FF; margin-bottom: 8px;'>📅 數據結算測試：{m_date}</div>
             <table style='width:100%; border-collapse: collapse; font-size: 14px; color: white;'>
                 <tr style='border-bottom: 1px solid #334155; font-weight: bold;'>
                     <td style='padding: 4px 0;'>法人身份</td>
