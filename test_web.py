@@ -1252,7 +1252,7 @@ if sorted_dates:
 # ==========================================
 st.write("---")
 st.markdown("<div id='section-2-1'></div>", unsafe_allow_html=True)
-st.header("🎯 區塊2-1：外資 5 日買超佔標的成交量 追蹤")
+st.header("🎯 區塊2-1：外資 5 日 買超佔標的成交量")
 
 import os
 import glob
@@ -1366,7 +1366,7 @@ else:
         # ==========================================================
         # 計算實際成功串聯的天數 (計算有幾個"成交比%"欄位)
         days_count = len([c for c in csv_display.columns if "成交比%" in c])
-        st.success(f"串聯 {days_count} 個交易日追蹤，共 {len(csv_display)} 檔")
+        st.success(f"串聯 {days_count} 個交易日追蹤共 {len(csv_display)} 檔")
         
         # 最後存入 Session State
         st.session_state['df_blk2_1'] = csv_display
@@ -1380,7 +1380,7 @@ else:
 # ==========================================
 st.write("---")
 st.markdown("<div id='section-2-2'></div>", unsafe_allow_html=True)
-st.header("🎯 區塊2-2：投信 5 日買超佔標的成交量 追蹤")
+st.header("🎯 區塊2-2：投信 5 日 買超佔標的成交量")
 
 import os
 import glob
@@ -1484,7 +1484,7 @@ else:
         st.dataframe(csv_display, use_container_width=True)
         # 計算實際成功串聯的天數 (計算有幾個"成交比%"欄位)
         days_count = len([c for c in csv_display.columns if "成交比%" in c])
-        st.success(f"串聯 {days_count} 個交易日追蹤，共 {len(csv_display)} 檔")
+        st.success(f"串聯 {days_count} 個交易日追蹤共 {len(csv_display)} 檔")
         
         # 🔥 【連動儲存】：存入對應的快搜抽屜
         st.session_state['df_blk2_2'] = csv_display
@@ -1496,7 +1496,12 @@ else:
 # ==========================================
 st.write("---")
 st.markdown("<div id='section-2-3'></div>", unsafe_allow_html=True)
-st.header("🎯 區塊2-3：外資 5 日買超佔公司發行張數 追蹤")
+st.header("🎯 區塊2-3：外資 5 日 買超佔公司發行張數")
+
+import os
+import glob
+import pandas as pd
+
 csv_pattern_fo = os.path.join(DATA_DIR, "*外資買超佔發行張數*.csv")
 all_files_fo = glob.glob(csv_pattern_fo)
 
@@ -1528,7 +1533,8 @@ else:
             
             if col_5d in df.columns:
                 df_s = df[['代號', '名稱', col_5d]].copy()
-                df_s = df_s.rename(columns={col_5d: f"{d_label}外資買發張數%"})
+                # 🔥 修改點 1：將欄位名稱精簡為 "發行數%"
+                df_s = df_s.rename(columns={col_5d: f"{d_label}發行數%"})
                 
                 if base_df is None:
                     base_df = df_s
@@ -1542,7 +1548,8 @@ else:
     if base_df is not None and len(date_labels) > 0:
         csv_display = base_df.fillna("未進榜").rename(columns={"代號": "股票代號", "名稱": "股票名稱"})
         
-        latest_5d_col = f"{date_labels[0]}外資買發張數%"
+        # 🔥 修改點 2：對齊新的精簡欄位名稱
+        latest_5d_col = f"{date_labels[0]}發行數%"
         if latest_5d_col in csv_display.columns:
             csv_display[latest_5d_col] = pd.to_numeric(csv_display[latest_5d_col].replace("未進榜", 0), errors='coerce').fillna(0)
             csv_display = csv_display.sort_values(by=latest_5d_col, ascending=False)
@@ -1570,14 +1577,15 @@ else:
         if show_bond: mask |= csv_display['股票代號'].str.endswith('B')
         csv_display = csv_display[mask]
         
-        history_cols = [c for c in csv_display.columns if "外資買發張數%" in c]
+        # 🔥 修改點 3：過濾並抓取新的精簡欄位名稱
+        history_cols = [c for c in csv_display.columns if "發行數%" in c]
         csv_display = csv_display[["股票代號", "股票名稱", "今日短動態"] + history_cols]
         csv_display.index = range(1, len(csv_display) + 1)
         
         #表格
         st.dataframe(csv_display, use_container_width=True) 
         #說明
-        st.success(f"已成功串聯 {len(date_labels)} 個交易日追蹤共 {len(csv_display)} 檔")
+        st.success(f"已成功串聯 {len(date_labels)} 個交易日追蹤，共 {len(csv_display)} 檔")
         
         # 🔥 【連動儲存】
         st.session_state['df_blk2_3'] = csv_display
