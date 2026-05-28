@@ -2032,7 +2032,8 @@ st.write("")
 c1, c2 = st.columns(2)
 
 with c1:
-    st.subheader("📉 融資減少比例排名")
+    # 統一使用 h3 標籤，讓標題大小與區塊 3 完全對齊
+    st.markdown("<h3 style='margin-top: 0; margin-bottom: 10px;'>📉 融資減少比例排名</h3>", unsafe_allow_html=True)
     df_pct, msg_pct = get_specific_margin_data("融資減少幅度")
     df_pct_clean = process_margin_df(df_pct, "幅度", show_etf_41, show_bond_41)
     
@@ -2041,12 +2042,14 @@ with c1:
         date_str = re.search(r'\d{8}', msg_pct).group(0) if re.search(r'\d{8}', msg_pct) else "未知"
         
         st.dataframe(df_pct_clean, use_container_width=True, hide_index=True)
-        st.write(f" **最新數據: {date_str}**")
+        # 👇 替換為科技藍置底純文字
+        st.markdown(f"<div style='color: #00D2FF; font-size: 14px; margin-top: 5px;'>(最新數據: {date_str})</div>", unsafe_allow_html=True)
     else:
         st.warning("⚠️ 無相符資料")
 
 with c2:
-    st.subheader("📉 融資減少張數排名")
+    # 統一使用 h3 標籤
+    st.markdown("<h3 style='margin-top: 0; margin-bottom: 10px;'>📉 融資減少張數排名</h3>", unsafe_allow_html=True)
     df_vol, msg_vol = get_specific_margin_data("融資減少張數")
     df_vol_clean = process_margin_df(df_vol, "張數", show_etf_41, show_bond_41)
     
@@ -2054,14 +2057,13 @@ with c2:
         date_str = re.search(r'\d{8}', msg_vol).group(0) if re.search(r'\d{8}', msg_vol) else "未知"
         
         st.dataframe(df_vol_clean, use_container_width=True, hide_index=True)
-        date_val = my_latest_date if my_latest_date else '無資料'
-        st.markdown(f"<div style='color: #00D2FF; font-size: 14px; margin-top: 5px;'>(最新數據: {date_val})</div>", unsafe_allow_html=True)
+        # 👇 替換為科技藍置底純文字
+        st.markdown(f"<div style='color: #00D2FF; font-size: 14px; margin-top: 5px;'>(最新數據: {date_str})</div>", unsafe_allow_html=True)
     else:
         st.warning("⚠️ 無相符資料")
 
 st.session_state['df_margin_pct'] = df_pct_clean
 st.session_state['df_margin_vol'] = df_vol_clean
-
 # ==========================================
 # 📅 區塊 4-2：借券賣出減少動向
 # ==========================================
