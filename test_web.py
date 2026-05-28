@@ -1719,11 +1719,9 @@ def read_live_ln_report(file_keyword, strict_type, exact_field_name, prefix_keyw
     date_str = extract_date_from_name(latest_file) 
     
     try:
-        # 強制指定 utf-8-sig 以解決中文亂碼，並清除欄位中的隱形字元
         df = pd.read_csv(latest_file, encoding='utf-8-sig')
         df.columns = df.columns.astype(str).str.replace('\n', '').str.replace(' ', '').str.replace('\ufeff', '').str.strip()
         
-        # 動態查找欄位
         col_id = next((c for c in df.columns if '代號' in c), df.columns[0])
         col_name = next((c for c in df.columns if '名稱' in c), df.columns[1])
         
@@ -1743,13 +1741,12 @@ def read_live_ln_report(file_keyword, strict_type, exact_field_name, prefix_keyw
         output_df["股票代號"] = df_sorted[col_id].astype(str).str.strip()
         output_df["股票名稱"] = df_sorted[col_name].astype(str).str.strip()
         
-        # 根據「日」或「週」分配不同的專業戰略標籤
         def get_status_tag(val):
             if strict_type == "日":
                 if val >= 10: return "🔥 波段認養"
                 elif val >= 5: return "⚡ 買盤點火"
                 else: return "🆕 試單觀察"
-            else: # 週連買
+            else:
                 if val >= 10: return "👑 長線主控"
                 elif val >= 5: return "🚀 趨勢加溫"
                 else: return "🌱 週線發動"
@@ -1772,7 +1769,7 @@ def read_live_ln_report(file_keyword, strict_type, exact_field_name, prefix_keyw
         return pd.DataFrame(), f"解讀失敗: {str(e)}"
 
 # ==========================================
-# 🛠  必備函數：強硬讀取法
+# 🛠 必備函數：強硬讀取法
 # ==========================================
 def robust_read_csv(file_path):
     for encoding in ['cp950', 'utf-8-sig', 'utf-8']:
@@ -1813,19 +1810,42 @@ if live_it_wk.empty:
         live_it_wk, date_it_wk = read_live_ln_report("外資連買", "週", "投信連續買賣週數", "投信", "最新連買週數")
 
 # ========================================================
+# 🔍 新增：全域 ETF 與 債券 篩選器
+# ========================================================
+c_f1, c_f2 = st.columns(2)
+show_etf_b3 = c_f1.checkbox("顯示 ETF", value=True, key="b3_etf_filter")
+show_bond_b3 = c_f2.checkbox("顯示 債券/債券ETF", value=True, key="b3_bond_filter")
+
+def apply_b3_filter(df):
+    if df is None or df.empty:
+        return df
+    mask = (df['股票代號'].str.len() == 4)
+    if show_etf_b3: mask |= ((df['股票代號'].str.len() >= 5) & (~df['股票代號'].str.endswith('B')))
+    if show_bond_b3: mask |= df['股票代號'].str.endswith('B')
+    res_df = df[mask].copy()
+    res_df.index = range(1, len(res_df) + 1)
+    return res_df
+
+# 套用篩選器
+live_fo_day = apply_b3_filter(live_fo_day)
+live_it_day = apply_b3_filter(live_it_day)
+live_fo_wk = apply_b3_filter(live_fo_wk)
+live_it_wk = apply_b3_filter(live_it_wk)
+
+# ========================================================
 # 🖼️ 視覺介面渲染 (最新單日區塊)
 # ========================================================
-st.subheader("📅 最新單日連續買超")
+# 🔥 修正點 1：刪除標題的日曆圖案
+st.subheader("最新單日連續買超")
 
-# 🔥 修正點：將日動態說明改為白色字，並緊貼在日連買標題下方
 st.markdown("<div style='color: white; margin-bottom: 15px; font-size: 14px;'>💡 <b>日動態說明：</b> 🔥 波段認養 (連買10天以上) | ⚡ 買盤點火 (連買5~9天) | 🆕 試單觀察 (連買1~4天)</div>", unsafe_allow_html=True)
 
 c_day1, c_day2 = st.columns(2)
 
 with c_day1:
     date_val = date_fo_day if date_fo_day else '無資料'
-    # 🔥 修正點：改用 "()" 且字體不加粗
-    st.markdown(f"🌐 **外資最新日連買** (<span style='color: #60a5fa;'>最新數據: {date_val}</span>)", unsafe_allow_html=True)
+    # 🔥 修正點 2：將括號包入藍色 style 中，統一色彩
+    st.markdown(f"🌐 **外資最新日連買** <span style='color: #60a5fa;'>(最新數據: {date_val})</span>", unsafe_allow_html=True)
     if not live_fo_day.empty:
         st.dataframe(live_fo_day, use_container_width=True)
     else:
@@ -1833,8 +1853,7 @@ with c_day1:
 
 with c_day2:
     date_val = date_it_day if date_it_day else '無資料'
-    # 🔥 修正點：改用 "()" 且字體不加粗
-    st.markdown(f"🏦 **投信最新日連買** (<span style='color: #60a5fa;'>最新數據: {date_val}</span>)", unsafe_allow_html=True)
+    st.markdown(f"🏦 **投信最新日連買** <span style='color: #60a5fa;'>(最新數據: {date_val})</span>", unsafe_allow_html=True)
     if not live_it_day.empty:
         st.dataframe(live_it_day, use_container_width=True)
     else:
@@ -1845,17 +1864,17 @@ st.write(" ")
 # ========================================================
 # 🖼️ 視覺介面渲染 (最新單週區塊)
 # ========================================================
-st.subheader("📅 最新單週連續波段買超")
+# 🔥 修正點 1：刪除標題的日曆圖案
+st.subheader("最新單週連續波段買超")
 
-# 🔥 修正點：將週動態說明獨立移到下方，改為白色字，緊貼在週連買標題下方
 st.markdown("<div style='color: white; margin-bottom: 15px; font-size: 14px;'>💡 <b>週動態說明：</b> 👑 長線主控 (連買10週以上) | 🚀 趨勢加溫 (連買5~9週) | 🌱 週線發動 (連買1~4週)</div>", unsafe_allow_html=True)
 
 c_wk1, c_wk2 = st.columns(2)
 
 with c_wk1:
     date_val = date_fo_wk if date_fo_wk else '無資料'
-    # 🔥 修正點：改用 "()" 且字體不加粗
-    st.markdown(f"🌐 **外資最新週連買** (<span style='color: #60a5fa;'>最新數據: {date_val}</span>)", unsafe_allow_html=True)
+    # 🔥 修正點 2：將括號包入藍色 style 中，統一色彩
+    st.markdown(f"🌐 **外資最新週連買** <span style='color: #60a5fa;'>(最新數據: {date_val})</span>", unsafe_allow_html=True)
     if not live_fo_wk.empty:
         st.dataframe(live_fo_wk, use_container_width=True)
     else:
@@ -1863,8 +1882,7 @@ with c_wk1:
 
 with c_wk2:
     date_val = date_it_wk if date_it_wk else '無資料'
-    # 🔥 修正點：改用 "()" 且字體不加粗
-    st.markdown(f"🏦 **投信最新週連買** (<span style='color: #60a5fa;'>最新數據: {date_val}</span>)", unsafe_allow_html=True)
+    st.markdown(f"🏦 **投信最新週連買** <span style='color: #60a5fa;'>(最新數據: {date_val})</span>", unsafe_allow_html=True)
     if not live_it_wk.empty:
         st.dataframe(live_it_wk, use_container_width=True)
     else:
