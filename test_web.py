@@ -2054,7 +2054,8 @@ with c2:
         date_str = re.search(r'\d{8}', msg_vol).group(0) if re.search(r'\d{8}', msg_vol) else "未知"
         
         st.dataframe(df_vol_clean, use_container_width=True, hide_index=True)
-        st.write(f" **最新數據: {date_str}**")
+        date_val = my_latest_date if my_latest_date else '無資料'
+        st.markdown(f"<div style='color: #00D2FF; font-size: 14px; margin-top: 5px;'>(最新數據: {date_val})</div>", unsafe_allow_html=True)
     else:
         st.warning("⚠️ 無相符資料")
 
