@@ -1838,14 +1838,14 @@ live_it_wk = apply_b3_filter(live_it_wk)
 # 🔥 修正點 1：刪除標題的日曆圖案
 st.subheader("最新單日連續買超")
 
-st.markdown("<div style='color: white; margin-bottom: 15px; font-size: 14px;'>💡 <b>日動態說明：</b> 🔥 波段認養 (連買10天以上) | ⚡ 買盤點火 (連買5~9天) | 🆕 試單觀察 (連買1~4天)</div>", unsafe_allow_html=True)
+st.markdown("<div style='color: white; margin-bottom: 16px; font-size: 16px;'>💡 <b>日動態說明：</b> 🔥 波段認養 (連買10天以上) | ⚡ 買盤點火 (連買5~9天) | 🆕 試單觀察 (連買1~4天)</div>", unsafe_allow_html=True)
 
 c_day1, c_day2 = st.columns(2)
 
 with c_day1:
     date_val = date_fo_day if date_fo_day else '無資料'
     # 🔥 修正點 2：將括號包入藍色 style 中，統一色彩
-    st.markdown(f"🌐 **外資最新日連買** <span style='color: #60a5fa;'>(最新數據: {date_val})</span>", unsafe_allow_html=True)
+    st.markdown(f"🌐 **外資最新日連買** <span style='color: #0080FF;'>(最新數據: {date_val})</span>", unsafe_allow_html=True)
     if not live_fo_day.empty:
         st.dataframe(live_fo_day, use_container_width=True)
     else:
