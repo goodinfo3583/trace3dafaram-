@@ -1585,7 +1585,7 @@ else:
         #表格
         st.dataframe(csv_display, use_container_width=True) 
         #說明
-        st.success(f"已成功串聯 {len(date_labels)} 個交易日追蹤，共 {len(csv_display)} 檔")
+        st.success(f"串聯 {len(date_labels)} 個交易日追蹤共 {len(csv_display)} 檔")
         
         # 🔥 【連動儲存】
         st.session_state['df_blk2_3'] = csv_display
@@ -1597,7 +1597,12 @@ else:
 # ==========================================
 st.write("---")
 st.markdown("<div id='section-2-4'></div>", unsafe_allow_html=True)
-st.header("🎯 區塊2-4：投信 5 日買超佔公司發行張數 追蹤")
+st.header("🎯 區塊2-4：投信 5 日 買超佔公司發行張數")
+
+import os
+import glob
+import pandas as pd
+
 csv_pattern_sitc = os.path.join(DATA_DIR, "*投信買超佔發行張數*.csv")
 all_files_sitc = glob.glob(csv_pattern_sitc)
 
@@ -1629,7 +1634,8 @@ else:
             
             if col_5d in df.columns:
                 df_s = df[['代號', '名稱', col_5d]].copy()
-                df_s = df_s.rename(columns={col_5d: f"{d_label}投信買發張數%"})
+                # 🔥 修改點 1：將欄位名稱精簡為 "發行數%"
+                df_s = df_s.rename(columns={col_5d: f"{d_label}發行數%"})
                 
                 if base_df is None:
                     base_df = df_s
@@ -1643,7 +1649,8 @@ else:
     if base_df is not None and len(date_labels) > 0:
         csv_display = base_df.fillna("未進榜").rename(columns={"代號": "股票代號", "名稱": "股票名稱"})
         
-        latest_5d_col = f"{date_labels[0]}投信買發張數%"
+        # 🔥 修改點 2：對齊新的精簡欄位名稱
+        latest_5d_col = f"{date_labels[0]}發行數%"
         if latest_5d_col in csv_display.columns:
             csv_display[latest_5d_col] = pd.to_numeric(csv_display[latest_5d_col].replace("未進榜", 0), errors='coerce').fillna(0)
             csv_display = csv_display.sort_values(by=latest_5d_col, ascending=False)
@@ -1662,7 +1669,6 @@ else:
 
         csv_display['今日短動態'] = csv_display.apply(judge_today_alert_sitc, axis=1)
         
-        
         c1, c2 = st.columns(2)
         show_etf = c1.checkbox("顯示 ETF", value=True, key="sitc_etf_final_v3")
         show_bond = c2.checkbox("顯示 債券/債券ETF", value=True, key="sitc_bond_final_v3")
@@ -1672,13 +1678,16 @@ else:
         if show_bond: mask |= csv_display['股票代號'].str.endswith('B')
         csv_display = csv_display[mask]
         
-        history_cols = [c for c in csv_display.columns if "投信買發張數%" in c]
+        # 🔥 修改點 3：過濾並抓取新的精簡欄位名稱
+        history_cols = [c for c in csv_display.columns if "發行數%" in c]
         csv_display = csv_display[["股票代號", "股票名稱", "今日短動態"] + history_cols]
         csv_display.index = range(1, len(csv_display) + 1)
         
         
         st.dataframe(csv_display, use_container_width=True)
-        st.success(f"已成功串聯 {len(date_labels)} 個交易日追蹤共 {len(csv_display)} 檔")
+        # 🔥 修改點 4：統一成功訊息的標點符號格式
+        st.success(f"串聯 {len(date_labels)} 個交易日追蹤共 {len(csv_display)} 檔")
+        
         # 🔥 【連動儲存】
         st.session_state['df_blk2_4'] = csv_display
     else:
