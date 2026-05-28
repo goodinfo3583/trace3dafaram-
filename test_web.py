@@ -1855,7 +1855,7 @@ with c_day1:
         st.write("無資料")
     # 將日期移到表格正下方
     date_val = date_fo_day if date_fo_day else '無資料'
-    st.markdown(f"<div style='color: #00D2FF; font-size: 14px; margin-top: 5px;'>(最新數據: {date_val})</div>", unsafe_allow_html=True)
+    st.markdown(f"<div style='color: #00D2FF; font-size: 16px; margin-top: 1px;'>最新數據: {date_val}</div>", unsafe_allow_html=True)
 
 with c_day2:
     if not live_it_day.empty:
@@ -1864,7 +1864,7 @@ with c_day2:
         st.write("無資料")
     # 將日期移到表格正下方
     date_val = date_it_day if date_it_day else '無資料'
-    st.markdown(f"<div style='color: #00D2FF; font-size: 14px; margin-top: 5px;'>(最新數據: {date_val})</div>", unsafe_allow_html=True)
+    st.markdown(f"<div style='color: #00D2FF; font-size: 16px; margin-top: 1px;'>最新數據: {date_val}</div>", unsafe_allow_html=True)
 
 st.write("---") # 加上分隔線，讓日與週的區塊更分明
 
