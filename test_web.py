@@ -1265,7 +1265,8 @@ if not all_csv_files:
     st.warning("⚠️ 找不到任何包含『外資買超佔成交比』的 CSV 檔案。")
 else:
     all_csv_files.sort(reverse=True)
-    target_files = all_csv_files[:14]
+    #串聯日數
+    target_files = all_csv_files[:10]
     base_df = None
     latest_day_today_data = {}
 
@@ -1393,7 +1394,8 @@ if not all_files_sitc:
     st.warning("⚠️ 找不到任何包含『投信買超佔成交比』的 CSV 檔案。")
 else:
     all_files_sitc.sort(reverse=True)
-    target_files = all_files_sitc[:14]
+    #串聯日數
+    target_files = all_files_sitc[:10]
     base_df = None
     latest_day_today_data_sitc = {}
 
