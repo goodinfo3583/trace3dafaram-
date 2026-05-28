@@ -1839,14 +1839,14 @@ live_it_wk = apply_b3_filter(live_it_wk)
 h_day1, h_day2 = st.columns(2)
 with h_day1:
     date_val = date_fo_day if date_fo_day else '無資料'
-    st.markdown(f"<h3 style='margin-top: 0; margin-bottom: 0;'>🌐 外資最新日連買 <span style='font-size: 16px; color: #00D2FF; font-weight: normal;'>(最新數據: {date_val})</span></h3>", unsafe_allow_html=True)
-    #最新數據日期文字大小色號
+    st.markdown(f"<h3 style='margin-top: 0; margin-bottom: 0;'>🌐 外資最新日連買 <span style='font-size: 16px; color: #60a5fa; font-weight: normal;'>(最新數據: {date_val})</span></h3>", unsafe_allow_html=True)
+
 with h_day2:
     date_val = date_it_day if date_it_day else '無資料'
-    st.markdown(f"<h3 style='margin-top: 0; margin-bottom: 0;'>🏦 投信最新日連買 <span style='font-size: 16px; color: #00D2FF; font-weight: normal;'>(最新數據: {date_val})</span></h3>", unsafe_allow_html=True)
-    #最新數據日期文字大小色號
+    st.markdown(f"<h3 style='margin-top: 0; margin-bottom: 0;'>🏦 投信最新日連買 <span style='font-size: 16px; color: #60a5fa; font-weight: normal;'>(最新數據: {date_val})</span></h3>", unsafe_allow_html=True)
+
 # 2. 第二層：動態說明 (置於標題與表格之間)
-st.markdown("<div style='color: white; margin-top: 5px; margin-bottom: 18px; font-size: 18px;'>💡 <b>日動態說明：</b> 🔥 波段認養 (連買10天以上)  ⚡ 買盤點火 (連買5~9天)  🆕 試單觀察 (連買1~4天)</div>", unsafe_allow_html=True)
+st.markdown("<div style='color: white; margin-top: 5px; margin-bottom: 18px; font-size: 18px;'>💡 <b>日動態說明：</b> 🔥 波段認養 (連買10天以上) | ⚡ 買盤點火 (連買5~9天) | 🆕 試單觀察 (連買1~4天)</div>", unsafe_allow_html=True)
 
 # 3. 第三層：左右資料表
 c_day1, c_day2 = st.columns(2)
@@ -1871,14 +1871,14 @@ st.write("---") # 加上分隔線，讓日與週的區塊更分明
 h_wk1, h_wk2 = st.columns(2)
 with h_wk1:
     date_val = date_fo_wk if date_fo_wk else '無資料'
-    st.markdown(f"<h3 style='margin-top: 0; margin-bottom: 0;'>🌐 外資最新週連買 <span style='font-size: 16px; color: #00D2FF; font-weight: normal;'>(最新數據: {date_val})</span></h3>", unsafe_allow_html=True)
+    st.markdown(f"<h3 style='margin-top: 0; margin-bottom: 0;'>🌐 外資最新週連買 <span style='font-size: 16px; color: #60a5fa; font-weight: normal;'>(最新數據: {date_val})</span></h3>", unsafe_allow_html=True)
 
 with h_wk2:
     date_val = date_it_wk if date_it_wk else '無資料'
-    st.markdown(f"<h3 style='margin-top: 0; margin-bottom: 0;'>🏦 投信最新週連買 <span style='font-size: 16px; color: #00D2FF; font-weight: normal;'>(最新數據: {date_val})</span></h3>", unsafe_allow_html=True)
+    st.markdown(f"<h3 style='margin-top: 0; margin-bottom: 0;'>🏦 投信最新週連買 <span style='font-size: 16px; color: #60a5fa; font-weight: normal;'>(最新數據: {date_val})</span></h3>", unsafe_allow_html=True)
 
 # 2. 第二層：動態說明
-st.markdown("<div style='color: white; margin-top: 5px; margin-bottom: 18px; font-size: 18px;'>💡 <b>週動態說明：</b> 👑 長線主控 (連買10週以上)  🚀 趨勢加溫 (連買5~9週)  🌱 週線發動 (連買1~4週)</div>", unsafe_allow_html=True)
+st.markdown("<div style='color: white; margin-top: 5px; margin-bottom: 15px; font-size: 14px;'>💡 <b>週動態說明：</b> 👑 長線主控 (連買10週以上) | 🚀 趨勢加溫 (連買5~9週) | 🌱 週線發動 (連買1~4週)</div>", unsafe_allow_html=True)
 
 # 3. 第三層：左右資料表
 c_wk1, c_wk2 = st.columns(2)
