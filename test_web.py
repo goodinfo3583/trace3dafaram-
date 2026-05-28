@@ -1835,54 +1835,64 @@ live_it_wk = apply_b3_filter(live_it_wk)
 # ========================================================
 # 🖼️ 視覺介面渲染 (最新單日區塊)
 # ========================================================
-# 🔥 修正點 1：刪除標題的日曆圖案
 st.subheader("最新單日連續買超")
 
-st.markdown("<div style='color: white; margin-bottom: 16px; font-size: 16px;'>💡 <b>日動態說明：</b> 🔥 波段認養 (連買10天以上)   ⚡ 買盤點火 (連買5~9天)   🆕 試單觀察 (連買1~4天)</div>", unsafe_allow_html=True)
-
-c_day1, c_day2 = st.columns(2)
-
-with c_day1:
+# 1. 第一層：左右子標題 (放大至與 subheader 等大，日期維持原樣)
+h_day1, h_day2 = st.columns(2)
+with h_day1:
     date_val = date_fo_day if date_fo_day else '無資料'
-    # 🔥 修正點 2：將括號包入藍色 style 中，統一色彩
-    st.markdown(f"🌐 **外資最新日連買** <span style='color: #00D2FF;'>(最新數據: {date_val})</span>", unsafe_allow_html=True)
+    st.markdown(f"<h3 style='margin-top: 0; margin-bottom: 0;'>🌐 外資最新日連買 <span style='font-size: 16px; color: #60a5fa; font-weight: normal;'>(最新數據: {date_val})</span></h3>", unsafe_allow_html=True)
+
+with h_day2:
+    date_val = date_it_day if date_it_day else '無資料'
+    st.markdown(f"<h3 style='margin-top: 0; margin-bottom: 0;'>🏦 投信最新日連買 <span style='font-size: 16px; color: #60a5fa; font-weight: normal;'>(最新數據: {date_val})</span></h3>", unsafe_allow_html=True)
+
+# 2. 第二層：動態說明 (置於標題與表格之間)
+st.markdown("<div style='color: white; margin-top: 5px; margin-bottom: 15px; font-size: 14px;'>💡 <b>日動態說明：</b> 🔥 波段認養 (連買10天以上) | ⚡ 買盤點火 (連買5~9天) | 🆕 試單觀察 (連買1~4天)</div>", unsafe_allow_html=True)
+
+# 3. 第三層：左右資料表
+c_day1, c_day2 = st.columns(2)
+with c_day1:
     if not live_fo_day.empty:
         st.dataframe(live_fo_day, use_container_width=True)
     else:
         st.write("無資料")
 
 with c_day2:
-    date_val = date_it_day if date_it_day else '無資料'
-    st.markdown(f"🏦 **投信最新日連買** <span style='color: #00D2FF;'>(最新數據: {date_val})</span>", unsafe_allow_html=True)
     if not live_it_day.empty:
         st.dataframe(live_it_day, use_container_width=True)
     else:
         st.write("無資料")
 
-st.write(" ") 
+st.write("---") # 加上分隔線，讓日與週的區塊更分明
 
 # ========================================================
 # 🖼️ 視覺介面渲染 (最新單週區塊)
 # ========================================================
-# 🔥 修正點 1：刪除標題的日曆圖案
 st.subheader("最新單週連續波段買超")
 
-st.markdown("<div style='color: white; margin-bottom: 15px; font-size: 14px;'>💡 <b>週動態說明：</b> 👑 長線主控 (連買10週以上)   🚀 趨勢加溫 (連買5~9週)   🌱 週線發動 (連買1~4週)</div>", unsafe_allow_html=True)
-
-c_wk1, c_wk2 = st.columns(2)
-
-with c_wk1:
+# 1. 第一層：左右子標題
+h_wk1, h_wk2 = st.columns(2)
+with h_wk1:
     date_val = date_fo_wk if date_fo_wk else '無資料'
-    # 🔥 修正點 2：將括號包入藍色 style 中，統一色彩
-    st.markdown(f"🌐 **外資最新週連買** <span style='color: #00D2FF;'>(最新數據: {date_val})</span>", unsafe_allow_html=True)
+    st.markdown(f"<h3 style='margin-top: 0; margin-bottom: 0;'>🌐 外資最新週連買 <span style='font-size: 16px; color: #60a5fa; font-weight: normal;'>(最新數據: {date_val})</span></h3>", unsafe_allow_html=True)
+
+with h_wk2:
+    date_val = date_it_wk if date_it_wk else '無資料'
+    st.markdown(f"<h3 style='margin-top: 0; margin-bottom: 0;'>🏦 投信最新週連買 <span style='font-size: 16px; color: #60a5fa; font-weight: normal;'>(最新數據: {date_val})</span></h3>", unsafe_allow_html=True)
+
+# 2. 第二層：動態說明
+st.markdown("<div style='color: white; margin-top: 5px; margin-bottom: 15px; font-size: 14px;'>💡 <b>週動態說明：</b> 👑 長線主控 (連買10週以上) | 🚀 趨勢加溫 (連買5~9週) | 🌱 週線發動 (連買1~4週)</div>", unsafe_allow_html=True)
+
+# 3. 第三層：左右資料表
+c_wk1, c_wk2 = st.columns(2)
+with c_wk1:
     if not live_fo_wk.empty:
         st.dataframe(live_fo_wk, use_container_width=True)
     else:
         st.write("無資料")
 
 with c_wk2:
-    date_val = date_it_wk if date_it_wk else '無資料'
-    st.markdown(f"🏦 **投信最新週連買** <span style='color: #00D2FF;'>(最新數據: {date_val})</span>", unsafe_allow_html=True)
     if not live_it_wk.empty:
         st.dataframe(live_it_wk, use_container_width=True)
     else:
