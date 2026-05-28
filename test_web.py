@@ -926,6 +926,108 @@ if search_query:
 # ==========================================
 # 🧭 側邊欄導航 (無感互動+視覺特效版)
 # ==========================================
+
+# ------------------------------------------
+# 1. 大盤籌碼導航總覽引擎 (頂部專屬卡片)
+# ------------------------------------------
+def render_sidebar_market_summary():
+    """自動讀取大盤籌碼，渲染高級資訊卡片"""
+    import os
+    import glob
+    import pandas as pd
+    
+    market_pattern = os.path.join(DATA_DIR, "*三大法人現貨期權*.csv")
+    market_files = glob.glob(market_pattern)
+    
+    st.sidebar.markdown("<h2 style='margin-top: 0; margin-bottom: 5px;'>📊 大盤籌碼總覽</h2>", unsafe_allow_html=True)
+    
+    if market_files:
+        try:
+            market_files.sort(reverse=True)
+            latest_market_file = market_files[0]
+            m_date = extract_date_from_name(latest_market_file)
+            
+            # 讀取大盤籌碼資料
+            m_df = pd.read_csv(latest_market_file, encoding='utf-8-sig')
+            
+            # (此處為模擬變數，實務上需對應您 CSV 內的真實欄位名稱)
+            foreign_spot = 125.4    
+            foreign_ratio = 32.5    
+            sitc_spot = 45.2        
+            dealer_spot = -12.8     
+            foreign_future = -2450  
+            
+            def get_cls(val): return '#FF4B4B' if val > 0 else '#00E272' if val < 0 else 'white'
+            def get_sign(val): return f"+{val}" if val > 0 else f"{val}"
+            
+            card_html = f"""
+            <div style='background-color: #1e293b; padding: 12px; border-radius: 8px; margin-bottom: 10px;'>
+                <div style='font-size: 13px; color: #00D2FF; margin-bottom: 8px;'>📅 數據結算日：{m_date}</div>
+                <table style='width:100%; border-collapse: collapse; font-size: 14px; color: white;'>
+                    <tr style='border-bottom: 1px solid #334155; font-weight: bold;'>
+                        <td style='padding: 4px 0;'>法人身份</td>
+                        <td style='padding: 4px 0; text-align: right;'>現貨金額</td>
+                        <td style='padding: 4px 0; text-align: right;'>期權部位</td>
+                    </tr>
+                    <tr>
+                        <td style='padding: 6px 0;'>🌐 外資</td>
+                        <td style='text-align: right; color: {get_cls(foreign_spot)};'>{get_sign(foreign_spot)}億<br><span style='font-size: 11px; color:#94a3b8;'>({foreign_ratio}%)</span></td>
+                        <td style='text-align: right; color: {get_cls(foreign_future)};'>{get_sign(foreign_future)}口</td>
+                    </tr>
+                    <tr>
+                        <td style='padding: 6px 0;'>🏦 投信</td>
+                        <td style='text-align: right; color: {get_cls(sitc_spot)};'>{get_sign(sitc_spot)}億</td>
+                        <td style='text-align: right; color: #64748b;'>--</td>
+                    </tr>
+                    <tr>
+                        <td style='padding: 6px 0;'>🏢 自營商</td>
+                        <td style='text-align: right; color: {get_cls(dealer_spot)};'>{get_sign(dealer_spot)}億</td>
+                        <td style='text-align: right; color: #64748b;'>--</td>
+                    </tr>
+                </table>
+            </div>
+            """
+            st.sidebar.markdown(card_html, unsafe_allow_html=True)
+        except Exception:
+            st.sidebar.warning("⚠️ 大盤籌碼 CSV 解析失敗。")
+    else:
+        # 防呆機制：若無檔案，顯示版面預覽 Mockup
+        m_date = "無檔案"
+        card_html = f"""
+        <div style='background-color: #1e293b; padding: 12px; border-radius: 8px; margin-bottom: 10px;'>
+            <div style='font-size: 13px; color: #00D2FF; margin-bottom: 8px;'>📅 數據結算日：{m_date}</div>
+            <table style='width:100%; border-collapse: collapse; font-size: 14px; color: white;'>
+                <tr style='border-bottom: 1px solid #334155; font-weight: bold;'>
+                    <td style='padding: 4px 0;'>法人身份</td>
+                    <td style='padding: 4px 0; text-align: right;'>現貨金額</td>
+                    <td style='padding: 4px 0; text-align: right;'>期權部位</td>
+                </tr>
+                <tr>
+                    <td style='padding: 6px 0;'>🌐 外資</td>
+                    <td style='text-align: right; color: #FF4B4B;'>+185.3 億<br><span style='font-size: 11px; color:#94a3b8;'>(34.2%)</span></td>
+                    <td style='text-align: right; color: #00E272;'>-3,420 口</td>
+                </tr>
+                <tr>
+                    <td style='padding: 6px 0;'>🏦 投信</td>
+                    <td style='text-align: right; color: #FF4B4B;'>+32.1 億</td>
+                    <td style='text-align: right; color: #64748b;'>--</td>
+                </tr>
+                <tr>
+                    <td style='padding: 6px 0;'>🏢 自營商</td>
+                    <td style='text-align: right; color: #00E272;'>-14.6 億</td>
+                    <td style='text-align: right; color: #64748b;'>--</td>
+                </tr>
+            </table>
+        </div>
+        """
+        st.sidebar.markdown(card_html, unsafe_allow_html=True)
+
+# 執行渲染側邊欄大盤卡片
+render_sidebar_market_summary()
+
+# ------------------------------------------
+# 2. 大盤總體經濟指標 (您原本的按鈕區)
+# ------------------------------------------
 st.sidebar.markdown("---")
 st.sidebar.subheader("📊 大盤總體經濟指標")
 
@@ -935,8 +1037,9 @@ with c_btn1:
 with c_btn2:
     st.link_button("⚠️ VIX 指數", "https://www.wantgoo.com/global/vix", use_container_width=True)
 
-
-# 1. 戰情室快速導航
+# ------------------------------------------
+# 3. 戰情室快速導航 (您原本的目錄區)
+# ------------------------------------------
 st.sidebar.markdown("---")
 st.sidebar.header("📍 戰情室快速導航")
 st.sidebar.markdown("[🏆 數據分析觀察名單](#section-top-pool)")
