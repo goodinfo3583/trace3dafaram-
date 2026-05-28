@@ -2021,7 +2021,7 @@ def process_margin_df(df, type_name, flag_etf, flag_bond):
 # ==========================================
 st.write("---")
 st.markdown("<div id='section-4-1'></div>", unsafe_allow_html=True)
-st.header("📅 區塊 4-1：融資減少動向")
+st.header("🔄 區塊 4-1：融資減少動向")
 
 
 f_col1, f_col2, _ = st.columns([1, 1, 2])
@@ -2043,7 +2043,7 @@ with c1:
         
         st.dataframe(df_pct_clean, use_container_width=True, hide_index=True)
         # 👇 替換為科技藍置底純文字
-        st.markdown(f"<div style='color: #00D2FF; font-size: 14px; margin-top: 5px;'>(最新數據: {date_str})</div>", unsafe_allow_html=True)
+        st.markdown(f"<div style='color: #00D2FF; font-size: 16px; margin-top: 5px;'>最新數據: {date_str}</div>", unsafe_allow_html=True)
     else:
         st.warning("⚠️ 無相符資料")
 
@@ -2058,7 +2058,7 @@ with c2:
         
         st.dataframe(df_vol_clean, use_container_width=True, hide_index=True)
         # 👇 替換為科技藍置底純文字
-        st.markdown(f"<div style='color: #00D2FF; font-size: 14px; margin-top: 5px;'>(最新數據: {date_str})</div>", unsafe_allow_html=True)
+        st.markdown(f"<div style='color: #00D2FF; font-size: 16px; margin-top: 5px;'>最新數據: {date_str}</div>", unsafe_allow_html=True)
     else:
         st.warning("⚠️ 無相符資料")
 
@@ -2069,8 +2069,7 @@ st.session_state['df_margin_vol'] = df_vol_clean
 # ==========================================
 st.write("---")
 st.markdown("<div id='section-4-2'></div>", unsafe_allow_html=True)
-st.header("📅 區塊 4-2：借券賣出減少動向")
-
+st.header("🔄 區塊 4-2：借券賣出減少動向")
 
 f_col1, f_col2, _ = st.columns([1, 1, 2])
 with f_col1: show_etf_42 = st.checkbox("顯示 ETF", value=True, key="stock_show_etf_42")
@@ -2080,7 +2079,8 @@ st.write("")
 c1, c2 = st.columns(2)
 
 with c1:
-    st.subheader("📉 借券賣出減少比例排名")
+    # 統一使用 h3 標籤，對齊版面
+    st.markdown("<h3 style='margin-top: 0; margin-bottom: 10px;'>📉 借券賣出減少比例排名</h3>", unsafe_allow_html=True)
     df_pct, msg_pct = get_specific_margin_data("借券賣出減少幅度")
     df_pct_clean = process_margin_df(df_pct, "幅度", show_etf_42, show_bond_42)
     
@@ -2089,12 +2089,14 @@ with c1:
         date_str = re.search(r'\d{8}', msg_pct).group(0) if re.search(r'\d{8}', msg_pct) else "未知"
         
         st.dataframe(df_pct_clean, use_container_width=True, hide_index=True)
-        st.write(f" **最新數據: {date_str}**")
+        # 👇 科技藍置底文字 (無括號，字體放大至 16px)
+        st.markdown(f"<div style='color: #00D2FF; font-size: 16px; margin-top: 5px;'>最新數據: {date_str}</div>", unsafe_allow_html=True)
     else:
         st.warning("⚠️ 無相符資料")
 
 with c2:
-    st.subheader("📉 借券賣出減少張數排名")
+    # 統一使用 h3 標籤
+    st.markdown("<h3 style='margin-top: 0; margin-bottom: 10px;'>📉 借券賣出減少張數排名</h3>", unsafe_allow_html=True)
     df_vol, msg_vol = get_specific_margin_data("借券賣出減少張數")
     df_vol_clean = process_margin_df(df_vol, "張數", show_etf_42, show_bond_42)
     
@@ -2102,20 +2104,21 @@ with c2:
         date_str = re.search(r'\d{8}', msg_vol).group(0) if re.search(r'\d{8}', msg_vol) else "未知"
         
         st.dataframe(df_vol_clean, use_container_width=True, hide_index=True)
-        st.write(f" **最新數據: {date_str}**")
+        # 👇 科技藍置底文字 (無括號，字體放大至 16px)
+        st.markdown(f"<div style='color: #00D2FF; font-size: 16px; margin-top: 5px;'>最新數據: {date_str}</div>", unsafe_allow_html=True)
     else:
         st.warning("⚠️ 無相符資料")
 
 st.session_state['df_short_pct'] = df_pct_clean
 st.session_state['df_short_vol'] = df_vol_clean
 
+
 # ==========================================
 # 📅 區塊 4-3：融券增加動向
 # ==========================================
 st.write("---")
 st.markdown("<div id='section-4-3'></div>", unsafe_allow_html=True)
-st.header("📅 區塊 4-3：融券增加動向")
-
+st.header("🔄 區塊 4-3：融券增加動向")
 
 f_col1, f_col2, _ = st.columns([1, 1, 2])
 with f_col1: show_etf_43 = st.checkbox("顯示 ETF", value=True, key="stock_show_etf_43")
@@ -2125,21 +2128,23 @@ st.write("")
 c1, c2 = st.columns(2)
 
 with c1:
-    st.subheader("📈 融券增加比例排名")
+    # 統一使用 h3 標籤
+    st.markdown("<h3 style='margin-top: 0; margin-bottom: 10px;'>📈 融券增加比例排名</h3>", unsafe_allow_html=True)
     df_pct, msg_pct = get_specific_margin_data("融券增加幅度")
     df_pct_clean = process_margin_df(df_pct, "幅度", show_etf_43, show_bond_43)
     
     if not df_pct_clean.empty:
-        # 👈 核心修改：只過濾出 8 碼日期字串
         date_str = re.search(r'\d{8}', msg_pct).group(0) if re.search(r'\d{8}', msg_pct) else "未知"
         
         st.dataframe(df_pct_clean, use_container_width=True, hide_index=True)
-        st.write(f" **最新數據: {date_str}**")
+        # 👇 科技藍置底文字 (無括號，字體放大至 16px)
+        st.markdown(f"<div style='color: #00D2FF; font-size: 16px; margin-top: 5px;'>最新數據: {date_str}</div>", unsafe_allow_html=True)
     else:
         st.warning("⚠️ 無相符資料")
 
 with c2:
-    st.subheader("📈 融券增加張數排名")
+    # 統一使用 h3 標籤
+    st.markdown("<h3 style='margin-top: 0; margin-bottom: 10px;'>📈 融券增加張數排名</h3>", unsafe_allow_html=True)
     df_vol, msg_vol = get_specific_margin_data("融券增加張數")
     df_vol_clean = process_margin_df(df_vol, "張數", show_etf_43, show_bond_43)
     
@@ -2147,7 +2152,8 @@ with c2:
         date_str = re.search(r'\d{8}', msg_vol).group(0) if re.search(r'\d{8}', msg_vol) else "未知"
         
         st.dataframe(df_vol_clean, use_container_width=True, hide_index=True)
-        st.write(f" **最新數據: {date_str}**")
+        # 👇 科技藍置底文字 (無括號，字體放大至 16px)
+        st.markdown(f"<div style='color: #00D2FF; font-size: 16px; margin-top: 5px;'>最新數據: {date_str}</div>", unsafe_allow_html=True)
     else:
         st.warning("⚠️ 無相符資料")
 
