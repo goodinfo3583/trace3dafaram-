@@ -1699,10 +1699,14 @@ else:
 # ==========================================
 st.write("---")
 st.markdown("<div id='section-3'></div>", unsafe_allow_html=True)
-st.header("📅 區塊3：連續買超")
+st.header("📅 區塊3：法人連續買超")
 
+# 📊 頂部說明面板：將日、週級別標籤徹底分流，呈現專業操盤室質感
 st.info("""
-狀態動態說明：🔥波段認養:連買10以上天/週   ⚡買盤點火:連買5~9天/週   🆕試單觀察:連買1~4天/週 """)
+**💡 法人連買狀態動態說明：**
+* ☀️ **日級別動態：** 🔥 波段認養 (連買10天以上) | ⚡ 買盤點火 (連買5~9天) | 🆕 試單觀察 (連買1~4天)
+* 🌙 **週級別動態：** 👑 長線主控 (連買10週以上) | 🚀 趨勢加溫 (連買5~9週) | 🌱 週線發動 (連買1~4週)
+""")
 
 def read_live_ln_report(file_keyword, strict_type, exact_field_name, prefix_keyword, col_label):
     if strict_type == "日":
@@ -1746,10 +1750,16 @@ def read_live_ln_report(file_keyword, strict_type, exact_field_name, prefix_keyw
         output_df["股票代號"] = df_sorted[col_id].astype(str).str.strip()
         output_df["股票名稱"] = df_sorted[col_name].astype(str).str.strip()
         
+        # 🔥 【邏輯核心修正】：根據「日」或「週」分配不同的專業戰略標籤
         def get_status_tag(val):
-            if val >= 10: return "🔥 波段認養"
-            elif val >= 5: return "⚡ 買盤點火"
-            else: return "🆕 試單觀察"
+            if strict_type == "日":
+                if val >= 10: return "🔥 波段認養"
+                elif val >= 5: return "⚡ 買盤點火"
+                else: return "🆕 試單觀察"
+            else: # 週連買
+                if val >= 10: return "👑 長線主控"
+                elif val >= 5: return "🚀 趨勢加溫"
+                else: return "🌱 週線發動"
                 
         output_df["狀態動態"] = df_sorted[target_data_col].apply(get_status_tag)
         output_df[col_label] = df_sorted[target_data_col].astype(int)
@@ -1768,12 +1778,22 @@ def read_live_ln_report(file_keyword, strict_type, exact_field_name, prefix_keyw
     except Exception as e:
         return pd.DataFrame(), f"解讀失敗: {str(e)}"
 
-# 執行排程與渲染 (與您原先邏輯相同)
-live_fo_day, date_fo_day = read_live_ln_report("外資連續買超", "日", "外資連續買賣日數", "外資", "最新連買天數")
-# ... (下方保持原本排程呼叫) ...
+# ==========================================
+# 🛠️ 必備函數：強硬讀取法 (已去重，保留單一乾淨版本)
+# ==========================================
+def robust_read_csv(file_path):
+    for encoding in ['cp950', 'utf-8-sig', 'utf-8']:
+        try:
+            df = pd.read_csv(file_path, encoding=encoding)
+            if not df.empty and len(df.columns) > 1 and '撖' in str(df.iloc[0, 1]): 
+                continue
+            return df
+        except:
+            continue
+    return pd.read_csv(file_path, encoding='cp950', errors='ignore')
 
 # ========================================================
-# 🚀 執行排程
+# 🚀 執行排程與備份邏輯
 # ========================================================
 live_fo_day, date_fo_day = read_live_ln_report("外資連續買超", "日", "外資連續買賣日數", "外資", "最新連買天數")
 if live_fo_day.empty and date_fo_day is None: 
@@ -1800,20 +1820,23 @@ if live_it_wk.empty:
         live_it_wk, date_it_wk = read_live_ln_report("外資連買", "週", "投信連續買賣週數", "投信", "最新連買週數")
 
 # ========================================================
-# 🖼️ 視覺介面渲染 (左外資、右投信)
+# 🖼️ 視覺介面渲染 (左外資、右投信) — 🔥 升級科技藍日期樣式
 # ========================================================
 st.subheader("📅 最新單日連續買超")
 c_day1, c_day2 = st.columns(2)
 
 with c_day1:
-    st.markdown(f"🌐 **外資最新日連買** *(最新數據: {date_fo_day if date_fo_day else '無資料'})*")
+    # 💡 使用 HTML span 強制顯示為亮藍色 (Hex: #60a5fa)、無斜體字元
+    date_val = date_fo_day if date_fo_day else '無資料'
+    st.markdown(f"🌐 **外資最新日連買** — <span style='color: #60a5fa; font-weight: bold;'>最新數據: {date_val}</span>", unsafe_allow_html=True)
     if not live_fo_day.empty:
         st.dataframe(live_fo_day, use_container_width=True)
     else:
         st.write("無資料")
 
 with c_day2:
-    st.markdown(f"🏦 **投信最新日連買** *(最新數據: {date_it_day if date_it_day else '無資料'})*")
+    date_val = date_it_day if date_it_day else '無資料'
+    st.markdown(f"🏦 **投信最新日連買** — <span style='color: #60a5fa; font-weight: bold;'>最新數據: {date_val}</span>", unsafe_allow_html=True)
     if not live_it_day.empty:
         st.dataframe(live_it_day, use_container_width=True)
     else:
@@ -1825,69 +1848,24 @@ st.subheader("📅 最新單週連續波段買超")
 c_wk1, c_wk2 = st.columns(2)
 
 with c_wk1:
-    st.markdown(f"🌐 **外資最新週連買** *(最新數據: {date_fo_wk if date_fo_wk else '無資料'})*")
+    date_val = date_fo_wk if date_fo_wk else '無資料'
+    st.markdown(f"🌐 **外資最新週連買** — <span style='color: #60a5fa; font-weight: bold;'>最新數據: {date_val}</span>", unsafe_allow_html=True)
     if not live_fo_wk.empty:
         st.dataframe(live_fo_wk, use_container_width=True)
     else:
         st.write("無資料")
 
 with c_wk2:
-    st.markdown(f"🏦 **投信最新週連買** *(最新數據: {date_it_wk if date_it_wk else '無資料'})*")
+    date_val = date_it_wk if date_it_wk else '無資料'
+    st.markdown(f"🏦 **投信最新週連買** — <span style='color: #60a5fa; font-weight: bold;'>最新數據: {date_val}</span>", unsafe_allow_html=True)
     if not live_it_wk.empty:
         st.dataframe(live_it_wk, use_container_width=True)
     else:
         st.write("無資料")
 
-# ==========================================
-# 🛠️ 必備函數：強硬讀取法 (解決 Big5/UTF-8 亂碼)
-# ==========================================
-def robust_read_csv(file_path):
-    # 強制嘗試台灣常見編碼 (cp950 為 Big5)
-    for encoding in ['cp950', 'utf-8-sig', 'utf-8']:
-        try:
-            df = pd.read_csv(file_path, encoding=encoding)
-            # 簡單檢查：如果出現了亂碼常見字元，就換下一個編碼
-            if not df.empty and len(df.columns) > 1 and '撖' in str(df.iloc[0, 1]): 
-                continue
-            return df
-        except:
-            continue
-    # 真的都不行就強制讀取並忽略錯誤
-    return pd.read_csv(file_path, encoding='cp950', errors='ignore')
-
-# ==========================================
-# 🛠️ 必備函數：強硬讀取法
-# ==========================================
-def robust_read_csv(file_path):
-    for encoding in ['cp950', 'utf-8-sig', 'utf-8']:
-        try:
-            df = pd.read_csv(file_path, encoding=encoding)
-            if not df.empty and len(df.columns) > 1 and '撖' in str(df.iloc[0, 1]): 
-                continue
-            return df
-        except:
-            continue
-    return pd.read_csv(file_path, encoding='cp950', errors='ignore')
-
-# ==========================================
-# 🛠️ 必備函數：強硬讀取法
-# ==========================================
-def robust_read_csv(file_path):
-    for encoding in ['cp950', 'utf-8-sig', 'utf-8']:
-        try:
-            df = pd.read_csv(file_path, encoding=encoding)
-            if not df.empty and len(df.columns) > 1 and '撖' in str(df.iloc[0, 1]): 
-                continue
-            return df
-        except:
-            continue
-    return pd.read_csv(file_path, encoding='cp950', errors='ignore')
 # ========================================================
-# 🖼️ 視覺介面渲染 (左外資、右投信)搜尋功能用
-# ==========================================
-# ...（以上維持您原本的4個 columns 視覺程式碼）...
-
-# 🔥 【重點新增】：將區塊 3 的日、週連買共 4 張資料表清洗、標記並整合
+# 🖼️ 記憶體整合連動區塊 (供快搜功能使用)
+# ========================================================
 b3_combined_list = []
 
 if 'live_fo_day' in locals() and not live_fo_day.empty:
@@ -1916,13 +1894,10 @@ if 'live_it_wk' in locals() and not live_it_wk.empty:
 
 if b3_combined_list:
     df_b3 = pd.concat(b3_combined_list, ignore_index=True)
-    # 💡 【修改點】：重新排列欄位，將「連買類型」移至最前面
     df_b3 = df_b3[['連買類型', '股票代號', '股票名稱', '狀態動態', '連買週期數']]
     st.session_state['df_blk3_main'] = df_b3
 else:
     st.session_state['df_blk3_main'] = pd.DataFrame(columns=['連買類型', '股票代號', '股票名稱', '狀態動態', '連買週期數'])
-
-# ==========券資比資料請一起搬遷============
 # ==========================================
 # 📅 區塊 4 綜合區：融資與借券動向 (5日累計)
 # ==========================================
