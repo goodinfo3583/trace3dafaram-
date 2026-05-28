@@ -1900,7 +1900,7 @@ with c_wk2:
         st.write("無資料")
     # 將日期移到表格正下方
     date_val = date_it_wk if date_it_wk else '無資料'
-    st.markdown(f"<div style='color: #00D2FF; font-size: 14px; margin-top: 5px;'>(最新數據: {date_val})</div>", unsafe_allow_html=True)
+    st.markdown(f"<div style='color: #00D2FF; font-size: 16px; margin-top: 1px;'>最新數據: {date_val}</div>", unsafe_allow_html=True)
 
 # ========================================================
 # 🖼️ 記憶體整合連動區塊 (供快搜功能使用)
