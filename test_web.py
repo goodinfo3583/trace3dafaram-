@@ -1845,7 +1845,7 @@ c_day1, c_day2 = st.columns(2)
 with c_day1:
     date_val = date_fo_day if date_fo_day else '無資料'
     # 🔥 修正點 2：將括號包入藍色 style 中，統一色彩
-    st.markdown(f"🌐 **外資最新日連買** <span style='color: #0080FF;'>(最新數據: {date_val})</span>", unsafe_allow_html=True)
+    st.markdown(f"🌐 **外資最新日連買** <span style='color: #46A3FF;'>(最新數據: {date_val})</span>", unsafe_allow_html=True)
     if not live_fo_day.empty:
         st.dataframe(live_fo_day, use_container_width=True)
     else:
