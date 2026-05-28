@@ -1845,7 +1845,7 @@ c_day1, c_day2 = st.columns(2)
 with c_day1:
     date_val = date_fo_day if date_fo_day else '無資料'
     # 🔥 修正點 2：將括號包入藍色 style 中，統一色彩
-    st.markdown(f"🌐 **外資最新日連買** <span style='color: #46A3FF;'>(最新數據: {date_val})</span>", unsafe_allow_html=True)
+    st.markdown(f"🌐 **外資最新日連買** <span style='color: #00D2FF;'>(最新數據: {date_val})</span>", unsafe_allow_html=True)
     if not live_fo_day.empty:
         st.dataframe(live_fo_day, use_container_width=True)
     else:
@@ -1853,7 +1853,7 @@ with c_day1:
 
 with c_day2:
     date_val = date_it_day if date_it_day else '無資料'
-    st.markdown(f"🏦 **投信最新日連買** <span style='color: #60a5fa;'>(最新數據: {date_val})</span>", unsafe_allow_html=True)
+    st.markdown(f"🏦 **投信最新日連買** <span style='color: #00D2FF;'>(最新數據: {date_val})</span>", unsafe_allow_html=True)
     if not live_it_day.empty:
         st.dataframe(live_it_day, use_container_width=True)
     else:
@@ -1874,7 +1874,7 @@ c_wk1, c_wk2 = st.columns(2)
 with c_wk1:
     date_val = date_fo_wk if date_fo_wk else '無資料'
     # 🔥 修正點 2：將括號包入藍色 style 中，統一色彩
-    st.markdown(f"🌐 **外資最新週連買** <span style='color: #60a5fa;'>(最新數據: {date_val})</span>", unsafe_allow_html=True)
+    st.markdown(f"🌐 **外資最新週連買** <span style='color: #00D2FF;'>(最新數據: {date_val})</span>", unsafe_allow_html=True)
     if not live_fo_wk.empty:
         st.dataframe(live_fo_wk, use_container_width=True)
     else:
@@ -1882,7 +1882,7 @@ with c_wk1:
 
 with c_wk2:
     date_val = date_it_wk if date_it_wk else '無資料'
-    st.markdown(f"🏦 **投信最新週連買** <span style='color: #60a5fa;'>(最新數據: {date_val})</span>", unsafe_allow_html=True)
+    st.markdown(f"🏦 **投信最新週連買** <span style='color: #00D2FF;'>(最新數據: {date_val})</span>", unsafe_allow_html=True)
     if not live_it_wk.empty:
         st.dataframe(live_it_wk, use_container_width=True)
     else:
