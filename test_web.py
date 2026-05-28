@@ -1292,10 +1292,10 @@ else:
             if idx == 0 and col_today:
                 latest_day_today_data = dict(zip(df['代號'], pd.to_numeric(df[col_today], errors='coerce')))
             
-            # 合併歷史
+            # 合併歷史 (修改為：成交比%)
             if col_5d:
                 df_s = df[['代號', '名稱', col_5d]].copy()
-                df_s = df_s.rename(columns={col_5d: f"{d_label}買佔比%"})
+                df_s = df_s.rename(columns={col_5d: f"{d_label}成交比%"})
                 if base_df is None:
                     base_df = df_s
                 else:
@@ -1306,23 +1306,31 @@ else:
     if base_df is not None:
         csv_display = base_df.fillna("未進榜").rename(columns={"代號": "股票代號", "名稱": "股票名稱"})
         
-        # 強健排序：依據最新日期數值排序
-        latest_col_name = f"{extract_date_from_name(target_files[0])[-4:]}買佔比%"
+        # 強健排序：依據最新日期數值排序 (修改為：成交比%)
+        latest_col_name = f"{extract_date_from_name(target_files[0])[-4:]}成交比%"
         if latest_col_name in csv_display.columns:
             csv_display[latest_col_name] = pd.to_numeric(csv_display[latest_col_name].replace("未進榜", 0), errors='coerce').fillna(0)
             csv_display = csv_display.sort_values(by=latest_col_name, ascending=False)
             
-        # 增加當日買佔比欄位處理
-        csv_display['當日買佔比%'] = csv_display['股票代號'].map(latest_day_today_data).fillna(0)
-            
-        # 動態判定邏輯
+        # 動態判定邏輯 (將當日買佔比直接融合成文字)
         def evaluate_continuity(row):
             today = latest_day_today_data.get(row['股票代號'], 0)
             base = pd.to_numeric(row.get(latest_col_name, 0), errors='coerce')
-            if pd.isna(today): return "⚪ 觀望"
-            if today > 0: return "🔥 強延續" if today > base else "⚠️ 趨緩"
-            elif today < 0: return "🚨 劇烈倒貨" if abs(today) > abs(base) else "📉 調節洗盤"
-            return "🔄 持平"
+            
+            # 格式化顯示數值
+            if pd.isna(today):
+                val_str = "(無資料)"
+            else:
+                val_str = f"({today}%)"
+
+            if pd.isna(today): return f"⚪ 觀望 {val_str}"
+            if today > 0: 
+                status = "🔥 強延續" if today > base else "⚠️ 趨緩"
+                return f"{status} {val_str}"
+            elif today < 0: 
+                status = "🚨 劇烈倒貨" if abs(today) > abs(base) else "📉 調節洗盤"
+                return f"{status} {val_str}"
+            return f"🔄 持平 {val_str}"
 
         csv_display['今日短動態'] = csv_display.apply(evaluate_continuity, axis=1)
         
@@ -1341,8 +1349,8 @@ else:
         if show_bond: mask |= csv_display['股票代號'].str.endswith('B')
         csv_display = csv_display[mask]
         
-        # 2. 調整欄位順序
-        cols = ["股票代號", "股票名稱", "今日短動態", "當日買佔比%"] + [c for c in csv_display.columns if "買佔比%" in c and c != "當日買佔比%"]
+        # 2. 調整欄位順序 (拿掉獨立的當日佔比，並抓取"成交比%")
+        cols = ["股票代號", "股票名稱", "今日短動態"] + [c for c in csv_display.columns if "成交比%" in c]
         csv_display = csv_display[cols]
         csv_display.index = range(1, len(csv_display) + 1)
         
