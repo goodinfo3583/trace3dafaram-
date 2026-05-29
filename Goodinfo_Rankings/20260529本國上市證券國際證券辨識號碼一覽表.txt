@@ -3,7 +3,7 @@
 掛牌日以正式公告為準
 #"檔案來源：https://isin.twse.com.tw/isin/C_public.jsp?strMode=2"
 有價證券代號及名稱	國際證券辨識號碼(ISIN Code)	上市日	市場別	產業別	CFICode	備註
-股票
+
 1101　台泥	TW0001101004	1962/02/09	上市	水泥工業	ESVUFR	
 1102　亞泥	TW0001102002	1962/06/08	上市	水泥工業	ESVUFR	
 1103　嘉泥	TW0001103000	1969/11/14	上市	水泥工業	ESVUFR	
