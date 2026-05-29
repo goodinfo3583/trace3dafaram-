@@ -39,52 +39,85 @@ def robust_read_csv(file_path):
         except:
             continue
     return pd.read_csv(file_path, encoding='cp950', errors='ignore')
-# ==========================================
-# 🗂️ 台股代號與名稱 萬用字典引擎 (解析產業別升級版)
-# ==========================================
-@st.cache_data(ttl=3600)
-def get_stock_dictionary():
-    """讀取證交所 ISIN 檔案，建立『名稱 -> 代號與產業別』的雙向對照表"""
-    mapping = {}
-    # 尋找資料夾中的「證券辨識號碼一覽表」
-    dict_files = glob.glob(os.path.join(DATA_DIR, "*本國上市證券國際證券辨識號碼一覽表*.txt"))
-    if not dict_files:
-        return mapping
-        
-    try:
-        for encoding in ['cp950', 'utf-8', 'utf-16', 'utf-8-sig']:
-            try:
-                with open(dict_files[0], 'r', encoding=encoding, errors='ignore') as f:
-                    lines = f.readlines()
-                if len(lines) > 10: 
-                    break
-            except:
-                continue
-                
-        for line in lines:
-            parts = line.split('\t')
-            # 🔥 核心修正：資料列至少要有 5 個欄位 (自動過濾掉標頭與 "股票" 等無效字眼)
-            if len(parts) >= 5:
-                name_part = parts[0].strip()
-                industry = parts[4].strip() # 產業別剛好在第 5 欄 (index 4)
-                
-                # 暴力切割全形空白
-                clean_name = name_part.replace('　', ' ')
-                tokens = clean_name.split()
-                
-                if len(tokens) >= 2:
-                    sid = tokens[0].strip()
-                    sname = tokens[1].strip()
-                    if sid.isalnum():
-                        # 建立雙向字典，不管打代號還是名稱，都能查出所有資訊
-                        mapping[sname] = {"id": sid, "name": sname, "industry": industry}
-                        mapping[sid] = {"id": sid, "name": sname, "industry": industry}
-    except Exception as e:
-        pass
-    return mapping
 
-# 在系統啟動時，直接載入這本字典
-STOCK_DICT = get_stock_dictionary()
+# ==========================================
+# 🛑 區塊 0：證券對照表實測與除錯面板 (代號/股票/產業別直讀)
+# ==========================================
+st.write("---")
+st.markdown("<h3 style='color:#00D2FF;'>🛑 區塊 0：證券對照表實測與除錯面板</h3>", unsafe_allow_html=True)
+
+# 智慧防呆：同時搜尋大寫、小寫資料夾與根目錄，徹底消滅 Linux 找不到檔案的問題
+search_patterns = [
+    os.path.join(DATA_DIR, "*辨識號碼*.txt"),
+    os.path.join("./goodinfo_rankings", "*辨識號碼*.txt"),
+    "./*辨識號碼*.txt"
+]
+dict_files = []
+for pattern in search_patterns:
+    dict_files.extend(glob.glob(pattern))
+
+# 全域字典初始化
+STOCK_DICT = {}
+debug_parsed_list = []
+
+if not dict_files:
+    st.error("❌ 【系統警報】在所有預期路徑都找不到包含『辨識號碼』的 TXT 檔案！請檢查 GitHub 上的資料夾名稱與檔名。")
+else:
+    target_file = dict_files[0]
+    
+    # 嘗試多種中文編碼讀取
+    lines = []
+    for encoding in ['cp950', 'utf-8', 'utf-16', 'utf-8-sig']:
+        try:
+            with open(target_file, 'r', encoding=encoding, errors='ignore') as f:
+                lines = f.readlines()
+            if len(lines) > 10:
+                break
+        except:
+            continue
+
+    # 開始解析欄位
+    for line in lines:
+        parts = line.split('\t')
+        # 證交所格式：有價證券代號及名稱在第1欄，產業別在第5欄 (index 4)
+        if len(parts) >= 5:
+            name_part = parts[0].strip()
+            industry = parts[4].strip()
+            
+            # 把討厭的全形空白替換成半形空白，方便切開代號與名稱
+            clean_name = name_part.replace('　', ' ')
+            tokens = clean_name.split()
+            
+            if len(tokens) >= 2:
+                sid = tokens[0].strip()
+                sname = tokens[1].strip()
+                
+                # 嚴格過濾：代號必須是數字（這樣就能自動跳過前6行的文字標頭與非股票資料）
+                if sid.isdigit():
+                    # 存入全域字典，供下方的快搜和 K 線圖調用
+                    STOCK_DICT[sname] = {"id": sid, "name": sname, "industry": industry}
+                    STOCK_DICT[sid] = {"id": sid, "name": sname, "industry": industry}
+                    
+                    # 存入區塊 0 顯示用的清單
+                    debug_parsed_list.append({
+                        "代號": sid,
+                        "股票": sname,
+                        "產業別": industry
+                    })
+
+    # 將結果呈現在網頁最頂端
+    if debug_parsed_list:
+        block0_df = pd.DataFrame(debug_parsed_list)
+        st.success(f"🔍 成功對接對照表！共成功解析出 {len(block0_df)} 檔上市證券標的。")
+        
+        # 唯美摺疊面板，預設展開讓您看個夠，不要看時可以收起來
+        with st.expander("📊 點此查看【區塊 0】官方代號與產業別對照資料表 (前 50 筆範例)", expanded=True):
+            st.dataframe(block0_df.head(50), use_container_width=True, hide_index=True)
+    else:
+        st.warning("⚠️ 找到了 TXT 檔案，但程式切開欄位後發現規格不符，未能成功擷取任何股票。")
+
+
+        
 # ==========================================
 # 📡 免安裝 API 籌碼連續抓取引擎 (直接連線版)
 # ==========================================
