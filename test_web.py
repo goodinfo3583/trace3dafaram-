@@ -2519,9 +2519,9 @@ if not block_df.empty:
             styles = [''] * len(row)
             try:
                 # 把字串轉回數字來比較大小
-                close_p = float(str(row['🔽收盤價']).replace(',', ''))
-                # 🔥 此處修復了原本 row['成交價'] 找不到欄位的 Bug
-                block_p = float(str(row['🔽成交價']).replace(',', ''))
+                close_p = float(str(row['🔴收盤價']).replace(',', ''))
+                # 🔥 此處修復了原本 row['🔴成交價'] 找不到欄位的 Bug
+                block_p = float(str(row['成交價']).replace(',', ''))
                 
                 if close_p > block_p: color = '#FF4B4B'       # 紅色
                 elif close_p == block_p: color = '#FFA500'    # 橘色
