@@ -40,23 +40,18 @@ def robust_read_csv(file_path):
             continue
     return pd.read_csv(file_path, encoding='cp950', errors='ignore')
 # ==========================================
-# 🗂️ 台股代號與名稱 萬用字典引擎 (暴力切割+防快取版)
+# 🗂️ 台股代號與名稱 萬用字典引擎 (解析產業別升級版)
 # ==========================================
-@st.cache_data(ttl=3600) # 🔥 新增：加上時效，強迫系統每小時重新檢查檔案，避免死記空資料
+@st.cache_data(ttl=3600)
 def get_stock_dictionary():
-    """讀取證交所 ISIN 檔案，建立完美的『名稱 -> 代號』對照表"""
+    """讀取證交所 ISIN 檔案，建立『名稱 -> 代號與產業別』的雙向對照表"""
     mapping = {}
-    
-    # 🔥 升級 1：擴大搜尋雷達，同時找 Goodinfo_Rankings 資料夾與「根目錄」，以防您放錯層
-    search_pattern_1 = os.path.join(DATA_DIR, "*證券辨識號碼*.txt")
-    search_pattern_2 = "*證券辨識號碼*.txt"
-    dict_files = glob.glob(search_pattern_1) + glob.glob(search_pattern_2)
-    
+    # 尋找資料夾中的「證券辨識號碼一覽表」
+    dict_files = glob.glob(os.path.join(DATA_DIR, "*本國上市證券國際證券辨識號碼一覽表*.txt"))
     if not dict_files:
         return mapping
         
     try:
-        # 解決中文檔案編碼問題
         for encoding in ['cp950', 'utf-8', 'utf-16', 'utf-8-sig']:
             try:
                 with open(dict_files[0], 'r', encoding=encoding, errors='ignore') as f:
@@ -68,22 +63,24 @@ def get_stock_dictionary():
                 
         for line in lines:
             parts = line.split('\t')
-            if len(parts) > 0:
+            # 🔥 核心修正：資料列至少要有 5 個欄位 (自動過濾掉標頭與 "股票" 等無效字眼)
+            if len(parts) >= 5:
                 name_part = parts[0].strip()
+                industry = parts[4].strip() # 產業別剛好在第 5 欄 (index 4)
                 
-                # 🔥 升級 2：暴力切割法！把討厭的「全形空白」強制換成半形，然後直接切開
+                # 暴力切割全形空白
                 clean_name = name_part.replace('　', ' ')
                 tokens = clean_name.split()
                 
                 if len(tokens) >= 2:
                     sid = tokens[0].strip()
                     sname = tokens[1].strip()
-                    # 確保抓到的是數字代號 (例如 2330, 1101)
-                    if sid.isalnum():  
-                        mapping[sname] = sid
+                    if sid.isalnum():
+                        # 建立雙向字典，不管打代號還是名稱，都能查出所有資訊
+                        mapping[sname] = {"id": sid, "name": sname, "industry": industry}
+                        mapping[sid] = {"id": sid, "name": sname, "industry": industry}
     except Exception as e:
         pass
-        
     return mapping
 
 # 在系統啟動時，直接載入這本字典
@@ -741,61 +738,68 @@ def scan_and_display(title, session_key, query):
         st.write("⚪ 未進榜")
 
 # ==========================================
-# 🎯 搜尋輸入框
+# 🎯 搜尋輸入框 (導入產業別與全域代號翻譯)
 # ==========================================
 search_query = st.text_input("請輸入想觀測的股票代號或名稱 (例如: 3231 或 緯創，未顯示任何資料代表你的標的可能法人持股未達一定比例)：", key="global_search_final")
 
-if search_query:
-    st.write(f"### 🎯 綜合診斷標的：{search_query}")
+# 預先準備好全域變數，供下方所有區塊(AI、K線)使用
+pure_stock_id = ""
+display_name = search_query
 
-    # 🔥 模擬置頂區塊，動態顯示該標的總分
+if search_query:
+    query_clean = search_query.strip()
+    industry_label = "未分類"
+    
+    # 🌟 透過升級版字典，自動翻譯出正確代號與產業
+    if query_clean in STOCK_DICT:
+        pure_stock_id = STOCK_DICT[query_clean]["id"]
+        display_name = f"{STOCK_DICT[query_clean]['id']} {STOCK_DICT[query_clean]['name']}"
+        industry_label = STOCK_DICT[query_clean]["industry"]
+    else:
+        # 模糊搜尋備用 (如果只輸入"台積"，也能找到)
+        for k, v in STOCK_DICT.items():
+            if query_clean in k:
+                pure_stock_id = v["id"]
+                display_name = f"{v['id']} {v['name']}"
+                industry_label = v["industry"]
+                break
+    
+    # 如果字典真的查不到，最後手段：看看是不是輸入純數字
+    if pure_stock_id == "":
+        match_num = re.search(r'\d+', query_clean)
+        if match_num:
+            pure_stock_id = match_num.group(0)
+
+    # 🔥 顯示帶有科技感「產業別」標籤的標題
+    st.markdown(f"### 🎯 綜合診斷標的：{display_name} <span style='font-size:16px; background-color:#1E293B; padding:4px 10px; border-radius:6px; color:#00D2FF; margin-left:10px;'>🏷️ {industry_label}</span>", unsafe_allow_html=True)
+
+    # 🔥 動態顯示該標的總分
     pool_df = st.session_state.get('top_pool_df', pd.DataFrame())
     target_score = None
-    current_stock_id = "" # 預先準備好一個空變數來裝股票代號
-    delta_val = 0.0       # 👈 新增變數：預設 Delta 為 0.0
+    current_stock_id = pure_stock_id # 將正確代號交給後續系統
+    delta_val = 0.0
 
     if not pool_df.empty:
-        match = robust_search_engine(pool_df, search_query)
+        # 用正確的代號去總表精準搜尋
+        match = robust_search_engine(pool_df, current_stock_id) if current_stock_id else robust_search_engine(pool_df, search_query)
         if not match.empty:
             target_score = match.iloc[0].get('總分', 0)
-            current_stock_id = str(match.iloc[0].get('股票代號', '')).strip()
-            # 💡 聰明抓取：直接從榜單結果中抽出 Delta 分數，不需再呼叫額外函數！
             delta_val = match.iloc[0].get('Delta (日變動)', 0.0) 
 
-    # 🔥 搜尋區塊新增：Delta 分數與進階指標
+    # 🔥 顯示 Delta 分數
     if target_score is not None and current_stock_id != "":
-        # 直接使用剛剛從表裡抓到的數值
         delta = delta_val 
-        
-        # 配合台股習慣：正數紅色(轉強)，負數綠色(轉弱)
         delta_color = "#FF4B4B" if delta > 0 else "#00CC66" if delta < 0 else "#E2E8F0"
         delta_symbol = "🔥" if delta > 0 else "🚨" if delta < 0 else "🔄"
-        delta_str = f"+{delta}" if delta > 0 else f"{delta}" # 正數加上加號
+        delta_str = f"+{delta}" if delta > 0 else f"{delta}" 
         
         st.markdown(f"""
         #### 🏆 系統綜合評分：<span style='color:#FFD700; font-size:24px;'>**{target_score}**</span> 分 
         <span style='color:{delta_color}; font-size:16px; margin-left:15px;'>{delta_symbol} Delta變化: **{delta_str}**</span>
         <span style='color:#FFFFFF; font-size:14px; font-weight:normal; margin-left:10px;'>(評分數據僅供參考)</span>
         """, unsafe_allow_html=True)
-        
     else:
         st.markdown("#### 🏆 系統綜合評分：<span style='color:#718096; font-size:18px;'>未達綜合進榜標準 (0分)</span> <span style='color:#FFFFFF; font-size:14px; font-weight:normal;'>(評分數據僅供參考)</span>", unsafe_allow_html=True)
-    # ==========================================
-    # 🤖 呼叫 AI 量化評語
-    # ==========================================
-    st.write("---")
-    if 'top_pool_df' in st.session_state:
-        # 從計分總表中搜尋這檔股票
-        ai_target = robust_search_engine(st.session_state['top_pool_df'], search_query)
-        if not ai_target.empty:
-            st.markdown("#### 🤖 系統綜合診斷評語")
-            # 將找到的該筆資料 (row) 丟進我們寫好的 AI 引擎
-            commentary = generate_stock_commentary(ai_target.iloc[0])
-            st.info(f"**{commentary}**")
-        else:
-            # 如果這檔股票沒有在計分表裡 (代表它可能連基本條件都沒達到)
-            st.markdown("#### 🤖 系統綜合診斷評語")
-            st.info("❄️ 【弱勢整理】該標的未能進入綜合評分池，籌碼處於流失或無主力認養狀態。若無特殊題材發酵，短期內建議暫不考量。")
 
 
     # ==========================================
@@ -814,47 +818,15 @@ if search_query:
         st.rerun()
 
     if st.session_state.show_kline:
-        import re
-        pure_stock_id = ""
-        
-        # 🔥 智慧救援 1：優先使用剛剛上方計分區已經成功查到的股票代號反查股票名稱
-        if 'current_stock_id' in locals() and current_stock_id != "":
-            pure_stock_id = current_stock_id
-        else:
-            # 🔥 智慧救援 2：如果沒進榜，但資料庫(區塊1)有這檔股票，用中文名稱反查代號
-            if 'my_final_df' in st.session_state:
-                fallback_df = st.session_state['my_final_df']
-                fallback_match = robust_search_engine(fallback_df, search_query)
-                if not fallback_match.empty:
-                    pure_stock_id = str(fallback_match.iloc[0].get('股票代號', '')).strip()
-            
-            # 🔥 智慧救援 3：啟用終極中文字典翻譯！
-            if pure_stock_id == "":
-                # 情況 A：使用者有打數字 (例如輸入 3231)
-                stock_id_match = re.search(r'\d+', search_query)
-                if stock_id_match:
-                    pure_stock_id = stock_id_match.group(0)
-                else:
-                    # 情況 B：使用者純打中文 (例如輸入 "台泥" 或 "緯創")
-                    query_clean = search_query.strip()
-                    
-                    # 精準命中
-                    if query_clean in STOCK_DICT:
-                        pure_stock_id = STOCK_DICT[query_clean]
-                    else:
-                        # 模糊搜尋 (如果只打 "台積"，也能自動對應到 "台積電")
-                        for name, sid in STOCK_DICT.items():
-                            if query_clean in name:
-                                pure_stock_id = sid
-                                break
-        
-        # 只要 pure_stock_id 有抓到東西，就畫圖！
-        if pure_stock_id != "":          
+        # 🔥 剛剛在搜尋區塊頂端已經翻譯好 pure_stock_id 了，這裡直接無腦取用！
+        if 'pure_stock_id' in locals() and pure_stock_id != "":          
             st.markdown("##### ⚙️ 技術線圖與指標配置面板")
             
             # 🔥 縮小按鈕魔法：將版面切成 4 塊，前面 3 塊極小，後面留白
             tf_c1, tf_c2, tf_c3, _space = st.columns([1, 1, 1, 5])
             
+            # ... (下面 p_day, p_week 的按鈕代碼維持不變，繼續留著) ...
+                      
             p_day = "日K" if st.session_state.kline_period == "日線" else "日K"
             p_week = "週K" if st.session_state.kline_period == "週線" else "週K"
             p_month = "月K" if st.session_state.kline_period == "月線" else "月K"
