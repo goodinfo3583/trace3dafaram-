@@ -101,10 +101,12 @@ STOCK_DICT = get_stock_dictionary()
 #以上原始區塊0
 # ==========================================
 # ==========================================
-# 📡 證交所 API 直連：大盤資金與大戶動向戰情板
+# 📡 證交所 API 直連：後台資料抓取引擎 (保留給側邊欄使用)
 # ==========================================
 import requests
 import datetime
+import pandas as pd
+import streamlit as st
 
 @st.cache_data(ttl=600)
 def fetch_twse_institutional_data():
@@ -134,213 +136,70 @@ def fetch_block_trades():
     except:
         return pd.DataFrame()
 
-# 🚀 建立大盤資金戰情面板 UI
+
+# ==========================================
+# 🧪 暫時測試區塊：鉅額交易 (BFIAUU) 直連除錯面板 (取代原本的主畫面 UI)
+# ==========================================
 st.write("---")
-st.markdown("<h3 style='color:#00D2FF;'>🏦 盤後資金風向球：大盤籌碼與大戶暗盤雷達</h3>", unsafe_allow_html=True)
+st.markdown("<h3 style='color:#FF4B4B;'>🧪 實驗室：鉅額交易 API 連線測試 (全資料突破版)</h3>", unsafe_allow_html=True)
 
-# 建立兩個分頁 (Tab)，讓畫面乾淨俐落
-tab_inst, tab_block = st.tabs(["📊 三大法人買賣超統計", "🐋 鉅額交易(大戶暗盤)追蹤"])
+# 讓您可以手動輸入日期來測試
+test_date_block = st.text_input("請輸入測試日期 (格式: YYYYMMDD，例如 20260529):", value="20260529", key="block_date")
 
-# ==========================================
-# [分頁 1] 三大法人買賣超
-# ==========================================
-with tab_inst:
-    twse_title, twse_df = fetch_twse_institutional_data()
+if st.button("🚀 開始測試鉅額交易 API"):
+    headers = {
+        "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36",
+        "Accept": "application/json, text/javascript, */*; q=0.01"
+    }
     
-    if twse_df is not None and not twse_df.empty:
-        now = datetime.datetime.now()
-        current_time = now.time()
-        
-        status_badge = "🌕 <span style='color:#00D2FF;'>完整版數據 (含鉅額交易結算)</span>" if current_time >= datetime.time(19, 40) else "🟢 <span style='color:#00CC66;'>初版數據 (不含鉅額交易)</span>" if current_time >= datetime.time(14, 50) else "⏳ <span style='color:#FFCC00;'>盤後結算中</span>"
-        
-        st.markdown(f"**{twse_title}** | 狀態：{status_badge}", unsafe_allow_html=True)
-        
-        def to_hundred_million(val_str):
-            try:
-                return float(str(val_str).replace(',', '')) / 100000000
-            except:
-                return 0.0
-
-        net_buy_foreign = net_buy_trust = net_buy_dealer = net_buy_total = 0
-        for index, row in twse_df.iterrows():
-            unit_name = row['單位名稱']
-            net_val = to_hundred_million(row['買賣差額'])
-            if '外資及陸資' in unit_name: net_buy_foreign += net_val
-            elif '投信' in unit_name: net_buy_trust += net_val
-            elif '自營商' in unit_name: net_buy_dealer += net_val
-            elif '合計' in unit_name: net_buy_total = net_val
-
-        c1, c2, c3, c4 = st.columns(4)
-        def format_metric(val):
-            color = "#FF4B4B" if val > 0 else "#00CC66" if val < 0 else "#E2E8F0"
-            return f"<span style='color:{color}; font-size:24px; font-weight:bold;'>{'+' if val > 0 else ''}{val:,.1f} 億</span>"
-
-        c1.markdown(f"🦅 **外資買賣超**<br>{format_metric(net_buy_foreign)}", unsafe_allow_html=True)
-        c2.markdown(f"🐳 **投信買賣超**<br>{format_metric(net_buy_trust)}", unsafe_allow_html=True)
-        c3.markdown(f"🦊 **自營商買賣超**<br>{format_metric(net_buy_dealer)}", unsafe_allow_html=True)
-        c4.markdown(f"🔥 **三大法人合計**<br>{format_metric(net_buy_total)}", unsafe_allow_html=True)
-            
-        with st.expander("📄 查看證交所原始結算明細表 (單位：元)"):
-            st.dataframe(twse_df, use_container_width=True, hide_index=True)
-    else:
-        st.info("🕒 目前查無今日三大法人買賣資料，證交所尚未產出報表。")
-
-# ==========================================
-# [分頁 2] 鉅額交易 (大戶暗盤)
-# ==========================================
-with tab_block:
-    st.write("💡 *鉅額交易通常為大戶於盤後進行之籌碼換手，其「成交單價」極具長線支撐或壓力參考價值。*")
-    block_df = fetch_block_trades()
+    # 🎯 加上 selectType=ALL 確保抓取所有分類 (單一證券與股票組合)，並帶上日期
+    test_url = f"https://www.twse.com.tw/rwd/zh/block/BFIAUU?response=json&date={test_date_block}&selectType=ALL"
+    st.info(f"連線網址: `{test_url}`")
     
-    if not block_df.empty:
-        try:
-            block_df['成交股數_數值'] = block_df['成交股數'].astype(str).str.replace(',', '').astype(float)
-            block_df['成交金額_數值'] = block_df['成交金額'].astype(str).str.replace(',', '').astype(float)
-            
-            block_df['成交量(張)'] = (block_df['成交股數_數值'] / 1000).round(1)
-            block_df['成交總額(百萬)'] = (block_df['成交金額_數值'] / 1000000).round(2)
-            
-            # 依照砸錢金額由大到小排序
-            block_df = block_df.sort_values(by='成交金額_數值', ascending=False)
-            
-            display_cols = ['證券代號', '證券名稱', '成交單價', '成交量(張)', '成交總額(百萬)']
-            display_df = block_df[display_cols]
-            
-            st.success(f"🎯 成功攔截今日鉅額交易！共偵測到 {len(display_df)} 筆大戶換手紀錄。")
-            st.dataframe(display_df, use_container_width=True, hide_index=True)
-        except:
-            st.warning("⚠️ 資料清洗時發生錯誤，顯示原始數據：")
-            st.dataframe(block_df, use_container_width=True, hide_index=True)
-    else:
-        st.info("🕒 目前查無今日鉅額交易資料，或證交所尚未結算公告 (通常於盤後 17:00 後陸續更新)。")
-
-
-# ==========================================
-# 📡 免安裝 API 籌碼連續抓取引擎 (直接連線版)
-# ==========================================
-@st.cache_data(ttl=3600)
-def get_continuous_institutional_data(stock_id, days=20):
-    """
-    免安裝 FinMind 套件！直接透過 API 網址抓取連續法人買賣超資料，徹底解決破洞問題。
-    """
     try:
-        url = "https://api.finmindtrade.com/api/v4/data"
-        start_date = (datetime.date.today() - datetime.timedelta(days=40)).strftime("%Y-%m-%d")
+        res = requests.get(test_url, headers=headers, timeout=10)
+        st.write(f"🌐 狀態碼: `{res.status_code}`")
         
-        parameter = {
-            "dataset": "TaiwanStockInstitutionalInvestorsBuySell",
-            "data_id": str(stock_id).strip(),
-            "start_date": start_date,
-        }
-        
-        # 直接發送網路請求拿資料
-        resp = requests.get(url, params=parameter, timeout=10)
-        if resp.status_code == 200:
-            json_data = resp.json()
-            if json_data.get("status") == 200 and json_data.get("data"):
-                df = pd.DataFrame(json_data.get("data"))
+        if res.status_code == 200:
+            json_data = res.json()
+            st.write(f"📋 狀態 (Stat): `{json_data.get('stat')}`")
+            
+            if json_data.get('stat') == 'OK':
+                # 抓出欄位與資料
+                cols = json_data.get('fields', [])
+                rows = json_data.get('data', [])
+                st.success(f"🎉 成功抓取！後台確實是一次給全部資料，共抓到 {len(rows)} 筆大戶交易 (已突破 10 筆限制)！")
                 
-                if not df.empty:
-                    # 整理三大法人買賣超 (將股數除以 1000 換算成「張」)
-                    df['net_buy'] = (df['buy'] - df['sell']) / 1000
-                    df_pivot = df.groupby(['date', 'name'])['net_buy'].sum().unstack().fillna(0)
+                # 建立原始表格並印出
+                df = pd.DataFrame(rows, columns=cols)
+                with st.expander("📄 點此查看證交所回傳的【原始全量表格】"):
+                    st.dataframe(df, use_container_width=True, hide_index=True)
+                
+                # 順便測試金額轉換與大戶砸錢排行榜
+                st.write("---")
+                st.write("🔧 **正在測試轉換為『百萬元』與排行榜邏輯...**")
+                try:
+                    df['成交股數_數值'] = df['成交股數'].astype(str).str.replace(',', '').astype(float)
+                    df['成交金額_數值'] = df['成交金額'].astype(str).str.replace(',', '').astype(float)
+                    df['成交量(張)'] = (df['成交股數_數值'] / 1000).round(1)
+                    df['成交總額(百萬)'] = (df['成交金額_數值'] / 1000000).round(2)
                     
-                    # 轉換英文欄位名稱
-                    if 'Foreign_Investor' in df_pivot: df_pivot.rename(columns={'Foreign_Investor': '外資'}, inplace=True)
-                    if 'Investment_Trust' in df_pivot: df_pivot.rename(columns={'Investment_Trust': '投信'}, inplace=True)
-                    if 'Dealer' in df_pivot: df_pivot.rename(columns={'Dealer': '自營商'}, inplace=True)
+                    df_sorted = df.sort_values(by='成交金額_數值', ascending=False)
+                    st.success("✅ 數值轉換與排序測試成功！今日大戶砸錢排行榜如下：")
                     
-                    # 計算「三大法人合計買賣超」
-                    cols_to_sum = [c for c in ['外資', '投信', '自營商'] if c in df_pivot.columns]
-                    df_pivot['法人合計'] = df_pivot[cols_to_sum].sum(axis=1)
-                    
-                    # 將日期變成欄位，並把日期格式改為 MMDD
-                    df_pivot = df_pivot.reset_index()
-                    df_pivot['乾淨日期'] = pd.to_datetime(df_pivot['date']).dt.strftime('%m%d')
-                    
-                    return df_pivot.tail(days)
+                    st.dataframe(df_sorted[['證券代號', '證券名稱', '成交單價', '成交量(張)', '成交總額(百萬)']], use_container_width=True, hide_index=True)
+                except Exception as parse_e:
+                    st.error(f"⚠️ 解析數值時發生錯誤: {str(parse_e)}")
+                    st.write("這代表欄位名稱可能與我們預期的不同，請打開上方的原始表格核對欄位名稱！")
+            else:
+                st.warning("⚠️ 查無資料。證交所回傳：可能為假日、尚未更新，或是輸入日期錯誤。")
+                st.json(json_data)
+        else:
+            st.error("❌ 連線被拒絕。")
     except Exception as e:
-        pass
-        
-    return pd.DataFrame()
-
+        st.error(f"💥 錯誤: {str(e)}")
 # ==========================================
-# 2. Delta 分數與歷史存檔工具函數 (終極時空校正版)
-# ==========================================
-import pytz
-import datetime
-import glob
-import os
-import pandas as pd
-import re
-
-tw_tz = pytz.timezone('Asia/Taipei')
-
-def get_data_date():
-    """🎯 核心升級：只認 TXT 與 CSV 檔名，徹底解決週末補跑、跨夜執行的時空錯亂"""
-    # 1. 嚴格限定只掃描 .txt 與 .csv 檔案
-    txt_files = glob.glob(os.path.join(DATA_DIR, "*.txt"))
-    csv_files = glob.glob(os.path.join(DATA_DIR, "*.csv"))
-    all_data_files = txt_files + csv_files
-    
-    dates = []
-    for f in all_data_files:
-        # 2. 從檔名中找出 8 位數的日期格式 (例如 20260528)
-        match = re.search(r'\d{8}', os.path.basename(f))
-        if match:
-            dates.append(match.group(0))
-    
-    # 3. 排序並抓出最新的一天當作「系統現在時間」
-    if dates:
-        dates.sort()
-        return dates[-1] 
-    
-    # 如果資料夾竟然是空的，才無奈地使用電腦現在時間
-    return datetime.datetime.now(tw_tz).strftime("%Y%m%d")
-def save_daily_score(df):
-    """將今日總分存入對應『資料日期』的 CSV"""
-    data_date = get_data_date()
-    filepath = os.path.join(SCORE_HISTORY_DIR, f"scores_{data_date}.csv")
-    df[['股票代號', '總分']].to_csv(filepath, index=False)
-
-def calculate_delta(current_df):
-    """計算與前一個『資料交易日』的總分落差"""
-    data_date = get_data_date()
-    history_files = glob.glob(os.path.join(SCORE_HISTORY_DIR, "scores_*.csv"))
-
-    # 🔥 關鍵修正：排除『這批資料日期』的歷史檔，強迫往前找一天 (例如排除0528，找到0527)
-    past_files = [f for f in history_files if not f.endswith(f"{data_date}.csv")]
-
-    if not past_files:
-        current_df['Delta (日變動)'] = 0.0
-        return current_df
-
-    # 找出真正的「前一個交易日」
-    past_files.sort()
-    latest_past_file = past_files[-1]
-
-    try:
-        past_df = pd.read_csv(latest_past_file)
-        past_df['股票代號'] = past_df['股票代號'].astype(str)
-        current_df['股票代號'] = current_df['股票代號'].astype(str)
-
-        merged = current_df.merge(past_df[['股票代號', '總分']], on='股票代號', how='left', suffixes=('', '_yesterday'))
-        merged['總分_yesterday'] = merged['總分_yesterday'].fillna(merged['總分'])
-        merged['Delta (日變動)'] = (merged['總分'] - merged['總分_yesterday']).round(2)
-        
-        merged.drop(columns=['總分_yesterday'], inplace=True)
-        return merged
-
-    except Exception as e:
-        current_df['Delta (日變動)'] = 0.0
-        return current_df
-# ==========================================
-# 3. 網頁開頭訊息
-# ==========================================
-st.write("")
-st.write("📊 本站進行數據分析僅供參考而非推薦個股與飆股另請愛惜荷包小心騙騙")
-# ==========================================
-# 🌌 注入極致黑看盤軟體專屬風格樣式 (全站深色化 + 表格與按鈕優化)
+# 🌌 網頁格式顏色搭配注入極致黑看盤軟體專屬風格樣式 (全站深色化 + 表格與按鈕優化)
 # ==========================================
 st.markdown(
     """
