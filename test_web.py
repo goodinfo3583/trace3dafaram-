@@ -2439,7 +2439,7 @@ if not block_df.empty:
         block_df['成交股數_數值'] = pd.to_numeric(block_df['成交股數'].astype(str).str.replace(',', ''), errors='coerce').fillna(0)
         block_df['成交金額_數值'] = pd.to_numeric(block_df['成交金額'].astype(str).str.replace(',', ''), errors='coerce').fillna(0)
         
-        # 成交價格：抹除小數點
+        # 成交價格：抹除小數點並確保整數化
         block_df['🔴成交價格'] = pd.to_numeric(block_df[price_col].astype(str).str.replace(',', ''), errors='coerce').fillna(0).round(0).astype(int)
         
         # 過濾掉股數為 0 的無效數據行
@@ -2453,45 +2453,60 @@ if not block_df.empty:
             lambda x: f"{x:.2f}".rstrip('0').rstrip('.')
         )
         
-        # 4. 🔍 終極收盤價獵漏引擎：跨記憶體與本地最新 CSV 進行地毯式搜索
+        # 4. 🔍 終極收盤價獵漏引擎：遍歷所有個股 CSV 檔案抓取「收盤價」
         close_price_dict = {}
-        
-        # 優先路徑 A：從本地資料夾直接掃描最新的 Goodinfo 現貨 CSV 檔案
         try:
             import glob
-            # 掃描資料夾內所有 CSV，通常裡面都含有收盤價
+            import re
             all_csv_files = glob.glob(os.path.join(DATA_DIR, "*.csv"))
-            if all_csv_files:
-                # 拿最新的檔案來讀取
-                latest_csv = sorted(all_csv_files, reverse=True)[0]
-                sample_df = pd.read_csv(latest_csv, encoding='utf-8-sig')
-                
-                # 自動找出代號欄與收盤價欄
-                c_id = next((c for c in sample_df.columns if '代號' in c), None)
-                c_price = next((c for c in sample_df.columns if '收盤' in c or '價格' in c or '現價' in c), None)
-                
-                if c_id and c_price:
-                    # 強制將代號轉為「乾淨的去空格字串」進行繫結
-                    close_price_dict.update(dict(zip(
-                        sample_df[c_id].astype(str).str.replace(r'\D', '', regex=True), 
-                        sample_df[c_price]
-                    )))
+            # 🔥 關鍵修正：嚴格排除大盤總體檔案與歷史分數檔案，只留下純個股資料表
+            stock_csv_files = [f for f in all_csv_files if "三大法人現貨期權" not in f and "scores_" not in f]
+            
+            if stock_csv_files:
+                # 巡檢最新的 5 個個股檔案，確保各區塊代號與收盤價能被完整搜集
+                for csv_path in sorted(stock_csv_files, reverse=True)[:5]:
+                    try:
+                        sample_df = robust_read_csv(csv_path)
+                        c_id = next((c for c in sample_df.columns if '代號' in c), None)
+                        c_price = next((c for c in sample_df.columns if c in ['收盤價', '收盤', '成交價']), None)
+                        if not c_price:
+                            c_price = next((c for c in sample_df.columns if '收盤' in c or '現價' in c), None)
+                            
+                        if c_id and c_price:
+                            # 強制將代號轉為「乾淨且無空格」的純數字字串
+                            sample_df['__clean_id'] = sample_df[c_id].astype(str).str.replace(r'\D', '', regex=True)
+                            valid_rows = sample_df[sample_df['__clean_id'] != '']
+                            for _, r in valid_rows.iterrows():
+                                sid = r['__clean_id']
+                                price_val = r[c_price]
+                                if pd.notna(price_val) and str(price_val).strip() != '':
+                                    try:
+                                        # 同步將收盤價抹除小數點，維持畫面的俐落感
+                                        close_price_dict[sid] = str(int(float(str(price_val).replace(',', ''))))
+                                    except:
+                                        close_price_dict[sid] = str(price_val).strip()
+                    except:
+                        pass
         except:
             pass
 
-        # 優先路徑 B：從網頁記憶體中的選股池大表進行覆蓋更新
+        # 備援路徑：從網頁記憶體中的選股池大表進行交叉比對覆蓋
         for key in ['top_pool_df', 'my_final_df', 'df_blk1']:
             if key in st.session_state and isinstance(st.session_state[key], pd.DataFrame) and not st.session_state[key].empty:
                 df_src = st.session_state[key]
                 id_col = next((c for c in df_src.columns if '代號' in c or '股票代號' in c), None)
                 price_col_src = next((c for c in df_src.columns if '收盤' in c or '價格' in c or '現價' in c), None)
                 if id_col and price_col_src:
-                    close_price_dict.update(dict(zip(
-                        df_src[id_col].astype(str).str.replace(r'\D', '', regex=True), 
-                        df_src[price_col_src]
-                    )))
+                    for _, r in df_src.iterrows():
+                        sid = re.sub(r'\D', '', str(r[id_col]).split('.')[0].strip())
+                        price_val = r[price_col_src]
+                        if pd.notna(price_val) and str(price_val).strip() != '':
+                            try:
+                                close_price_dict[sid] = str(int(float(str(price_val).replace(',', ''))))
+                            except:
+                                close_price_dict[sid] = str(price_val).strip()
         
-        # 5. 精確配對與填入收盤價 (代號端與字典端皆強制去空值、去非數字符號)
+        # 5. 精確配對與填入收盤價 (代號端與字典端皆強制清除隱性空白)
         block_df['乾淨代號'] = block_df['證券代號'].astype(str).str.replace(r'\D', '', regex=True)
         block_df['收盤價格'] = block_df['乾淨代號'].map(close_price_dict).fillna('-')
         
@@ -2517,7 +2532,7 @@ if not block_df.empty:
         # 渲染核心資料表格
         st.dataframe(styled_df, use_container_width=True, hide_index=True)
         
-        # 8. 🎯 動態嵌入時間戳記至最底部
+        # 8. 🎯 動態嵌入精確時間戳記至最底部
         try:
             raw_date = get_data_date() 
             if not raw_date or len(raw_date) != 8:
