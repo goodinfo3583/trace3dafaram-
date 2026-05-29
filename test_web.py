@@ -82,10 +82,6 @@ STOCK_DICT = get_stock_dictionary()
 # ==========================================
 # 📡 免安裝 API 籌碼連續抓取引擎 (直接連線版)
 # ==========================================
-# ...(您原本下面的程式碼繼續保留)...
-# ==========================================
-# 📡 免安裝 API 籌碼連續抓取引擎 (直接連線版)
-# ==========================================
 @st.cache_data(ttl=3600)
 def get_continuous_institutional_data(stock_id, days=20):
     """
@@ -203,7 +199,7 @@ def calculate_delta(current_df):
         current_df['Delta (日變動)'] = 0.0
         return current_df
 # ==========================================
-# 3. 頁面開頭訊息
+# 3. 網頁開頭訊息
 # ==========================================
 st.write("")
 st.write("📊 本站進行數據分析僅供參考而非推薦個股與飆股另請愛惜荷包小心騙騙")
@@ -823,11 +819,25 @@ if search_query:
                 if not fallback_match.empty:
                     pure_stock_id = str(fallback_match.iloc[0].get('股票代號', '')).strip()
             
-            # 🔥 智慧救援 3：如果真的都找不到，才試著從輸入字串抓數字
+            # 🔥 智慧救援 3：啟用終極中文字典翻譯！
             if pure_stock_id == "":
+                # 情況 A：使用者有打數字 (例如輸入 3231)
                 stock_id_match = re.search(r'\d+', search_query)
                 if stock_id_match:
                     pure_stock_id = stock_id_match.group(0)
+                else:
+                    # 情況 B：使用者純打中文 (例如輸入 "台泥" 或 "緯創")
+                    query_clean = search_query.strip()
+                    
+                    # 精準命中
+                    if query_clean in STOCK_DICT:
+                        pure_stock_id = STOCK_DICT[query_clean]
+                    else:
+                        # 模糊搜尋 (如果只打 "台積"，也能自動對應到 "台積電")
+                        for name, sid in STOCK_DICT.items():
+                            if query_clean in name:
+                                pure_stock_id = sid
+                                break
         
         # 只要 pure_stock_id 有抓到東西，就畫圖！
         if pure_stock_id != "":          
@@ -872,9 +882,10 @@ if search_query:
         else:
             st.warning("⚠️ 技術 K 線圖目前僅支援代號查詢。請在上方輸入框加入股票代號。")
 
- 
+    # ==========================================
     # ==========================================
     # 👑 區塊 1：短中長線三大法人持股變化 (搜尋結果專屬顯示)
+    # ==========================================
     # ==========================================
     st.write("---")
     st.subheader("👑 區塊 1：短中長線三大法人持股變化")
