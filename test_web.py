@@ -2438,7 +2438,9 @@ if not block_df.empty:
         # 2. 安全數值轉換 (防止空字串與 NaN 地雷)
         block_df['成交股數_數值'] = pd.to_numeric(block_df['成交股數'].astype(str).str.replace(',', ''), errors='coerce').fillna(0)
         block_df['成交金額_數值'] = pd.to_numeric(block_df['成交金額'].astype(str).str.replace(',', ''), errors='coerce').fillna(0)
-        block_df['成交價格(元)'] = pd.to_numeric(block_df[price_col].astype(str).str.replace(',', ''), errors='coerce').fillna(0)
+        
+        # 🔥 修正 1 & 2：拿掉欄位名稱的 (元)，並使用 .round(0).astype(int) 徹底抹除小數點
+        block_df['成交價格'] = pd.to_numeric(block_df[price_col].astype(str).str.replace(',', ''), errors='coerce').fillna(0).round(0).astype(int)
         
         # 過濾掉股數為 0 的無效數據行
         block_df = block_df[block_df['成交股數_數值'] > 0].copy()
@@ -2464,8 +2466,8 @@ if not block_df.empty:
         # 依照成交總額由大到小排序
         block_df = block_df.sort_values(by='成交總額(千萬)', ascending=False)
         
-        # 5. 變更欄位名稱與重新精簡排版
-        display_cols = ['證券代號', '證券名稱', '成交價格(元)', '收盤價格', '成交張數', '成交總額(千萬)']
+        # 5. 變更欄位名稱與重新精簡排版 (套用無小數點的「成交價格」)
+        display_cols = ['證券代號', '證券名稱', '成交價格', '收盤價格', '成交張數', '成交總額(千萬)']
         display_df = block_df[display_cols].copy()
         
         # 精確更名：證券代號 -> 代號，證券名稱 -> 股票名稱
@@ -2474,26 +2476,26 @@ if not block_df.empty:
             '證券名稱': '股票名稱'
         })
         
-        # 6. ✨ 視覺特效：將「成交價格(元)」欄位數值套用高級紅字高亮
+        # 6. ✨ 視覺特效：將「成交價格」欄位數值套用高級紅字高亮
         def apply_red_style(val):
             return 'color: #FF4B4B; font-weight: bold;'
             
-        styled_df = display_df.style.map(apply_red_style, subset=['成交價格(元)'])
+        styled_df = display_df.style.map(apply_red_style, subset=['成交價格'])
         
         # 渲染核心資料表格
         st.dataframe(styled_df, use_container_width=True, hide_index=True)
         
-        # 7. 🎯 數據統計訊息下移，並動態嵌入時間戳記
+        # 7. 🔥 修正 3：精準抓取當前資料日期，並放入統計文字中
         try:
-            raw_date = get_data_date()
-            if len(raw_date) == 8:
-                data_date_formatted = f"{raw_date[:4]}/{raw_date[4:6]}/{raw_date[6:]} "
-            else:
-                data_date_formatted = f"{raw_date} "
+            raw_date = get_data_date() # 自動抓取系統判定的日期 (如 20260529)
+            if not raw_date or len(raw_date) != 8:
+                import datetime
+                raw_date = datetime.datetime.now().strftime("%Y%m%d")
         except:
-            data_date_formatted = ""
+            import datetime
+            raw_date = datetime.datetime.now().strftime("%Y%m%d")
             
-        st.success(f"📊 {data_date_formatted}共偵測到 {len(display_df)} 筆大戶暗盤換手紀錄。")
+        st.success(f"📊 {raw_date} 共偵測到 {len(display_df)} 筆大戶暗盤換手紀錄。")
 
     except Exception as e:
         st.warning(f"⚠️ 資料解析發生錯誤: {str(e)}。顯示證交所原始回傳數據：")
