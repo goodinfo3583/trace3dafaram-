@@ -39,6 +39,45 @@ def robust_read_csv(file_path):
         except:
             continue
     return pd.read_csv(file_path, encoding='cp950', errors='ignore')
+# ==========================================
+# 🗂️ 台股代號與名稱 萬用字典引擎 (透過官方 ISIN 表)
+# ==========================================
+@st.cache_data
+def get_stock_dictionary():
+    """讀取證交所 ISIN 檔案，建立完美的『名稱 -> 代號』對照表"""
+    mapping = {}
+    # 尋找資料夾中的「證券辨識號碼一覽表」
+    dict_files = glob.glob(os.path.join(DATA_DIR, "*證券辨識號碼*.txt"))
+    if not dict_files:
+        return mapping
+        
+    try:
+        # 解決中文檔案編碼問題
+        for encoding in ['cp950', 'utf-8', 'utf-16', 'utf-8-sig']:
+            try:
+                with open(dict_files[0], 'r', encoding=encoding, errors='ignore') as f:
+                    lines = f.readlines()
+                if len(lines) > 10: 
+                    break
+            except:
+                continue
+                
+        for line in lines:
+            parts = line.split('\t')
+            if len(parts) > 0:
+                name_part = parts[0].strip()
+                # 切割「1101　台泥」這種類型的字串 (支援全形與半形空白)
+                match = re.match(r'^([A-Z0-9]{4,6})\s+(.+)$', name_part, re.UNICODE)
+                if match:
+                    sid = match.group(1).strip()
+                    sname = match.group(2).strip()
+                    mapping[sname] = sid
+    except Exception as e:
+        pass
+    return mapping
+
+# 在系統啟動時，直接載入這本字典
+STOCK_DICT = get_stock_dictionary()
 
 # ==========================================
 # 📡 免安裝 API 籌碼連續抓取引擎 (直接連線版)
