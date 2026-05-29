@@ -1074,7 +1074,7 @@ st.sidebar.markdown("[🔄 區塊4-1：融資減少動向](#section-4-1)")
 st.sidebar.markdown("[🔄 區塊4-2：借券賣出減少動向](#section-4-2)")
 st.sidebar.markdown("[🔄 區塊4-3：融券增加動向](#section-4-3)")
 st.sidebar.markdown("[💰 區塊5：大股東動向](#section-5)")
-st.sidebar.markdown("[💸 區塊6：鉅額交易](#section-6)")
+st.sidebar.markdown("[💸 區塊6：鉅額交易動向](#section-6)")
 # ==========================================
 # 🏠 核心五大區塊
 # ==========================================
@@ -2423,8 +2423,8 @@ else:
 # ==========================================
 st.write("---")
 st.markdown("<div id='section-6'></div>", unsafe_allow_html=True)
-st.subheader("💸 區塊 6：暗盤雷達 (今日盤後鉅額交易總表)")
-st.write("💡 鉅額交易常為大戶私下換手籌碼,避免股價盤中劇烈波動。成交價為「支撐/壓力」防守線或是「壓/拉尾盤」；短線跌破須嚴設停損")
+st.subheader("💸 區塊 6：鉅額交易動向")
+st.write("💡 鉅額交易常為大戶私下換手籌碼,避免股價盤中劇烈波動。成交價為「支撐/壓力」防守線或是「壓/拉尾盤」；短線跌破建議嚴設停損。")
 
 block_df = fetch_block_trades()
 
@@ -2437,12 +2437,14 @@ if not block_df.empty:
         block_df['成交股數_數值'] = pd.to_numeric(block_df['成交股數'].astype(str).str.replace(',', ''), errors='coerce').fillna(0)
         block_df['成交金額_數值'] = pd.to_numeric(block_df['成交金額'].astype(str).str.replace(',', ''), errors='coerce').fillna(0)
         
-        # 抹除小數點與 (元)，欄位名稱改為「成交價」
-        block_df['成交價'] = pd.to_numeric(block_df[price_col].astype(str).str.replace(',', ''), errors='coerce').fillna(0).round(0).astype(int)
+        # 抹除小數點與 (元)，並加上 ▼ 符號
+        block_df['▼成交價'] = pd.to_numeric(block_df[price_col].astype(str).str.replace(',', ''), errors='coerce').fillna(0).round(0).astype(int)
         
         block_df = block_df[block_df['成交股數_數值'] > 0].copy()
         block_df['成交張數'] = (block_df['成交股數_數值'] / 1000).astype(int)
-        block_df['成交總額(千萬)'] = (block_df['成交金額_數值'] / 10000000).apply(lambda x: f"{x:.2f}".rstrip('0').rstrip('.'))
+        
+        # 🌟 單位統一進化：將總額除以 1 億，並聰明抹除多餘小數點
+        block_df['成交總額(億)'] = (block_df['成交金額_數值'] / 100000000).apply(lambda x: f"{x:.2f}".rstrip('0').rstrip('.'))
         
         block_df['乾淨代號'] = block_df['證券代號'].astype(str).str.replace(r'\D', '', regex=True)
         
@@ -2468,8 +2470,8 @@ if not block_df.empty:
                                     close_price_dict[sid] = str(int(round(valid_prices.iloc[-1])))
             except: pass 
         
-        # 填入 yfinance 抓到的收盤價，找不到就給 "-"
-        block_df['🔴收盤價'] = block_df['乾淨代號'].map(close_price_dict).fillna('-')
+        # 填入 yfinance 抓到的收盤價，並加上 ▼ 符號
+        block_df['▼收盤價'] = block_df['乾淨代號'].map(close_price_dict).fillna('-')
         
         # ==========================================
         # 🔥 群聚排序引擎：同股票綁定 + 紅字優先
@@ -2484,27 +2486,27 @@ if not block_df.empty:
             except:
                 return 4 # 無法判斷者墊底
 
-        # 1. 計算每一筆紀錄的顏色層級
-        block_df['__color_rank'] = block_df.apply(lambda r: get_color_rank(r['🔴收盤價'], r['成交價']), axis=1)
+        # 計算每一筆紀錄的顏色層級 (適應新的欄位名稱)
+        block_df['__color_rank'] = block_df.apply(lambda r: get_color_rank(r['▼收盤價'], r['▼成交價']), axis=1)
         
-        # 2. 統整每一檔股票的「最強顏色」與「總成交金額」
+        # 統整每一檔股票的「最強顏色」與「總成交金額」
         stock_stats = block_df.groupby('乾淨代號').agg(
-            stock_min_rank=('__color_rank', 'min'),    # 只要有一筆紅字，整檔股票就是最高級別(1)
-            stock_total_amt=('成交金額_數值', 'sum')  # 計算該檔股票今日鉅額總額
+            stock_min_rank=('__color_rank', 'min'),
+            stock_total_amt=('成交金額_數值', 'sum')  
         ).reset_index()
         
-        # 3. 將統整資料合併回主表
+        # 將統整資料合併回主表
         block_df = block_df.merge(stock_stats, on='乾淨代號', how='left')
         
-        # 4. 終極多層排序！
-        # 順序: 股票優先級(紅先) -> 股票總金額(大先) -> 股票代號(綁在一起) -> 單筆顏色級別(紅先) -> 單筆金額(大先)
+        # 終極多層排序
         block_df = block_df.sort_values(
             by=['stock_min_rank', 'stock_total_amt', '乾淨代號', '__color_rank', '成交金額_數值'],
             ascending=[True, False, True, True, False]
         )
         # ==========================================
         
-        display_cols = ['乾淨代號', '證券名稱', '成交價', '🔴收盤價', '成交張數', '成交總額(千萬)']
+        # 🌟 更新要顯示的欄位名稱
+        display_cols = ['乾淨代號', '證券名稱', '▼成交價', '▼收盤價', '成交張數', '成交總額(億)']
         display_df = block_df[display_cols].copy()
         
         display_df = display_df.rename(columns={
@@ -2518,23 +2520,21 @@ if not block_df.empty:
         def highlight_block_row(row):
             styles = [''] * len(row)
             try:
-                # 把字串轉回數字來比較大小
-                close_p = float(str(row['🔴收盤價']).replace(',', ''))
-                # 🔥 此處修復了原本 row['🔴成交價'] 找不到欄位的 Bug
-                block_p = float(str(row['成交價']).replace(',', ''))
+                # 配合新欄位名稱轉換數字比較
+                close_p = float(str(row['▼收盤價']).replace(',', ''))
+                block_p = float(str(row['▼成交價']).replace(',', ''))
                 
                 if close_p > block_p: color = '#FF4B4B'       # 紅色
                 elif close_p == block_p: color = '#FFA500'    # 橘色
                 else: color = '#00E272'                       # 綠色
                 
-                # 找到 '成交價' 這個欄位的位置，並上色
-                idx = row.index.get_loc('成交價')
+                # 針對 '▼成交價' 這個欄位上色
+                idx = row.index.get_loc('▼成交價')
                 styles[idx] = f'color: {color}; font-weight: bold;'
             except:
-                pass # 如果收盤價是 "-" 無法轉換，就保持原色不變
+                pass 
             return styles
             
-        # apply 是針對「整行(Row)」做處理的進階寫法
         styled_df = display_df.style.apply(highlight_block_row, axis=1)
         
         st.dataframe(styled_df, use_container_width=True, hide_index=True)
