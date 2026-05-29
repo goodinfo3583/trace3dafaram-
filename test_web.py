@@ -708,18 +708,20 @@ if search_query:
     pool_df = st.session_state.get('top_pool_df', pd.DataFrame())
     target_score = None
     current_stock_id = "" # 預先準備好一個空變數來裝股票代號
-    
+    delta_val = 0.0       # 👈 新增變數：預設 Delta 為 0.0
+
     if not pool_df.empty:
         match = robust_search_engine(pool_df, search_query)
         if not match.empty:
             target_score = match.iloc[0].get('總分', 0)
-            # 💡 聰明抓取：直接從榜單結果中抽出純代號，解決名稱搜尋的問題
             current_stock_id = str(match.iloc[0].get('股票代號', '')).strip()
-    
+            # 💡 聰明抓取：直接從榜單結果中抽出 Delta 分數，不需再呼叫額外函數！
+            delta_val = match.iloc[0].get('Delta (日變動)', 0.0) 
+
     # 🔥 搜尋區塊新增：Delta 分數與進階指標
     if target_score is not None and current_stock_id != "":
-        # 把剛抓到的 current_stock_id 餵給 Delta 計算機
-        delta = get_delta_score(current_stock_id, target_score)
+        # 直接使用剛剛從表裡抓到的數值
+        delta = delta_val 
         
         # 配合台股習慣：正數紅色(轉強)，負數綠色(轉弱)
         delta_color = "#FF4B4B" if delta > 0 else "#00CC66" if delta < 0 else "#E2E8F0"
