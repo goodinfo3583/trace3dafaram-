@@ -69,39 +69,70 @@ def get_continuous_institutional_data(stock_id, days=20):
     return pd.DataFrame()
 
 # ==========================================
-# 2. Delta 分數與歷史存檔工具函數
+# 2. Delta 分數與歷史存檔工具函數 (終極時空校正版)
 # ==========================================
+import pytz
+import datetime
+import glob
+import os
+import pandas as pd
+import re
 
-# ==========================================
-# 2. Delta 分數與歷史存檔工具函數
-# ==========================================
+tw_tz = pytz.timezone('Asia/Taipei')
+
+def get_data_date():
+    """🎯 核心升級：不看時鐘，直接從您的資料夾自動抓取最新的『資料日期』"""
+    files = glob.glob(os.path.join(DATA_DIR, "*.*"))
+    dates = []
+    for f in files:
+        # 從所有檔名中找出 8 位數的日期格式
+        match = re.search(r'\d{8}', os.path.basename(f))
+        if match:
+            dates.append(match.group(0))
+    
+    if dates:
+        dates.sort()
+        return dates[-1] # 回傳資料夾中最新的一天 (例如 20260528)
+    
+    return datetime.datetime.now(tw_tz).strftime("%Y%m%d") # 備用方案
+
 def save_daily_score(df):
-    """將今日總分存入 CSV"""
-    today_str = datetime.datetime.now().strftime("%Y%m%d")
-    filepath = os.path.join(SCORE_HISTORY_DIR, f"scores_{today_str}.csv")
+    """將今日總分存入對應『資料日期』的 CSV"""
+    data_date = get_data_date()
+    filepath = os.path.join(SCORE_HISTORY_DIR, f"scores_{data_date}.csv")
     df[['股票代號', '總分']].to_csv(filepath, index=False)
 
-def get_delta_score(sid, current_score):
-    """計算與昨日分數的 Delta"""
-    history_files = sorted(glob.glob(os.path.join(SCORE_HISTORY_DIR, "scores_*.csv")), reverse=True)
-    if len(history_files) < 2: return 0.0 # 沒有歷史紀錄則為 0
-    
+def calculate_delta(current_df):
+    """計算與前一個『資料交易日』的總分落差"""
+    data_date = get_data_date()
+    history_files = glob.glob(os.path.join(SCORE_HISTORY_DIR, "scores_*.csv"))
+
+    # 🔥 關鍵修正：排除『這批資料日期』的歷史檔，強迫往前找一天 (例如排除0528，找到0527)
+    past_files = [f for f in history_files if not f.endswith(f"{data_date}.csv")]
+
+    if not past_files:
+        current_df['Delta (日變動)'] = 0.0
+        return current_df
+
+    # 找出真正的「前一個交易日」
+    past_files.sort()
+    latest_past_file = past_files[-1]
+
     try:
-        # 讀取上一筆 (歷史第二新的檔案，最新的那份是今天剛存的)
-        prev_df = pd.read_csv(history_files[1])
-        prev_score = prev_df.loc[prev_df['股票代號'] == str(sid), '總分']
+        past_df = pd.read_csv(latest_past_file)
+        past_df['股票代號'] = past_df['股票代號'].astype(str)
+        current_df['股票代號'] = current_df['股票代號'].astype(str)
+
+        merged = current_df.merge(past_df[['股票代號', '總分']], on='股票代號', how='left', suffixes=('', '_yesterday'))
+        merged['總分_yesterday'] = merged['總分_yesterday'].fillna(merged['總分'])
+        merged['Delta (日變動)'] = (merged['總分'] - merged['總分_yesterday']).round(2)
         
-        if not prev_score.empty:
-            return round(current_score - prev_score.iloc[0], 2)
-    except Exception:
-        return 0.0
-    return 0.0
+        merged.drop(columns=['總分_yesterday'], inplace=True)
+        return merged
 
-def extract_date_from_name(filepath):
-    filename = os.path.basename(filepath)
-    date_match = re.search(r'(\d+)', filename)
-    return date_match.group(1) if date_match else "00000000"
-
+    except Exception as e:
+        current_df['Delta (日變動)'] = 0.0
+        return current_df
 # ==========================================
 # 3. 頁面開頭訊息
 # ==========================================
