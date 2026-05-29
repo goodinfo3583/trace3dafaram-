@@ -137,67 +137,7 @@ def fetch_block_trades():
         return pd.DataFrame()
 
 
-# ==========================================
-# 🧪 暫時測試區塊：鉅額交易 (BFIAUU) 直連除錯面板 (取代原本的主畫面 UI)
-# ==========================================
-st.write("---")
-st.markdown("<h3 style='color:#FF4B4B;'>🧪 實驗室：鉅額交易 API 連線測試 (全資料突破版)</h3>", unsafe_allow_html=True)
 
-# 讓您可以手動輸入日期來測試
-test_date_block = st.text_input("請輸入測試日期 (格式: YYYYMMDD，例如 20260529):", value="20260529", key="block_date")
-
-if st.button("🚀 開始測試鉅額交易 API"):
-    headers = {
-        "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36",
-        "Accept": "application/json, text/javascript, */*; q=0.01"
-    }
-    
-    # 🎯 加上 selectType=ALL 確保抓取所有分類 (單一證券與股票組合)，並帶上日期
-    test_url = f"https://www.twse.com.tw/rwd/zh/block/BFIAUU?response=json&date={test_date_block}&selectType=ALL"
-    st.info(f"連線網址: `{test_url}`")
-    
-    try:
-        res = requests.get(test_url, headers=headers, timeout=10)
-        st.write(f"🌐 狀態碼: `{res.status_code}`")
-        
-        if res.status_code == 200:
-            json_data = res.json()
-            st.write(f"📋 狀態 (Stat): `{json_data.get('stat')}`")
-            
-            if json_data.get('stat') == 'OK':
-                # 抓出欄位與資料
-                cols = json_data.get('fields', [])
-                rows = json_data.get('data', [])
-                st.success(f"🎉 成功抓取！後台確實是一次給全部資料，共抓到 {len(rows)} 筆大戶交易 (已突破 10 筆限制)！")
-                
-                # 建立原始表格並印出
-                df = pd.DataFrame(rows, columns=cols)
-                with st.expander("📄 點此查看證交所回傳的【原始全量表格】"):
-                    st.dataframe(df, use_container_width=True, hide_index=True)
-                
-                # 順便測試金額轉換與大戶砸錢排行榜
-                st.write("---")
-                st.write("🔧 **正在測試轉換為『百萬元』與排行榜邏輯...**")
-                try:
-                    df['成交股數_數值'] = df['成交股數'].astype(str).str.replace(',', '').astype(float)
-                    df['成交金額_數值'] = df['成交金額'].astype(str).str.replace(',', '').astype(float)
-                    df['成交量(張)'] = (df['成交股數_數值'] / 1000).round(1)
-                    df['成交總額(百萬)'] = (df['成交金額_數值'] / 1000000).round(2)
-                    
-                    df_sorted = df.sort_values(by='成交金額_數值', ascending=False)
-                    st.success("✅ 數值轉換與排序測試成功！今日大戶砸錢排行榜如下：")
-                    
-                    st.dataframe(df_sorted[['證券代號', '證券名稱', '成交單價', '成交量(張)', '成交總額(百萬)']], use_container_width=True, hide_index=True)
-                except Exception as parse_e:
-                    st.error(f"⚠️ 解析數值時發生錯誤: {str(parse_e)}")
-                    st.write("這代表欄位名稱可能與我們預期的不同，請打開上方的原始表格核對欄位名稱！")
-            else:
-                st.warning("⚠️ 查無資料。證交所回傳：可能為假日、尚未更新，或是輸入日期錯誤。")
-                st.json(json_data)
-        else:
-            st.error("❌ 連線被拒絕。")
-    except Exception as e:
-        st.error(f"💥 錯誤: {str(e)}")
 # ==========================================
 # 🌌 網頁格式顏色搭配注入極致黑看盤軟體專屬風格樣式 (全站深色化 + 表格與按鈕優化)
 # ==========================================
@@ -2788,6 +2728,49 @@ with top_pool_container:
                     )
                 }
             )
+
+# ==========================================
+# 🐋 區塊 6：盤後鉅額交易總表 (大戶暗盤雷達)
+# ==========================================
+st.write("---")
+st.markdown("<div id='section-6'></div>", unsafe_allow_html=True)
+st.subheader("🐋 區塊 6：暗盤雷達 (今日盤後鉅額交易總表)")
+st.write("💡 *鉅額交易為大戶私下換手之籌碼。成交價格往往成為關鍵的「支撐/壓力」防守線。*")
+
+# 呼叫已經寫好的爬蟲引擎 (從全域共用區塊呼叫)
+block_df = fetch_block_trades()
+
+if not block_df.empty:
+    try:
+        # 清洗數字字串
+        block_df['成交股數_數值'] = block_df['成交股數'].astype(str).str.replace(',', '').astype(float)
+        block_df['成交金額_數值'] = block_df['成交金額'].astype(str).str.replace(',', '').astype(float)
+        
+        # 單位換算
+        block_df['成交量(張)'] = (block_df['成交股數_數值'] / 1000).round(1)
+        block_df['成交總額(百萬)'] = (block_df['成交金額_數值'] / 1000000).round(2)
+        
+        # 🔥 修正處：將 '成交單價' 改為證交所實際的 '成交價格'
+        # 為了排版好看，我們也可以新增一個乾淨的單價欄位
+        block_df['成交價格(元)'] = block_df['成交價格'].astype(str).str.replace(',', '').astype(float)
+        
+        # 依照砸錢總額由大到小排序
+        block_df = block_df.sort_values(by='成交金額_數值', ascending=False)
+        
+        # 決定要顯示在畫面上的精華欄位
+        display_cols = ['證券代號', '證券名稱', '成交價格(元)', '成交量(張)', '成交總額(百萬)']
+        display_df = block_df[display_cols]
+        
+        st.success(f"🎯 成功攔截！今日共偵測到 {len(display_df)} 筆大戶暗盤換手紀錄 (已依成交總額排序)。")
+        
+        # 使用 Streamlit 內建 dataframe 呈現，支援欄位點擊排序與下載
+        st.dataframe(display_df, use_container_width=True, hide_index=True)
+
+    except Exception as e:
+        st.warning(f"⚠️ 資料解析發生錯誤: {str(e)}。顯示證交所原始回傳數據：")
+        st.dataframe(block_df, use_container_width=True, hide_index=True)
+else:
+    st.info("🕒 目前查無今日鉅額交易資料，或證交所尚未結算公告 (通常於盤後 17:00 後更新)。")
 # ==========================================
 # 📊 【蜂蜜計數器】本站累計觀測人次統計
 # ==========================================
