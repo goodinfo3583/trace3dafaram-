@@ -19,64 +19,7 @@ SCORE_HISTORY_DIR = os.path.join(DATA_DIR, "ScoreHistory")
 
 if not os.path.exists(SCORE_HISTORY_DIR):
     os.makedirs(SCORE_HISTORY_DIR)
-#==========================================
-# 🧪 暫時測試區塊：大盤籌碼連線直讀除錯面板
-# ==========================================
-st.write("---")
-st.markdown("<h3 style='color:#FF4B4B;'>🧪 實驗室：證交所大盤籌碼 API 連線測試</h3>", unsafe_allow_html=True)
 
-import requests
-import datetime
-import pandas as pd
-
-# 1. 智慧取得要查詢的日期格式 (證交所 API 必須指定精確日期，例如 20260529)
-# 預設抓今天，若週末沒資料，我們可以手動在網頁上輸入日期測試
-test_date_str = st.text_input("請輸入測試日期 (格式: YYYYMMDD，例如 20260529):", value="20260529")
-
-if st.button("🚀 開始測試直連證交所 API"):
-    # 建立標準瀏覽器偽裝標頭 (User-Agent)
-    headers = {
-        "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36",
-        "Accept": "application/json, text/javascript, */*; q=0.01",
-        "Accept-Language": "zh-TW,zh;q=0.9,en-US;q=0.8,en;q=0.7"
-    }
-    
-    # 帶有精確日期的證交所 RWD 隱藏版 JSON 節點
-    test_url = f"https://www.twse.com.tw/rwd/zh/fund/BFI82U?response=json&date={test_date_str}"
-    
-    st.info(f"正在嘗試連線網址: `{test_url}`")
-    
-    try:
-        res = requests.get(test_url, headers=headers, timeout=10)
-        
-        # 顯示網路狀態碼 (200 代表連線成功，403 代表被證交所機房防火牆封鎖)
-        st.write(f"🌐 網路連線狀態碼 (Status Code): `{res.status_code}`")
-        
-        if res.status_code == 200:
-            json_data = res.json()
-            st.write(f"📋 證交所回應狀態 (Stat): `{json_data.get('stat')}`")
-            
-            if json_data.get('stat') == 'OK':
-                st.success("🎉 恭喜！網頁直連擷取資料成功！")
-                
-                # 解析成表格
-                cols = json_data['fields']
-                rows = json_data['data']
-                test_df = pd.DataFrame(rows, columns=cols)
-                
-                # 直接在網頁頂端秀出表格
-                st.dataframe(test_df, use_container_width=True, hide_index=True)
-            else:
-                st.warning("⚠️ 連線成功，但證交所回傳：該日期查無資料（可能為假日或尚未開盤）。")
-                st.write("🔽 證交所回傳的原始 JSON 內容：")
-                st.json(json_data)
-        else:
-            st.error(f"❌ 連線失敗！伺服器拒絕連線。這通常代表 Streamlit 雲端主機的 IP 被證交所封鎖了。")
-            
-    except Exception as e:
-        st.error(f"💥 程式執行發生嚴重錯誤: {str(e)}")
-
-st.write("---")
 
 #======測試爬蟲=====
 # ==========================================
