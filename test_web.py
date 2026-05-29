@@ -2434,46 +2434,42 @@ else:
     else:
         st.error("無法合併資料。")
 # ==========================================
-# 🐋 區塊 6：盤後鉅額交易總表 (大戶暗盤雷達)
+# 🐋 區塊 6：盤後鉅額交易總表 (大戶暗盤雷達 - 自動容錯版)
 # ==========================================
 st.write("---")
 st.markdown("<div id='section-6'></div>", unsafe_allow_html=True)
 st.subheader("🐋 區塊 6：暗盤雷達 (今日盤後鉅額交易總表)")
-st.write("💡 *鉅額交易為大戶私下換手之籌碼。成交價格往往成為關鍵的「支撐/壓力」防守線。*")
 
-# 呼叫已經寫好的爬蟲引擎 (從全域共用區塊呼叫)
 block_df = fetch_block_trades()
 
 if not block_df.empty:
     try:
-        # 清洗數字字串
+        # 自動識別哪個欄位是成交價 (可能是 '成交價格' 或 '成交單價')
+        price_col = '成交價格' if '成交價格' in block_df.columns else '成交單價'
+        
+        # 清洗數字 (防止包含逗號)
         block_df['成交股數_數值'] = block_df['成交股數'].astype(str).str.replace(',', '').astype(float)
         block_df['成交金額_數值'] = block_df['成交金額'].astype(str).str.replace(',', '').astype(float)
+        block_df['成交價格(元)'] = block_df[price_col].astype(str).str.replace(',', '').astype(float)
         
         # 單位換算
         block_df['成交量(張)'] = (block_df['成交股數_數值'] / 1000).round(1)
         block_df['成交總額(百萬)'] = (block_df['成交金額_數值'] / 1000000).round(2)
         
-        # 將 '成交單價' 改為證交所實際的 '成交價格'
-        block_df['成交價格(元)'] = block_df['成交價格'].astype(str).str.replace(',', '').astype(float)
-        
-        # 依照砸錢總額由大到小排序
+        # 排序與顯示
         block_df = block_df.sort_values(by='成交金額_數值', ascending=False)
+        display_df = block_df[['證券代號', '證券名稱', '成交價格(元)', '成交量(張)', '成交總額(百萬)']]
         
-        # 決定要顯示在畫面上的精華欄位
-        display_cols = ['證券代號', '證券名稱', '成交價格(元)', '成交量(張)', '成交總額(百萬)']
-        display_df = block_df[display_cols]
-        
-        st.success(f"🎯 成功攔截！今日共偵測到 {len(display_df)} 筆大戶暗盤換手紀錄 (已依成交總額排序)。")
-        
-        # 使用 Streamlit 內建 dataframe 呈現，支援欄位點擊排序與下載
+        st.success(f"🎯 成功攔截 {len(display_df)} 筆大戶暗盤換手紀錄。")
         st.dataframe(display_df, use_container_width=True, hide_index=True)
 
     except Exception as e:
-        st.warning(f"⚠️ 資料解析發生錯誤: {str(e)}。顯示證交所原始回傳數據：")
+        st.warning(f"⚠️ 解析欄位時發現變更，顯示原始數據: {str(e)}")
         st.dataframe(block_df, use_container_width=True, hide_index=True)
 else:
-    st.info("🕒 目前查無今日鉅額交易資料，或證交所尚未結算公告 (通常於盤後 17:00 後更新)。")
+    st.info("🕒 目前查無今日鉅額交易資料，或證交所尚未更新。")
+
+# ==========================================以上網頁核心區塊 
 # ==========================================
 # 🏆 頂級選股池核心引擎 (精確量化權重 + 欄位美化版)
 # ==========================================
@@ -2746,8 +2742,11 @@ with top_pool_container:
             # ==========================================
             # 💾 3. 存檔與最終 UI 唯一顯示 (含懸浮視窗魔法)
             # ==========================================
-            # 掃描完成後，自動存檔 (含最新的總分，供明天相減使用)
-            save_daily_score(res_df)
+            # 使用更安全的存檔機制，檢查 res_df 是否真的存在
+            if 'res_df' in locals() and res_df is not None and not res_df.empty:
+                save_daily_score(res_df)
+            elif 'top_pool_df' in st.session_state and not st.session_state['top_pool_df'].empty:
+                save_daily_score(st.session_state['top_pool_df'])
 
             # 將結果存入記憶體供下方搜尋區塊使用
             st.session_state['top_pool_df'] = res_df
@@ -2755,7 +2754,7 @@ with top_pool_container:
             # 🔥 這裡才是「唯一一次」印出訊息與表格的地方！
             st.success(f"選股池掃描完成！共過濾出 {len(res_df)} 檔潛力標的。")
             
-            # 使用 column_config 開啟「評分明細」的 Tooltip 懸浮功能，並限制寬度避免佔用太多版面
+            # 使用 column_config 開啟「評分明細」的 Tooltip 懸浮功能
             st.dataframe(
                 res_df, 
                 use_container_width=True, 
@@ -2765,6 +2764,9 @@ with top_pool_container:
                         "評分明細",
                         help="滑鼠游標停留在這裡，查看完整加扣分明細",
                         max_chars=12, # 欄位平常只顯示前幾個字，保持版面乾淨
+                    )
+                }
+            )
                     )
                 }
             )
