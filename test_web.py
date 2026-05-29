@@ -2740,7 +2740,7 @@ with top_pool_container:
             # 💾 3. 存檔與最終 UI 唯一顯示 (含懸浮視窗魔法)
             # ==========================================
             # 掃描完成後，自動存檔 (含最新的總分，供明天相減使用)
-            save_daily_score(res_df)
+            #save_daily_score(res_df)
 
             # 將結果存入記憶體供下方搜尋區塊使用
             st.session_state['top_pool_df'] = res_df
