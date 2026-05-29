@@ -583,9 +583,22 @@ def render_technical_chart(stock_id, timeframe="日線", selected_mas=[], show_r
             for r in range(1, rows + 1):
                 fig.update_xaxes(range=zoom_range, row=r, col=1)
         
+        # ==========================================
+        # 🔥 升級 5：動態填補 K 線圖破洞 (精準剃除所有週末與國定假日)
+        # ==========================================
         if timeframe == "日線":
+            # 1. 產生從第一天到最後一天的「完整日曆天」
+            all_days = pd.date_range(start=daily_df.index.min().normalize(), end=daily_df.index.max().normalize(), freq='D')
+            
+            # 2. 抓出這檔股票「實際有開盤交易的日子」
+            actual_days = daily_df.index.normalize()
+            
+            # 3. 兩者相減，自動抓出所有「沒開盤的日子」(包含六日、國定假日、颱風假)
+            missing_days = all_days.difference(actual_days).strftime('%Y-%m-%d').tolist()
+
             for r in range(1, rows + 1):
-                fig.update_xaxes(rangebreaks=[dict(bounds=["sat", "mon"])], row=r, col=1)
+                # 將原本死板的 bounds，改成精準隱藏 missing_days
+                fig.update_xaxes(rangebreaks=[dict(values=missing_days)], row=r, col=1)
         
         plotly_config = {
             'scrollZoom': True,
