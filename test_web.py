@@ -5,7 +5,8 @@ import os
 import glob
 import re
 import datetime
-import requests  # 👈 我們的救星，用來取代 FinMind 套件！
+import requests  
+import pytz  
 
 # ==========================================
 # 1. 網頁基本設定 & 目錄路徑初始化
@@ -19,6 +20,30 @@ SCORE_HISTORY_DIR = os.path.join(DATA_DIR, "ScoreHistory")
 if not os.path.exists(SCORE_HISTORY_DIR):
     os.makedirs(SCORE_HISTORY_DIR)
 
+# ==========================================
+# 🧰 全站共用核心工具箱 (剛剛不小心消失的救命工具)
+# ==========================================
+def extract_date_from_name(filename):
+    """從檔名中萃取出 8 碼日期，供全站各區塊排序使用"""
+    match = re.search(r'\d{8}', os.path.basename(filename))
+    return match.group(0) if match else "00000000"
+
+def robust_read_csv(file_path):
+    """強硬讀取法：解決各種中文編碼亂碼問題"""
+    for encoding in ['cp950', 'utf-8-sig', 'utf-8']:
+        try:
+            df = pd.read_csv(file_path, encoding=encoding)
+            if not df.empty and len(df.columns) > 1 and '撖' in str(df.iloc[0, 1]): 
+                continue
+            return df
+        except:
+            continue
+    return pd.read_csv(file_path, encoding='cp950', errors='ignore')
+
+# ==========================================
+# 📡 免安裝 API 籌碼連續抓取引擎 (直接連線版)
+# ==========================================
+# ...(您原本下面的程式碼繼續保留)...
 # ==========================================
 # 📡 免安裝 API 籌碼連續抓取引擎 (直接連線版)
 # ==========================================
