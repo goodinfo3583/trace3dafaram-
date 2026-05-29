@@ -960,109 +960,119 @@ if search_query:
 
     
 # ==========================================
-# 🧭 側邊欄導航 (無感互動+視覺特效版)
+# 🧭 側邊欄導航 (API 即時連線 + 視覺特效版)
 # ==========================================
 
 # ------------------------------------------
-# 1. 大盤籌碼導航總覽引擎 (頂部專屬卡片)
+# 1. 大盤籌碼導航總覽引擎 (API 即時連線版)
 # ------------------------------------------
 def render_sidebar_market_summary():
-    """自動讀取大盤籌碼，渲染高級資訊卡片"""
-    import os
-    import glob
+    """自動連線證交所 API，渲染高級資訊卡片 (三大法人 + 鉅額大戶)"""
+    import datetime
     import pandas as pd
-    
-    market_pattern = os.path.join(DATA_DIR, "*三大法人現貨期權*.csv")
-    market_files = glob.glob(market_pattern)
-    
-    st.sidebar.markdown("<h2 style='margin-top: 0; margin-bottom: 5px;'>📊 大盤籌碼總覽</h2>", unsafe_allow_html=True)
-    
-    if market_files:
-        try:
-            market_files.sort(reverse=True)
-            latest_market_file = market_files[0]
-            m_date = extract_date_from_name(latest_market_file)
+    import streamlit as st
+
+    st.sidebar.markdown("<h2 style='margin-top: 0; margin-bottom: 5px;'>📊 大盤資金風向球</h2>", unsafe_allow_html=True)
+
+    # 1️⃣ 呼叫 API 抓取三大法人現貨明細
+    twse_title, twse_df = fetch_twse_institutional_data()
+
+    if twse_df is not None and not twse_df.empty:
+        # 判定時間狀態
+        now = datetime.datetime.now()
+        current_time = now.time()
+        
+        if current_time < datetime.time(14, 50):
+            status_badge = "⏳ <span style='color:#FFCC00;'>盤後結算中</span>"
+            date_str = "今日"
+        else:
+            status_badge = "🌕 <span style='color:#00D2FF;'>完整版</span>" if current_time >= datetime.time(19, 40) else "🟢 <span style='color:#00CC66;'>初版</span>"
+            date_str = twse_title.replace("三大法人買賣金額統計表", "").strip() or "今日結算"
+
+        def to_hundred_million(val_str):
+            try:
+                return float(str(val_str).replace(',', '')) / 100000000
+            except:
+                return 0.0
+
+        net_buy_foreign = 0.0
+        net_buy_trust = 0.0
+        net_buy_dealer = 0.0
+        net_buy_total = 0.0
+
+        # 精準加總
+        for index, row in twse_df.iterrows():
+            unit_name = str(row['單位名稱']).strip()
+            net_val = to_hundred_million(row['買賣差額'])
             
-            # 讀取大盤籌碼資料
-            m_df = pd.read_csv(latest_market_file, encoding='utf-8-sig')
-            
-            # (此處為模擬變數，實務上需對應您 CSV 內的真實欄位名稱)
-            foreign_spot = 125.4    
-            foreign_ratio = 32.5    
-            sitc_spot = 45.2        
-            dealer_spot = -12.8     
-            foreign_future = -2450  
-            
-            def get_cls(val): return '#FF4B4B' if val > 0 else '#00E272' if val < 0 else 'white'
-            def get_sign(val): return f"+{val}" if val > 0 else f"{val}"
-            
-            card_html = f"""
-            <div style='background-color: #1e293b; padding: 12px; border-radius: 8px; margin-bottom: 10px;'>
-                <div style='font-size: 13px; color: #00D2FF; margin-bottom: 8px;'>📅 數據結算日：{m_date}</div>
-                <table style='width:100%; border-collapse: collapse; font-size: 14px; color: white;'>
-                    <tr style='border-bottom: 1px solid #334155; font-weight: bold;'>
-                        <td style='padding: 4px 0;'>法人身份</td>
-                        <td style='padding: 4px 0; text-align: right;'>現貨金額</td>
-                        <td style='padding: 4px 0; text-align: right;'>期權部位</td>
-                    </tr>
-                    <tr>
-                        <td style='padding: 6px 0;'>🌐 外資</td>
-                        <td style='text-align: right; color: {get_cls(foreign_spot)};'>{get_sign(foreign_spot)}億<br><span style='font-size: 11px; color:#94a3b8;'>({foreign_ratio}%)</span></td>
-                        <td style='text-align: right; color: {get_cls(foreign_future)};'>{get_sign(foreign_future)}口</td>
-                    </tr>
-                    <tr>
-                        <td style='padding: 6px 0;'>🏦 投信</td>
-                        <td style='text-align: right; color: {get_cls(sitc_spot)};'>{get_sign(sitc_spot)}億</td>
-                        <td style='text-align: right; color: #64748b;'>--</td>
-                    </tr>
-                    <tr>
-                        <td style='padding: 6px 0;'>🏢 自營商</td>
-                        <td style='text-align: right; color: {get_cls(dealer_spot)};'>{get_sign(dealer_spot)}億</td>
-                        <td style='text-align: right; color: #64748b;'>--</td>
-                    </tr>
-                </table>
-            </div>
-            """
-            st.sidebar.markdown(card_html, unsafe_allow_html=True)
-        except Exception:
-            st.sidebar.warning("⚠️ 大盤籌碼 CSV 解析失敗。")
-    else:
-        # 防呆機制：若無檔案，顯示版面預覽 Mockup
-        m_date = "無檔案"
+            if unit_name in ['外資及陸資(不含外資自營商)', '外資自營商']:
+                net_buy_foreign += net_val
+            elif unit_name == '投信':
+                net_buy_trust += net_val
+            elif unit_name in ['自營商(自行買賣)', '自營商(避險)']:
+                net_buy_dealer += net_val
+            elif unit_name == '合計':
+                net_buy_total = net_val
+
+        def get_cls(val): return '#FF4B4B' if val > 0 else '#00CC66' if val < 0 else 'white'
+        def get_sign(val): return f"+{val:.1f}" if val > 0 else f"{val:.1f}"
+
         card_html = f"""
         <div style='background-color: #1e293b; padding: 12px; border-radius: 8px; margin-bottom: 10px;'>
-            <div style='font-size: 13px; color: #00D2FF; margin-bottom: 8px;'>📅 數據結算測試：{m_date}</div>
+            <div style='font-size: 13px; color: #00D2FF; margin-bottom: 8px;'>📅 {date_str} | {status_badge}</div>
             <table style='width:100%; border-collapse: collapse; font-size: 14px; color: white;'>
                 <tr style='border-bottom: 1px solid #334155; font-weight: bold;'>
                     <td style='padding: 4px 0;'>法人身份</td>
-                    <td style='padding: 4px 0; text-align: right;'>現貨金額</td>
-                    <td style='padding: 4px 0; text-align: right;'>期權部位</td>
+                    <td style='padding: 4px 0; text-align: right;'>現貨買賣差額</td>
                 </tr>
                 <tr>
                     <td style='padding: 6px 0;'>🌐 外資</td>
-                    <td style='text-align: right; color: #FF4B4B;'>+185.3 億<br><span style='font-size: 11px; color:#94a3b8;'>(34.2%)</span></td>
-                    <td style='text-align: right; color: #00E272;'>-3,420 口</td>
+                    <td style='text-align: right; color: {get_cls(net_buy_foreign)}; font-weight: bold;'>{get_sign(net_buy_foreign)} 億</td>
                 </tr>
                 <tr>
                     <td style='padding: 6px 0;'>🏦 投信</td>
-                    <td style='text-align: right; color: #FF4B4B;'>+32.1 億</td>
-                    <td style='text-align: right; color: #64748b;'>--</td>
+                    <td style='text-align: right; color: {get_cls(net_buy_trust)}; font-weight: bold;'>{get_sign(net_buy_trust)} 億</td>
                 </tr>
                 <tr>
                     <td style='padding: 6px 0;'>🏢 自營商</td>
-                    <td style='text-align: right; color: #00E272;'>-14.6 億</td>
-                    <td style='text-align: right; color: #64748b;'>--</td>
+                    <td style='text-align: right; color: {get_cls(net_buy_dealer)}; font-weight: bold;'>{get_sign(net_buy_dealer)} 億</td>
+                </tr>
+                <tr style='border-top: 1px dashed #334155;'>
+                    <td style='padding: 6px 0; color: #FFD700; font-weight: bold;'>🔥 合計</td>
+                    <td style='text-align: right; color: {get_cls(net_buy_total)}; font-weight: bold;'>{get_sign(net_buy_total)} 億</td>
                 </tr>
             </table>
         </div>
         """
         st.sidebar.markdown(card_html, unsafe_allow_html=True)
+    else:
+        st.sidebar.info("🕒 目前查無今日三大法人買賣資料。")
+
+    # 2️⃣ 呼叫 API 抓取鉅額交易 (Top 5 排行榜)
+    st.sidebar.markdown("<h4 style='color:#FF9900; margin-top: 15px; margin-bottom: 5px;'>🐋 大戶暗盤 (金額 Top 5)</h4>", unsafe_allow_html=True)
+    
+    block_df = fetch_block_trades()
+    
+    if not block_df.empty:
+        try:
+            block_df['成交金額_數值'] = block_df['成交金額'].astype(str).str.replace(',', '').astype(float)
+            block_df['總額(百萬)'] = (block_df['成交金額_數值'] / 1000000).round(1)
+            
+            top5_block = block_df.sort_values(by='成交金額_數值', ascending=False).head(5)
+            
+            # 🔥 這裡已經修正為「成交價格」
+            display_cols = ['證券名稱', '成交價格', '總額(百萬)']
+            st.sidebar.dataframe(top5_block[display_cols], use_container_width=True, hide_index=True)
+        except:
+            st.sidebar.warning("⚠️ 鉅額交易資料解析錯誤")
+    else:
+        st.sidebar.info("🕒 尚無鉅額交易資料")
 
 # 執行渲染側邊欄大盤卡片
 render_sidebar_market_summary()
 
 # ------------------------------------------
-# 2. 大盤總體經濟指標 (您原本的按鈕區)
+# 2. 大盤總體經濟指標
 # ------------------------------------------
 st.sidebar.markdown("---")
 st.sidebar.subheader("📊 大盤總體經濟指標")
@@ -1074,7 +1084,7 @@ with c_btn2:
     st.link_button("⚠️ VIX 指數", "https://www.wantgoo.com/global/vix", use_container_width=True)
 
 # ------------------------------------------
-# 3. 戰情室快速導航 (您原本的目錄區)
+# 3. 戰情室快速導航
 # ------------------------------------------
 st.sidebar.markdown("---")
 st.sidebar.header("📍 戰情室快速導航")
@@ -1090,6 +1100,7 @@ st.sidebar.markdown("[🔄 區塊4-1：融資減少動向](#section-4-1)")
 st.sidebar.markdown("[🔄 區塊4-2：借券賣出減少動向](#section-4-2)")
 st.sidebar.markdown("[🔄 區塊4-3：融券增加動向](#section-4-3)")
 st.sidebar.markdown("[💰 區塊5：大股東動向](#section-5)")
+st.sidebar.markdown("[🐋 區塊6：大戶暗盤雷達](#section-6)")  
 # ==========================================
 # 🏠 核心五大區塊
 # ==========================================
@@ -2708,6 +2719,14 @@ with top_pool_container:
             # ==========================================
             # 掃描完成後，自動存檔 (含最新的總分，供明天相減使用)
             save_daily_score(res_df)
+            # ==========================================
+            # 💾 系統結尾：安全儲存今日總分
+            # ==========================================
+            # 加入這個 if 判斷，確保就算今天沒有產生 res_df (總分表)，系統也不會當機崩潰
+            if 'res_df' in locals() and not res_df.empty:
+                save_daily_score(res_df)
+            elif 'top_pool_df' in st.session_state and not st.session_state['top_pool_df'].empty:
+                save_daily_score(st.session_state['top_pool_df'])
 
             # 將結果存入記憶體供下方搜尋區塊使用
             st.session_state['top_pool_df'] = res_df
