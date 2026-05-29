@@ -47,7 +47,7 @@ def get_stock_dictionary():
     """讀取證交所 ISIN 檔案，建立完美的『名稱 -> 代號』對照表"""
     mapping = {}
     # 尋找資料夾中的「證券辨識號碼一覽表」
-    dict_files = glob.glob(os.path.join(DATA_DIR, "*證券辨識號碼*.txt"))
+    dict_files = glob.glob(os.path.join(DATA_DIR, "*本國上市證券國際證券辨識號碼一覽表*.txt"))
     if not dict_files:
         return mapping
         
