@@ -41,12 +41,13 @@ def robust_read_csv(file_path):
     return pd.read_csv(file_path, encoding='cp950', errors='ignore')
 
 # ==========================================
-# 🛑 區塊 0：證券對照表實測與除錯面板 (代號/股票/產業別直讀)
+# 🛑 區塊 0：證券對照表實測與除錯面板 (編碼與暴力切割終極版)
 # ==========================================
 st.write("---")
 st.markdown("<h3 style='color:#00D2FF;'>🛑 區塊 0：證券對照表實測與除錯面板</h3>", unsafe_allow_html=True)
 
-# 智慧防呆：同時搜尋大寫、小寫資料夾與根目錄，徹底消滅 Linux 找不到檔案的問題
+import re # 引入正則表達式工具
+
 search_patterns = [
     os.path.join(DATA_DIR, "*辨識號碼*.txt"),
     os.path.join("./goodinfo_rankings", "*辨識號碼*.txt"),
@@ -56,65 +57,62 @@ dict_files = []
 for pattern in search_patterns:
     dict_files.extend(glob.glob(pattern))
 
-# 全域字典初始化
 STOCK_DICT = {}
 debug_parsed_list = []
+raw_lines_for_debug = [] # 拿來裝原始資料，萬一失敗可以印出來看
 
 if not dict_files:
-    st.error("❌ 【系統警報】在所有預期路徑都找不到包含『辨識號碼』的 TXT 檔案！請檢查 GitHub 上的資料夾名稱與檔名。")
+    st.error("❌ 【系統警報】在所有預期路徑都找不到包含『辨識號碼』的 TXT 檔案！")
 else:
     target_file = dict_files[0]
+    st.info(f"📁 成功定位檔案：`{target_file}`")
     
-    # 嘗試多種中文編碼讀取
-    lines = []
-    for encoding in ['cp950', 'utf-8', 'utf-16', 'utf-8-sig']:
+    # 🔥 升級 1：修正編碼陷阱！把 'utf-8-sig' 和 'utf-8' 放到最前面，並且「移除 errors='ignore'」，強迫它必須讀出真中文！
+    for encoding in ['utf-8-sig', 'utf-8', 'cp950', 'utf-16', 'big5']:
         try:
-            with open(target_file, 'r', encoding=encoding, errors='ignore') as f:
-                lines = f.readlines()
-            if len(lines) > 10:
-                break
+            with open(target_file, 'r', encoding=encoding) as f:
+                raw_lines_for_debug = f.readlines()
+            if len(raw_lines_for_debug) > 10:
+                break # 成功用正確編碼讀取就跳出迴圈
         except:
             continue
 
-    # 開始解析欄位
-    for line in lines:
-        parts = line.split('\t')
-        # 證交所格式：有價證券代號及名稱在第1欄，產業別在第5欄 (index 4)
+    # 開始解析
+    for line in raw_lines_for_debug:
+        # 支援 tab 或逗號分隔
+        parts = line.split('\t') if '\t' in line else line.split(',')
+        
         if len(parts) >= 5:
             name_part = parts[0].strip()
             industry = parts[4].strip()
             
-            # 把討厭的全形空白替換成半形空白，方便切開代號與名稱
-            clean_name = name_part.replace('　', ' ')
-            tokens = clean_name.split()
+            # 🔥 升級 2：正則表達式終極暴力切割 (消滅所有全形空白、不換行空白、神秘隱形字元)
+            clean_name = re.sub(r'[\s　]+', ' ', name_part).strip()
+            tokens = clean_name.split(' ')
             
             if len(tokens) >= 2:
                 sid = tokens[0].strip()
                 sname = tokens[1].strip()
                 
-                # 嚴格過濾：代號必須是數字（這樣就能自動跳過前6行的文字標頭與非股票資料）
+                # 確保代號是純數字
                 if sid.isdigit():
-                    # 存入全域字典，供下方的快搜和 K 線圖調用
                     STOCK_DICT[sname] = {"id": sid, "name": sname, "industry": industry}
                     STOCK_DICT[sid] = {"id": sid, "name": sname, "industry": industry}
-                    
-                    # 存入區塊 0 顯示用的清單
                     debug_parsed_list.append({
-                        "代號": sid,
-                        "股票": sname,
-                        "產業別": industry
+                        "代號": sid, "股票": sname, "產業別": industry
                     })
 
-    # 將結果呈現在網頁最頂端
     if debug_parsed_list:
         block0_df = pd.DataFrame(debug_parsed_list)
         st.success(f"🔍 成功對接對照表！共成功解析出 {len(block0_df)} 檔上市證券標的。")
-        
-        # 唯美摺疊面板，預設展開讓您看個夠，不要看時可以收起來
         with st.expander("📊 點此查看【區塊 0】官方代號與產業別對照資料表 (前 50 筆範例)", expanded=True):
             st.dataframe(block0_df.head(50), use_container_width=True, hide_index=True)
     else:
-        st.warning("⚠️ 找到了 TXT 檔案，但程式切開欄位後發現規格不符，未能成功擷取任何股票。")
+        st.warning("⚠️ 找到了 TXT 檔案，但未能成功擷取任何股票。這通常是『編碼變成亂碼』或『分隔符號不是 Tab』的問題。")
+        
+        # 🔥 升級 3：透視眼除錯面板！把系統讀到的前 15 行印出來
+        st.write("🕵️‍♂️ **【除錯模式】以下是系統眼中看到的檔案內容 (前 15 行)，請確認是不是變成亂碼了？**")
+        st.code("".join(raw_lines_for_debug[:15]), language="text")
 
 
         
