@@ -699,7 +699,7 @@ def scan_and_display(title, session_key, query):
 # ==========================================
 # 🎯 搜尋輸入框
 # ==========================================
-search_query = st.text_input("請輸入想觀測的股票代號或名稱 (例如: 3231 或 緯創，未顯示任何資料代表你的標的可能太弱了)：", key="global_search_final")
+search_query = st.text_input("請輸入想觀測的股票代號或名稱 (例如: 3231 或 緯創，未顯示任何資料代表你的標的可能法人持股未達一定比例)：", key="global_search_final")
 
 if search_query:
     st.write(f"### 🎯 綜合診斷標的：{search_query}")
