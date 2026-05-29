@@ -19,12 +19,64 @@ SCORE_HISTORY_DIR = os.path.join(DATA_DIR, "ScoreHistory")
 
 if not os.path.exists(SCORE_HISTORY_DIR):
     os.makedirs(SCORE_HISTORY_DIR)
+#==========================================
+# 🧪 暫時測試區塊：大盤籌碼連線直讀除錯面板
+# ==========================================
+st.write("---")
+st.markdown("<h3 style='color:#FF4B4B;'>🧪 實驗室：證交所大盤籌碼 API 連線測試</h3>", unsafe_allow_html=True)
 
-#======測試爬蟲=====
+import requests
+import datetime
+import pandas as pd
 
+# 1. 智慧取得要查詢的日期格式 (證交所 API 必須指定精確日期，例如 20260529)
+# 預設抓今天，若週末沒資料，我們可以手動在網頁上輸入日期測試
+test_date_str = st.text_input("請輸入測試日期 (格式: YYYYMMDD，例如 20260529):", value="20260529")
 
+if st.button("🚀 開始測試直連證交所 API"):
+    # 建立標準瀏覽器偽裝標頭 (User-Agent)
+    headers = {
+        "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36",
+        "Accept": "application/json, text/javascript, */*; q=0.01",
+        "Accept-Language": "zh-TW,zh;q=0.9,en-US;q=0.8,en;q=0.7"
+    }
+    
+    # 帶有精確日期的證交所 RWD 隱藏版 JSON 節點
+    test_url = f"https://www.twse.com.tw/rwd/zh/fund/BFI82U?response=json&date={test_date_str}"
+    
+    st.info(f"正在嘗試連線網址: `{test_url}`")
+    
+    try:
+        res = requests.get(test_url, headers=headers, timeout=10)
+        
+        # 顯示網路狀態碼 (200 代表連線成功，403 代表被證交所機房防火牆封鎖)
+        st.write(f"🌐 網路連線狀態碼 (Status Code): `{res.status_code}`")
+        
+        if res.status_code == 200:
+            json_data = res.json()
+            st.write(f"📋 證交所回應狀態 (Stat): `{json_data.get('stat')}`")
+            
+            if json_data.get('stat') == 'OK':
+                st.success("🎉 恭喜！網頁直連擷取資料成功！")
+                
+                # 解析成表格
+                cols = json_data['fields']
+                rows = json_data['data']
+                test_df = pd.DataFrame(rows, columns=cols)
+                
+                # 直接在網頁頂端秀出表格
+                st.dataframe(test_df, use_container_width=True, hide_index=True)
+            else:
+                st.warning("⚠️ 連線成功，但證交所回傳：該日期查無資料（可能為假日或尚未開盤）。")
+                st.write("🔽 證交所回傳的原始 JSON 內容：")
+                st.json(json_data)
+        else:
+            st.error(f"❌ 連線失敗！伺服器拒絕連線。這通常代表 Streamlit 雲端主機的 IP 被證交所封鎖了。")
+            
+    except Exception as e:
+        st.error(f"💥 程式執行發生嚴重錯誤: {str(e)}")
 
-
+st.write("---")
 
 #======測試爬蟲=====
 # ==========================================
@@ -105,6 +157,120 @@ STOCK_DICT = get_stock_dictionary()
 # ==========================================
 #以上原始區塊0
 # ==========================================
+# ==========================================
+# 📡 證交所 API 直連：大盤資金與大戶動向戰情板
+# ==========================================
+import requests
+import datetime
+
+@st.cache_data(ttl=600)
+def fetch_twse_institutional_data():
+    """自動連線證交所抓取今日三大法人買賣超 (BFI82U)"""
+    url = "https://www.twse.com.tw/rwd/zh/fund/BFI82U?response=json"
+    headers = {"User-Agent": "Mozilla/5.0"}
+    try:
+        res = requests.get(url, headers=headers, timeout=5)
+        data = res.json()
+        if data.get('stat') == 'OK':
+            return data.get('title', '三大法人買賣金額統計表'), pd.DataFrame(data['data'], columns=data['fields'])
+        return None, None
+    except:
+        return None, None
+
+@st.cache_data(ttl=600)
+def fetch_block_trades():
+    """抓取證交所每日鉅額交易明細 (BFIAUU)"""
+    url = "https://www.twse.com.tw/rwd/zh/block/BFIAUU?response=json"
+    headers = {"User-Agent": "Mozilla/5.0"}
+    try:
+        res = requests.get(url, headers=headers, timeout=5)
+        data = res.json()
+        if data.get('stat') == 'OK':
+            return pd.DataFrame(data['data'], columns=data['fields'])
+        return pd.DataFrame()
+    except:
+        return pd.DataFrame()
+
+# 🚀 建立大盤資金戰情面板 UI
+st.write("---")
+st.markdown("<h3 style='color:#00D2FF;'>🏦 盤後資金風向球：大盤籌碼與大戶暗盤雷達</h3>", unsafe_allow_html=True)
+
+# 建立兩個分頁 (Tab)，讓畫面乾淨俐落
+tab_inst, tab_block = st.tabs(["📊 三大法人買賣超統計", "🐋 鉅額交易(大戶暗盤)追蹤"])
+
+# ==========================================
+# [分頁 1] 三大法人買賣超
+# ==========================================
+with tab_inst:
+    twse_title, twse_df = fetch_twse_institutional_data()
+    
+    if twse_df is not None and not twse_df.empty:
+        now = datetime.datetime.now()
+        current_time = now.time()
+        
+        status_badge = "🌕 <span style='color:#00D2FF;'>完整版數據 (含鉅額交易結算)</span>" if current_time >= datetime.time(19, 40) else "🟢 <span style='color:#00CC66;'>初版數據 (不含鉅額交易)</span>" if current_time >= datetime.time(14, 50) else "⏳ <span style='color:#FFCC00;'>盤後結算中</span>"
+        
+        st.markdown(f"**{twse_title}** | 狀態：{status_badge}", unsafe_allow_html=True)
+        
+        def to_hundred_million(val_str):
+            try:
+                return float(str(val_str).replace(',', '')) / 100000000
+            except:
+                return 0.0
+
+        net_buy_foreign = net_buy_trust = net_buy_dealer = net_buy_total = 0
+        for index, row in twse_df.iterrows():
+            unit_name = row['單位名稱']
+            net_val = to_hundred_million(row['買賣差額'])
+            if '外資及陸資' in unit_name: net_buy_foreign += net_val
+            elif '投信' in unit_name: net_buy_trust += net_val
+            elif '自營商' in unit_name: net_buy_dealer += net_val
+            elif '合計' in unit_name: net_buy_total = net_val
+
+        c1, c2, c3, c4 = st.columns(4)
+        def format_metric(val):
+            color = "#FF4B4B" if val > 0 else "#00CC66" if val < 0 else "#E2E8F0"
+            return f"<span style='color:{color}; font-size:24px; font-weight:bold;'>{'+' if val > 0 else ''}{val:,.1f} 億</span>"
+
+        c1.markdown(f"🦅 **外資買賣超**<br>{format_metric(net_buy_foreign)}", unsafe_allow_html=True)
+        c2.markdown(f"🐳 **投信買賣超**<br>{format_metric(net_buy_trust)}", unsafe_allow_html=True)
+        c3.markdown(f"🦊 **自營商買賣超**<br>{format_metric(net_buy_dealer)}", unsafe_allow_html=True)
+        c4.markdown(f"🔥 **三大法人合計**<br>{format_metric(net_buy_total)}", unsafe_allow_html=True)
+            
+        with st.expander("📄 查看證交所原始結算明細表 (單位：元)"):
+            st.dataframe(twse_df, use_container_width=True, hide_index=True)
+    else:
+        st.info("🕒 目前查無今日三大法人買賣資料，證交所尚未產出報表。")
+
+# ==========================================
+# [分頁 2] 鉅額交易 (大戶暗盤)
+# ==========================================
+with tab_block:
+    st.write("💡 *鉅額交易通常為大戶於盤後進行之籌碼換手，其「成交單價」極具長線支撐或壓力參考價值。*")
+    block_df = fetch_block_trades()
+    
+    if not block_df.empty:
+        try:
+            block_df['成交股數_數值'] = block_df['成交股數'].astype(str).str.replace(',', '').astype(float)
+            block_df['成交金額_數值'] = block_df['成交金額'].astype(str).str.replace(',', '').astype(float)
+            
+            block_df['成交量(張)'] = (block_df['成交股數_數值'] / 1000).round(1)
+            block_df['成交總額(百萬)'] = (block_df['成交金額_數值'] / 1000000).round(2)
+            
+            # 依照砸錢金額由大到小排序
+            block_df = block_df.sort_values(by='成交金額_數值', ascending=False)
+            
+            display_cols = ['證券代號', '證券名稱', '成交單價', '成交量(張)', '成交總額(百萬)']
+            display_df = block_df[display_cols]
+            
+            st.success(f"🎯 成功攔截今日鉅額交易！共偵測到 {len(display_df)} 筆大戶換手紀錄。")
+            st.dataframe(display_df, use_container_width=True, hide_index=True)
+        except:
+            st.warning("⚠️ 資料清洗時發生錯誤，顯示原始數據：")
+            st.dataframe(block_df, use_container_width=True, hide_index=True)
+    else:
+        st.info("🕒 目前查無今日鉅額交易資料，或證交所尚未結算公告 (通常於盤後 17:00 後陸續更新)。")
+
 
 # ==========================================
 # 📡 免安裝 API 籌碼連續抓取引擎 (直接連線版)
