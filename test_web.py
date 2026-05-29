@@ -2419,12 +2419,12 @@ else:
     else:
         st.error("無法合併資料。")
 # ==========================================
-# 🐋 區塊 6：盤後鉅額交易總表 (大戶暗盤雷達)
+# 💸 區塊 6：盤後鉅額交易總表 (大戶暗盤雷達)
 # ==========================================
 st.write("---")
 st.markdown("<div id='section-6'></div>", unsafe_allow_html=True)
-st.subheader("🐋 區塊 6：暗盤雷達 (今日盤後鉅額交易總表)")
-st.write("💡 *鉅額交易為大戶私下換手之籌碼。成交價格往往成為關鍵的「支撐/壓力」防守線。*")
+st.subheader("💸 區塊 6：暗盤雷達 (今日盤後鉅額交易總表)")
+st.write("💡 鉅額交易常為大戶私下換手籌碼。成交價格為關鍵「支撐/壓力」防守線；短線跌破須嚴格停損")
 
 block_df = fetch_block_trades()
 
@@ -2435,32 +2435,66 @@ if not block_df.empty:
         if not price_col:
             raise ValueError(f"找不到價格欄位。目前可用欄位為: {list(block_df.columns)}")
 
-        # 2. 🔥 安全數值轉換 (解決 could not convert string to float: '' 的問題)
-        # errors='coerce' 會將無法轉換的空字串自動變成 NaN，然後用 .fillna(0) 補成 0
+        # 2. 安全數值轉換 (防止空字串與 NaN 地雷)
         block_df['成交股數_數值'] = pd.to_numeric(block_df['成交股數'].astype(str).str.replace(',', ''), errors='coerce').fillna(0)
         block_df['成交金額_數值'] = pd.to_numeric(block_df['成交金額'].astype(str).str.replace(',', ''), errors='coerce').fillna(0)
         block_df['成交價格(元)'] = pd.to_numeric(block_df[price_col].astype(str).str.replace(',', ''), errors='coerce').fillna(0)
         
-        # 過濾掉股數為 0 的無效干擾行 (例如證交所的總計行)
+        # 過濾掉股數為 0 的無效數據行
         block_df = block_df[block_df['成交股數_數值'] > 0].copy()
         
-        # 3. 單位換算與瘦身
-        # 股數轉張數 (除以 1000)
+        # 3. 單位新進化：股數轉為張數，金額轉為千萬元
         block_df['成交張數'] = (block_df['成交股數_數值'] / 1000).astype(int)
-        
-        # 金額轉為「千萬」單位 (除以 10,000,000)
         block_df['成交總額(千萬)'] = (block_df['成交金額_數值'] / 10000000).round(2)
         
-        # 依照砸錢總額由大到小排序
+        # 4. 🔍 核心機制：自現有 session_state 資料中跨表搜尋「收盤價格」
+        close_price_dict = {}
+        for key in ['top_pool_df', 'my_final_df', 'df_blk1', 'df_blk2_1']:
+            if key in st.session_state and isinstance(st.session_state[key], pd.DataFrame) and not st.session_state[key].empty:
+                df_src = st.session_state[key]
+                # 自動辨識對照欄位
+                id_col = next((c for c in df_src.columns if '代號' in c or '股票代號' in c), None)
+                price_col_src = next((c for c in df_src.columns if '收盤' in c or '價格' in c or '現價' in c), None)
+                if id_col and price_col_src:
+                    close_price_dict.update(dict(zip(df_src[id_col].astype(str).str.strip(), df_src[price_col_src])))
+        
+        # 對應代號填入收盤價
+        block_df['收盤價格'] = block_df['證券代號'].astype(str).str.strip().map(close_price_dict).fillna('-')
+        
+        # 依照成交總額由大到小排序
         block_df = block_df.sort_values(by='成交總額(千萬)', ascending=False)
         
-        # 4. 🔥 決定精華顯示欄位 (徹底刪除「交易別」與重複的數值欄位)
-        display_cols = ['證券代號', '證券名稱', '成交價格(元)', '成交張數', '成交總額(千萬)']
-        display_df = block_df[display_cols]
+        # 5. 變更欄位名稱與重新精簡排版
+        display_cols = ['證券代號', '證券名稱', '成交價格(元)', '收盤價格', '成交張數', '成交總額(千萬)']
+        display_df = block_df[display_cols].copy()
         
+        # 精確更名：證券代號 -> 代號，證券名稱 -> 股票名稱
+        display_df = display_df.rename(columns={
+            '證券代號': '代號',
+            '證券名稱': '股票名稱'
+        })
         
-        st.dataframe(display_df, use_container_width=True, hide_index=True)
-        st.success(f"🎯 {date_str}</div共偵測到 {len(display_df)} 筆大戶暗盤換手紀錄 (已依成交總額排序)。")
+        # 6. ✨ 視覺特效：將「成交價格(元)」欄位數值套用高級紅字高亮
+        def apply_red_style(val):
+            return 'color: #FF4B4B; font-weight: bold;'
+            
+        styled_df = display_df.style.map(apply_red_style, subset=['成交價格(元)'])
+        
+        # 渲染核心資料表格
+        st.dataframe(styled_df, use_container_width=True, hide_index=True)
+        
+        # 7. 🎯 數據統計訊息下移，並動態嵌入時間戳記
+        try:
+            raw_date = get_data_date()
+            if len(raw_date) == 8:
+                data_date_formatted = f"{raw_date[:4]}/{raw_date[4:6]}/{raw_date[6:]} "
+            else:
+                data_date_formatted = f"{raw_date} "
+        except:
+            data_date_formatted = ""
+            
+        st.success(f"📊 {data_date_formatted}共偵測到 {len(display_df)} 筆大戶暗盤換手紀錄。")
+
     except Exception as e:
         st.warning(f"⚠️ 資料解析發生錯誤: {str(e)}。顯示證交所原始回傳數據：")
         st.dataframe(block_df, use_container_width=True, hide_index=True)
