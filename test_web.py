@@ -2424,99 +2424,91 @@ else:
 st.write("---")
 st.markdown("<div id='section-6'></div>", unsafe_allow_html=True)
 st.subheader("💸 區塊 6：暗盤雷達 (今日盤後鉅額交易總表)")
-st.write("💡 鉅額交易常為大戶私下換手籌碼。成交價格為關鍵「支撐/壓力」防守線；短線跌破須嚴格停損")
+st.write("💡 鉅額交易常為大戶私下換手籌碼。成交價為關鍵「支撐/壓力」防守線；短線跌破須嚴格停損")
 
 block_df = fetch_block_trades()
 
 if not block_df.empty:
     try:
-        # 1. 動態抓取正確的價格欄位
         price_col = next((c for c in ['成交價', '成交價格', '成交單價'] if c in block_df.columns), None)
         if not price_col:
             raise ValueError(f"找不到價格欄位。目前可用欄位為: {list(block_df.columns)}")
 
-        # 2. 安全數值轉換
         block_df['成交股數_數值'] = pd.to_numeric(block_df['成交股數'].astype(str).str.replace(',', ''), errors='coerce').fillna(0)
         block_df['成交金額_數值'] = pd.to_numeric(block_df['成交金額'].astype(str).str.replace(',', ''), errors='coerce').fillna(0)
         
-        # 🔴 成交價格：抹除小數點與 (元)
-        block_df['🔴成交價格'] = pd.to_numeric(block_df[price_col].astype(str).str.replace(',', ''), errors='coerce').fillna(0).round(0).astype(int)
+        # 抹除小數點與 (元)，欄位名稱改為「成交價」
+        block_df['成交價'] = pd.to_numeric(block_df[price_col].astype(str).str.replace(',', ''), errors='coerce').fillna(0).round(0).astype(int)
         
-        # 過濾無效數據行
         block_df = block_df[block_df['成交股數_數值'] > 0].copy()
-        
-        # 3. 單位進化：張數與千萬元
         block_df['成交張數'] = (block_df['成交股數_數值'] / 1000).astype(int)
-        block_df['成交總額(千萬)'] = (block_df['成交金額_數值'] / 10000000).apply(
-            lambda x: f"{x:.2f}".rstrip('0').rstrip('.')
-        )
+        block_df['成交總額(千萬)'] = (block_df['成交金額_數值'] / 10000000).apply(lambda x: f"{x:.2f}".rstrip('0').rstrip('.'))
         
-        # 乾淨代號 (去除空白)
         block_df['乾淨代號'] = block_df['證券代號'].astype(str).str.replace(r'\D', '', regex=True)
         
-        # ==========================================
-        # 🚀 4. yfinance 批次光速下載引擎 (阿東優化版)
-        # ==========================================
         import yfinance as yf
         close_price_dict = {}
-        
-        # 找出不重複的股票代號 (例如 44 筆交易可能只有 15 檔不同股票)
         unique_ids = block_df['乾淨代號'].dropna().unique()
         
         if len(unique_ids) > 0:
-            # 加上台股後綴 .TW，並打包成字串 (例如 "2330.TW 2454.TW")
             yf_tickers = " ".join([f"{sid}.TW" for sid in unique_ids])
-            
             try:
-                # 靜默抓取近 5 天資料 (防呆機制：確保假日或清晨也能拿到最新的「上一交易日」收盤價)
                 df_yf = yf.download(yf_tickers, period="5d", progress=False)
-                
                 if not df_yf.empty and 'Close' in df_yf:
                     close_data = df_yf['Close']
-                    
-                    # 情況 A：如果今天只有一檔股票發生鉅額交易
                     if len(unique_ids) == 1:
                         price = close_data.dropna().iloc[-1]
                         close_price_dict[unique_ids[0]] = str(int(round(price)))
-                    
-                    # 情況 B：多檔股票批次處理
                     else:
                         for sid in unique_ids:
                             tkr = f"{sid}.TW"
                             if tkr in close_data.columns:
-                                # 抓取這檔股票近 5 天最後一個有效數值
                                 valid_prices = close_data[tkr].dropna()
                                 if not valid_prices.empty:
-                                    # 抹除小數點，保持畫面乾淨
                                     close_price_dict[sid] = str(int(round(valid_prices.iloc[-1])))
-            except:
-                pass # 若 yfinance 斷線則靜默略過，不影響主程式
+            except: pass 
         
-        # 將收盤價填入表格
-        block_df['收盤價格'] = block_df['乾淨代號'].map(close_price_dict).fillna('-')
-        
-        # 依照成交金額由大到小排序
+        # 填入 yfinance 抓到的收盤價，找不到就給 "-"
+        block_df['🔴收盤價'] = block_df['乾淨代號'].map(close_price_dict).fillna('-')
         block_df = block_df.sort_values(by='成交金額_數值', ascending=False)
         
-        # 5. 變更欄位名稱與重新精簡排版
-        display_cols = ['乾淨代號', '證券名稱', '🔴成交價格', '收盤價格', '成交張數', '成交總額(千萬)']
+        display_cols = ['乾淨代號', '證券名稱', '成交價', '🔴收盤價', '成交張數', '成交總額(千萬)']
         display_df = block_df[display_cols].copy()
         
-        # 精確更名
         display_df = display_df.rename(columns={
             '乾淨代號': '代號',
             '證券名稱': '股票名稱'
         })
         
-        # 6. ✨ 視覺特效：紅色高亮
-        def apply_red_style(val):
-            return 'color: #FF4B4B; font-weight: bold;'
+        # ==========================================
+        # 🎨 核心視覺：收盤價 vs 成交價 動態變色引擎
+        # 收盤價 > 成交價 = 紅色 (溢價)
+        # 收盤價 == 成交價 = 橘色 (平價)
+        # 收盤價 < 成交價 = 綠色 (折價)
+        # ==========================================
+        def highlight_block_row(row):
+            styles = [''] * len(row)
+            try:
+                # 把字串轉回數字來比較大小
+                close_p = float(str(row['🔴收盤價']).replace(',', ''))
+                block_p = float(str(row['成交價']).replace(',', ''))
+                
+                if close_p > block_p: color = '#FF4B4B'       # 紅色
+                elif close_p == block_p: color = '#FFA500'    # 橘色
+                else: color = '#00E272'                       # 綠色
+                
+                # 找到 '成交價' 這個欄位的位置，並上色
+                idx = row.index.get_loc('成交價')
+                styles[idx] = f'color: {color}; font-weight: bold;'
+            except:
+                pass # 如果收盤價是 "-" 無法轉換，就保持原色不變
+            return styles
             
-        styled_df = display_df.style.map(apply_red_style, subset=['🔴成交價格'])
+        # apply 是針對「整行(Row)」做處理的進階寫法
+        styled_df = display_df.style.apply(highlight_block_row, axis=1)
         
         st.dataframe(styled_df, use_container_width=True, hide_index=True)
         
-        # 7. 🎯 動態嵌入時間戳記
         try:
             raw_date = get_data_date() 
             if not raw_date or len(raw_date) != 8:
@@ -2535,7 +2527,7 @@ else:
     st.info("🕒 目前查無今日鉅額交易資料，或證交所尚未結算公告。")
 # ==========================================以上網頁核心區塊 
 # ==========================================
-# 🏆 頂級選股池核心引擎 (精確量化權重 + 欄位美化版)
+# 🏆 頂級選股池核心引擎 (精確量化權重 + 暗盤連動 + Delta測試版)
 # ==========================================
 with top_pool_container:
     st.write("---")
@@ -2550,13 +2542,11 @@ with top_pool_container:
     latest_date_str = "未知日期"
 
     if all_txt_files:
-        # 抓取檔名最前面日期最大的檔案
         latest_file = max(all_txt_files, key=os.path.basename)
         date_label = os.path.basename(latest_file)[:8]
         if date_label.isdigit():
             latest_date_str = f"{date_label[:4]}/{date_label[4:6]}/{date_label[6:]}"
 
-    # 2. 顯示帶有最新日期的科技感標題
     st.markdown(f"## 🏆 數據分析觀察名單 <span style='font-size:18px; color:#00D2FF; font-weight:500;'>(最新數據: {latest_date_str})</span>", unsafe_allow_html=True)
     st.info("💡 **權重評分**：法人持股上榜搭配其他數據分析積分,請參考短動態。(評分數據僅供參考)")
 
@@ -2564,22 +2554,19 @@ with top_pool_container:
         st.warning("⚠️ 尚未載入區塊 1 資料，無法進行選股池評比。")
     else:
         df_b1 = st.session_state['my_final_df'].copy()
-        
-        # 尋找區塊 1 的動態欄位與今日上榜欄位
         dyn_col = next((c for c in df_b1.columns if '動態' in c or '動能' in c), None)
         rank_col = next((c for c in df_b1.columns if '今日上榜' in c or '上榜' in c), None)
         
         if dyn_col:
-            # 🔥 確保「吸籌、衝進、回歸」等高級量化字眼都在白名單內
             mask = df_b1[dyn_col].astype(str).str.contains('趨緩|上升|升|吸籌|衝進|回歸', na=False)
             pool_df = df_b1[mask].copy()
         else:
             pool_df = df_b1.copy()
             
         if pool_df.empty:
-            st.warning("⚪ 目前區塊 1 中沒有符合「趨緩、上升、持平」動能的標的。")
+            st.warning("⚪ 目前區塊 1 中沒有符合動能的標的。")
         else:
-            # 3. 讀取賣出警示名單 (外資/投信倒貨)
+            # 讀取賣出警示名單 
             fo_sell_ids, it_sell_ids = set(), set()
             try:
                 fo_sell_files = glob.glob(os.path.join(DATA_DIR, "*外資賣出佔成交比*3日*.csv"))
@@ -2602,11 +2589,9 @@ with top_pool_container:
             df_b2_1, df_b2_2 = get_df_safe('df_blk2_1'), get_df_safe('df_blk2_2')
             df_b2_3, df_b2_4 = get_df_safe('df_blk2_3'), get_df_safe('df_blk2_4')
             df_b3 = get_df_safe('df_blk3_main')
-            
             s_b4_mar_pct, s_b4_mar_vol = set(get_df_safe('df_margin_pct').get('股票代號', [])), set(get_df_safe('df_margin_vol').get('股票代號', []))
             s_b4_sho_pct, s_b4_sho_vol = set(get_df_safe('df_short_pct').get('股票代號', [])), set(get_df_safe('df_short_vol').get('股票代號', []))
             s_b4_mp_pct, s_b4_mp_vol = set(get_df_safe('df_margin_plus_pct').get('股票代號', [])), set(get_df_safe('df_margin_plus_vol').get('股票代號', []))
-            
             df_b5 = get_df_safe('df_blk5')
 
             def check_b2_strict(df, sid, bad_keywords):
@@ -2633,30 +2618,34 @@ with top_pool_container:
                     elif days >= 5: return 1.5, f"✔️({days}週)"
                     else: return 1.0, f"✔️({days}週)"
 
-            # 🔥 新增：微型抓取器，專門用來偷看 DataFrame 裡面的當日數據是否為負
             def get_today_ratio(df, stock_id, col_name):
                 if df is not None and not df.empty and stock_id in df['股票代號'].values:
-                    try:
-                        return float(df.loc[df['股票代號'] == stock_id, col_name].iloc[0])
-                    except:
-                        return 0.0
+                    try: return float(df.loc[df['股票代號'] == stock_id, col_name].iloc[0])
+                    except: return 0.0
                 return 0.0
 
-            # ==========================================
-            # 5. 計分迴圈 (含換手防禦、當日重扣與【計分明細追蹤】)
-            # ==========================================
+            # 🚀 跨區塊連動：先偷偷抓一下今天有沒有鉅額交易的股票代號！
+            block_sids = set()
+            try:
+                temp_block = fetch_block_trades()
+                if not temp_block.empty:
+                    block_sids = set(temp_block['證券代號'].astype(str).str.replace(r'\D', '', regex=True))
+            except: pass
+
             results = []
             for _, row in pool_df.iterrows():
                 sid = str(row['股票代號']).strip()
                 sname = str(row.get('股票名稱', '')).strip()
                 b1_dyn = str(row.get(dyn_col, '')) if dyn_col else '-'
+                
+                # 🔥 暗盤標籤注入：如果在鉅額名單中，加上專屬徽章
+                if sid in block_sids:
+                    b1_dyn = f"{b1_dyn} | 🎯暗盤"
+                    
                 b1_rank = str(row.get(rank_col, '-')) if rank_col else '-'
                 score = 0.0
-                
-                # 📝 建立一個追蹤清單，用來記錄這檔股票所有加扣分軌跡
                 details = [] 
                 
-                # 📈 區塊 2 加分機制
                 r_b2_1 = "✔️" if check_b2_strict(df_b2_1, sid, bad_b2_vol) else ""
                 if r_b2_1: score += 1; details.append("外買佔: +1")
                 
@@ -2669,13 +2658,11 @@ with top_pool_container:
                 r_b2_4 = "✔️" if check_b2_strict(df_b2_4, sid, bad_b2_iss) else ""
                 if r_b2_4: score += 1; details.append("投佔發行: +1")
                 
-                # 🚨 【當日轉賣扣分引擎】
-                if get_today_ratio(df_b2_1, sid, '當日買佔比%') <= -10: score -= 0.5; details.append("當日外買佔(<-10%): -0.5")
-                if get_today_ratio(df_b2_2, sid, '當日買佔比%') <= -10: score -= 0.5; details.append("當日投買佔(<-10%): -0.5")
-                if get_today_ratio(df_b2_3, sid, '當日買發比%') <= -10: score -= 0.5; details.append("當日外佔發行(<-10%): -0.5")
-                if get_today_ratio(df_b2_4, sid, '當日買發比%') <= -10: score -= 0.5; details.append("當日投佔發行(<-10%): -0.5")
+                if get_today_ratio(df_b2_1, sid, '當日買佔比%') <= -10: score -= 0.5; details.append("外買佔(<-10%): -0.5")
+                if get_today_ratio(df_b2_2, sid, '當日買佔比%') <= -10: score -= 0.5; details.append("投買佔(<-10%): -0.5")
+                if get_today_ratio(df_b2_3, sid, '當日買發比%') <= -10: score -= 0.5; details.append("外佔發(<-10%): -0.5")
+                if get_today_ratio(df_b2_4, sid, '當日買發比%') <= -10: score -= 0.5; details.append("投佔發(<-10%): -0.5")
                 
-                # 📈 區塊 3 連買加分
                 s_fd, r_b3_fd = get_b3_score(df_b3, sid, '外資日')
                 if s_fd > 0: score += s_fd; details.append(f"外資日連: +{s_fd}")
                 
@@ -2688,52 +2675,39 @@ with top_pool_container:
                 s_iw, r_b3_iw = get_b3_score(df_b3, sid, '投信週')
                 if s_iw > 0: score += s_iw; details.append(f"投信週連: +{s_iw}")
                 
-                # 📈 區塊 4 資券加分
-                r_b4_mar = ""; 
+                r_b4_mar = ""
                 if sid in s_b4_mar_pct: r_b4_mar += "✔️(幅)"; score += 1; details.append("資減(幅): +1")
                 if sid in s_b4_mar_vol: r_b4_mar += "✔️(量)"; score += 0.5; details.append("資減(量): +0.5")
                 
-                r_b4_sho = ""; 
+                r_b4_sho = ""
                 if sid in s_b4_sho_pct: r_b4_sho += "✔️(幅)"; score += 1; details.append("借減(幅): +1")
                 if sid in s_b4_sho_vol: r_b4_sho += "✔️(量)"; score += 0.5; details.append("借減(量): +0.5")
                 
-                r_b4_mp = ""; 
+                r_b4_mp = ""
                 if sid in s_b4_mp_pct: r_b4_mp += "✔️(幅)"; score += 1; details.append("券增(幅): +1")
                 if sid in s_b4_mp_vol: r_b4_mp += "✔️(量)"; score += 0.5; details.append("券增(量): +0.5")
                 
-                # 📊 區塊 5 大股東動向
                 r_b5 = ""
                 if not df_b5.empty and sid in df_b5['股票代號'].values:
                     trend = str(df_b5[df_b5['股票代號'] == sid].iloc[0].get('週動態', ''))
                     if '大增' in trend or ('增' in trend and '微' not in trend): 
                         score += 2; r_b5 = "🔥大增(+2)"; details.append("大股東大增: +2")
-                    elif '微增' in trend: 
-                        score += 1; r_b5 = "↗️微增(+1)"; details.append("大股東微增: +1")
-                    elif '大減' in trend: 
-                        score -= 1; r_b5 = "🚨大減(-1)"; details.append("大股東大減: -1")
-                    elif '減' in trend and '微' in trend: 
-                        score -= 0.5; r_b5 = "↘️微減(-0.5)"; details.append("大股東微減: -0.5")
-                    elif '減' in trend: 
-                        score -= 0.5; r_b5 = "📉減(-0.5)"; details.append("大股東減: -0.5")
+                    elif '微增' in trend: score += 1; r_b5 = "↗️微增(+1)"; details.append("大股東微增: +1")
+                    elif '大減' in trend: score -= 1; r_b5 = "🚨大減(-1)"; details.append("大股東大減: -1")
+                    elif '減' in trend and '微' in trend: score -= 0.5; r_b5 = "↘️微減(-0.5)"; details.append("大股東微減: -0.5")
+                    elif '減' in trend: score -= 0.5; r_b5 = "📉減(-0.5)"; details.append("大股東減: -0.5")
                     else: r_b5 = trend
                 
-                # 🚨 【換手防禦版】轉賣警示與扣分引擎
                 is_fo_sell = sid in fo_sell_ids
                 is_it_sell = sid in it_sell_ids
                 if is_fo_sell and is_it_sell: 
-                    r_warn = "🚨外投雙倒"
-                    score -= 2.0; details.append("外投雙倒: -2")
-                elif is_fo_sell: 
-                    r_warn = "⚠️外資倒(換手?)"
-                elif is_it_sell: 
-                    r_warn = "⚠️投信倒(換手?)"
-                else: 
-                    r_warn = "-"
+                    r_warn = "🚨外投雙倒"; score -= 2.0; details.append("外投雙倒: -2")
+                elif is_fo_sell: r_warn = "⚠️外資倒(換手?)"
+                elif is_it_sell: r_warn = "⚠️投信倒(換手?)"
+                else: r_warn = "-"
 
-                # 📝 將明細清單組合成多行文字 (換行符號 \n，讓系統能產生 Tooltip 排版)
                 score_breakdown = " \n".join(details) if details else "無加扣分"
 
-                # 🔥 唯一的一次儲存！沒有其他分身！
                 results.append({
                     '總分': score,
                     '股票代號': sid,
@@ -2747,75 +2721,39 @@ with top_pool_container:
                     '大股東動向': r_b5, '法人賣出警示': r_warn
                 })
                 
-            # ==========================================
-            # 1. 先將結果轉成 DataFrame、排序並【剃除重複分身】
-            # ==========================================
             res_df = pd.DataFrame(results)
-            
-            # 先依照總分由高到低排序
             res_df = res_df.sort_values(by='總分', ascending=False)
-            
-            # 🔥 新增核心機制：同一個股票代號只保留第一筆 (最高分)，並重新整理序號
             res_df = res_df.drop_duplicates(subset=['股票代號'], keep='first').reset_index(drop=True)
             
             # ==========================================
-            # 🔥 2. 批次計算全表的 Delta 分數並精準插入欄位
+            # 🧪 測試區塊：強制產生昨日分數來驗證 Delta 欄位！
             # ==========================================
-            # 讀取「昨日」的歷史檔案建立對照表
-            history_files = sorted(glob.glob(os.path.join(SCORE_HISTORY_DIR, "scores_*.csv")), reverse=True)
-            prev_scores_dict = {}
-            if len(history_files) >= 2:
-                try:
-                    prev_df = pd.read_csv(history_files[1])
-                    # 建立 { '代號': 總分 } 的極速對照字典
-                    prev_scores_dict = dict(zip(prev_df['股票代號'].astype(str), prev_df['總分']))
-                except Exception:
-                    pass
-
-            # 定義表格每一列的 Delta 運算邏輯
-            def calc_table_delta(row):
-                sid = str(row['股票代號'])
-                curr_score = row.get('總分', 0)
-                # 如果昨天沒有這檔的資料，Delta 預設為 0
-                prev_score = prev_scores_dict.get(sid, curr_score) 
-                delta = round(curr_score - prev_score, 2)
-                
-                # 格式化為純數值文字：正數補上+號，0或負數維持原樣
-                return f"+{delta}" if delta > 0 else str(delta)
-
-            # 瞬間產生整條 Delta 欄位
-            if not res_df.empty and '總分' in res_df.columns:
-                res_df['Delta'] = res_df.apply(calc_table_delta, axis=1)
-
-                # ==========================================
-                # 🔥 完美排版：將 Delta 與評分明細，安插在最順眼的位置
-                # ==========================================
-                # 先把這兩個特殊欄位抽出來
-                cols = [c for c in res_df.columns if c not in ['Delta', '評分明細']]
-                
-                # 1. 將 Delta 插在「總分」的正右邊
-                score_idx = cols.index('總分')
-                cols.insert(score_idx + 1, 'Delta')
-                
-                # 2. 將 評分明細 插在「股票名稱」的正右邊
-                name_idx = cols.index('股票名稱')
-                cols.insert(name_idx + 1, '評分明細')
-                
-                res_df = res_df[cols]
-
+            import random
+            # 建立一個測試用的 0528 總分 (把今天的總分隨機減掉 0 到 3 分)
+            res_df['測試_0528總分'] = res_df['總分'].apply(lambda x: x - round(random.uniform(0, 3), 1))
+            
+            # 真正的 Delta 計算：今日總分 減去 昨日總分
+            res_df['Delta'] = (res_df['總分'] - res_df['測試_0528總分']).round(1)
+            res_df['Delta'] = res_df['Delta'].apply(lambda x: f"+{x}" if x > 0 else str(x))
             # ==========================================
-            # 💾 3. 存檔與最終 UI 唯一顯示 (含懸浮視窗魔法)
-            # ==========================================
-            # 掃描完成後，自動存檔 (含最新的總分，供明天相減使用)
-            #save_daily_score(res_df)
 
-            # 將結果存入記憶體供下方搜尋區塊使用
+            cols = [c for c in res_df.columns if c not in ['Delta', '評分明細', '測試_0528總分']]
+            
+            # 將 Delta 與 測試分數 排在總分旁邊
+            score_idx = cols.index('總分')
+            cols.insert(score_idx + 1, '測試_0528總分')
+            cols.insert(score_idx + 2, 'Delta')
+            
+            name_idx = cols.index('股票名稱')
+            cols.insert(name_idx + 1, '評分明細')
+            
+            res_df = res_df[cols]
+
             st.session_state['top_pool_df'] = res_df
 
-            # 🔥 這裡才是「唯一一次」印出訊息與表格的地方！
-            st.success(f"選股池掃描完成！共過濾出 {len(res_df)} 檔潛力標的。")
+            st.success(f"選股池掃描完成！共過濾出 {len(res_df)} 檔潛力標的。 (已開啟 Delta 測試模組)")
             
-            # 使用 column_config 開啟「評分明細」的 Tooltip 懸浮功能，並限制寬度避免佔用太多版面
+            # 🔥 欄位寬度極限壓縮：max_chars=4 (大約只顯示3-4個中文字)
             st.dataframe(
                 res_df, 
                 use_container_width=True, 
@@ -2824,12 +2762,11 @@ with top_pool_container:
                     "評分明細": st.column_config.TextColumn(
                         "評分明細",
                         help="滑鼠游標停留在這裡，查看完整加扣分明細",
-                        max_chars=12, # 欄位平常只顯示前幾個字，保持版面乾淨
-
+                        width="small",
+                        max_chars=4 
                     )
                 }
             )
-
 # ==========================================
 # 📊 【蜂蜜計數器】本站累計觀測人次統計
 # ==========================================
