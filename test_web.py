@@ -2458,9 +2458,9 @@ if not block_df.empty:
         display_cols = ['證券代號', '證券名稱', '成交價格(元)', '成交張數', '成交總額(千萬)']
         display_df = block_df[display_cols]
         
-        st.success(f"🎯 成功攔截！今日共偵測到 {len(display_df)} 筆大戶暗盤換手紀錄 (已依成交總額排序)。")
+        
         st.dataframe(display_df, use_container_width=True, hide_index=True)
-
+        st.success(f"🎯 {date_str}</div共偵測到 {len(display_df)} 筆大戶暗盤換手紀錄 (已依成交總額排序)。")
     except Exception as e:
         st.warning(f"⚠️ 資料解析發生錯誤: {str(e)}。顯示證交所原始回傳數據：")
         st.dataframe(block_df, use_container_width=True, hide_index=True)
