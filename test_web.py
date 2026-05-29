@@ -81,21 +81,26 @@ import re
 tw_tz = pytz.timezone('Asia/Taipei')
 
 def get_data_date():
-    """🎯 核心升級：不看時鐘，直接從您的資料夾自動抓取最新的『資料日期』"""
-    files = glob.glob(os.path.join(DATA_DIR, "*.*"))
+    """🎯 核心升級：只認 TXT 與 CSV 檔名，徹底解決週末補跑、跨夜執行的時空錯亂"""
+    # 1. 嚴格限定只掃描 .txt 與 .csv 檔案
+    txt_files = glob.glob(os.path.join(DATA_DIR, "*.txt"))
+    csv_files = glob.glob(os.path.join(DATA_DIR, "*.csv"))
+    all_data_files = txt_files + csv_files
+    
     dates = []
-    for f in files:
-        # 從所有檔名中找出 8 位數的日期格式
+    for f in all_data_files:
+        # 2. 從檔名中找出 8 位數的日期格式 (例如 20260528)
         match = re.search(r'\d{8}', os.path.basename(f))
         if match:
             dates.append(match.group(0))
     
+    # 3. 排序並抓出最新的一天當作「系統現在時間」
     if dates:
         dates.sort()
-        return dates[-1] # 回傳資料夾中最新的一天 (例如 20260528)
+        return dates[-1] 
     
-    return datetime.datetime.now(tw_tz).strftime("%Y%m%d") # 備用方案
-
+    # 如果資料夾竟然是空的，才無奈地使用電腦現在時間
+    return datetime.datetime.now(tw_tz).strftime("%Y%m%d")
 def save_daily_score(df):
     """將今日總分存入對應『資料日期』的 CSV"""
     data_date = get_data_date()
