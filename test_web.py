@@ -2291,6 +2291,7 @@ st.session_state['df_margin_plus_vol'] = df_vol_clean
 st.write("---")
 st.markdown("<div id='section-5'></div>", unsafe_allow_html=True)
 st.header("💰 區塊 5：大股東動向")
+st.write("💡 400張以上大股東週更新資訊。")
 
 import re
 
@@ -2548,7 +2549,7 @@ if not block_df.empty:
             import datetime
             raw_date = datetime.datetime.now().strftime("%Y%m%d")
             
-        st.success(f"更新 {raw_date} 共偵測到 {len(display_df)} 筆大戶暗盤換手紀錄。")
+        st.success(f"更新 {raw_date} 共偵測到 {len(display_df)} 筆大戶暗盤資金換手紀錄。")
 
     except Exception as e:
         st.warning(f"⚠️ 資料解析發生錯誤: {str(e)}。顯示證交所原始回傳數據：")
