@@ -40,14 +40,18 @@ def robust_read_csv(file_path):
             continue
     return pd.read_csv(file_path, encoding='cp950', errors='ignore')
 # ==========================================
-# 🗂️ 台股代號與名稱 萬用字典引擎 (透過官方 ISIN 表)
+# 🗂️ 台股代號與名稱 萬用字典引擎 (暴力切割+防快取版)
 # ==========================================
-@st.cache_data
+@st.cache_data(ttl=3600) # 🔥 新增：加上時效，強迫系統每小時重新檢查檔案，避免死記空資料
 def get_stock_dictionary():
     """讀取證交所 ISIN 檔案，建立完美的『名稱 -> 代號』對照表"""
     mapping = {}
-    # 尋找資料夾中的「證券辨識號碼一覽表」
-    dict_files = glob.glob(os.path.join(DATA_DIR, "*本國上市證券國際證券辨識號碼一覽表*.txt"))
+    
+    # 🔥 升級 1：擴大搜尋雷達，同時找 Goodinfo_Rankings 資料夾與「根目錄」，以防您放錯層
+    search_pattern_1 = os.path.join(DATA_DIR, "*證券辨識號碼*.txt")
+    search_pattern_2 = "*證券辨識號碼*.txt"
+    dict_files = glob.glob(search_pattern_1) + glob.glob(search_pattern_2)
+    
     if not dict_files:
         return mapping
         
@@ -66,19 +70,24 @@ def get_stock_dictionary():
             parts = line.split('\t')
             if len(parts) > 0:
                 name_part = parts[0].strip()
-                # 切割「1101　台泥」這種類型的字串 (支援全形與半形空白)
-                match = re.match(r'^([A-Z0-9]{4,6})\s+(.+)$', name_part, re.UNICODE)
-                if match:
-                    sid = match.group(1).strip()
-                    sname = match.group(2).strip()
-                    mapping[sname] = sid
+                
+                # 🔥 升級 2：暴力切割法！把討厭的「全形空白」強制換成半形，然後直接切開
+                clean_name = name_part.replace('　', ' ')
+                tokens = clean_name.split()
+                
+                if len(tokens) >= 2:
+                    sid = tokens[0].strip()
+                    sname = tokens[1].strip()
+                    # 確保抓到的是數字代號 (例如 2330, 1101)
+                    if sid.isalnum():  
+                        mapping[sname] = sid
     except Exception as e:
         pass
+        
     return mapping
 
 # 在系統啟動時，直接載入這本字典
 STOCK_DICT = get_stock_dictionary()
-
 # ==========================================
 # 📡 免安裝 API 籌碼連續抓取引擎 (直接連線版)
 # ==========================================
