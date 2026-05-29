@@ -2430,26 +2430,32 @@ block_df = fetch_block_trades()
 
 if not block_df.empty:
     try:
-        # 🔥 動態抓取正確的價格欄位 (今天證交所的欄位叫 "成交價")
+        # 1. 動態抓取正確的價格欄位
         price_col = next((c for c in ['成交價', '成交價格', '成交單價'] if c in block_df.columns), None)
-        
         if not price_col:
             raise ValueError(f"找不到價格欄位。目前可用欄位為: {list(block_df.columns)}")
 
-        # 清洗數字字串
-        block_df['成交股數_數值'] = block_df['成交股數'].astype(str).str.replace(',', '').astype(float)
-        block_df['成交金額_數值'] = block_df['成交金額'].astype(str).str.replace(',', '').astype(float)
-        block_df['成交價格(元)'] = block_df[price_col].astype(str).str.replace(',', '').astype(float)
+        # 2. 🔥 安全數值轉換 (解決 could not convert string to float: '' 的問題)
+        # errors='coerce' 會將無法轉換的空字串自動變成 NaN，然後用 .fillna(0) 補成 0
+        block_df['成交股數_數值'] = pd.to_numeric(block_df['成交股數'].astype(str).str.replace(',', ''), errors='coerce').fillna(0)
+        block_df['成交金額_數值'] = pd.to_numeric(block_df['成交金額'].astype(str).str.replace(',', ''), errors='coerce').fillna(0)
+        block_df['成交價格(元)'] = pd.to_numeric(block_df[price_col].astype(str).str.replace(',', ''), errors='coerce').fillna(0)
         
-        # 單位換算
-        block_df['成交量(張)'] = (block_df['成交股數_數值'] / 1000).round(1)
-        block_df['成交總額(百萬)'] = (block_df['成交金額_數值'] / 1000000).round(2)
+        # 過濾掉股數為 0 的無效干擾行 (例如證交所的總計行)
+        block_df = block_df[block_df['成交股數_數值'] > 0].copy()
+        
+        # 3. 單位換算與瘦身
+        # 股數轉張數 (除以 1000)
+        block_df['成交張數'] = (block_df['成交股數_數值'] / 1000).astype(int)
+        
+        # 金額轉為「千萬」單位 (除以 10,000,000)
+        block_df['成交總額(千萬)'] = (block_df['成交金額_數值'] / 10000000).round(2)
         
         # 依照砸錢總額由大到小排序
-        block_df = block_df.sort_values(by='成交金額_數值', ascending=False)
+        block_df = block_df.sort_values(by='成交總額(千萬)', ascending=False)
         
-        # 決定要顯示在畫面上的精華欄位
-        display_cols = ['證券代號', '證券名稱', '成交價格(元)', '成交量(張)', '成交總額(百萬)']
+        # 4. 🔥 決定精華顯示欄位 (徹底刪除「交易別」與重複的數值欄位)
+        display_cols = ['證券代號', '證券名稱', '成交價格(元)', '成交張數', '成交總額(千萬)']
         display_df = block_df[display_cols]
         
         st.success(f"🎯 成功攔截！今日共偵測到 {len(display_df)} 筆大戶暗盤換手紀錄 (已依成交總額排序)。")
@@ -2733,8 +2739,8 @@ with top_pool_container:
             # ==========================================
             # 💾 3. 存檔與最終 UI 唯一顯示 (含懸浮視窗魔法)
             # ==========================================
-            # 使用更安全的存檔機制，檢查 res_df 是否真的存在
-
+            # 掃描完成後，自動存檔 (含最新的總分，供明天相減使用)
+            save_daily_score(res_df)
 
             # 將結果存入記憶體供下方搜尋區塊使用
             st.session_state['top_pool_df'] = res_df
@@ -2742,7 +2748,7 @@ with top_pool_container:
             # 🔥 這裡才是「唯一一次」印出訊息與表格的地方！
             st.success(f"選股池掃描完成！共過濾出 {len(res_df)} 檔潛力標的。")
             
-            # 使用 column_config 開啟「評分明細」的 Tooltip 懸浮功能
+            # 使用 column_config 開啟「評分明細」的 Tooltip 懸浮功能，並限制寬度避免佔用太多版面
             st.dataframe(
                 res_df, 
                 use_container_width=True, 
@@ -2752,6 +2758,7 @@ with top_pool_container:
                         "評分明細",
                         help="滑鼠游標停留在這裡，查看完整加扣分明細",
                         max_chars=12, # 欄位平常只顯示前幾個字，保持版面乾淨
+
                     )
                 }
             )
