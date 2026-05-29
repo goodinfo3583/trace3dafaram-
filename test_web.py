@@ -41,52 +41,44 @@ def robust_read_csv(file_path):
     return pd.read_csv(file_path, encoding='cp950', errors='ignore')
 
 # ==========================================
-# 🛑 區塊 0：證券對照表實測與除錯面板 (編碼與暴力切割終極版)
+# 🗂️ 台股代號與名稱產業類別 萬用字典引擎 (後台靜默運作版)
 # ==========================================
-st.write("---")
-st.markdown("<h3 style='color:#00D2FF;'>🛑 區塊 0：證券對照表實測與除錯面板</h3>", unsafe_allow_html=True)
-
-import re # 引入正則表達式工具
-
-search_patterns = [
-    os.path.join(DATA_DIR, "*辨識號碼*.txt"),
-    os.path.join("./goodinfo_rankings", "*辨識號碼*.txt"),
-    "./*辨識號碼*.txt"
-]
-dict_files = []
-for pattern in search_patterns:
-    dict_files.extend(glob.glob(pattern))
-
-STOCK_DICT = {}
-debug_parsed_list = []
-raw_lines_for_debug = [] # 拿來裝原始資料，萬一失敗可以印出來看
-
-if not dict_files:
-    st.error("❌ 【系統警報】在所有預期路徑都找不到包含『辨識號碼』的 TXT 檔案！")
-else:
-    target_file = dict_files[0]
-    st.info(f"📁 成功定位檔案：`{target_file}`")
+@st.cache_data(ttl=3600)
+def get_stock_dictionary():
+    """讀取證交所 ISIN 檔案，在後台安靜地建立雙向對照表"""
+    import re
+    mapping = {}
     
-    # 🔥 升級 1：修正編碼陷阱！把 'utf-8-sig' 和 'utf-8' 放到最前面，並且「移除 errors='ignore'」，強迫它必須讀出真中文！
+    search_patterns = [
+        os.path.join(DATA_DIR, "*辨識號碼*.txt"),
+        os.path.join("./goodinfo_rankings", "*辨識號碼*.txt"),
+        "./*辨識號碼*.txt"
+    ]
+    dict_files = []
+    for pattern in search_patterns:
+        dict_files.extend(glob.glob(pattern))
+        
+    if not dict_files:
+        return mapping
+        
+    target_file = dict_files[0]
+    raw_lines = []
+    
     for encoding in ['utf-8-sig', 'utf-8', 'cp950', 'utf-16', 'big5']:
         try:
             with open(target_file, 'r', encoding=encoding) as f:
-                raw_lines_for_debug = f.readlines()
-            if len(raw_lines_for_debug) > 10:
-                break # 成功用正確編碼讀取就跳出迴圈
+                raw_lines = f.readlines()
+            if len(raw_lines) > 10:
+                break
         except:
             continue
-
-    # 開始解析
-    for line in raw_lines_for_debug:
-        # 支援 tab 或逗號分隔
+            
+    for line in raw_lines:
         parts = line.split('\t') if '\t' in line else line.split(',')
-        
         if len(parts) >= 5:
             name_part = parts[0].strip()
             industry = parts[4].strip()
             
-            # 🔥 升級 2：正則表達式終極暴力切割 (消滅所有全形空白、不換行空白、神秘隱形字元)
             clean_name = re.sub(r'[\s　]+', ' ', name_part).strip()
             tokens = clean_name.split(' ')
             
@@ -94,26 +86,15 @@ else:
                 sid = tokens[0].strip()
                 sname = tokens[1].strip()
                 
-                # 確保代號是純數字
                 if sid.isdigit():
-                    STOCK_DICT[sname] = {"id": sid, "name": sname, "industry": industry}
-                    STOCK_DICT[sid] = {"id": sid, "name": sname, "industry": industry}
-                    debug_parsed_list.append({
-                        "代號": sid, "股票": sname, "產業別": industry
-                    })
+                    # 建立雙向字典 (輸入代號或名稱都能通)
+                    mapping[sname] = {"id": sid, "name": sname, "industry": industry}
+                    mapping[sid] = {"id": sid, "name": sname, "industry": industry}
+                    
+    return mapping
 
-    if debug_parsed_list:
-        block0_df = pd.DataFrame(debug_parsed_list)
-        st.success(f"🔍 成功對接對照表！共成功解析出 {len(block0_df)} 檔上市證券標的。")
-        with st.expander("📊 點此查看【區塊 0】官方代號與產業別對照資料表 (前 50 筆範例)", expanded=True):
-            st.dataframe(block0_df.head(50), use_container_width=True, hide_index=True)
-    else:
-        st.warning("⚠️ 找到了 TXT 檔案，但未能成功擷取任何股票。這通常是『編碼變成亂碼』或『分隔符號不是 Tab』的問題。")
-        
-        # 🔥 升級 3：透視眼除錯面板！把系統讀到的前 15 行印出來
-        st.write("🕵️‍♂️ **【除錯模式】以下是系統眼中看到的檔案內容 (前 15 行)，請確認是不是變成亂碼了？**")
-        st.code("".join(raw_lines_for_debug[:15]), language="text")
-
+# 在系統啟動時，直接載入這本字典
+STOCK_DICT = get_stock_dictionary()
 
         
 # ==========================================
@@ -781,7 +762,7 @@ if search_query:
     query_clean = search_query.strip()
     industry_label = "未分類"
     
-    # 🌟 透過升級版字典，自動翻譯出正確代號與產業
+    # 🌟 透過搜尋後台股票代號名稱字典，自動翻譯出正確代號與產業類別
     if query_clean in STOCK_DICT:
         pure_stock_id = STOCK_DICT[query_clean]["id"]
         display_name = f"{STOCK_DICT[query_clean]['id']} {STOCK_DICT[query_clean]['name']}"
