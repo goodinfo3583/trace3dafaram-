@@ -964,17 +964,17 @@ if search_query:
 # ==========================================
 
 # ------------------------------------------
-# 1. 大盤籌碼導航總覽引擎 (API 即時連線版)
+# 1. 大盤籌碼導航總覽引擎 (純三大法人精簡版)
 # ------------------------------------------
 def render_sidebar_market_summary():
-    """自動連線證交所 API，渲染高級資訊卡片 (三大法人 + 鉅額大戶)"""
+    """自動連線證交所 API，精準對照欄位並加總渲染側邊欄資訊卡片"""
     import datetime
     import pandas as pd
     import streamlit as st
 
     st.sidebar.markdown("<h2 style='margin-top: 0; margin-bottom: 5px;'>📊 大盤資金風向球</h2>", unsafe_allow_html=True)
 
-    # 1️⃣ 呼叫 API 抓取三大法人現貨明細
+    # 呼叫 API 抓取三大法人現貨明細
     twse_title, twse_df = fetch_twse_institutional_data()
 
     if twse_df is not None and not twse_df.empty:
@@ -1043,28 +1043,8 @@ def render_sidebar_market_summary():
     else:
         st.sidebar.info("🕒 目前查無今日三大法人買賣資料。")
 
-    # 2️⃣ 呼叫 API 抓取鉅額交易 (Top 5 排行榜)
-    st.sidebar.markdown("<h4 style='color:#FF9900; margin-top: 15px; margin-bottom: 5px;'>🐋 大戶暗盤 (金額 Top 5)</h4>", unsafe_allow_html=True)
-    block_df = fetch_block_trades()
-    if not block_df.empty:
-        try:
-            # 容錯：抓取正確的價格欄位
-            p_col = next((c for c in ['成交價', '成交價格', '成交單價'] if c in block_df.columns), None)
-            block_df['成交金額_數值'] = block_df['成交金額'].astype(str).str.replace(',', '').astype(float)
-            block_df['總額(百萬)'] = (block_df['成交金額_數值'] / 1000000).round(1)
-            top5_block = block_df.sort_values(by='成交金額_數值', ascending=False).head(5)
-            
-            if p_col:
-                display_cols = ['證券名稱', p_col, '總額(百萬)']
-                st.sidebar.dataframe(top5_block[display_cols], use_container_width=True, hide_index=True)
-            else:
-                st.sidebar.dataframe(top5_block[['證券名稱', '總額(百萬)']], use_container_width=True, hide_index=True)
-        except:
-            st.sidebar.warning("⚠️ 鉅額資料解析錯誤")
-
 # 執行渲染側邊欄大盤卡片
 render_sidebar_market_summary()
-
 # ------------------------------------------
 # 2. 大盤總體經濟指標 (您原本的按鈕區)
 # ------------------------------------------
@@ -1094,6 +1074,7 @@ st.sidebar.markdown("[🔄 區塊4-1：融資減少動向](#section-4-1)")
 st.sidebar.markdown("[🔄 區塊4-2：借券賣出減少動向](#section-4-2)")
 st.sidebar.markdown("[🔄 區塊4-3：融券增加動向](#section-4-3)")
 st.sidebar.markdown("[💰 區塊5：大股東動向](#section-5)")
+st.sidebar.markdown("[💸 區塊6：鉅額交易](#section-6)")
 # ==========================================
 # 🏠 核心五大區塊
 # ==========================================
@@ -2753,10 +2734,7 @@ with top_pool_container:
             # 💾 3. 存檔與最終 UI 唯一顯示 (含懸浮視窗魔法)
             # ==========================================
             # 使用更安全的存檔機制，檢查 res_df 是否真的存在
-            if 'res_df' in locals() and res_df is not None and not res_df.empty:
-                save_daily_score(res_df)
-            elif 'top_pool_df' in st.session_state and not st.session_state['top_pool_df'].empty:
-                save_daily_score(st.session_state['top_pool_df'])
+
 
             # 將結果存入記憶體供下方搜尋區塊使用
             st.session_state['top_pool_df'] = res_df
