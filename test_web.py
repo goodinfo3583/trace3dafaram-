@@ -2424,7 +2424,7 @@ else:
 st.write("---")
 st.markdown("<div id='section-6'></div>", unsafe_allow_html=True)
 st.subheader("💸 區塊 6：暗盤雷達 (今日盤後鉅額交易總表)")
-st.write("💡 鉅額交易常為大戶私下換手籌碼。成交價為關鍵「支撐/壓力」防守線；短線跌破須嚴格停損")
+st.write("💡 鉅額交易常為大戶私下換手籌碼,避免股價盤中劇烈波動。成交價為「支撐/壓力」防守線或是「壓/拉尾盤」；短線跌破須嚴設停損")
 
 block_df = fetch_block_trades()
 
@@ -2470,7 +2470,39 @@ if not block_df.empty:
         
         # 填入 yfinance 抓到的收盤價，找不到就給 "-"
         block_df['🔴收盤價'] = block_df['乾淨代號'].map(close_price_dict).fillna('-')
-        block_df = block_df.sort_values(by='成交金額_數值', ascending=False)
+        
+        # ==========================================
+        # 🔥 群聚排序引擎：同股票綁定 + 紅字優先
+        # ==========================================
+        def get_color_rank(close_val, block_val):
+            try:
+                c = float(str(close_val).replace(',', ''))
+                b = float(str(block_val).replace(',', ''))
+                if c > b: return 1   # 紅色優先級最高
+                elif c == b: return 2 # 橘色次之
+                else: return 3       # 綠色排後
+            except:
+                return 4 # 無法判斷者墊底
+
+        # 1. 計算每一筆紀錄的顏色層級
+        block_df['__color_rank'] = block_df.apply(lambda r: get_color_rank(r['🔴收盤價'], r['成交價']), axis=1)
+        
+        # 2. 統整每一檔股票的「最強顏色」與「總成交金額」
+        stock_stats = block_df.groupby('乾淨代號').agg(
+            stock_min_rank=('__color_rank', 'min'),    # 只要有一筆紅字，整檔股票就是最高級別(1)
+            stock_total_amt=('成交金額_數值', 'sum')  # 計算該檔股票今日鉅額總額
+        ).reset_index()
+        
+        # 3. 將統整資料合併回主表
+        block_df = block_df.merge(stock_stats, on='乾淨代號', how='left')
+        
+        # 4. 終極多層排序！
+        # 順序: 股票優先級(紅先) -> 股票總金額(大先) -> 股票代號(綁在一起) -> 單筆顏色級別(紅先) -> 單筆金額(大先)
+        block_df = block_df.sort_values(
+            by=['stock_min_rank', 'stock_total_amt', '乾淨代號', '__color_rank', '成交金額_數值'],
+            ascending=[True, False, True, True, False]
+        )
+        # ==========================================
         
         display_cols = ['乾淨代號', '證券名稱', '成交價', '🔴收盤價', '成交張數', '成交總額(千萬)']
         display_df = block_df[display_cols].copy()
@@ -2482,16 +2514,14 @@ if not block_df.empty:
         
         # ==========================================
         # 🎨 核心視覺：收盤價 vs 成交價 動態變色引擎
-        # 收盤價 > 成交價 = 紅色 (溢價)
-        # 收盤價 == 成交價 = 橘色 (平價)
-        # 收盤價 < 成交價 = 綠色 (折價)
         # ==========================================
         def highlight_block_row(row):
             styles = [''] * len(row)
             try:
                 # 把字串轉回數字來比較大小
-                close_p = float(str(row['🔴收盤價']).replace(',', ''))
-                block_p = float(str(row['成交價']).replace(',', ''))
+                close_p = float(str(row['🔽收盤價']).replace(',', ''))
+                # 🔥 此處修復了原本 row['成交價'] 找不到欄位的 Bug
+                block_p = float(str(row['🔽成交價']).replace(',', ''))
                 
                 if close_p > block_p: color = '#FF4B4B'       # 紅色
                 elif close_p == block_p: color = '#FFA500'    # 橘色
@@ -2518,7 +2548,7 @@ if not block_df.empty:
             import datetime
             raw_date = datetime.datetime.now().strftime("%Y%m%d")
             
-        st.success(f"📊 {raw_date} 共偵測到 {len(display_df)} 筆大戶暗盤換手紀錄。")
+        st.success(f"更新 {raw_date} 共偵測到 {len(display_df)} 筆大戶暗盤換手紀錄。")
 
     except Exception as e:
         st.warning(f"⚠️ 資料解析發生錯誤: {str(e)}。顯示證交所原始回傳數據：")
