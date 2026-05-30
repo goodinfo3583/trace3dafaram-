@@ -371,7 +371,7 @@ def render_technical_chart(stock_id, timeframe="日線", selected_mas=[], show_r
                 highest_60d = df['High'].iloc[-60:].max()
                 # 如果今天的最高價，等於或突破過去 60 天的最高價
                 if df['High'].iloc[-1] >= highest_60d:
-                    signals.append("🚀 **波段創高**：今日股價突破 60 日 (約一季) 以來新高點，上攻動能極強！")
+                    signals.append("🚀 波段創高：今日股價突破 60 日 (約一季) 以來新高點，上攻動能極強！")
 
             # 6. 📈 均線多頭排列提示 (5MA > 10MA > 20MA > 60MA 且季線上揚)
             if len(df) >= 60:
