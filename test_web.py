@@ -2299,6 +2299,7 @@ else:
 
 # 🛠️ 【不可省略】讀取函數
 def get_specific_margin_data(keyword):
+    import os, pandas as pd
     found_files = []
     for root, dirs, files in os.walk(os.getcwd()):
         if '.git' in root or 'venv' in root: continue
@@ -2320,7 +2321,7 @@ def get_specific_margin_data(keyword):
         df.columns = df.columns.astype(str).str.replace('\ufeff', '').str.strip()
         
         for col in df.columns:
-            if "幅度" in col or "張數" in col or "%" in col or "％" in col:
+            if "幅度" in col or "張數" in col or "%" in col or "％" in col or "漲跌" in col:
                 df[col] = df[col].astype(str).str.replace(',', '', regex=False).str.replace('%', '', regex=False)
                 df[col] = pd.to_numeric(df[col], errors='coerce')
                 
@@ -2328,7 +2329,7 @@ def get_specific_margin_data(keyword):
     except Exception as e:
         return pd.DataFrame(), f"讀取崩潰 ({file_name}): {str(e)}"
 
-# 🛠️ 【不可省略】欄位清理與過濾函數 (修正欄位名稱，讓搜尋引擎認得)
+# 🛠️ 【不可省略】欄位清理與過濾函數
 def process_margin_df(df, type_name, flag_etf, flag_bond):
     if df.empty: return df
     df = df.copy()
@@ -2356,9 +2357,7 @@ def process_margin_df(df, type_name, flag_etf, flag_bond):
     col_id = next((c for c in df.columns if '代號' in c), None)
     
     if col_name and col_id:
-        # 🔥 【終極修正】：強迫改名為 '股票代號' 與 '股票名稱'，搜尋引擎才找得到！
         df = df.rename(columns={col_id: '股票代號', col_name: '股票名稱'})
-        
         df['股票代號'] = df['股票代號'].astype(str).str.strip()
         df['股票名稱'] = df['股票名稱'].astype(str).str.strip()
         
@@ -2368,17 +2367,68 @@ def process_margin_df(df, type_name, flag_etf, flag_bond):
         if not flag_bond: df = df[~mask_bond]
         if not flag_etf: df = df[~(mask_etf & ~mask_bond)] 
 
+    # 📊 核心機制：自動尋找「漲跌」相關欄位，進行優化排序
+    sort_col = next((c for c in df.columns if '漲跌' in str(c)), None)
+    if sort_col:
+        df[sort_col] = pd.to_numeric(df[sort_col], errors='coerce').fillna(0)
+        # 排序：漲幅/漲跌價大的（正值）絕對優先排在前面
+        df = df.sort_values(by=sort_col, ascending=False)
+
     df = df.reset_index(drop=True)
     df.index = df.index + 1
     return df
+
+# 🎨 核心渲染引擎：實現上漲整欄改紅，平盤下跌維持原樣
+def render_styled_margin_table(clean_df):
+    if clean_df.empty:
+        st.warning("⚠️ 無相符資料")
+        return
+
+    # 尋找關鍵的漲跌欄位
+    change_col = next((c for c in clean_df.columns if '漲跌' in str(c)), None)
+    
+    def style_row_by_price(row):
+        styles = [''] * len(row)
+        if change_col:
+            try:
+                val = float(str(row[change_col]).replace(',', ''))
+                if val > 0:
+                    # 🚀 強勢軋空股：整列文字改為顯目紅色，並加粗體
+                    return ['color: #FF4B4B; font-weight: bold;'] * len(row)
+            except:
+                pass
+        return styles
+
+    styled_df = clean_df.style.apply(style_row_by_price, axis=1)
+    
+    # 📐 欄位寬度最佳化配置：強行鎖定股票名稱寬度，完美讓右側當日數據浮現
+    col_config = {
+        "股票代號": st.column_config.TextColumn("股票代號", width=70),
+        "股票名稱": st.column_config.TextColumn("股票名稱", width=95)
+    }
+    
+    st.dataframe(
+        styled_df, 
+        use_container_width=True, 
+        hide_index=True,
+        column_config=col_config
+    )
+
+# 🕒 輔助函數：提早解析日期供大表頭使用
+def peek_data_date(keyword):
+    import re
+    _, msg = get_specific_margin_data(keyword)
+    return re.search(r'\d{8}', msg).group(0) if re.search(r'\d{8}', msg) else "未知"
 
 # ==========================================
 # 📅 區塊 4-1：融資減少動向
 # ==========================================
 st.write("---")
 st.markdown("<div id='section-4-1'></div>", unsafe_allow_html=True)
-st.header("🔄 區塊 4-1：融資減少動向")
 
+# 🎯 表頭優化：將最新數據日期直接與表頭並列，加上中括號且維持原色
+date_41 = peek_data_date("融資減少幅度")
+st.header(f"🔄 區塊 4-1：融資減少動向 ({date_41})")
 
 f_col1, f_col2, _ = st.columns([1, 1, 2])
 with f_col1: show_etf_41 = st.checkbox("顯示 ETF", value=True, key="margin_show_etf")
@@ -2388,44 +2438,28 @@ st.write("")
 c1, c2 = st.columns(2)
 
 with c1:
-    # 統一使用 h3 標籤，讓標題大小與區塊 3 完全對齊
     st.markdown("<h3 style='margin-top: 0; margin-bottom: 10px;'>📉 融資減少比例排名</h3>", unsafe_allow_html=True)
-    df_pct, msg_pct = get_specific_margin_data("融資減少幅度")
+    df_pct, _ = get_specific_margin_data("融資減少幅度")
     df_pct_clean = process_margin_df(df_pct, "幅度", show_etf_41, show_bond_41)
-    
-    if not df_pct_clean.empty:
-        # 👈 核心修改：只過濾出 8 碼日期字串
-        date_str = re.search(r'\d{8}', msg_pct).group(0) if re.search(r'\d{8}', msg_pct) else "未知"
-        
-        st.dataframe(df_pct_clean, use_container_width=True, hide_index=True)
-        # 👇 替換為科技藍置底純文字
-        st.markdown(f"<div style='color: #00D2FF; font-size: 16px; margin-top: 5px;'>最新數據: {date_str}</div>", unsafe_allow_html=True)
-    else:
-        st.warning("⚠️ 無相符資料")
+    render_styled_margin_table(df_pct_clean)
 
 with c2:
-    # 統一使用 h3 標籤
     st.markdown("<h3 style='margin-top: 0; margin-bottom: 10px;'>📉 融資減少張數排名</h3>", unsafe_allow_html=True)
-    df_vol, msg_vol = get_specific_margin_data("融資減少張數")
+    df_vol, _ = get_specific_margin_data("融資減少張數")
     df_vol_clean = process_margin_df(df_vol, "張數", show_etf_41, show_bond_41)
-    
-    if not df_vol_clean.empty:
-        date_str = re.search(r'\d{8}', msg_vol).group(0) if re.search(r'\d{8}', msg_vol) else "未知"
-        
-        st.dataframe(df_vol_clean, use_container_width=True, hide_index=True)
-        # 👇 替換為科技藍置底純文字
-        st.markdown(f"<div style='color: #00D2FF; font-size: 16px; margin-top: 5px;'>最新數據: {date_str}</div>", unsafe_allow_html=True)
-    else:
-        st.warning("⚠️ 無相符資料")
+    render_styled_margin_table(df_vol_clean)
 
 st.session_state['df_margin_pct'] = df_pct_clean
 st.session_state['df_margin_vol'] = df_vol_clean
+
 # ==========================================
 # 📅 區塊 4-2：借券賣出減少動向
 # ==========================================
 st.write("---")
 st.markdown("<div id='section-4-2'></div>", unsafe_allow_html=True)
-st.header("🔄 區塊 4-2：借券賣出減少動向")
+
+date_42 = peek_data_date("借券賣出減少幅度")
+st.header(f"🔄 區塊 4-2：借券賣出減少動向 ({date_42})")
 
 f_col1, f_col2, _ = st.columns([1, 1, 2])
 with f_col1: show_etf_42 = st.checkbox("顯示 ETF", value=True, key="stock_show_etf_42")
@@ -2435,46 +2469,28 @@ st.write("")
 c1, c2 = st.columns(2)
 
 with c1:
-    # 統一使用 h3 標籤，對齊版面
     st.markdown("<h3 style='margin-top: 0; margin-bottom: 10px;'>📉 借券賣出減少比例排名</h3>", unsafe_allow_html=True)
-    df_pct, msg_pct = get_specific_margin_data("借券賣出減少幅度")
+    df_pct, _ = get_specific_margin_data("借券賣出減少幅度")
     df_pct_clean = process_margin_df(df_pct, "幅度", show_etf_42, show_bond_42)
-    
-    if not df_pct_clean.empty:
-        # 👈 核心修改：只過濾出 8 碼日期字串
-        date_str = re.search(r'\d{8}', msg_pct).group(0) if re.search(r'\d{8}', msg_pct) else "未知"
-        
-        st.dataframe(df_pct_clean, use_container_width=True, hide_index=True)
-        # 👇 科技藍置底文字 (無括號，字體放大至 16px)
-        st.markdown(f"<div style='color: #00D2FF; font-size: 16px; margin-top: 5px;'>最新數據: {date_str}</div>", unsafe_allow_html=True)
-    else:
-        st.warning("⚠️ 無相符資料")
+    render_styled_margin_table(df_pct_clean)
 
 with c2:
-    # 統一使用 h3 標籤
     st.markdown("<h3 style='margin-top: 0; margin-bottom: 10px;'>📉 借券賣出減少張數排名</h3>", unsafe_allow_html=True)
-    df_vol, msg_vol = get_specific_margin_data("借券賣出減少張數")
+    df_vol, _ = get_specific_margin_data("借券賣出減少張數")
     df_vol_clean = process_margin_df(df_vol, "張數", show_etf_42, show_bond_42)
-    
-    if not df_vol_clean.empty:
-        date_str = re.search(r'\d{8}', msg_vol).group(0) if re.search(r'\d{8}', msg_vol) else "未知"
-        
-        st.dataframe(df_vol_clean, use_container_width=True, hide_index=True)
-        # 👇 科技藍置底文字 (無括號，字體放大至 16px)
-        st.markdown(f"<div style='color: #00D2FF; font-size: 16px; margin-top: 5px;'>最新數據: {date_str}</div>", unsafe_allow_html=True)
-    else:
-        st.warning("⚠️ 無相符資料")
+    render_styled_margin_table(df_vol_clean)
 
 st.session_state['df_short_pct'] = df_pct_clean
 st.session_state['df_short_vol'] = df_vol_clean
-
 
 # ==========================================
 # 📅 區塊 4-3：融券增加動向
 # ==========================================
 st.write("---")
 st.markdown("<div id='section-4-3'></div>", unsafe_allow_html=True)
-st.header("🔄 區塊 4-3：融券增加動向")
+
+date_43 = peek_data_date("融券增加幅度")
+st.header(f"🔄 區塊 4-3：融券增加動向 ({date_43})")
 
 f_col1, f_col2, _ = st.columns([1, 1, 2])
 with f_col1: show_etf_43 = st.checkbox("顯示 ETF", value=True, key="stock_show_etf_43")
@@ -2484,38 +2500,19 @@ st.write("")
 c1, c2 = st.columns(2)
 
 with c1:
-    # 統一使用 h3 標籤
     st.markdown("<h3 style='margin-top: 0; margin-bottom: 10px;'>📈 融券增加比例排名</h3>", unsafe_allow_html=True)
-    df_pct, msg_pct = get_specific_margin_data("融券增加幅度")
+    df_pct, _ = get_specific_margin_data("融券增加幅度")
     df_pct_clean = process_margin_df(df_pct, "幅度", show_etf_43, show_bond_43)
-    
-    if not df_pct_clean.empty:
-        date_str = re.search(r'\d{8}', msg_pct).group(0) if re.search(r'\d{8}', msg_pct) else "未知"
-        
-        st.dataframe(df_pct_clean, use_container_width=True, hide_index=True)
-        # 👇 科技藍置底文字 (無括號，字體放大至 16px)
-        st.markdown(f"<div style='color: #00D2FF; font-size: 16px; margin-top: 5px;'>最新數據: {date_str}</div>", unsafe_allow_html=True)
-    else:
-        st.warning("⚠️ 無相符資料")
+    render_styled_margin_table(df_pct_clean)
 
 with c2:
-    # 統一使用 h3 標籤
     st.markdown("<h3 style='margin-top: 0; margin-bottom: 10px;'>📈 融券增加張數排名</h3>", unsafe_allow_html=True)
-    df_vol, msg_vol = get_specific_margin_data("融券增加張數")
+    df_vol, _ = get_specific_margin_data("融券增加張數")
     df_vol_clean = process_margin_df(df_vol, "張數", show_etf_43, show_bond_43)
-    
-    if not df_vol_clean.empty:
-        date_str = re.search(r'\d{8}', msg_vol).group(0) if re.search(r'\d{8}', msg_vol) else "未知"
-        
-        st.dataframe(df_vol_clean, use_container_width=True, hide_index=True)
-        # 👇 科技藍置底文字 (無括號，字體放大至 16px)
-        st.markdown(f"<div style='color: #00D2FF; font-size: 16px; margin-top: 5px;'>最新數據: {date_str}</div>", unsafe_allow_html=True)
-    else:
-        st.warning("⚠️ 無相符資料")
+    render_styled_margin_table(df_vol_clean)
 
 st.session_state['df_margin_plus_pct'] = df_pct_clean
 st.session_state['df_margin_plus_vol'] = df_vol_clean
-# ==========券資比資料請一起搬遷============
 
 # ==========================================
 # 💰 區塊 5：大股東動向 (日期去重與去西元修復版)
