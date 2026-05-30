@@ -2579,7 +2579,7 @@ else:
     st.info("🕒 目前查無今日鉅額交易資料，或證交所尚未結算公告。")
 # ==========================================以上網頁核心區塊 
 # ==========================================
-# 🏆 頂級選股池核心引擎 (精確量化權重 + 暗盤連動 + Delta測試版)
+# 🏆 頂級選股池核心引擎 (精確量化權重 + 暗盤連動 + 歷史追蹤分頁)
 # ==========================================
 with top_pool_container:
     st.write("---")
@@ -2587,6 +2587,7 @@ with top_pool_container:
     
     import os
     import glob
+    import re
 
     # 1. 自動掃描最新資料日期
     txt_pattern = os.path.join(DATA_DIR, "*持股排名變化*.txt") 
@@ -2676,7 +2677,7 @@ with top_pool_container:
                     except: return 0.0
                 return 0.0
 
-            # 🚀 跨區塊連動：先偷偷抓一下今天有沒有鉅額交易的股票代號！
+            # 🚀 跨區塊連動：偷抓今日鉅額交易的股票代號！
             block_sids = set()
             try:
                 temp_block = fetch_block_trades()
@@ -2690,42 +2691,38 @@ with top_pool_container:
                 sname = str(row.get('股票名稱', '')).strip()
                 b1_dyn = str(row.get(dyn_col, '')) if dyn_col else '-'
                 
-                # 🔥 暗盤標籤注入：如果在鉅額名單中，加上專屬徽章
-                if sid in block_sids:
-                    b1_dyn = f"{b1_dyn} | 🎯暗盤"
+                # 🔥 暗盤標籤注入
+                if sid in block_sids: b1_dyn = f"{b1_dyn} | 🎯暗盤"
                     
                 b1_rank = str(row.get(rank_col, '-')) if rank_col else '-'
                 score = 0.0
                 details = [] 
                 
-                r_b2_1 = "✔️" if check_b2_strict(df_b2_1, sid, bad_b2_vol) else ""
-                if r_b2_1: score += 1; details.append("外買佔: +1")
+                if check_b2_strict(df_b2_1, sid, bad_b2_vol): score += 1; details.append("外買佔: +1"); r_b2_1 = "✔️"
+                else: r_b2_1 = ""
                 
-                r_b2_2 = "✔️" if check_b2_strict(df_b2_2, sid, bad_b2_vol) else ""
-                if r_b2_2: score += 1; details.append("投買佔: +1")
+                if check_b2_strict(df_b2_2, sid, bad_b2_vol): score += 1; details.append("投買佔: +1"); r_b2_2 = "✔️"
+                else: r_b2_2 = ""
                 
-                r_b2_3 = "✔️" if check_b2_strict(df_b2_3, sid, bad_b2_iss) else ""
-                if r_b2_3: score += 1; details.append("外佔發行: +1")
+                if check_b2_strict(df_b2_3, sid, bad_b2_iss): score += 1; details.append("外佔發行: +1"); r_b2_3 = "✔️"
+                else: r_b2_3 = ""
                 
-                r_b2_4 = "✔️" if check_b2_strict(df_b2_4, sid, bad_b2_iss) else ""
-                if r_b2_4: score += 1; details.append("投佔發行: +1")
+                if check_b2_strict(df_b2_4, sid, bad_b2_iss): score += 1; details.append("投佔發行: +1"); r_b2_4 = "✔️"
+                else: r_b2_4 = ""
                 
                 if get_today_ratio(df_b2_1, sid, '當日買佔比%') <= -10: score -= 0.5; details.append("外買佔(<-10%): -0.5")
                 if get_today_ratio(df_b2_2, sid, '當日買佔比%') <= -10: score -= 0.5; details.append("投買佔(<-10%): -0.5")
                 if get_today_ratio(df_b2_3, sid, '當日買發比%') <= -10: score -= 0.5; details.append("外佔發(<-10%): -0.5")
                 if get_today_ratio(df_b2_4, sid, '當日買發比%') <= -10: score -= 0.5; details.append("投佔發(<-10%): -0.5")
                 
-                s_fd, r_b3_fd = get_b3_score(df_b3, sid, '外資日')
-                if s_fd > 0: score += s_fd; details.append(f"外資日連: +{s_fd}")
-                
-                s_fw, r_b3_fw = get_b3_score(df_b3, sid, '外資週')
-                if s_fw > 0: score += s_fw; details.append(f"外資週連: +{s_fw}")
-                
-                s_id, r_b3_id = get_b3_score(df_b3, sid, '投信日')
-                if s_id > 0: score += s_id; details.append(f"投信日連: +{s_id}")
-                
-                s_iw, r_b3_iw = get_b3_score(df_b3, sid, '投信週')
-                if s_iw > 0: score += s_iw; details.append(f"投信週連: +{s_iw}")
+                s_fd, r_b3_fd = get_b3_score(df_b3, sid, '外資日'); score += s_fd; 
+                if s_fd > 0: details.append(f"外資日連: +{s_fd}")
+                s_fw, r_b3_fw = get_b3_score(df_b3, sid, '外資週'); score += s_fw; 
+                if s_fw > 0: details.append(f"外資週連: +{s_fw}")
+                s_id, r_b3_id = get_b3_score(df_b3, sid, '投信日'); score += s_id; 
+                if s_id > 0: details.append(f"投信日連: +{s_id}")
+                s_iw, r_b3_iw = get_b3_score(df_b3, sid, '投信週'); score += s_iw; 
+                if s_iw > 0: details.append(f"投信週連: +{s_iw}")
                 
                 r_b4_mar = ""
                 if sid in s_b4_mar_pct: r_b4_mar += "✔️(幅)"; score += 1; details.append("資減(幅): +1")
@@ -2742,18 +2739,15 @@ with top_pool_container:
                 r_b5 = ""
                 if not df_b5.empty and sid in df_b5['股票代號'].values:
                     trend = str(df_b5[df_b5['股票代號'] == sid].iloc[0].get('週動態', ''))
-                    if '大增' in trend or ('增' in trend and '微' not in trend): 
-                        score += 2; r_b5 = "🔥大增(+2)"; details.append("大股東大增: +2")
+                    if '大增' in trend or ('增' in trend and '微' not in trend): score += 2; r_b5 = "🔥大增(+2)"; details.append("大股東大增: +2")
                     elif '微增' in trend: score += 1; r_b5 = "↗️微增(+1)"; details.append("大股東微增: +1")
                     elif '大減' in trend: score -= 1; r_b5 = "🚨大減(-1)"; details.append("大股東大減: -1")
                     elif '減' in trend and '微' in trend: score -= 0.5; r_b5 = "↘️微減(-0.5)"; details.append("大股東微減: -0.5")
                     elif '減' in trend: score -= 0.5; r_b5 = "📉減(-0.5)"; details.append("大股東減: -0.5")
                     else: r_b5 = trend
                 
-                is_fo_sell = sid in fo_sell_ids
-                is_it_sell = sid in it_sell_ids
-                if is_fo_sell and is_it_sell: 
-                    r_warn = "🚨外投雙倒"; score -= 2.0; details.append("外投雙倒: -2")
+                is_fo_sell = sid in fo_sell_ids; is_it_sell = sid in it_sell_ids
+                if is_fo_sell and is_it_sell: r_warn = "🚨外投雙倒"; score -= 2.0; details.append("外投雙倒: -2")
                 elif is_fo_sell: r_warn = "⚠️外資倒(換手?)"
                 elif is_it_sell: r_warn = "⚠️投信倒(換手?)"
                 else: r_warn = "-"
@@ -2761,64 +2755,112 @@ with top_pool_container:
                 score_breakdown = " \n".join(details) if details else "無加扣分"
 
                 results.append({
-                    '總分': score,
-                    '股票代號': sid,
-                    '股票名稱': sname,
-                    '評分明細': score_breakdown, 
-                    '最新動態': b1_dyn,
-                    '今日上榜': b1_rank,  
+                    '總分': score, '股票代號': sid, '股票名稱': sname, '評分明細': score_breakdown, 
+                    '最新動態': b1_dyn, '今日上榜': b1_rank,  
                     '外買佔比': r_b2_1, '投買佔比': r_b2_2, '外佔發行': r_b2_3, '投佔發行': r_b2_4,
                     '外日連': r_b3_fd, '外週連': r_b3_fw, '投日連': r_b3_id, '投週連': r_b3_iw,
                     '資減': r_b4_mar, '借減': r_b4_sho, '券增': r_b4_mp,
                     '大股東動向': r_b5, '法人賣出警示': r_warn
                 })
                 
-            res_df = pd.DataFrame(results)
-            res_df = res_df.sort_values(by='總分', ascending=False)
-            res_df = res_df.drop_duplicates(subset=['股票代號'], keep='first').reset_index(drop=True)
+            res_df = pd.DataFrame(results).sort_values(by='總分', ascending=False).drop_duplicates(subset=['股票代號']).reset_index(drop=True)
             
             # ==========================================
-            # 🧪 測試區塊：強制產生昨日分數來驗證 Delta 欄位！
+            # 🔥 真正的 Delta 計算引擎：自動讀取硬碟歷史紀錄相減
             # ==========================================
-            import random
-            # 建立一個測試用的 0528 總分 (把今天的總分隨機減掉 0 到 3 分)
-            res_df['測試_0528總分'] = res_df['總分'].apply(lambda x: x - round(random.uniform(0, 3), 1))
-            
-            # 真正的 Delta 計算：今日總分 減去 昨日總分
-            res_df['Delta'] = (res_df['總分'] - res_df['測試_0528總分']).round(1)
-            res_df['Delta'] = res_df['Delta'].apply(lambda x: f"+{x}" if x > 0 else str(x))
+            history_files = sorted(glob.glob(os.path.join(SCORE_HISTORY_DIR, "scores_*.csv")), reverse=True)
+            prev_scores_dict = {}
+            # 確保資料夾內至少有兩天的檔案 (今天與昨天) 才能相減
+            if len(history_files) >= 2:
+                try:
+                    prev_df = pd.read_csv(history_files[1]) # [1] 代表時間第二近的檔案 (也就是昨天)
+                    prev_scores_dict = dict(zip(prev_df['股票代號'].astype(str).str.replace(r'\D', '', regex=True), prev_df['總分']))
+                except: pass
+
+            def calc_table_delta(row):
+                sid = str(row['股票代號']).replace(r'\D', '')
+                curr_score = row.get('總分', 0)
+                # 若找不到昨天分數，代表可能是今天新上榜，預設 Delta 等於今日總分 (或 0)
+                prev_score = prev_scores_dict.get(sid, curr_score) 
+                delta = round(curr_score - prev_score, 1)
+                return f"+{delta}" if delta > 0 else str(delta)
+
+            if not res_df.empty and '總分' in res_df.columns:
+                res_df['Delta'] = res_df.apply(calc_table_delta, axis=1)
             # ==========================================
 
-            cols = [c for c in res_df.columns if c not in ['Delta', '評分明細', '測試_0528總分']]
-            
-            # 將 Delta 與 測試分數 排在總分旁邊
+            cols = [c for c in res_df.columns if c not in ['Delta', '評分明細']]
             score_idx = cols.index('總分')
-            cols.insert(score_idx + 1, '測試_0528總分')
-            cols.insert(score_idx + 2, 'Delta')
-            
+            cols.insert(score_idx + 1, 'Delta')
             name_idx = cols.index('股票名稱')
             cols.insert(name_idx + 1, '評分明細')
-            
             res_df = res_df[cols]
 
             st.session_state['top_pool_df'] = res_df
-
-            st.success(f"選股池掃描完成！共過濾出 {len(res_df)} 檔潛力標的。 (已開啟 Delta 測試模組)")
             
-            # 🔥 欄位寬度極限壓縮：max_chars=4 (大約只顯示3-4個中文字)
-            st.dataframe(
-                res_df, 
-                use_container_width=True, 
-                hide_index=True,
-                column_config={
-                    "評分明細": st.column_config.TextColumn(
-                        "評分明細",
-                        help="滑鼠游標停留在這裡，查看完整加扣分明細",
-                        width="small",
-                        max_chars=4 
-                    )
-                }
-            )
+            # ==========================================
+            # 🌟 創新介面：引入 Streamlit 分頁功能 (Tabs)
+            # ==========================================
+            tab1, tab2 = st.tabs(["🔥 今日最新排行", "📈 歷史分數追蹤表"])
+            
+            with tab1:
+                st.success(f"選股池掃描完成！今日共過濾出 {len(res_df)} 檔潛力標的。")
+                st.dataframe(
+                    res_df, 
+                    use_container_width=True, 
+                    hide_index=True,
+                    column_config={
+                        "評分明細": st.column_config.TextColumn(
+                            "評分明細", help="滑鼠游標停留在這裡，查看完整明細", width="small", max_chars=4 
+                        )
+                    }
+                )
+                
+            with tab2:
+                st.info("💡 這裡統整了標的在過去一週選股池中的【總分變化】，可藉此觀察籌碼動能的延續性與驗證 Delta！")
+                try:
+                    # 反向讀取所有歷史檔案，找出最近 7 天的軌跡
+                    all_hist_files = sorted(glob.glob(os.path.join(SCORE_HISTORY_DIR, "scores_*.csv")))
+                    if len(all_hist_files) > 0:
+                        hist_list = []
+                        for f in all_hist_files[-7:]:
+                            try:
+                                # 抓取檔名中的日期 (例如 scores_20260528.csv -> 05/28)
+                                date_str = re.search(r'\d{8}', os.path.basename(f)).group(0)
+                                formatted_date = f"{date_str[4:6]}/{date_str[6:]}"
+                                
+                                df_h = pd.read_csv(f)
+                                if '股票代號' in df_h.columns and '總分' in df_h.columns:
+                                    df_h['日期'] = formatted_date
+                                    df_h['代號'] = df_h['股票代號'].astype(str).str.replace(r'\D', '', regex=True)
+                                    df_h = df_h[['代號', '總分', '日期']]
+                                    hist_list.append(df_h)
+                            except: pass
+                        
+                        if hist_list:
+                            # 將所有日期的紀錄垂直合併
+                            hist_combined = pd.concat(hist_list, ignore_index=True)
+                            
+                            # 進行樞紐分析 (Pivot)：變成橫向矩陣 (代號 vs 日期)
+                            hist_pivot = hist_combined.pivot_table(index='代號', columns='日期', values='總分', aggfunc='first').reset_index()
+                            
+                            # 補上股票名稱 (從目前的 res_df 拿取)
+                            name_mapping = dict(zip(res_df['股票代號'].astype(str).str.replace(r'\D', '', regex=True), res_df['股票名稱']))
+                            hist_pivot.insert(1, '股票名稱', hist_pivot['代號'].map(name_mapping).fillna('-'))
+                            
+                            # ✨ 智慧過濾：只顯示「今天還在榜上」的股票，並依照今日分數高低排序
+                            latest_day = hist_pivot.columns[-1]
+                            hist_pivot = hist_pivot[hist_pivot['股票名稱'] != '-']
+                            hist_pivot = hist_pivot.sort_values(by=latest_day, ascending=False).reset_index(drop=True)
+                            
+                            st.dataframe(hist_pivot, use_container_width=True, hide_index=True)
+                        else:
+                            st.warning("歷史資料格式不符，無法解析。")
+                    else:
+                        st.warning("尚無足夠的歷史分數紀錄。需等待系統累積數日資料。")
+                except Exception as e:
+                    st.error(f"歷史分數讀取發生錯誤: {e}")
+
 # ==========================================
 # 📊 【蜂蜜計數器】本站累計觀測人次統計
 # ==========================================
