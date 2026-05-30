@@ -1035,8 +1035,10 @@ def render_sidebar_market_summary():
     backup_margin_path = os.path.join(DATA_DIR, "sidebar_margin_backup.csv")
 
     margin_today, margin_prev = None, None
+    date_key = None
 
     if twse_df is not None and not twse_df.empty:
+        # 1. 處理三大法人資料 (獨立 Try-Except 防止互相干擾)
         try:
             twse_df.to_csv(backup_df_path, index=False, encoding='utf-8-sig')
             with open(backup_title_path, 'w', encoding='utf-8') as f:
@@ -1047,7 +1049,11 @@ def render_sidebar_market_summary():
                 
             market_hist_file = os.path.join(MARKET_HISTORY_DIR, f"market_{date_key}.csv")
             twse_df.to_csv(market_hist_file, index=False, encoding='utf-8-sig')
+        except:
+            pass
 
+        # 2. 嘗試連線抓取今日融資
+        try:
             margin_url = "https://www.twse.com.tw/rwd/zh/margin/MI_MARGN?response=json&selectType=MS"
             res_margin = requests.get(margin_url, timeout=5)
             if res_margin.status_code == 200:
@@ -1072,17 +1078,24 @@ def render_sidebar_market_summary():
                     margin_temp_df = pd.DataFrame([{"today_bal": margin_today, "prev_bal": margin_prev}])
                     margin_temp_df.to_csv(backup_margin_path, index=False, encoding='utf-8-sig')
                     
-                    margin_hist_file = os.path.join(MARKET_HISTORY_DIR, f"margin_{date_key}.csv")
-                    margin_temp_df.to_csv(margin_hist_file, index=False, encoding='utf-8-sig')
-                else:
-                    # 🔥 終極修復點：如果連線成功但抓不到今日融資（例如週末遇到證交所空包彈），強制觸發備援急救包！
-                    if os.path.exists(backup_margin_path):
-                        margin_df_backup = pd.read_csv(backup_margin_path)
-                        if not margin_df_backup.empty:
-                            margin_today = float(margin_df_backup.iloc[0]['today_bal'])
-                            margin_prev = float(margin_df_backup.iloc[0]['prev_bal'])
+                    if date_key is not None:
+                        margin_hist_file = os.path.join(MARKET_HISTORY_DIR, f"margin_{date_key}.csv")
+                        margin_temp_df.to_csv(margin_hist_file, index=False, encoding='utf-8-sig')
         except:
             pass
+
+        # 3. 🔥 終極無敵修復點：跳出 Try-Except 的結界！
+        # 不管上面 API 是超時、報錯、還是假資料，只要最後 margin_today 還是空的，就強制啟用備援！
+        if margin_today is None:
+            if os.path.exists(backup_margin_path):
+                try:
+                    margin_df_backup = pd.read_csv(backup_margin_path)
+                    if not margin_df_backup.empty:
+                        margin_today = float(margin_df_backup.iloc[0]['today_bal'])
+                        margin_prev = float(margin_df_backup.iloc[0]['prev_bal'])
+                except:
+                    pass
+
     else:
         # 🌙 這裡處理的是「連三大法人都抓不到」的全面斷線狀況
         if os.path.exists(backup_df_path) and os.path.exists(backup_title_path):
@@ -1100,6 +1113,7 @@ def render_sidebar_market_summary():
                     margin_prev = float(margin_df_backup.iloc[0]['prev_bal'])
             except:
                 pass
+
     # ------------------------------------------
     # B. 計算與 UI 排版視覺化渲染
     # ------------------------------------------
@@ -1167,6 +1181,7 @@ def render_sidebar_market_summary():
         st.sidebar.markdown(card_html, unsafe_allow_html=True)
     else:
         st.sidebar.info("🕒 目前查無今日三大法人買賣資料。")
+        
 # 執行渲染側邊欄大盤卡片
 render_sidebar_market_summary()
 
