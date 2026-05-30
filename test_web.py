@@ -2865,39 +2865,35 @@ with top_pool_container:
 
             st.session_state['top_pool_df'] = res_df
             # ==========================================
-# ==========================================
-# 💾 核心引擎：選股池結果強制同步覆寫存檔
-# ==========================================
-if res_df is not None and not res_df.empty:
-    try:
-        # 1. 自動對齊資料的真實日期 (避免用到週末的電腦時間)
-        import datetime
-        import re
-        
-        # 嘗試從您剛剛寫好的大盤日期變數中提取，若無則預設抓今天
-        file_date_str = datetime.datetime.now().strftime("%Y%m%d") 
-        if 'twse_title' in locals() and twse_title:
-            date_match = re.search(r'(\d+)年(\d+)月(\d+)日', twse_title)
-            if date_match:
-                roc_yr, m, d = date_match.groups()
-                file_date_str = f"{int(roc_yr) + 1911}{int(m):02d}{int(d):02d}"
-
-        # 2. 定義今日存檔路徑
-        today_score_file = os.path.join(SCORE_HISTORY_DIR, f"scores_{file_date_str}.csv")
-        
-        # 3. 🔴 關鍵動作：強制無條件覆寫！
-        # 不論一天跑幾次，永遠把當下最新算出的 res_df 直接覆蓋進歷史檔
-        res_df.to_csv(today_score_file, index=False, encoding='utf-8-sig')
-        
-    except Exception as e:
-        pass
-
-# ------------------------------------------
-# (下方接著您原本的 tab1, tab2 介面渲染程式碼)
-# tab1, tab2 = st.tabs(["🔥 今日最新排行", "📈 歷史分數追蹤表"])
-# with tab1: ...
             # ==========================================
-            # 🌟 Streamlit "歷史分數追蹤"分頁的頁籤功能 (Tabs)
+            # 💾 核心引擎：選股池結果強制同步覆寫存檔
+            # ==========================================
+            if res_df is not None and not res_df.empty:
+                try:
+                    # 1. 自動對齊資料的真實日期 (避免用到週末的電腦時間)
+                    import datetime
+                    import re
+        
+                    # 嘗試從您剛剛寫好的大盤日期變數中提取，若無則預設抓今天
+                    file_date_str = datetime.datetime.now().strftime("%Y%m%d") 
+                    if 'twse_title' in locals() and twse_title:
+                        date_match = re.search(r'(\d+)年(\d+)月(\d+)日', twse_title)
+                        if date_match:
+                            roc_yr, m, d = date_match.groups()
+                            file_date_str = f"{int(roc_yr) + 1911}{int(m):02d}{int(d):02d}"
+
+                    # 2. 定義今日存檔路徑
+                    today_score_file = os.path.join(SCORE_HISTORY_DIR, f"scores_{file_date_str}.csv")
+        
+                    # 3. 🔴 關鍵動作：強制無條件覆寫！
+                    # 不論一天跑幾次，永遠把當下最新算出的 res_df 直接覆蓋進歷史檔
+                    res_df.to_csv(today_score_file, index=False, encoding='utf-8-sig')
+        
+                except Exception as e:
+                    pass
+
+            # ==========================================
+            # 🌟 Streamlit "🔥 今日最新排行", "📈 歷史分數追蹤表"分頁的頁籤功能 (Tabs)
             # ==========================================
             tab1, tab2 = st.tabs(["🔥 今日最新排行", "📈 歷史分數追蹤表"])
             
