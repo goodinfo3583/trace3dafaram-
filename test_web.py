@@ -23,7 +23,80 @@ BLOCK_HISTORY_DIR = os.path.join(DATA_DIR, "BlockHistory")
 for folder in [SCORE_HISTORY_DIR, MARKET_HISTORY_DIR, BLOCK_HISTORY_DIR]:
     if not os.path.exists(folder):
         os.makedirs(folder)
+# ==========================================
+# ==========================================
+# 🧪 區塊 00：臺股期貨未平倉測試區 (置頂測試)
+# ==========================================
+import requests
+from bs4 import BeautifulSoup
 
+st.markdown("### 🧪 區塊 00：期貨未平倉測試區 (指定日期 2026/05/29)")
+
+@st.cache_data(ttl=600)
+def fetch_futures_oi(test_date="2026/05/29"):
+    url = "https://www.taifex.com.tw/cht/3/futContractsDate"
+    # 期交所查詢歷史日期的參數 payload
+    payload = {'queryDate': test_date}
+    headers = {'User-Agent': 'Mozilla/5.0'}
+    
+    result = {"外資": 0, "投信": 0, "自營商": 0}
+    
+    try:
+        res = requests.post(url, data=payload, headers=headers, timeout=5)
+        soup = BeautifulSoup(res.text, 'html.parser')
+        rows = soup.find_all('tr')
+        
+        current_product = ""
+        for row in rows:
+            tds = row.find_all('td')
+            texts = [td.get_text(strip=True) for td in tds]
+            
+            # 過濾掉無效的標題行或空白行
+            if not texts or len(texts) < 10:
+                continue
+                
+            # 判斷目前讀取到哪個商品
+            if "臺股期貨" in texts:
+                current_product = "臺股期貨"
+            elif any("期貨" in t for t in texts[:2]):
+                current_product = "其他商品"
+                
+            # 只針對臺股期貨進行資料萃取
+            if current_product == "臺股期貨":
+                identity = None
+                if "外資" in texts: identity = "外資"
+                elif "投信" in texts: identity = "投信"
+                elif "自營商" in texts: identity = "自營商"
+                
+                if identity:
+                    # 💡 破解期交所表格魔法：不論有沒有合併儲存格，
+                    # 該行的倒數第二個資料絕對是「未平倉淨口數」！
+                    net_oi_str = texts[-2].replace(',', '')
+                    try:
+                        result[identity] = int(net_oi_str)
+                    except:
+                        pass
+                        
+    except Exception as e:
+        st.error(f"連線期交所發生錯誤: {e}")
+        
+    return result
+
+# 執行抓取 (強制指定 5/29)
+oi_data = fetch_futures_oi("2026/05/29")
+
+# 視覺化顯示
+c1, c2, c3 = st.columns(3)
+def format_oi(val):
+    color = "#FF4B4B" if val > 0 else "#00CC66" if val < 0 else "white"
+    sign = "+" if val > 0 else ""
+    return f"<span style='color:{color}; font-weight:bold; font-size:22px;'>{sign}{val:,}</span>"
+
+c1.markdown(f"<div style='background-color:#1e293b; padding:15px; border-radius:8px;'>🌐 外資 TX淨未平倉<br>{format_oi(oi_data['外資'])} 口</div>", unsafe_allow_html=True)
+c2.markdown(f"<div style='background-color:#1e293b; padding:15px; border-radius:8px;'>🏦 投信 TX淨未平倉<br>{format_oi(oi_data['投信'])} 口</div>", unsafe_allow_html=True)
+c3.markdown(f"<div style='background-color:#1e293b; padding:15px; border-radius:8px;'>🏢 自營商 TX淨未平倉<br>{format_oi(oi_data['自營商'])} 口</div>", unsafe_allow_html=True)
+st.write("---")
+# ==========================================
 # ==========================================
 # 🧹 清道夫：強制刪除週末錯誤生成的假檔案 (05/28, 05/30, 05/31)
 # ==========================================
