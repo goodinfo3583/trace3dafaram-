@@ -1033,65 +1033,112 @@ if search_query:
 # ==========================================
 # 🧭 側邊欄導航 (無感互動+休市備援版)
 # ==========================================
-
-# ------------------------------------------
-# 1. 大盤籌碼導航總覽引擎 (純三大法人精簡版)
-# ------------------------------------------
+#大盤資金風向球
 def render_sidebar_market_summary():
-    """自動連線證交所 API，若遇休市/週末切換至備援，抓到新數據則自動儲存為永久歷史 CSV 檔"""
+    """自動連線證交所抓取三大法人與融資餘額，支援週末休市備援，並自動儲存每日永久歷史 CSV"""
     import datetime
     import pandas as pd
     import streamlit as st
     import re
+    import requests
 
     st.sidebar.markdown("<h2 style='margin-top: 0; margin-bottom: 5px;'>📊 大盤資金風向球</h2>", unsafe_allow_html=True)
 
+    # ------------------------------------------
+    # A. 數據採集與永久歸檔核心
+    # ------------------------------------------
     twse_title, twse_df = fetch_twse_institutional_data()
 
     backup_df_path = os.path.join(DATA_DIR, "sidebar_twse_df_backup.csv")
     backup_title_path = os.path.join(DATA_DIR, "sidebar_twse_title_backup.txt")
+    backup_margin_path = os.path.join(DATA_DIR, "sidebar_margin_backup.csv")
+
+    margin_today, margin_prev = None, None
 
     if twse_df is not None and not twse_df.empty:
-        # 🟢 盤後有正常抓到當日新數據：即時更新日常備援，並寫入永久歷史庫
+        # 🟢 情況一：工作日盤後成功獲取最新數據
         try:
             twse_df.to_csv(backup_df_path, index=False, encoding='utf-8-sig')
             with open(backup_title_path, 'w', encoding='utf-8') as f:
                 f.write(str(twse_title))
             
-            # 🚀 歷史歸檔機制：將「115年05月29日」精準轉為「20260529」作為檔名
             date_match = re.search(r'(\d+)年(\d+)月(\d+)日', twse_title)
-            if date_match:
-                roc_yr, m, d = date_match.groups()
-                ad_yr = int(roc_yr) + 1911
-                date_key = f"{ad_yr}{int(m):02d}{int(d):02d}"
-            else:
-                date_key = datetime.datetime.now().strftime("%Y%m%d")
+            date_key = f"{int(date_match.group(1))+1911}{int(date_match.group(2)):02d}{int(date_match.group(3)):02d}" if date_match else datetime.datetime.now().strftime("%Y%m%d")
                 
             market_hist_file = os.path.join(MARKET_HISTORY_DIR, f"market_{date_key}.csv")
             twse_df.to_csv(market_hist_file, index=False, encoding='utf-8-sig')
+
+            # 融資融券底層數據全自動分層解碼引擎
+            margin_url = "https://www.twse.com.tw/rwd/zh/margin/MI_MARGN?response=json&selectType=MS"
+            res_margin = requests.get(margin_url, timeout=5)
+            if res_margin.status_code == 200:
+                m_json = res_margin.json()
+                m_data = []
+                
+                if "data" in m_json and isinstance(m_json["data"], list):
+                    m_data = m_json["data"]
+                elif "tables" in m_json and isinstance(m_json["tables"], list) and len(m_json["tables"]) > 0:
+                    first_table = m_json["tables"][0]
+                    if isinstance(first_table, dict) and "data" in first_table:
+                        m_data = first_table["data"]
+                
+                if isinstance(m_data, list):
+                    for row in m_data:
+                        if row and len(row) >= 6 and "融資" in str(row[0]):
+                            margin_prev = float(str(row[4]).replace(',', '').strip())
+                            margin_today = float(str(row[5]).replace(',', '').strip())
+                            break
+                
+                if margin_today is not None:
+                    margin_temp_df = pd.DataFrame([{"today_bal": margin_today, "prev_bal": margin_prev}])
+                    margin_temp_df.to_csv(backup_margin_path, index=False, encoding='utf-8-sig')
+                    
+                    margin_hist_file = os.path.join(MARKET_HISTORY_DIR, f"margin_{date_key}.csv")
+                    margin_temp_df.to_csv(margin_hist_file, index=False, encoding='utf-8-sig')
         except:
             pass
     else:
-        # 🌙 遇到週末或股市休市：全自動切換至上一交易日存檔數據
+        # 🌙 情況二：週末或股市休市期間，全自動啟用歷史快照存檔
         if os.path.exists(backup_df_path) and os.path.exists(backup_title_path):
             try:
                 twse_df = pd.read_csv(backup_df_path, encoding='utf-8-sig')
                 with open(backup_title_path, 'r', encoding='utf-8') as f:
                     twse_title = f.read().strip()
-                st.sidebar.caption("🌙 週末/休市期間：自動啟用上一交易日存檔數據")
+                # ❌ 已依指示刪除原本的 st.sidebar.caption 提示文字，保持版面極簡乾淨
+            except:
+                pass
+        if os.path.exists(backup_margin_path):
+            try:
+                margin_df_backup = pd.read_csv(backup_margin_path)
+                if not margin_df_backup.empty:
+                    margin_today = float(margin_df_backup.iloc[0]['today_bal'])
+                    margin_prev = float(margin_df_backup.iloc[0]['prev_bal'])
             except:
                 pass
 
-    if twse_df is not None and not twse_df.empty:
+    # ------------------------------------------
+    # B. 計算與 UI 排版視覺化渲染
+    # ------------------------------------------
+    # 🔥 修正安全機制：確保就算沒抓到即時三大法人，只要有融資歷史存檔就能完整渲染整張大盤卡片
+    if (twse_df is not None and not twse_df.empty) or (margin_today is not None):
+        
+        # 🚀 修正處 1：將「今日」轉換為 8 碼資料日期 (精確對齊為 20260529，而非電腦時間)
+        date_str = "未知日期"
+        if twse_title:
+            date_match = re.search(r'(\d+)年(\d+)月(\d+)日', twse_title)
+            if date_match:
+                roc_yr, m, d = date_match.groups()
+                ad_yr = int(roc_yr) + 1911
+                date_str = f"{ad_yr}{int(m):02d}{int(d):02d}"
+        
         now = datetime.datetime.now()
         current_time = now.time()
+        is_weekend_mode = not (twse_df is not None and not twse_df.empty and datetime.datetime.today().weekday() < 5)
         
-        if current_time < datetime.time(14, 50) and "休市" not in twse_title:
+        if current_time < datetime.time(14, 50) and not is_weekend_mode:
             status_badge = "⏳ <span style='color:#FFCC00;'>盤後結算中</span>"
-            date_str = "今日"
         else:
             status_badge = "🌕 <span style='color:#00D2FF;'>完整版</span>"
-            date_str = twse_title.replace("三大法人買賣金額統計表", "").strip() or "今日結算"
 
         def to_hundred_million(val_str):
             try: return float(str(val_str).replace(',', '')) / 100000000
@@ -1099,14 +1146,15 @@ def render_sidebar_market_summary():
 
         net_buy_foreign = 0.0; net_buy_trust = 0.0; net_buy_dealer = 0.0; net_buy_total = 0.0
 
-        for index, row in twse_df.iterrows():
-            unit_name = str(row['單位名稱']).strip()
-            net_val = to_hundred_million(row['買賣差額'])
-            
-            if unit_name in ['外資及陸資(不含外資自營商)', '外資自營商']: net_buy_foreign += net_val
-            elif unit_name == '投信': net_buy_trust += net_val
-            elif unit_name in ['自營商(自行買賣)', '自營商(避險)']: net_buy_dealer += net_val
-            elif unit_name == '合計': net_buy_total = net_val
+        if twse_df is not None and not twse_df.empty:
+            for index, row in twse_df.iterrows():
+                unit_name = str(row['單位名稱']).strip()
+                net_val = to_hundred_million(row['買賣差額'])
+                
+                if unit_name in ['外資及陸資(不含外資自營商)', '外資自營商']: net_buy_foreign += net_val
+                elif unit_name == '投信': net_buy_trust += net_val
+                elif unit_name in ['自營商(自行買賣)', '自營商(避險)']: net_buy_dealer += net_val
+                elif unit_name == '合計': net_buy_total = net_val
 
         def get_cls(val): return '#FF4B4B' if val > 0 else '#00CC66' if val < 0 else 'white'
         def get_sign(val): return f"+{val:.1f}" if val > 0 else f"{val:.1f}"
@@ -1131,10 +1179,30 @@ def render_sidebar_market_summary():
                     <td style='padding: 6px 0;'>🏢 自營商</td>
                     <td style='text-align: right; color: {get_cls(net_buy_dealer)}; font-weight: bold;'>{get_sign(net_buy_dealer)} 億</td>
                 </tr>
-                <tr style='border-top: 1px dashed #334155;'>
+                <tr style='border-top: 1px solid #334155;'>
                     <td style='padding: 6px 0; color: #FFD700; font-weight: bold;'>🔥 合計</td>
                     <td style='text-align: right; color: {get_cls(net_buy_total)}; font-weight: bold;'>{get_sign(net_buy_total)} 億</td>
                 </tr>
+        """
+
+        # 🚀 修正處 2：調整名稱為「融資餘額」，並完美優化散戶今日餘額的白灰色細體字樣式
+        if margin_today is not None and margin_prev is not None:
+            margin_today_yi = margin_today / 100000
+            margin_prev_yi = margin_prev / 100000
+            margin_diff_yi = margin_today_yi - margin_prev_yi
+            
+            card_html += f"""
+                <tr style='border-top: 1px dashed #334155;'>
+                    <td style='padding: 8px 0 2px 0; color: white; font-weight: bold;'>📊 融資餘額</td>
+                    <td style='padding: 8px 0 2px 0; text-align: right; color: {get_cls(margin_diff_yi)}; font-weight: bold;'>{get_sign(margin_diff_yi)} 億</td>
+                </tr>
+                <tr>
+                    <td style='padding: 1px 0 4px 0; font-size: 12px; color: #94A3B8; font-weight: normal;'>└ 今日餘額</td>
+                    <td style='padding: 1px 0 4px 0; text-align: right; color: #94A3B8; font-size: 12px; font-weight: normal;'>{margin_today_yi:.1f} 億</td>
+                </tr>
+            """
+
+        card_html += """
             </table>
         </div>
         """
