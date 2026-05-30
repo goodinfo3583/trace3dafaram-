@@ -1033,7 +1033,9 @@ if search_query:
 # ==========================================
 # 🧭 側邊欄導航 (無感互動+休市備援版)
 # ==========================================
-#大盤資金風向球
+# ------------------------------------------
+# 1. 大盤籌碼導航總覽引擎 (純三大法人精簡版)
+# ------------------------------------------
 def render_sidebar_market_summary():
     """自動連線證交所抓取三大法人與融資餘額，支援週末休市備援，並自動儲存每日永久歷史 CSV"""
     import datetime
@@ -1056,7 +1058,7 @@ def render_sidebar_market_summary():
     margin_today, margin_prev = None, None
 
     if twse_df is not None and not twse_df.empty:
-        # 🟢 情況一：工作日盤後成功獲取最新數據
+        # 🟢 工作日盤後成功獲取最新數據
         try:
             twse_df.to_csv(backup_df_path, index=False, encoding='utf-8-sig')
             with open(backup_title_path, 'w', encoding='utf-8') as f:
@@ -1068,7 +1070,7 @@ def render_sidebar_market_summary():
             market_hist_file = os.path.join(MARKET_HISTORY_DIR, f"market_{date_key}.csv")
             twse_df.to_csv(market_hist_file, index=False, encoding='utf-8-sig')
 
-            # 融資融券底層數據全自動分層解碼引擎
+            # 融資融券數據解析
             margin_url = "https://www.twse.com.tw/rwd/zh/margin/MI_MARGN?response=json&selectType=MS"
             res_margin = requests.get(margin_url, timeout=5)
             if res_margin.status_code == 200:
@@ -1098,13 +1100,12 @@ def render_sidebar_market_summary():
         except:
             pass
     else:
-        # 🌙 情況二：週末或股市休市期間，全自動啟用歷史快照存檔
+        # 🌙 週末或股市休市期間，啟用歷史快照
         if os.path.exists(backup_df_path) and os.path.exists(backup_title_path):
             try:
                 twse_df = pd.read_csv(backup_df_path, encoding='utf-8-sig')
                 with open(backup_title_path, 'r', encoding='utf-8') as f:
                     twse_title = f.read().strip()
-                # ❌ 已依指示刪除原本的 st.sidebar.caption 提示文字，保持版面極簡乾淨
             except:
                 pass
         if os.path.exists(backup_margin_path):
@@ -1117,12 +1118,10 @@ def render_sidebar_market_summary():
                 pass
 
     # ------------------------------------------
-    # B. 計算與 UI 排版視覺化渲染
+    # B. 計算與 UI 排版視覺化渲染 (免受 Markdown 干擾版)
     # ------------------------------------------
-    # 🔥 修正安全機制：確保就算沒抓到即時三大法人，只要有融資歷史存檔就能完整渲染整張大盤卡片
     if (twse_df is not None and not twse_df.empty) or (margin_today is not None):
         
-        # 🚀 修正處 1：將「今日」轉換為 8 碼資料日期 (精確對齊為 20260529，而非電腦時間)
         date_str = "未知日期"
         if twse_title:
             date_match = re.search(r'(\d+)年(\d+)月(\d+)日', twse_title)
@@ -1159,53 +1158,31 @@ def render_sidebar_market_summary():
         def get_cls(val): return '#FF4B4B' if val > 0 else '#00CC66' if val < 0 else 'white'
         def get_sign(val): return f"+{val:.1f}" if val > 0 else f"{val:.1f}"
 
-        card_html = f"""
-        <div style='background-color: #1e293b; padding: 12px; border-radius: 8px; margin-bottom: 10px;'>
-            <div style='font-size: 13px; color: #00D2FF; margin-bottom: 8px;'>📅 {date_str} | {status_badge}</div>
-            <table style='width:100%; border-collapse: collapse; font-size: 14px; color: white;'>
-                <tr style='border-bottom: 1px solid #334155; font-weight: bold;'>
-                    <td style='padding: 4px 0;'>法人身份</td>
-                    <td style='padding: 4px 0; text-align: right;'>現貨金額</td>
-                </tr>
-                <tr>
-                    <td style='padding: 6px 0;'>🌐 外資</td>
-                    <td style='text-align: right; color: {get_cls(net_buy_foreign)}; font-weight: bold;'>{get_sign(net_buy_foreign)} 億</td>
-                </tr>
-                <tr>
-                    <td style='padding: 6px 0;'>🏦 投信</td>
-                    <td style='text-align: right; color: {get_cls(net_buy_trust)}; font-weight: bold;'>{get_sign(net_buy_trust)} 億</td>
-                </tr>
-                <tr>
-                    <td style='padding: 6px 0;'>🏢 自營商</td>
-                    <td style='text-align: right; color: {get_cls(net_buy_dealer)}; font-weight: bold;'>{get_sign(net_buy_dealer)} 億</td>
-                </tr>
-                <tr style='border-top: 1px solid #334155;'>
-                    <td style='padding: 6px 0; color: #FFD700; font-weight: bold;'>🔥 合計</td>
-                    <td style='text-align: right; color: {get_cls(net_buy_total)}; font-weight: bold;'>{get_sign(net_buy_total)} 億</td>
-                </tr>
-        """
+        # 🔥 核心解法：使用無縮排的陣列組合 HTML，100% 杜絕 Markdown 區塊誤判
+        html_lines = [
+            f"<div style='background-color: #1e293b; padding: 12px; border-radius: 8px; margin-bottom: 10px;'>",
+            f"<div style='font-size: 13px; color: #00D2FF; margin-bottom: 8px;'>📅 {date_str} | {status_badge}</div>",
+            f"<table style='width:100%; border-collapse: collapse; font-size: 14px; color: white;'>",
+            f"<tr style='border-bottom: 1px solid #334155; font-weight: bold;'><td style='padding: 4px 0;'>法人身份</td><td style='padding: 4px 0; text-align: right;'>現貨金額</td></tr>",
+            f"<tr><td style='padding: 6px 0;'>🌐 外資</td><td style='text-align: right; color: {get_cls(net_buy_foreign)}; font-weight: bold;'>{get_sign(net_buy_foreign)} 億</td></tr>",
+            f"<tr><td style='padding: 6px 0;'>🏦 投信</td><td style='text-align: right; color: {get_cls(net_buy_trust)}; font-weight: bold;'>{get_sign(net_buy_trust)} 億</td></tr>",
+            f"<tr><td style='padding: 6px 0;'>🏢 自營商</td><td style='text-align: right; color: {get_cls(net_buy_dealer)}; font-weight: bold;'>{get_sign(net_buy_dealer)} 億</td></tr>",
+            f"<tr style='border-top: 1px solid #334155;'><td style='padding: 6px 0; color: #FFD700; font-weight: bold;'>🔥 合計</td><td style='text-align: right; color: {get_cls(net_buy_total)}; font-weight: bold;'>{get_sign(net_buy_total)} 億</td></tr>"
+        ]
 
-        # 🚀 修正處 2：調整名稱為「融資餘額」，並完美優化散戶今日餘額的白灰色細體字樣式
         if margin_today is not None and margin_prev is not None:
             margin_today_yi = margin_today / 100000
             margin_prev_yi = margin_prev / 100000
             margin_diff_yi = margin_today_yi - margin_prev_yi
             
-            card_html += f"""
-                <tr style='border-top: 1px dashed #334155;'>
-                    <td style='padding: 8px 0 2px 0; color: white; font-weight: bold;'>📊 融資餘額</td>
-                    <td style='padding: 8px 0 2px 0; text-align: right; color: {get_cls(margin_diff_yi)}; font-weight: bold;'>{get_sign(margin_diff_yi)} 億</td>
-                </tr>
-                <tr>
-                    <td style='padding: 1px 0 4px 0; font-size: 12px; color: #94A3B8; font-weight: normal;'>└ 今日餘額</td>
-                    <td style='padding: 1px 0 4px 0; text-align: right; color: #94A3B8; font-size: 12px; font-weight: normal;'>{margin_today_yi:.1f} 億</td>
-                </tr>
-            """
+            # 將融資的標籤緊密貼合在一行，防呆機制啟動
+            html_lines.append(f"<tr style='border-top: 1px dashed #334155;'><td style='padding: 8px 0 2px 0; color: white; font-weight: bold;'>📊 融資餘額</td><td style='padding: 8px 0 2px 0; text-align: right; color: {get_cls(margin_diff_yi)}; font-weight: bold;'>{get_sign(margin_diff_yi)} 億</td></tr>")
+            html_lines.append(f"<tr><td style='padding: 1px 0 4px 0; font-size: 12px; color: #94A3B8; font-weight: normal;'>└ 今日餘額</td><td style='padding: 1px 0 4px 0; text-align: right; color: #94A3B8; font-size: 12px; font-weight: normal;'>{margin_today_yi:.1f} 億</td></tr>")
 
-        card_html += """
-            </table>
-        </div>
-        """
+        html_lines.append("</table></div>")
+        
+        # 組裝成一個乾淨的字串並渲染
+        card_html = "".join(html_lines)
         st.sidebar.markdown(card_html, unsafe_allow_html=True)
     else:
         st.sidebar.info("🕒 目前查無今日三大法人買賣資料。")
