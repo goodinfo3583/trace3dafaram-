@@ -2874,7 +2874,7 @@ with top_pool_container:
             tab1, tab2 = st.tabs(["🔥 今日最新排行", "📈 歷史分數追蹤表"])
             
             with tab1:
-                st.success(f"選股池掃描完成！今日共過濾出 {len(res_df)} 檔潛力標的。")
+                
                 st.dataframe(
                     res_df, 
                     use_container_width=True, 
@@ -2885,7 +2885,7 @@ with top_pool_container:
                         )
                     }
                 )
-                
+                st.success(f"選股池掃描完成！今日共過濾出 {len(res_df)} 檔潛力標的。")
             with tab2:
                 try:
                     # 反向讀取所有歷史檔案，找出最近 20 天的軌跡
