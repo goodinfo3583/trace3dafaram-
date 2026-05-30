@@ -2861,6 +2861,45 @@ with top_pool_container:
                 except Exception as e:
                     st.error(f"歷史分數讀取發生錯誤: {e}")
 
+
+
+# ==========================================
+# 🛠️ 臨時除錯區：雲端歷史檔案檢查器 (隨時可刪除)
+# ==========================================
+st.sidebar.write("---")
+st.sidebar.subheader("📁 雲端歷史檔案檢查器")
+
+if os.path.exists(SCORE_HISTORY_DIR):
+    # 抓取雲端目前存的所有分數 CSV
+    hist_files = glob.glob(os.path.join(SCORE_HISTORY_DIR, "scores_*.csv"))
+    
+    if hist_files:
+        st.sidebar.success(f"🟢 偵測到雲端硬碟目前存有 {len(hist_files)} 個歷史檔案：")
+        
+        # 依日期最新到最舊排序顯示
+        for fpath in sorted(hist_files, reverse=True):
+            fname = os.path.basename(fpath)
+            try:
+                # 讀取檔案內容試試看
+                tmp_df = pd.read_csv(fpath)
+                st.sidebar.text(f"📄 {fname} (共 {len(tmp_df)} 檔標的)")
+                
+                # 🔥 直接在網頁上做一個下載按鈕，您可以點擊下載回電腦看內容！
+                st.sidebar.download_button(
+                    label=f"📥 下載 {fname}",
+                    data=tmp_df.to_csv(index=False).encode('utf-8-sig'),
+                    file_name=fname,
+                    mime='text/csv',
+                    key=f"debug_dl_{fname}"
+                )
+            except Exception as e:
+                st.sidebar.error(f"讀取 {fname} 失敗: {str(e)}")
+    else:
+        st.sidebar.warning("⚠️ ScoreHistory 資料夾存在，但內部是空的（可能剛被雲端重置清空了）。")
+else:
+    st.sidebar.error("❌ 雲端目前連 ScoreHistory 資料夾都還沒建立。")
+# ==========================================
+
 # ==========================================
 # 📊 【蜂蜜計數器】本站累計觀測人次統計
 # ==========================================
