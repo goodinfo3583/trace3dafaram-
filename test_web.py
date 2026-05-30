@@ -27,18 +27,18 @@ if not os.path.exists(SCORE_HISTORY_DIR):
 import pandas as pd
 import datetime
 
-# 假設今天是 29 號，我們強制產生一個 28 號的檔案
-dummy_history_file = os.path.join(SCORE_HISTORY_DIR, "scores_20260528.csv")
+# 假設今天是 29 號，我們強制產生一個 28 號的檔案(測試測試測試)
+#dummy_history_file = os.path.join(SCORE_HISTORY_DIR, "scores_20260528.csv")
 
 # 如果資料夾裡面沒有這個檔案，系統就自動幫您生一個出來！
-if not os.path.exists(dummy_history_file):
+#if not os.path.exists(dummy_history_file):
     # 隨便塞幾檔熱門股的假分數，讓系統明天可以相減
-    dummy_data = pd.DataFrame({
-        '股票代號': ['2330', '2454', '2317', '2603', '3231', '3450', '2382'],
-        '總分': [5.0, 4.0, 3.5, 6.0, 2.5, 7.0, 4.5] 
-    })
-    dummy_data.to_csv(dummy_history_file, index=False, encoding='utf-8-sig')
-    print("✅ 已自動生成 0528 歷史分數測試檔！")
+    #dummy_data = pd.DataFrame({
+        #'股票代號': ['2330', '2454', '2317', '2603', '3231', '3450', '2382'],
+        #'總分': [5.0, 4.0, 3.5, 6.0, 2.5, 7.0, 4.5] 
+    #})
+    #dummy_data.to_csv(dummy_history_file, index=False, encoding='utf-8-sig')
+    #print("✅ 已自動生成 0528 歷史分數測試檔！")
 # ==========================================
 
 
@@ -981,14 +981,14 @@ if search_query:
 
     
 # ==========================================
-# 🧭 側邊欄導航 (無感互動+視覺特效版)
+# 🧭 側邊欄導航 (無感互動+休市備援版)
 # ==========================================
 
 # ------------------------------------------
 # 1. 大盤籌碼導航總覽引擎 (純三大法人精簡版)
 # ------------------------------------------
 def render_sidebar_market_summary():
-    """自動連線證交所 API，精準對照欄位並加總渲染側邊欄資訊卡片"""
+    """自動連線證交所 API，若遇休市/週末則全自動切換至上一交易日存檔數據"""
     import datetime
     import pandas as pd
     import streamlit as st
@@ -998,23 +998,44 @@ def render_sidebar_market_summary():
     # 呼叫 API 抓取三大法人現貨明細
     twse_title, twse_df = fetch_twse_institutional_data()
 
+    # 設定本地備援路徑
+    backup_df_path = os.path.join(DATA_DIR, "sidebar_twse_df_backup.csv")
+    backup_title_path = os.path.join(DATA_DIR, "sidebar_twse_title_backup.txt")
+
+    if twse_df is not None and not twse_df.empty:
+        # 🟢 盤後有正常抓到當日新數據：即時儲存備援檔
+        try:
+            twse_df.to_csv(backup_df_path, index=False, encoding='utf-8-sig')
+            with open(backup_title_path, 'w', encoding='utf-8') as f:
+                f.write(str(twse_title))
+        except:
+            pass
+    else:
+        # 🌙 遇到週末或股市休市 API 查無資料：自動載入留存紀錄
+        if os.path.exists(backup_df_path) and os.path.exists(backup_title_path):
+            try:
+                twse_df = pd.read_csv(backup_df_path, encoding='utf-8-sig')
+                with open(backup_title_path, 'r', encoding='utf-8') as f:
+                    twse_title = f.read().strip()
+                st.sidebar.caption("🌙 週末/休市期間：自動啟用上一交易日存檔數據")
+            except:
+                pass
+
     if twse_df is not None and not twse_df.empty:
         # 判定時間狀態
         now = datetime.datetime.now()
         current_time = now.time()
         
-        if current_time < datetime.time(14, 50):
+        if current_time < datetime.time(14, 50) and "休市" not in twse_title:
             status_badge = "⏳ <span style='color:#FFCC00;'>盤後結算中</span>"
             date_str = "今日"
         else:
-            status_badge = "🌕 <span style='color:#00D2FF;'>完整版</span>" if current_time >= datetime.time(19, 40) else "🟢 <span style='color:#00CC66;'>初版</span>"
+            status_badge = "🌕 <span style='color:#00D2FF;'>完整版</span>"
             date_str = twse_title.replace("三大法人買賣金額統計表", "").strip() or "今日結算"
 
         def to_hundred_million(val_str):
-            try:
-                return float(str(val_str).replace(',', '')) / 100000000
-            except:
-                return 0.0
+            try: return float(str(val_str).replace(',', '')) / 100000000
+            except: return 0.0
 
         net_buy_foreign = 0.0
         net_buy_trust = 0.0
@@ -1066,8 +1087,9 @@ def render_sidebar_market_summary():
 
 # 執行渲染側邊欄大盤卡片
 render_sidebar_market_summary()
+
 # ------------------------------------------
-# 2. 大盤總體經濟指標 (您原本的按鈕區)
+# 2. 大盤總體經濟指標
 # ------------------------------------------
 st.sidebar.markdown("---")
 st.sidebar.subheader("📊 大盤總體經濟指標")
@@ -1079,7 +1101,7 @@ with c_btn2:
     st.link_button("⚠️ VIX 指數", "https://www.wantgoo.com/global/vix", use_container_width=True)
 
 # ------------------------------------------
-# 3. 戰情室快速導航 (您原本的目錄區)
+# 3. 戰情室快速導航
 # ------------------------------------------
 st.sidebar.markdown("---")
 st.sidebar.header("📍 戰情室快速導航")
@@ -2446,11 +2468,28 @@ else:
 st.write("---")
 st.markdown("<div id='section-6'></div>", unsafe_allow_html=True)
 st.subheader("💸 區塊 6：鉅額交易動向")
+# 🌟 更新：融入修正後的量化實戰看盤策略心法
 st.write("💡 鉅額交易常為大戶私下換手籌碼,避免股價盤中劇烈波動。成交價為「支撐/壓力」防守線或是「壓/拉尾盤」；短線跌破建議嚴設停損。")
 
 block_df = fetch_block_trades()
+backup_block_path = os.path.join(DATA_DIR, "block_trades_backup.csv")
 
-if not block_df.empty:
+if block_df is not None and not block_df.empty:
+    # 🟢 盤後成功抓到新數據：立刻寫入本地做週末/休市備援
+    try:
+        block_df.to_csv(backup_block_path, index=False, encoding='utf-8-sig')
+    except:
+        pass
+else:
+    # 🌙 遇休市/週末查無資料：自動提取上一次開盤日的存檔
+    if os.path.exists(backup_block_path):
+        try:
+            block_df = pd.read_csv(backup_block_path, encoding='utf-8-sig')
+            st.caption("🌙 週末/休市期間：自動啟用上一交易日大戶暗盤數據")
+        except:
+            pass
+
+if block_df is not None and not block_df.empty:
     try:
         price_col = next((c for c in ['成交價', '成交價格', '成交單價'] if c in block_df.columns), None)
         if not price_col:
@@ -2459,13 +2498,13 @@ if not block_df.empty:
         block_df['成交股數_數值'] = pd.to_numeric(block_df['成交股數'].astype(str).str.replace(',', ''), errors='coerce').fillna(0)
         block_df['成交金額_數值'] = pd.to_numeric(block_df['成交金額'].astype(str).str.replace(',', ''), errors='coerce').fillna(0)
         
-        # 抹除小數點與 (元)，並加上 ▼ 符號
+        # 抹除小數點，並加上 ▼ 符號
         block_df['▼成交價'] = pd.to_numeric(block_df[price_col].astype(str).str.replace(',', ''), errors='coerce').fillna(0).round(0).astype(int)
         
         block_df = block_df[block_df['成交股數_數值'] > 0].copy()
         block_df['成交張數'] = (block_df['成交股數_數值'] / 1000).astype(int)
         
-        # 🌟 單位統一進化：將總額除以 1 億，並聰明抹除多餘小數點
+        # 單位變更：改為以「億元」為單位，並消除贅字
         block_df['成交總額(億)'] = (block_df['成交金額_數值'] / 100000000).apply(lambda x: f"{x:.2f}".rstrip('0').rstrip('.'))
         
         block_df['乾淨代號'] = block_df['證券代號'].astype(str).str.replace(r'\D', '', regex=True)
@@ -2492,42 +2531,33 @@ if not block_df.empty:
                                     close_price_dict[sid] = str(int(round(valid_prices.iloc[-1])))
             except: pass 
         
-        # 填入 yfinance 抓到的收盤價，並加上 ▼ 符號
         block_df['▼收盤價'] = block_df['乾淨代號'].map(close_price_dict).fillna('-')
         
-        # ==========================================
-        # 🔥 群聚排序引擎：同股票綁定 + 紅字優先
-        # ==========================================
+        # 群聚排序引擎逻辑
         def get_color_rank(close_val, block_val):
             try:
                 c = float(str(close_val).replace(',', ''))
                 b = float(str(block_val).replace(',', ''))
-                if c > b: return 1   # 紅色優先級最高
-                elif c == b: return 2 # 橘色次之
-                else: return 3       # 綠色排後
+                if c > b: return 1   
+                elif c == b: return 2 
+                else: return 3       
             except:
-                return 4 # 無法判斷者墊底
+                return 4 
 
-        # 計算每一筆紀錄的顏色層級 (適應新的欄位名稱)
         block_df['__color_rank'] = block_df.apply(lambda r: get_color_rank(r['▼收盤價'], r['▼成交價']), axis=1)
         
-        # 統整每一檔股票的「最強顏色」與「總成交金額」
         stock_stats = block_df.groupby('乾淨代號').agg(
             stock_min_rank=('__color_rank', 'min'),
             stock_total_amt=('成交金額_數值', 'sum')  
         ).reset_index()
         
-        # 將統整資料合併回主表
         block_df = block_df.merge(stock_stats, on='乾淨代號', how='left')
         
-        # 終極多層排序
         block_df = block_df.sort_values(
             by=['stock_min_rank', 'stock_total_amt', '乾淨代號', '__color_rank', '成交金額_數值'],
             ascending=[True, False, True, True, False]
         )
-        # ==========================================
         
-        # 🌟 更新要顯示的欄位名稱
         display_cols = ['乾淨代號', '證券名稱', '▼成交價', '▼收盤價', '成交張數', '成交總額(億)']
         display_df = block_df[display_cols].copy()
         
@@ -2536,21 +2566,16 @@ if not block_df.empty:
             '證券名稱': '股票名稱'
         })
         
-        # ==========================================
-        # 🎨 核心視覺：收盤價 vs 成交價 動態變色引擎
-        # ==========================================
         def highlight_block_row(row):
             styles = [''] * len(row)
             try:
-                # 配合新欄位名稱轉換數字比較
                 close_p = float(str(row['▼收盤價']).replace(',', ''))
                 block_p = float(str(row['▼成交價']).replace(',', ''))
                 
-                if close_p > block_p: color = '#FF4B4B'       # 紅色
-                elif close_p == block_p: color = '#FFA500'    # 橘色
-                else: color = '#00E272'                       # 綠色
+                if close_p > block_p: color = '#FF4B4B'       
+                elif close_p == block_p: color = '#FFA500'    
+                else: color = '#00E272'                       
                 
-                # 針對 '▼成交價' 這個欄位上色
                 idx = row.index.get_loc('▼成交價')
                 styles[idx] = f'color: {color}; font-weight: bold;'
             except:
@@ -2558,7 +2583,6 @@ if not block_df.empty:
             return styles
             
         styled_df = display_df.style.apply(highlight_block_row, axis=1)
-        
         st.dataframe(styled_df, use_container_width=True, hide_index=True)
         
         try:
@@ -2799,12 +2823,12 @@ with top_pool_container:
             st.session_state['top_pool_df'] = res_df
             
             # ==========================================
-            # 🌟 創新介面：引入 Streamlit 分頁功能 (Tabs)
+            # 🌟 創新介面：產生 Streamlit 分頁的頁籤功能 (Tabs)
             # ==========================================
             tab1, tab2 = st.tabs(["🔥 今日最新排行", "📈 歷史分數追蹤表"])
             
             with tab1:
-                #st.success(f"選股池掃描完成！今日共過濾出 {len(res_df)} 檔潛力標的。")
+                st.success(f"選股池掃描完成！今日共過濾出 {len(res_df)} 檔潛力標的。")
                 st.dataframe(
                     res_df, 
                     use_container_width=True, 
@@ -2815,17 +2839,16 @@ with top_pool_container:
                         )
                     }
                 )
-                st.success(f"選股池掃描完成！今日共過濾出 {len(res_df)} 檔潛力標的。")
+                
             with tab2:
-                st.info("💡 這裡統整了標的在過去一週選股池中的【總分變化】，可藉此觀察籌碼動能的延續性與驗證 Delta！")
                 try:
-                    # 反向讀取所有歷史檔案，找出最近 7 天的軌跡
+                    # 反向讀取所有歷史檔案，找出最近 20 天的軌跡
                     all_hist_files = sorted(glob.glob(os.path.join(SCORE_HISTORY_DIR, "scores_*.csv")))
                     if len(all_hist_files) > 0:
                         hist_list = []
-                        for f in all_hist_files[-7:]:
+                        # 🔥 修正處 1：擴大觀測窗至 20 天
+                        for f in all_hist_files[-20:]:
                             try:
-                                # 抓取檔名中的日期 (例如 scores_20260528.csv -> 05/28)
                                 date_str = re.search(r'\d{8}', os.path.basename(f)).group(0)
                                 formatted_date = f"{date_str[4:6]}/{date_str[6:]}"
                                 
@@ -2838,29 +2861,27 @@ with top_pool_container:
                             except: pass
                         
                         if hist_list:
-                            # 將所有日期的紀錄垂直合併
                             hist_combined = pd.concat(hist_list, ignore_index=True)
-                            
-                            # 進行樞紐分析 (Pivot)：變成橫向矩陣 (代號 vs 日期)
                             hist_pivot = hist_combined.pivot_table(index='代號', columns='日期', values='總分', aggfunc='first').reset_index()
                             
-                            # 補上股票名稱 (從目前的 res_df 拿取)
                             name_mapping = dict(zip(res_df['股票代號'].astype(str).str.replace(r'\D', '', regex=True), res_df['股票名稱']))
                             hist_pivot.insert(1, '股票名稱', hist_pivot['代號'].map(name_mapping).fillna('-'))
                             
-                            # ✨ 智慧過濾：只顯示「今天還在榜上」的股票，並依照今日分數高低排序
                             latest_day = hist_pivot.columns[-1]
                             hist_pivot = hist_pivot[hist_pivot['股票名稱'] != '-']
                             hist_pivot = hist_pivot.sort_values(by=latest_day, ascending=False).reset_index(drop=True)
                             
+                            # 先行渲染核心歷史數據表
                             st.dataframe(hist_pivot, use_container_width=True, hide_index=True)
+                            
+                            # 🔥 修正處 2：將說明指示卡片成功移置表格下方，並同步修改為 20 日
+                            st.info("💡 這裡統整了標的在過去20日選股池中的【總分變化】，可藉此觀察籌碼動能的延續性與驗證 Delta！")
                         else:
                             st.warning("歷史資料格式不符，無法解析。")
                     else:
                         st.warning("尚無足夠的歷史分數紀錄。需等待系統累積數日資料。")
                 except Exception as e:
                     st.error(f"歷史分數讀取發生錯誤: {e}")
-
 
 
 # ==========================================
