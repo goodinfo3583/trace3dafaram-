@@ -2455,7 +2455,7 @@ def get_specific_margin_data(keyword):
         return df, file_name
     except Exception as e:
         return pd.DataFrame(), f"讀取崩潰 ({file_name}): {str(e)}"
-
+#==============表格欄位設計============
 # 🛠️ 【不可省略】欄位清理與過濾函數
 def process_margin_df(df, type_name, flag_etf, flag_bond):
     if df.empty: return df
@@ -2494,11 +2494,12 @@ def process_margin_df(df, type_name, flag_etf, flag_bond):
         if not flag_bond: df = df[~mask_bond]
         if not flag_etf: df = df[~(mask_etf & ~mask_bond)] 
 
-    # 🚀 顯示優化：上漲優先呈現排序機制
+    # 🚀 顯示優化：自動改名為「漲跌幅%」並進行上漲優先排序
     sort_col = next((c for c in df.columns if '漲跌' in str(c) or '漲幅' in str(c)), None)
     if sort_col:
-        df[sort_col] = pd.to_numeric(df[sort_col], errors='coerce').fillna(0)
-        df = df.sort_values(by=sort_col, ascending=False)
+        df = df.rename(columns={sort_col: '漲跌幅%'}) # 強制改名，畫面更直觀
+        df['漲跌幅%'] = pd.to_numeric(df['漲跌幅%'], errors='coerce').fillna(0)
+        df = df.sort_values(by='漲跌幅%', ascending=False)
 
     df = df.reset_index(drop=True)
     df.index = df.index + 1
@@ -2530,7 +2531,7 @@ def render_styled_margin_table(clean_df):
                 # 讀取原始 clean_df 的數值做精確多空判斷
                 orig_val = clean_df.loc[row.name, change_col]
                 if float(orig_val) > 0:
-                    return ['color: #C84B4B; font-weight: bold;'] * len(row) # 🎯 升級護眼暗紅
+                    return ['color: #A71154; font-weight: bold;'] * len(row) # 🎯 升級護眼暗紅
             except: pass
         return styles
 
@@ -2923,6 +2924,8 @@ with top_pool_container:
     import os
     import glob
     import re
+    import json
+    import pandas as pd
 
     # 1. 自動掃描最新資料日期
     txt_pattern = os.path.join(DATA_DIR, "*持股排名變化*.txt") 
@@ -2954,7 +2957,6 @@ with top_pool_container:
         if pool_df.empty:
             st.warning("⚪ 目前區塊 1 中沒有符合動能的標的。")
         else:
-            # 讀取賣出警示名單 
             fo_sell_ids, it_sell_ids = set(), set()
             try:
                 fo_sell_files = glob.glob(os.path.join(DATA_DIR, "*外資賣出佔成交比*3日*.csv"))
@@ -2977,9 +2979,14 @@ with top_pool_container:
             df_b2_1, df_b2_2 = get_df_safe('df_blk2_1'), get_df_safe('df_blk2_2')
             df_b2_3, df_b2_4 = get_df_safe('df_blk2_3'), get_df_safe('df_blk2_4')
             df_b3 = get_df_safe('df_blk3_main')
-            s_b4_mar_pct, s_b4_mar_vol = set(get_df_safe('df_margin_pct').get('股票代號', [])), set(get_df_safe('df_margin_vol').get('股票代號', []))
-            s_b4_sho_pct, s_b4_sho_vol = set(get_df_safe('df_short_pct').get('股票代號', [])), set(get_df_safe('df_short_vol').get('股票代號', []))
-            s_b4_mp_pct, s_b4_mp_vol = set(get_df_safe('df_margin_plus_pct').get('股票代號', [])), set(get_df_safe('df_margin_plus_vol').get('股票代號', []))
+            
+            df_b4_mar_pct, df_b4_mar_vol = get_df_safe('df_margin_pct'), get_df_safe('df_margin_vol')
+            df_b4_sho_pct, df_b4_sho_vol = get_df_safe('df_short_pct'), get_df_safe('df_short_vol')
+            df_b4_mp_pct, df_b4_mp_vol = get_df_safe('df_margin_plus_pct'), get_df_safe('df_margin_plus_vol')
+            
+            s_b4_mar_pct, s_b4_mar_vol = set(df_b4_mar_pct.get('股票代號', [])), set(df_b4_mar_vol.get('股票代號', []))
+            s_b4_sho_pct, s_b4_sho_vol = set(df_b4_sho_pct.get('股票代號', [])), set(df_b4_sho_vol.get('股票代號', []))
+            s_b4_mp_pct, s_b4_mp_vol = set(df_b4_mp_pct.get('股票代號', [])), set(df_b4_mp_vol.get('股票代號', []))
             df_b5 = get_df_safe('df_blk5')
 
             def check_b2_strict(df, sid, bad_keywords):
@@ -3012,7 +3019,6 @@ with top_pool_container:
                     except: return 0.0
                 return 0.0
 
-            # 🚀 跨區塊連動：偷抓今日鉅額交易的股票代號！
             block_sids = set()
             try:
                 temp_block = fetch_block_trades()
@@ -3026,22 +3032,19 @@ with top_pool_container:
                 sname = str(row.get('股票名稱', '')).strip()
                 b1_dyn = str(row.get(dyn_col, '')) if dyn_col else '-'
                 
-                # 🔥 暗盤標籤注入
                 if sid in block_sids: b1_dyn = f"{b1_dyn} | 🎯鉅額交易"
                     
                 b1_rank = str(row.get(rank_col, '-')) if rank_col else '-'
                 score = 0.0
                 details = [] 
                 
+                # 區塊二評分
                 if check_b2_strict(df_b2_1, sid, bad_b2_vol): score += 1; details.append("外買佔: +1"); r_b2_1 = "✔️"
                 else: r_b2_1 = ""
-                
                 if check_b2_strict(df_b2_2, sid, bad_b2_vol): score += 1; details.append("投買佔: +1"); r_b2_2 = "✔️"
                 else: r_b2_2 = ""
-                
                 if check_b2_strict(df_b2_3, sid, bad_b2_iss): score += 1; details.append("外佔發行: +1"); r_b2_3 = "✔️"
                 else: r_b2_3 = ""
-                
                 if check_b2_strict(df_b2_4, sid, bad_b2_iss): score += 1; details.append("投佔發行: +1"); r_b2_4 = "✔️"
                 else: r_b2_4 = ""
                 
@@ -3050,6 +3053,7 @@ with top_pool_container:
                 if get_today_ratio(df_b2_3, sid, '當日買發比%') <= -10: score -= 0.5; details.append("外佔發(<-10%): -0.5")
                 if get_today_ratio(df_b2_4, sid, '當日買發比%') <= -10: score -= 0.5; details.append("投佔發(<-10%): -0.5")
                 
+                # 區塊三評分
                 s_fd, r_b3_fd = get_b3_score(df_b3, sid, '外資日'); score += s_fd; 
                 if s_fd > 0: details.append(f"外資日連: +{s_fd}")
                 s_fw, r_b3_fw = get_b3_score(df_b3, sid, '外資週'); score += s_fw; 
@@ -3059,18 +3063,47 @@ with top_pool_container:
                 s_iw, r_b3_iw = get_b3_score(df_b3, sid, '投信週'); score += s_iw; 
                 if s_iw > 0: details.append(f"投信週連: +{s_iw}")
                 
+                # 🔥 區塊四核心升級：精準名次配分 (幅+1, 量+0.5)
                 r_b4_mar = ""
-                if sid in s_b4_mar_pct: r_b4_mar += "✔️(幅)"; score += 1; details.append("資減(幅): +1")
-                if sid in s_b4_mar_vol: r_b4_mar += "✔️(量)"; score += 0.5; details.append("資減(量): +0.5")
+                b4_list_count = 0
+                if sid in s_b4_mar_pct: r_b4_mar += "✔️(幅)"; score += 1.0; details.append("資減(幅): +1.0"); b4_list_count += 1
+                if sid in s_b4_mar_vol: r_b4_mar += "✔️(量)"; score += 0.5; details.append("資減(量): +0.5"); b4_list_count += 1
                 
                 r_b4_sho = ""
-                if sid in s_b4_sho_pct: r_b4_sho += "✔️(幅)"; score += 1; details.append("借減(幅): +1")
-                if sid in s_b4_sho_vol: r_b4_sho += "✔️(量)"; score += 0.5; details.append("借減(量): +0.5")
+                if sid in s_b4_sho_pct: r_b4_sho += "✔️(幅)"; score += 1.0; details.append("借減(幅): +1.0"); b4_list_count += 1
+                if sid in s_b4_sho_vol: r_b4_sho += "✔️(量)"; score += 0.5; details.append("借減(量): +0.5"); b4_list_count += 1
                 
                 r_b4_mp = ""
-                if sid in s_b4_mp_pct: r_b4_mp += "✔️(幅)"; score += 1; details.append("券增(幅): +1")
-                if sid in s_b4_mp_vol: r_b4_mp += "✔️(量)"; score += 0.5; details.append("券增(量): +0.5")
+                if sid in s_b4_mp_pct: r_b4_mp += "✔️(幅)"; score += 1.0; details.append("券增(幅): +1.0"); b4_list_count += 1
+                if sid in s_b4_mp_vol: r_b4_mp += "✔️(量)"; score += 0.5; details.append("券增(量): +0.5"); b4_list_count += 1
                 
+                # 💡 獨立讀取區塊四的漲跌幅：動能點火檢驗 (+0.7 / +1.4)
+                if b4_list_count > 0:
+                    change_val = 0.0
+                    b4_tables = [df_b4_mar_pct, df_b4_mar_vol, df_b4_sho_pct, df_b4_sho_vol, df_b4_mp_pct, df_b4_mp_vol]
+                    for b4_df in b4_tables:
+                        if not b4_df.empty and sid in b4_df['股票代號'].values and '漲跌幅%' in b4_df.columns:
+                            try: 
+                                change_val = float(str(b4_df.loc[b4_df['股票代號'] == sid, '漲跌幅%'].iloc[0]).replace('%', ''))
+                                break # 找到任一表中的漲跌幅即可跳出
+                            except: pass
+                    
+                    if change_val > 0:
+                        score += 0.7; details.append("榜上+當日上漲: +0.7")
+                        if change_val > 3:
+                            score += 0.7; details.append("榜上+漲幅>3%: +0.7")
+                            
+                    # 借券空頭認輸檢驗 (+1.2)
+                    short_decrease_val = 0.0
+                    if not df_b4_sho_pct.empty and sid in df_b4_sho_pct['股票代號'].values:
+                        s_col = next((c for c in df_b4_sho_pct.columns if '當日' in str(c) and ('%' in str(c) or '增減' in str(c))), None)
+                        if s_col:
+                            try: short_decrease_val = float(str(df_b4_sho_pct.loc[df_b4_sho_pct['股票代號'] == sid, s_col].iloc[0]).replace('%', ''))
+                            except: pass
+                    if abs(short_decrease_val) >= 1:
+                        score += 1.2; details.append("空頭認輸(借券減>1%): +1.2")
+
+                # 區塊五評分
                 r_b5 = ""
                 if not df_b5.empty and sid in df_b5['股票代號'].values:
                     trend = str(df_b5[df_b5['股票代號'] == sid].iloc[0].get('週動態', ''))
@@ -3101,28 +3134,25 @@ with top_pool_container:
             res_df = pd.DataFrame(results).sort_values(by='總分', ascending=False).drop_duplicates(subset=['股票代號']).reset_index(drop=True)
             
             # ==========================================
-            # 🔥 真正的 Delta 計算引擎：自動讀取硬碟歷史紀錄相減
+            # 🔥 Delta 計算引擎
             # ==========================================
             history_files = sorted(glob.glob(os.path.join(SCORE_HISTORY_DIR, "scores_*.csv")), reverse=True)
             prev_scores_dict = {}
-            # 確保資料夾內至少有兩天的檔案 (今天與昨天) 才能相減
             if len(history_files) >= 2:
                 try:
-                    prev_df = pd.read_csv(history_files[1]) # [1] 代表時間第二近的檔案 (也就是昨天)
+                    prev_df = pd.read_csv(history_files[1])
                     prev_scores_dict = dict(zip(prev_df['股票代號'].astype(str).str.replace(r'\D', '', regex=True), prev_df['總分']))
                 except: pass
 
             def calc_table_delta(row):
                 sid = str(row['股票代號']).replace(r'\D', '')
                 curr_score = row.get('總分', 0)
-                # 若找不到昨天分數，代表可能是今天新上榜，預設 Delta 等於今日總分 (或 0)
                 prev_score = prev_scores_dict.get(sid, curr_score) 
                 delta = round(curr_score - prev_score, 1)
                 return f"+{delta}" if delta > 0 else str(delta)
 
             if not res_df.empty and '總分' in res_df.columns:
                 res_df['Delta'] = res_df.apply(calc_table_delta, axis=1)
-            # ==========================================
 
             cols = [c for c in res_df.columns if c not in ['Delta', '評分明細']]
             score_idx = cols.index('總分')
@@ -3132,65 +3162,42 @@ with top_pool_container:
             res_df = res_df[cols]
 
             st.session_state['top_pool_df'] = res_df
-            # ==========================================
-            # ==========================================
-            # 💾 核心引擎：選股池結果強制同步覆寫存檔 (方案 A：交易日鎖死法)
-            # ==========================================
+            
+            # 💾 歷史紀錄存檔機制
             if res_df is not None and not res_df.empty:
                 try:
-                    import glob
-                    import os
-                    
-                    # 💡 終極解法：放棄電腦時間，直接去抓目錄下最新「持股排名變化」檔案的日期做為錨點
-                    txt_pattern = os.path.join(DATA_DIR, "*持股排名變化*.txt")
-                    all_txt_files = glob.glob(txt_pattern)
-                    
                     anchor_date_str = "00000000" 
                     if all_txt_files:
                         latest_file = max(all_txt_files, key=os.path.basename)
-                        # 檔名前 8 碼通常是日期，例如 20260529
                         date_label = os.path.basename(latest_file)[:8]
-                        if date_label.isdigit():
-                            anchor_date_str = date_label
+                        if date_label.isdigit(): anchor_date_str = date_label
                     
-                    # 只要有抓到正確的交易日期，就強制覆寫該日的檔案！
                     if anchor_date_str != "00000000":
                         today_score_file = os.path.join(SCORE_HISTORY_DIR, f"scores_{anchor_date_str}.csv")
                         res_df.to_csv(today_score_file, index=False, encoding='utf-8-sig')
-                        
-                except Exception as e:
-                    pass
+                except: pass
 
-            # ==========================================
-            # 🌟 Streamlit "🔥 今日最新排行", "📈 歷史分數追蹤表"分頁的頁籤功能 (Tabs)
-            # ==========================================
+            # 🌟 Streamlit 頁籤渲染
             tab1, tab2 = st.tabs(["🔥 今日最新排行", "📈 歷史分數追蹤表"])
-            
             with tab1:
-                
                 st.dataframe(
                     res_df, 
                     use_container_width=True, 
                     hide_index=True,
                     column_config={
-                        "評分明細": st.column_config.TextColumn(
-                            "評分明細", help="滑鼠游標停留在這裡，查看完整明細", width="small", max_chars=4 
-                        )
+                        "評分明細": st.column_config.TextColumn("評分明細", help="滑鼠游標停留在這裡，查看完整明細", width="small", max_chars=4)
                     }
                 )
                 st.success(f"選股池掃描完成！今日共過濾出 {len(res_df)} 檔潛力標的。")
             with tab2:
                 try:
-                    # 反向讀取所有歷史檔案，找出最近 20 天的軌跡
                     all_hist_files = sorted(glob.glob(os.path.join(SCORE_HISTORY_DIR, "scores_*.csv")))
                     if len(all_hist_files) > 0:
                         hist_list = []
-                        # 🔥 修正處 1：擴大觀測窗至 20 天
                         for f in all_hist_files[-20:]:
                             try:
                                 date_str = re.search(r'\d{8}', os.path.basename(f)).group(0)
                                 formatted_date = f"{date_str[4:6]}/{date_str[6:]}"
-                                
                                 df_h = pd.read_csv(f)
                                 if '股票代號' in df_h.columns and '總分' in df_h.columns:
                                     df_h['日期'] = formatted_date
@@ -3202,26 +3209,16 @@ with top_pool_container:
                         if hist_list:
                             hist_combined = pd.concat(hist_list, ignore_index=True)
                             hist_pivot = hist_combined.pivot_table(index='代號', columns='日期', values='總分', aggfunc='first').reset_index()
-                            
                             name_mapping = dict(zip(res_df['股票代號'].astype(str).str.replace(r'\D', '', regex=True), res_df['股票名稱']))
                             hist_pivot.insert(1, '股票名稱', hist_pivot['代號'].map(name_mapping).fillna('-'))
-                            
                             latest_day = hist_pivot.columns[-1]
                             hist_pivot = hist_pivot[hist_pivot['股票名稱'] != '-']
                             hist_pivot = hist_pivot.sort_values(by=latest_day, ascending=False).reset_index(drop=True)
-                            
-                            # 先行渲染核心歷史數據表
                             st.dataframe(hist_pivot, use_container_width=True, hide_index=True)
-                            
-                            # 🔥 修正處 2：將說明指示卡片成功移置表格下方，並同步修改為 20 日
                             st.info("💡 這裡統整了標的在過去20日選股池中的【總分變化】，可藉此觀察籌碼動能的延續性與驗證 Delta！")
-                        else:
-                            st.warning("歷史資料格式不符，無法解析。")
-                    else:
-                        st.warning("尚無足夠的歷史分數紀錄。需等待系統累積數日資料。")
-                except Exception as e:
-                    st.error(f"歷史分數讀取發生錯誤: {e}")
-
+                        else: st.warning("歷史資料格式不符，無法解析。")
+                    else: st.warning("尚無足夠的歷史分數紀錄。")
+                except Exception as e: st.error(f"歷史分數讀取發生錯誤: {e}")
 
 # ==========================================
 # 🛠️ 臨時除錯區：雲端歷史檔案檢查器 (隨時可刪除)
