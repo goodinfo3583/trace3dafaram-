@@ -3063,7 +3063,7 @@ with top_pool_container:
                 s_iw, r_b3_iw = get_b3_score(df_b3, sid, '投信週'); score += s_iw; 
                 if s_iw > 0: details.append(f"投信週連: +{s_iw}")
                 
-                # 🔥 區塊四核心升級：精準名次配分 (幅+1, 量+0.5)
+                # 🔥 區塊四核心升級 (幅+1, 量+0.5)
                 r_b4_mar = ""
                 b4_list_count = 0
                 if sid in s_b4_mar_pct: r_b4_mar += "✔️(幅)"; score += 1.0; details.append("資減(幅): +1.0"); b4_list_count += 1
@@ -3077,7 +3077,6 @@ with top_pool_container:
                 if sid in s_b4_mp_pct: r_b4_mp += "✔️(幅)"; score += 1.0; details.append("券增(幅): +1.0"); b4_list_count += 1
                 if sid in s_b4_mp_vol: r_b4_mp += "✔️(量)"; score += 0.5; details.append("券增(量): +0.5"); b4_list_count += 1
                 
-                # 💡 獨立讀取區塊四的漲跌幅：動能點火檢驗 (+0.7 / +1.4)
                 if b4_list_count > 0:
                     change_val = 0.0
                     b4_tables = [df_b4_mar_pct, df_b4_mar_vol, df_b4_sho_pct, df_b4_sho_vol, df_b4_mp_pct, df_b4_mp_vol]
@@ -3085,7 +3084,7 @@ with top_pool_container:
                         if not b4_df.empty and sid in b4_df['股票代號'].values and '漲跌幅%' in b4_df.columns:
                             try: 
                                 change_val = float(str(b4_df.loc[b4_df['股票代號'] == sid, '漲跌幅%'].iloc[0]).replace('%', ''))
-                                break # 找到任一表中的漲跌幅即可跳出
+                                break 
                             except: pass
                     
                     if change_val > 0:
@@ -3093,7 +3092,6 @@ with top_pool_container:
                         if change_val > 3:
                             score += 0.7; details.append("榜上+漲幅>3%: +0.7")
                             
-                    # 借券空頭認輸檢驗 (+1.2)
                     short_decrease_val = 0.0
                     if not df_b4_sho_pct.empty and sid in df_b4_sho_pct['股票代號'].values:
                         s_col = next((c for c in df_b4_sho_pct.columns if '當日' in str(c) and ('%' in str(c) or '增減' in str(c))), None)
@@ -3122,43 +3120,53 @@ with top_pool_container:
 
                 score_breakdown = " \n".join(details) if details else "無加扣分"
 
+                # 💡 變更點 1：將字串索引改為極簡名稱
                 results.append({
-                    '總分': score, '股票代號': sid, '股票名稱': sname, '評分明細': score_breakdown, 
-                    '最新動態': b1_dyn, '今日上榜': b1_rank,  
+                    '總分': score, '代號': sid, '名稱': sname, '明細': score_breakdown, 
+                    '最新動態': b1_dyn, '今日上榜': b1_rank, '賣出警示': r_warn,
                     '外買佔比': r_b2_1, '投買佔比': r_b2_2, '外佔發行': r_b2_3, '投佔發行': r_b2_4,
                     '外日連': r_b3_fd, '外週連': r_b3_fw, '投日連': r_b3_id, '投週連': r_b3_iw,
                     '資減': r_b4_mar, '借減': r_b4_sho, '券增': r_b4_mp,
-                    '大股東動向': r_b5, '法人賣出警示': r_warn
+                    '大股東動向': r_b5
                 })
                 
-            res_df = pd.DataFrame(results).sort_values(by='總分', ascending=False).drop_duplicates(subset=['股票代號']).reset_index(drop=True)
+            res_df = pd.DataFrame(results).sort_values(by='總分', ascending=False).drop_duplicates(subset=['代號']).reset_index(drop=True)
             
             # ==========================================
-            # 🔥 Delta 計算引擎
+            # 🔥 Delta (▼變量) 計算引擎
             # ==========================================
             history_files = sorted(glob.glob(os.path.join(SCORE_HISTORY_DIR, "scores_*.csv")), reverse=True)
             prev_scores_dict = {}
             if len(history_files) >= 2:
                 try:
                     prev_df = pd.read_csv(history_files[1])
-                    prev_scores_dict = dict(zip(prev_df['股票代號'].astype(str).str.replace(r'\D', '', regex=True), prev_df['總分']))
+                    id_col = '代號' if '代號' in prev_df.columns else '股票代號' if '股票代號' in prev_df.columns else None
+                    if id_col:
+                        prev_scores_dict = dict(zip(prev_df[id_col].astype(str).str.replace(r'\D', '', regex=True), prev_df['總分']))
                 except: pass
 
             def calc_table_delta(row):
-                sid = str(row['股票代號']).replace(r'\D', '')
+                sid = str(row['代號']).replace(r'\D', '')
                 curr_score = row.get('總分', 0)
                 prev_score = prev_scores_dict.get(sid, curr_score) 
                 delta = round(curr_score - prev_score, 1)
                 return f"+{delta}" if delta > 0 else str(delta)
 
             if not res_df.empty and '總分' in res_df.columns:
-                res_df['Delta'] = res_df.apply(calc_table_delta, axis=1)
+                res_df['▼變量'] = res_df.apply(calc_table_delta, axis=1)
 
-            cols = [c for c in res_df.columns if c not in ['Delta', '評分明細']]
+            # 💡 變更點 2：動態調配表頭順序，將「賣出警示」插入至「今日上榜」後方
+            cols = [c for c in res_df.columns if c not in ['▼變量', '明細', '賣出警示']]
+            
             score_idx = cols.index('總分')
-            cols.insert(score_idx + 1, 'Delta')
-            name_idx = cols.index('股票名稱')
-            cols.insert(name_idx + 1, '評分明細')
+            cols.insert(score_idx + 1, '▼變量')
+            
+            name_idx = cols.index('名稱')
+            cols.insert(name_idx + 1, '明細')
+            
+            rank_idx = cols.index('今日上榜')
+            cols.insert(rank_idx + 1, '賣出警示')
+            
             res_df = res_df[cols]
 
             st.session_state['top_pool_df'] = res_df
@@ -3185,7 +3193,8 @@ with top_pool_container:
                     use_container_width=True, 
                     hide_index=True,
                     column_config={
-                        "評分明細": st.column_config.TextColumn("評分明細", help="滑鼠游標停留在這裡，查看完整明細", width="small", max_chars=4)
+                        # 💡 變更點 3：UI 渲染配置檔同步對接「明細」
+                        "明細": st.column_config.TextColumn("明細", help="滑鼠游標停留在這裡，查看完整明細", width="small", max_chars=4)
                     }
                 )
                 st.success(f"選股池掃描完成！今日共過濾出 {len(res_df)} 檔潛力標的。")
@@ -3199,9 +3208,12 @@ with top_pool_container:
                                 date_str = re.search(r'\d{8}', os.path.basename(f)).group(0)
                                 formatted_date = f"{date_str[4:6]}/{date_str[6:]}"
                                 df_h = pd.read_csv(f)
-                                if '股票代號' in df_h.columns and '總分' in df_h.columns:
+                                
+                                id_col = '代號' if '代號' in df_h.columns else '股票代號' if '股票代號' in df_h.columns else None
+                                
+                                if id_col and '總分' in df_h.columns:
                                     df_h['日期'] = formatted_date
-                                    df_h['代號'] = df_h['股票代號'].astype(str).str.replace(r'\D', '', regex=True)
+                                    df_h['代號'] = df_h[id_col].astype(str).str.replace(r'\D', '', regex=True)
                                     df_h = df_h[['代號', '總分', '日期']]
                                     hist_list.append(df_h)
                             except: pass
@@ -3209,13 +3221,14 @@ with top_pool_container:
                         if hist_list:
                             hist_combined = pd.concat(hist_list, ignore_index=True)
                             hist_pivot = hist_combined.pivot_table(index='代號', columns='日期', values='總分', aggfunc='first').reset_index()
-                            name_mapping = dict(zip(res_df['股票代號'].astype(str).str.replace(r'\D', '', regex=True), res_df['股票名稱']))
-                            hist_pivot.insert(1, '股票名稱', hist_pivot['代號'].map(name_mapping).fillna('-'))
+                            # 💡 變更點 4：歷史表格同步更新映射名稱
+                            name_mapping = dict(zip(res_df['代號'].astype(str).str.replace(r'\D', '', regex=True), res_df['名稱']))
+                            hist_pivot.insert(1, '名稱', hist_pivot['代號'].map(name_mapping).fillna('-'))
                             latest_day = hist_pivot.columns[-1]
-                            hist_pivot = hist_pivot[hist_pivot['股票名稱'] != '-']
+                            hist_pivot = hist_pivot[hist_pivot['名稱'] != '-']
                             hist_pivot = hist_pivot.sort_values(by=latest_day, ascending=False).reset_index(drop=True)
                             st.dataframe(hist_pivot, use_container_width=True, hide_index=True)
-                            st.info("💡 這裡統整了標的在過去20日選股池中的【總分變化】，可藉此觀察籌碼動能的延續性與驗證 Delta！")
+                            st.info("💡 這裡統整了標的在過去20日選股池中的【總分變化】，可藉此觀察籌碼動能的延續性與驗證 ▼變量！")
                         else: st.warning("歷史資料格式不符，無法解析。")
                     else: st.warning("尚無足夠的歷史分數紀錄。")
                 except Exception as e: st.error(f"歷史分數讀取發生錯誤: {e}")
