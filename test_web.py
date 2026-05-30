@@ -13,12 +13,33 @@ import pytz
 # ==========================================
 st.set_page_config(page_title="台股籌碼五大核心矩陣儀表板", layout="wide")
 
-# 設定路徑 (一定要先定義 DATA_DIR，後面才能用它來串接)
+# 設定路徑
 DATA_DIR = "./Goodinfo_Rankings"
 SCORE_HISTORY_DIR = os.path.join(DATA_DIR, "ScoreHistory")
 
+# 確保資料夾存在
 if not os.path.exists(SCORE_HISTORY_DIR):
     os.makedirs(SCORE_HISTORY_DIR)
+
+# ==========================================
+# 🚀 【自動生成測試用歷史分數】確保 Delta 引擎正常運作
+# ==========================================
+import pandas as pd
+import datetime
+
+# 假設今天是 29 號，我們強制產生一個 28 號的檔案
+dummy_history_file = os.path.join(SCORE_HISTORY_DIR, "scores_20260528.csv")
+
+# 如果資料夾裡面沒有這個檔案，系統就自動幫您生一個出來！
+if not os.path.exists(dummy_history_file):
+    # 隨便塞幾檔熱門股的假分數，讓系統明天可以相減
+    dummy_data = pd.DataFrame({
+        '股票代號': ['2330', '2454', '2317', '2603', '3231', '3450', '2382'],
+        '總分': [5.0, 4.0, 3.5, 6.0, 2.5, 7.0, 4.5] 
+    })
+    dummy_data.to_csv(dummy_history_file, index=False, encoding='utf-8-sig')
+    print("✅ 已自動生成 0528 歷史分數測試檔！")
+# ==========================================
 
 
 #======測試爬蟲=====
