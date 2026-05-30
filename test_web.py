@@ -13,11 +13,8 @@ import pytz
 # ==========================================
 st.set_page_config(page_title="台股籌碼五大核心矩陣儀表板", layout="wide")
 
-# 設定路徑 
 DATA_DIR = "./Goodinfo_Rankings"
 SCORE_HISTORY_DIR = os.path.join(DATA_DIR, "ScoreHistory")
-
-# 🔥 新增：大盤與鉅額交易的永久歷史存檔資料夾
 MARKET_HISTORY_DIR = os.path.join(DATA_DIR, "MarketHistory")
 BLOCK_HISTORY_DIR = os.path.join(DATA_DIR, "BlockHistory")
 
@@ -27,59 +24,71 @@ for folder in [SCORE_HISTORY_DIR, MARKET_HISTORY_DIR, BLOCK_HISTORY_DIR]:
         os.makedirs(folder)
 
 # ==========================================
-# 🚀 【自動生成測試用歷史分數】確保 Delta 引擎正常運作
+# 🚀 週末空窗期急救包：強制注入 05/29 真實數據 (這是隱形的後台作業)
 # ==========================================
-import pandas as pd
-import datetime
-
-# 假設今天是 29 號，我們強制產生一個 28 號的檔案(測試測試測試)
-#dummy_history_file = os.path.join(SCORE_HISTORY_DIR, "scores_20260528.csv")
-
-# 如果資料夾裡面沒有這個檔案，系統就自動幫您生一個出來！
-#if not os.path.exists(dummy_history_file):
-    # 隨便塞幾檔熱門股的假分數，讓系統明天可以相減
-    #dummy_data = pd.DataFrame({
-        #'股票代號': ['2330', '2454', '2317', '2603', '3231', '3450', '2382'],
-        #'總分': [5.0, 4.0, 3.5, 6.0, 2.5, 7.0, 4.5] 
-    #})
-    #dummy_data.to_csv(dummy_history_file, index=False, encoding='utf-8-sig')
-    #print("✅ 已自動生成 0528 歷史分數測試檔！")
-
-# ==========測試爬蟲=========================
-# ==========================================
-# 🚀 週末空窗期急救包：強制注入 05/29 真實大盤與融資數據
-# ==========================================
-# ==========================================
-# 🚀 週末空窗期急救包：強制注入 05/29 真實大盤與融資數據
-# ==========================================
-import pandas as pd
-import os
-
 backup_df_path = os.path.join(DATA_DIR, "sidebar_twse_df_backup.csv")
 backup_title_path = os.path.join(DATA_DIR, "sidebar_twse_title_backup.txt")
 backup_margin_path = os.path.join(DATA_DIR, "sidebar_margin_backup.csv")
 
-# 1. 如果找不到三大法人備援檔，自動寫入 05/29 真實數據
+# 1. 注入三大法人真實數據
 if not os.path.exists(backup_df_path):
     dummy_data = pd.DataFrame({
         '單位名稱': ['自營商(自行買賣)', '自營商(避險)', '投信', '外資及陸資(不含外資自營商)', '外資自營商', '合計'],
         '買賣差額': ['2,865,270,779', '12,741,938,770', '7,018,067,618', '80,145,461,140', '0', '102,770,738,307']
     })
     dummy_data.to_csv(backup_df_path, index=False, encoding='utf-8-sig')
-    
     with open(backup_title_path, 'w', encoding='utf-8') as f:
         f.write("115年05月29日 三大法人買賣金額統計表")
 
-# 2. 🔥 新增：如果找不到融資備援檔，自動寫入 05/29 真實數據 (單位：仟元)
+# 2. 注入融資真實數據 (單位：仟元)
 if not os.path.exists(backup_margin_path):
     margin_dummy = pd.DataFrame([{
         "today_bal": 556359646.0, 
         "prev_bal": 535025764.0
     }])
     margin_dummy.to_csv(backup_margin_path, index=False, encoding='utf-8-sig')
+
 # ==========================================
+# 🛠️ 區塊 0：大盤與融資籌碼數據底層診斷面板 (這是您會在網頁頂端看到的畫面)
 # ==========================================
-# ==========================================
+st.markdown("### 🛠️ 區塊 0：全站籌碼數據讀入核心診斷面板")
+with st.expander("🔍 點擊展開/收合 底層數據讀取狀態與除錯面板", expanded=True):
+    c1, c2, c3 = st.columns(3)
+    
+    # 1. 檢查三大法人現貨備援快照
+    if os.path.exists(backup_df_path) and os.path.exists(backup_title_path):
+        try:
+            with open(backup_title_path, "r", encoding="utf-8") as f:
+                t_title = f.read().strip()
+            c1.success(f"🌐 三大法人歷史備援：正常\n\nSnapshot: {t_title[:12]}...")
+        except:
+            c1.warning("🌐 三大法人歷史備援：讀取失敗")
+    else:
+        c1.error("🌐 三大法人歷史備援：未建立檔案")
+        
+    # 2. 檢查融資總額備援快照
+    if os.path.exists(backup_margin_path):
+        try:
+            m_df = pd.read_csv(backup_margin_path)
+            if not m_df.empty and 'today_bal' in m_df.columns:
+                current_bal_yi = float(m_df.iloc[0]['today_bal']) / 100000
+                c2.success(f"📊 融資總額歷史備援：正常\n\n最新留存金額: {current_bal_yi:.1f} 億元")
+            else:
+                c2.warning("📊 融資歷史備援：資料格式空泛")
+        except:
+            c2.warning("📊 融資歷史備援：檔案損壞")
+    else:
+        c2.error("📊 融資歷史備援：未建立檔案")
+        
+    # 3. 檢查永久歷史歸檔庫檔案儲存數
+    if os.path.exists(MARKET_HISTORY_DIR):
+        f_count = len(glob.glob(os.path.join(MARKET_HISTORY_DIR, "*")))
+        c3.info(f"💾 永久歷史庫儲存：正常\n\n累計日曆化存檔數: {f_count} 個 CSV")
+    else:
+        c3.error("💾 永久歷史庫儲存：目錄未建立")
+        
+    st.caption("💡 **操盤手提示**：由於您目前在週末進行改版推送，雲端硬碟被自動洗白，若顯示『未建立檔案』屬於正常的雲端冷啟動現象。下週一開盤收盤（14:50後）系統成功抓到第一筆台股真實大盤與融資資料後，此處將全數轉為綠色正常燈號，並永久鎖定備援數據！")
+
 
 #======測試爬蟲=====
 
