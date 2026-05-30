@@ -3120,9 +3120,8 @@ with top_pool_container:
 
                 score_breakdown = " \n".join(details) if details else "無加扣分"
 
-                # 💡 變更點 1：將字串索引改為極簡名稱
                 results.append({
-                    '總分': score, '代號': sid, '名稱': sname, '明細': score_breakdown, 
+                    '總分': score, '代號': sid, '名稱': sname, '▼明細': score_breakdown, 
                     '最新動態': b1_dyn, '今日上榜': b1_rank, '賣出警示': r_warn,
                     '外買佔比': r_b2_1, '投買佔比': r_b2_2, '外佔發行': r_b2_3, '投佔發行': r_b2_4,
                     '外日連': r_b3_fd, '外週連': r_b3_fw, '投日連': r_b3_id, '投週連': r_b3_iw,
@@ -3155,14 +3154,13 @@ with top_pool_container:
             if not res_df.empty and '總分' in res_df.columns:
                 res_df['▼變量'] = res_df.apply(calc_table_delta, axis=1)
 
-            # 💡 變更點 2：動態調配表頭順序，將「賣出警示」插入至「今日上榜」後方
-            cols = [c for c in res_df.columns if c not in ['▼變量', '明細', '賣出警示']]
+            cols = [c for c in res_df.columns if c not in ['▼變量', '▼明細', '賣出警示']]
             
             score_idx = cols.index('總分')
             cols.insert(score_idx + 1, '▼變量')
             
             name_idx = cols.index('名稱')
-            cols.insert(name_idx + 1, '明細')
+            cols.insert(name_idx + 1, '▼明細')
             
             rank_idx = cols.index('今日上榜')
             cols.insert(rank_idx + 1, '賣出警示')
@@ -3193,8 +3191,7 @@ with top_pool_container:
                     use_container_width=True, 
                     hide_index=True,
                     column_config={
-                        # 💡 變更點 3：UI 渲染配置檔同步對接「明細」
-                        "明細": st.column_config.TextColumn("明細", help="滑鼠游標停留在這裡，查看完整明細", width="small", max_chars=4)
+                        "▼明細": st.column_config.TextColumn("▼明細", help="滑鼠游標停留在這裡，查看完整明細", width="small", max_chars=4)
                     }
                 )
                 st.success(f"選股池掃描完成！今日共過濾出 {len(res_df)} 檔潛力標的。")
@@ -3221,7 +3218,6 @@ with top_pool_container:
                         if hist_list:
                             hist_combined = pd.concat(hist_list, ignore_index=True)
                             hist_pivot = hist_combined.pivot_table(index='代號', columns='日期', values='總分', aggfunc='first').reset_index()
-                            # 💡 變更點 4：歷史表格同步更新映射名稱
                             name_mapping = dict(zip(res_df['代號'].astype(str).str.replace(r'\D', '', regex=True), res_df['名稱']))
                             hist_pivot.insert(1, '名稱', hist_pivot['代號'].map(name_mapping).fillna('-'))
                             latest_day = hist_pivot.columns[-1]
