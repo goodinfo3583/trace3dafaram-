@@ -2567,21 +2567,32 @@ st.markdown("<div id='section-6'></div>", unsafe_allow_html=True)
 st.subheader("💸 區塊 6：鉅額交易動向")
 st.write("💡 鉅額交易常為大戶私下換手籌碼,避免股價盤中劇烈波動。成交價為「支撐/壓力」防守線或是「壓/拉尾盤」；短線跌破建議嚴設停損。")
 
+# 🛠️ 核心修復：強制去讀取側邊欄已經確認過的「真實大盤日期」，徹底封殺電腦週末時間！
+def get_real_market_date():
+    import os, re, datetime
+    backup_title_path = os.path.join(DATA_DIR, "sidebar_twse_title_backup.txt")
+    if os.path.exists(backup_title_path):
+        try:
+            with open(backup_title_path, 'r', encoding='utf-8') as f:
+                title_text = f.read().strip()
+            date_match = re.search(r'(\d+)年(\d+)月(\d+)日', title_text)
+            if date_match:
+                roc_yr, m, d = date_match.groups()
+                return f"{int(roc_yr) + 1911}{int(m):02d}{int(d):02d}"
+        except: pass
+    return datetime.datetime.now().strftime("%Y%m%d")
+
 block_df = fetch_block_trades()
 backup_block_path = os.path.join(DATA_DIR, "block_trades_backup.csv")
+real_trade_date = get_real_market_date() # 🎯 抓取真實交易日 (例如 20260529)
 
 if block_df is not None and not block_df.empty:
     # 🟢 盤後成功抓到新數據：即時更新日常備援，並寫入永久歷史庫
     try:
         block_df.to_csv(backup_block_path, index=False, encoding='utf-8-sig')
         
-        # 🚀 歷史歸檔機制：自動抓取數據日期做為檔名
-        try: raw_date = get_data_date() 
-        except: raw_date = datetime.datetime.now().strftime("%Y%m%d")
-        if not raw_date or len(raw_date) != 8:
-            raw_date = datetime.datetime.now().strftime("%Y%m%d")
-            
-        block_hist_file = os.path.join(BLOCK_HISTORY_DIR, f"block_trades_{raw_date}.csv")
+        # 🚀 歷史歸檔機制：使用真實交易日作為檔名
+        block_hist_file = os.path.join(BLOCK_HISTORY_DIR, f"block_trades_{real_trade_date}.csv")
         block_df.to_csv(block_hist_file, index=False, encoding='utf-8-sig')
     except:
         pass
@@ -2590,7 +2601,7 @@ else:
     if os.path.exists(backup_block_path):
         try:
             block_df = pd.read_csv(backup_block_path, encoding='utf-8-sig')
-            st.caption("🌙 週末/休市期間：自動啟用上一交易日大戶暗盤數據")
+            st.caption(f"🌙 週末/休市期間：自動啟用 {real_trade_date} 大戶暗盤數據")
         except:
             pass
 
@@ -2670,9 +2681,9 @@ if block_df is not None and not block_df.empty:
             try:
                 close_p = float(str(row['▼收盤價']).replace(',', ''))
                 block_p = float(str(row['▼成交價']).replace(',', ''))
-                if close_p > block_p: color = '#FF4B4B'       
+                if close_p > block_p: color = '#FF4B4B'        
                 elif close_p == block_p: color = '#FFA500'    
-                else: color = '#00E272'                       
+                else: color = '#00E272'                        
                 idx = row.index.get_loc('▼成交價')
                 styles[idx] = f'color: {color}; font-weight: bold;'
             except: pass 
@@ -2681,16 +2692,8 @@ if block_df is not None and not block_df.empty:
         styled_df = display_df.style.apply(highlight_block_row, axis=1)
         st.dataframe(styled_df, use_container_width=True, hide_index=True)
         
-        try:
-            raw_date = get_data_date() 
-            if not raw_date or len(raw_date) != 8:
-                import datetime
-                raw_date = datetime.datetime.now().strftime("%Y%m%d")
-        except:
-            import datetime
-            raw_date = datetime.datetime.now().strftime("%Y%m%d")
-            
-        st.success(f"更新 {raw_date} 共偵測到 {len(display_df)} 筆大戶暗盤資金換手紀錄。")
+        # 🎯 這裡也同步改為使用 real_trade_date
+        st.success(f"更新 {real_trade_date} 共偵測到 {len(display_df)} 筆大戶暗盤資金換手紀錄。")
 
     except Exception as e:
         st.warning(f"⚠️ 資料解析發生錯誤: {str(e)}。顯示證交所原始回傳數據：")
