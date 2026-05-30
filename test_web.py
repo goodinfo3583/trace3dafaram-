@@ -2804,7 +2804,7 @@ with top_pool_container:
             tab1, tab2 = st.tabs(["🔥 今日最新排行", "📈 歷史分數追蹤表"])
             
             with tab1:
-                st.success(f"選股池掃描完成！今日共過濾出 {len(res_df)} 檔潛力標的。")
+                #st.success(f"選股池掃描完成！今日共過濾出 {len(res_df)} 檔潛力標的。")
                 st.dataframe(
                     res_df, 
                     use_container_width=True, 
@@ -2815,7 +2815,7 @@ with top_pool_container:
                         )
                     }
                 )
-                
+                st.success(f"選股池掃描完成！今日共過濾出 {len(res_df)} 檔潛力標的。")
             with tab2:
                 st.info("💡 這裡統整了標的在過去一週選股池中的【總分變化】，可藉此觀察籌碼動能的延續性與驗證 Delta！")
                 try:
