@@ -2421,12 +2421,141 @@ def peek_data_date(keyword):
     return re.search(r'\d{8}', msg).group(0) if re.search(r'\d{8}', msg) else "未知"
 
 # ==========================================
+# 📅 區塊 4 綜合區：融資與借券動向 (5日累計)
+# ==========================================
+
+# 🛠️ 【不可省略】讀取函數
+def get_specific_margin_data(keyword):
+    import os, pandas as pd
+    found_files = []
+    for root, dirs, files in os.walk(os.getcwd()):
+        if '.git' in root or 'venv' in root: continue
+        for file in files:
+            if file.lower().endswith(".csv") and keyword in file:
+                found_files.append(os.path.join(root, file))
+    
+    if not found_files:
+        return pd.DataFrame(), f"找不到包含『{keyword}』的檔案"
+    
+    latest_file = sorted(found_files, key=lambda x: os.path.basename(x), reverse=True)[0]
+    file_name = os.path.basename(latest_file)
+    
+    try:
+        df = robust_read_csv(latest_file)
+        if df.empty:
+            return pd.DataFrame(), f"讀取成功但內容為空: {file_name}"
+        
+        df.columns = df.columns.astype(str).str.replace('\ufeff', '').str.strip()
+        
+        for col in df.columns:
+            if "幅度" in col or "張數" in col or "%" in col or "％" in col or "漲跌" in col:
+                df[col] = df[col].astype(str).str.replace(',', '', regex=False).str.replace('%', '', regex=False)
+                df[col] = pd.to_numeric(df[col], errors='coerce')
+                
+        return df, file_name
+    except Exception as e:
+        return pd.DataFrame(), f"讀取崩潰 ({file_name}): {str(e)}"
+
+# 🛠️ 【不可省略】欄位清理與過濾函數
+def process_margin_df(df, type_name, flag_etf, flag_bond):
+    if df.empty: return df
+    df = df.copy()
+    
+    cols_to_drop = [c for c in df.columns if "更新" in str(c) and "日期" in str(c)]
+    if cols_to_drop:
+        df = df.drop(columns=cols_to_drop)
+        
+    target_idx = -1
+    if type_name == "幅度":
+        for i, col in enumerate(df.columns):
+            if "3個月" in str(col) and ("%" in str(col) or "％" in str(col)):
+                target_idx = i
+                break
+    else: 
+        for i, col in enumerate(df.columns):
+            if "3個月" in str(col) and "張數" in str(col):
+                target_idx = i
+                break
+                
+    if target_idx != -1:
+        df = df.iloc[:, :target_idx+1]
+        
+    col_name = next((c for c in df.columns if '名稱' in c), None)
+    col_id = next((c for c in df.columns if '代號' in c), None)
+    
+    if col_name and col_id:
+        df = df.rename(columns={col_id: '股票代號', col_name: '股票名稱'})
+        df['股票代號'] = df['股票代號'].astype(str).str.strip()
+        df['股票名稱'] = df['股票名稱'].astype(str).str.strip()
+        
+        mask_bond = df['股票名稱'].str.contains('債', na=False) | df['股票代號'].str.endswith('B', na=False)
+        mask_etf = df['股票代號'].str.startswith('00', na=False)
+        
+        if not flag_bond: df = df[~mask_bond]
+        if not flag_etf: df = df[~(mask_etf & ~mask_bond)] 
+
+    # 🚀 顯示優化：上漲優先呈現排序機制
+    sort_col = next((c for c in df.columns if '漲跌' in str(c) or '漲幅' in str(c)), None)
+    if sort_col:
+        df[sort_col] = pd.to_numeric(df[sort_col], errors='coerce').fillna(0)
+        df = df.sort_values(by=sort_col, ascending=False)
+
+    df = df.reset_index(drop=True)
+    df.index = df.index + 1
+    return df
+
+# 🎨 核心渲染引擎：移除多餘零尾隨、改採護眼紅渲染
+def render_styled_margin_table(clean_df):
+    if clean_df.empty:
+        st.warning("⚠️ 無相符資料")
+        return
+        
+    display_df = clean_df.copy()
+    change_col = next((c for c in display_df.columns if '漲跌' in str(c) or '漲幅' in str(c)), None)
+    
+    # 💡 終極去零法：在不破壞數據類型的前提下，將所有數值列收縮格式
+    for col in display_df.columns:
+        if col not in ['股票代號', '股票名稱']:
+            try:
+                display_df[col] = display_df[col].apply(
+                    lambda x: f"{x:.1f}".rstrip('0').rstrip('.') if pd.notna(x) and isinstance(x, (int, float)) else x
+                )
+            except: pass
+
+    # 🎨 護眼深紅渲染
+    def style_row_by_price(row):
+        styles = [''] * len(row)
+        if change_col:
+            try:
+                # 讀取原始 clean_df 的數值做精確多空判斷
+                orig_val = clean_df.loc[row.name, change_col]
+                if float(orig_val) > 0:
+                    return ['color: #C84B4B; font-weight: bold;'] * len(row) # 🎯 升級護眼暗紅
+            except: pass
+        return styles
+
+    styled_df = display_df.style.apply(style_row_by_price, axis=1)
+    
+    # 📐 欄位寬度最佳化配置：縮小股票名稱與代號寬度，強迫右側當日數據完美浮現
+    col_config = {
+        "股票代號": st.column_config.TextColumn("股票代號", width=65),
+        "股票名稱": st.column_config.TextColumn("股票名稱", width=80)
+    }
+    
+    st.dataframe(styled_df, use_container_width=True, hide_index=True, column_config=col_config)
+
+# 🕒 輔助函數：解析真實日期
+def peek_data_date(keyword):
+    import re
+    _, msg = get_specific_margin_data(keyword)
+    return re.search(r'\d{8}', msg).group(0) if re.search(r'\d{8}', msg) else "未知"
+
+# ==========================================
 # 📅 區塊 4-1：融資減少動向
 # ==========================================
 st.write("---")
 st.markdown("<div id='section-4-1'></div>", unsafe_allow_html=True)
 
-# 🎯 表頭優化：將最新數據日期直接與表頭並列，加上中括號且維持原色
 date_41 = peek_data_date("融資減少幅度")
 st.header(f"🔄 區塊 4-1：融資減少動向 ({date_41})")
 
@@ -2436,13 +2565,11 @@ with f_col2: show_bond_41 = st.checkbox("顯示債券/債券ETF", value=True, ke
 st.write("") 
 
 c1, c2 = st.columns(2)
-
 with c1:
     st.markdown("<h3 style='margin-top: 0; margin-bottom: 10px;'>📉 融資減少比例排名</h3>", unsafe_allow_html=True)
     df_pct, _ = get_specific_margin_data("融資減少幅度")
     df_pct_clean = process_margin_df(df_pct, "幅度", show_etf_41, show_bond_41)
     render_styled_margin_table(df_pct_clean)
-
 with c2:
     st.markdown("<h3 style='margin-top: 0; margin-bottom: 10px;'>📉 融資減少張數排名</h3>", unsafe_allow_html=True)
     df_vol, _ = get_specific_margin_data("融資減少張數")
@@ -2467,13 +2594,11 @@ with f_col2: show_bond_42 = st.checkbox("顯示債券/債券ETF", value=True, ke
 st.write("") 
 
 c1, c2 = st.columns(2)
-
 with c1:
     st.markdown("<h3 style='margin-top: 0; margin-bottom: 10px;'>📉 借券賣出減少比例排名</h3>", unsafe_allow_html=True)
     df_pct, _ = get_specific_margin_data("借券賣出減少幅度")
     df_pct_clean = process_margin_df(df_pct, "幅度", show_etf_42, show_bond_42)
     render_styled_margin_table(df_pct_clean)
-
 with c2:
     st.markdown("<h3 style='margin-top: 0; margin-bottom: 10px;'>📉 借券賣出減少張數排名</h3>", unsafe_allow_html=True)
     df_vol, _ = get_specific_margin_data("借券賣出減少張數")
@@ -2498,13 +2623,11 @@ with f_col2: show_bond_43 = st.checkbox("顯示債券/債券ETF", value=True, ke
 st.write("") 
 
 c1, c2 = st.columns(2)
-
 with c1:
     st.markdown("<h3 style='margin-top: 0; margin-bottom: 10px;'>📈 融券增加比例排名</h3>", unsafe_allow_html=True)
     df_pct, _ = get_specific_margin_data("融券增加幅度")
     df_pct_clean = process_margin_df(df_pct, "幅度", show_etf_43, show_bond_43)
     render_styled_margin_table(df_pct_clean)
-
 with c2:
     st.markdown("<h3 style='margin-top: 0; margin-bottom: 10px;'>📈 融券增加張數排名</h3>", unsafe_allow_html=True)
     df_vol, _ = get_specific_margin_data("融券增加張數")
