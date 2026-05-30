@@ -332,7 +332,7 @@ def render_technical_chart(stock_id, timeframe="日線", selected_mas=[], show_r
             # 1. 🧨 爆近期大量提示 (今日成交量 > 20日均量 2.5倍)
             vol_20ma = df['Volume'].rolling(window=20).mean().iloc[-2] # 拿昨天的均量來比
             if pd.notna(vol_20ma) and vol_20ma > 0 and latest_vol > (vol_20ma * 2.5):
-                signals.append(f"🧨 **爆量出擊**：今日成交量達 20 日均量的 {latest_vol/vol_20ma:.1f} 倍！")
+                signals.append(f"🧨 爆量出擊：今日成交量達 20 日均量的 {latest_vol/vol_20ma:.1f} 倍！")
 
             # 2. 🎯 均線回測與關鍵支撐 (差距 1.5% 內視為回測)
             mas = {'5MA': 5, '10MA': 10, '20MA': 20, '60MA': 60, '120MA': 120, '240MA': 240}
@@ -341,7 +341,7 @@ def render_technical_chart(stock_id, timeframe="日線", selected_mas=[], show_r
                     ma_val = df['Close'].rolling(window=period).mean().iloc[-1]
                     # 股價在均線上，且距離均線極近 (大於 0 但小於 1.5%)
                     if 0 < (latest_close - ma_val) / ma_val < 0.015:
-                        signals.append(f"🎯 **回測支撐**：股價目前極度貼近 {ma_name} ({ma_val:.2f}) 關鍵支撐線。")
+                        signals.append(f"🎯 回測支撐：股價目前極度貼近 {ma_name} ({ma_val:.2f}) 關鍵支撐線。")
 
             # 3. 🌀 短中長均線糾結提示 (5, 10, 20MA 極度壓縮在 2% 空間內)
             if len(df) >= 20:
@@ -350,7 +350,7 @@ def render_technical_chart(stock_id, timeframe="日線", selected_mas=[], show_r
                 ma20 = df['Close'].rolling(20).mean().iloc[-1]
                 ma_max, ma_min = max(ma5, ma10, ma20), min(ma5, ma10, ma20)
                 if pd.notna(ma_max) and (ma_max - ma_min) / ma_min < 0.02:
-                    signals.append("🌀 **均線糾結**：短天期 (5/10/20MA) 成本線高度重合壓縮，醞釀表態！")
+                    signals.append("🌀 均線糾結：短天期 (5/10/20MA) 成本線高度重合壓縮，醞釀表態！")
 
             # 4. 📐 三角收斂 / 波動壓縮提示 (近20日高低落差，比前一個20日縮小40%以上)
             if len(df) >= 60:
@@ -362,7 +362,7 @@ def render_technical_chart(stock_id, timeframe="日線", selected_mas=[], show_r
                 recent_volatility = recent_high - recent_low
                 prev_volatility = prev_high - prev_low
                 if prev_volatility > 0 and recent_volatility < (prev_volatility * 0.6):
-                    signals.append("📐 **型態壓縮**：近一個月股價高低波幅急遽收斂，疑似三角收斂末端。")
+                    signals.append("📐 型態壓縮：近一個月股價高低波幅急遽收斂，疑似三角收斂末端。")
             # 5. 🚀 股價創波段新高提示 (創 60 日新高)
             if len(df) >= 60:
                 # 找出過去 60 天的最高價
@@ -381,7 +381,7 @@ def render_technical_chart(stock_id, timeframe="日線", selected_mas=[], show_r
                 
                 # 嚴格定義：收盤價站上所有均線，且均線照順序排列，外加 60MA 必須是向上的
                 if pd.notna(ma60) and (latest_close > ma5 > ma10 > ma20 > ma60) and (ma60 > ma60_prev):
-                    signals.append("📈 **多頭排列**：短中長期均線 (5/10/20/60MA) 呈現完美多頭發散，趨勢明確翻多！")
+                    signals.append("📈 多頭排列：短中長期均線 (5/10/20/60MA) 呈現完美多頭發散，趨勢明確翻多！")
 
             return signals
 
@@ -2815,7 +2815,7 @@ with top_pool_container:
                 b1_dyn = str(row.get(dyn_col, '')) if dyn_col else '-'
                 
                 # 🔥 暗盤標籤注入
-                if sid in block_sids: b1_dyn = f"{b1_dyn} | 🎯暗盤"
+                if sid in block_sids: b1_dyn = f"{b1_dyn} | 🎯鉅額交易"
                     
                 b1_rank = str(row.get(rank_col, '-')) if rank_col else '-'
                 score = 0.0
