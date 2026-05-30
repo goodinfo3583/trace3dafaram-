@@ -1133,7 +1133,6 @@ def render_sidebar_market_summary():
         st.sidebar.markdown(card_html, unsafe_allow_html=True)
     else:
         st.sidebar.info("🕒 目前查無今日三大法人買賣資料。")
-
 # 執行渲染側邊欄大盤卡片
 render_sidebar_market_summary()
 
