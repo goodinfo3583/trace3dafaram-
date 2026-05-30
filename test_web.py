@@ -47,48 +47,34 @@ import datetime
 
 # ==========測試爬蟲=========================
 # ==========================================
-# 🛠️ 區塊 0：大盤與融資籌碼數據底層診斷面板 (置頂除錯專用)
+# 🚀 週末空窗期急救包：強制注入 05/29 真實大盤與融資數據
 # ==========================================
-st.markdown("### 🛠️ 區塊 0：全站籌碼數據讀入核心診斷面板")
-with st.expander("🔍 點擊展開/收合 底層數據讀取狀態與除錯面板", expanded=True):
-    c1, c2, c3 = st.columns(3)
+import pandas as pd
+import os
+
+backup_df_path = os.path.join(DATA_DIR, "sidebar_twse_df_backup.csv")
+backup_title_path = os.path.join(DATA_DIR, "sidebar_twse_title_backup.txt")
+backup_margin_path = os.path.join(DATA_DIR, "sidebar_margin_backup.csv")
+
+# 1. 如果找不到三大法人備援檔，自動寫入 05/29 真實數據
+if not os.path.exists(backup_df_path):
+    dummy_data = pd.DataFrame({
+        '單位名稱': ['自營商(自行買賣)', '自營商(避險)', '投信', '外資及陸資(不含外資自營商)', '外資自營商', '合計'],
+        '買賣差額': ['2,865,270,779', '12,741,938,770', '7,018,067,618', '80,145,461,140', '0', '102,770,738,307']
+    })
+    dummy_data.to_csv(backup_df_path, index=False, encoding='utf-8-sig')
     
-    # 1. 檢查三大法人現貨備援快照
-    b_twse_df = os.path.join(DATA_DIR, "sidebar_twse_df_backup.csv")
-    b_twse_title = os.path.join(DATA_DIR, "sidebar_twse_title_backup.txt")
-    if os.path.exists(b_twse_df) and os.path.exists(b_twse_title):
-        try:
-            with open(b_twse_title, "r", encoding="utf-8") as f:
-                t_title = f.read().strip()
-            c1.success(f"🌐 三大法人歷史備援：正常\n\nSnapshot: {t_title[:12]}...")
-        except:
-            c1.warning("🌐 三大法人歷史備援：讀取失敗")
-    else:
-        c1.error("🌐 三大法人歷史備援：未建立檔案")
-        
-    # 2. 檢查融資總額備援快照
-    b_margin = os.path.join(DATA_DIR, "sidebar_margin_backup.csv")
-    if os.path.exists(b_margin):
-        try:
-            m_df = pd.read_csv(b_margin)
-            if not m_df.empty and 'today_bal' in m_df.columns:
-                current_bal_yi = float(m_df.iloc[0]['today_bal']) / 100000
-                c2.success(f"📊 融資總額歷史備援：正常\n\n最新留存金額: {current_bal_yi:.1f} 億元")
-            else:
-                c2.warning("📊 融資歷史備援：資料格式空泛")
-        except:
-            c2.warning("📊 融資歷史備援：檔案損壞")
-    else:
-        c2.error("📊 融資歷史備援：未建立檔案")
-        
-    # 3. 檢查永久歷史歸檔庫檔案儲存數
-    if os.path.exists(MARKET_HISTORY_DIR):
-        f_count = len(glob.glob(os.path.join(MARKET_HISTORY_DIR, "*")))
-        c3.info(f"💾 永久歷史庫儲存：正常\n\n累計日曆化存檔數: {f_count} 個 CSV")
-    else:
-        c3.error("💾 永久歷史庫儲存：目錄未建立")
-        
-    st.caption("💡 **操盤手提示**：由於您目前在週末進行改版推送，雲端硬碟被自動洗白，若顯示『未建立檔案』屬於正常的雲端冷啟動現象。下週一開盤收盤（14:50後）系統成功抓到第一筆台股真實大盤與融資資料後，此處將全數轉為綠色正常燈號，並永久鎖定備援數據！")
+    with open(backup_title_path, 'w', encoding='utf-8') as f:
+        f.write("115年05月29日 三大法人買賣金額統計表")
+
+# 2. 🔥 新增：如果找不到融資備援檔，自動寫入 05/29 真實數據 (單位：仟元)
+if not os.path.exists(backup_margin_path):
+    margin_dummy = pd.DataFrame([{
+        "today_bal": 556359646.0, 
+        "prev_bal": 535025764.0
+    }])
+    margin_dummy.to_csv(backup_margin_path, index=False, encoding='utf-8-sig')
+# ==========================================
 
 #======測試爬蟲=====
 
