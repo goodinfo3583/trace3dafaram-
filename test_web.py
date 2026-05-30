@@ -1074,9 +1074,17 @@ def render_sidebar_market_summary():
                     
                     margin_hist_file = os.path.join(MARKET_HISTORY_DIR, f"margin_{date_key}.csv")
                     margin_temp_df.to_csv(margin_hist_file, index=False, encoding='utf-8-sig')
+                else:
+                    # 🔥 終極修復點：如果連線成功但抓不到今日融資（例如週末遇到證交所空包彈），強制觸發備援急救包！
+                    if os.path.exists(backup_margin_path):
+                        margin_df_backup = pd.read_csv(backup_margin_path)
+                        if not margin_df_backup.empty:
+                            margin_today = float(margin_df_backup.iloc[0]['today_bal'])
+                            margin_prev = float(margin_df_backup.iloc[0]['prev_bal'])
         except:
             pass
     else:
+        # 🌙 這裡處理的是「連三大法人都抓不到」的全面斷線狀況
         if os.path.exists(backup_df_path) and os.path.exists(backup_title_path):
             try:
                 twse_df = pd.read_csv(backup_df_path, encoding='utf-8-sig')
@@ -1092,7 +1100,6 @@ def render_sidebar_market_summary():
                     margin_prev = float(margin_df_backup.iloc[0]['prev_bal'])
             except:
                 pass
-
     # ------------------------------------------
     # B. 計算與 UI 排版視覺化渲染
     # ------------------------------------------
@@ -2923,10 +2930,6 @@ with top_pool_container:
                         
                 except Exception as e:
                     pass
-
-            # ==========================================
-            # 🌟 Streamlit "歷史分數追蹤"分頁的頁籤功能 (Tabs)
-            # ==========================================
 
             # ==========================================
             # 🌟 Streamlit "🔥 今日最新排行", "📈 歷史分數追蹤表"分頁的頁籤功能 (Tabs)
