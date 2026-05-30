@@ -13,13 +13,18 @@ import pytz
 # ==========================================
 st.set_page_config(page_title="台股籌碼五大核心矩陣儀表板", layout="wide")
 
-# 設定路徑
+# 設定路徑 
 DATA_DIR = "./Goodinfo_Rankings"
 SCORE_HISTORY_DIR = os.path.join(DATA_DIR, "ScoreHistory")
 
-# 確保資料夾存在
-if not os.path.exists(SCORE_HISTORY_DIR):
-    os.makedirs(SCORE_HISTORY_DIR)
+# 🔥 新增：大盤與鉅額交易的永久歷史存檔資料夾
+MARKET_HISTORY_DIR = os.path.join(DATA_DIR, "MarketHistory")
+BLOCK_HISTORY_DIR = os.path.join(DATA_DIR, "BlockHistory")
+
+# 確保所有資料夾在雲端都會被自動建立
+for folder in [SCORE_HISTORY_DIR, MARKET_HISTORY_DIR, BLOCK_HISTORY_DIR]:
+    if not os.path.exists(folder):
+        os.makedirs(folder)
 
 # ==========================================
 # 🚀 【自動生成測試用歷史分數】確保 Delta 引擎正常運作
@@ -988,30 +993,41 @@ if search_query:
 # 1. 大盤籌碼導航總覽引擎 (純三大法人精簡版)
 # ------------------------------------------
 def render_sidebar_market_summary():
-    """自動連線證交所 API，若遇休市/週末則全自動切換至上一交易日存檔數據"""
+    """自動連線證交所 API，若遇休市/週末切換至備援，抓到新數據則自動儲存為永久歷史 CSV 檔"""
     import datetime
     import pandas as pd
     import streamlit as st
+    import re
 
     st.sidebar.markdown("<h2 style='margin-top: 0; margin-bottom: 5px;'>📊 大盤資金風向球</h2>", unsafe_allow_html=True)
 
-    # 呼叫 API 抓取三大法人現貨明細
     twse_title, twse_df = fetch_twse_institutional_data()
 
-    # 設定本地備援路徑
     backup_df_path = os.path.join(DATA_DIR, "sidebar_twse_df_backup.csv")
     backup_title_path = os.path.join(DATA_DIR, "sidebar_twse_title_backup.txt")
 
     if twse_df is not None and not twse_df.empty:
-        # 🟢 盤後有正常抓到當日新數據：即時儲存備援檔
+        # 🟢 盤後有正常抓到當日新數據：即時更新日常備援，並寫入永久歷史庫
         try:
             twse_df.to_csv(backup_df_path, index=False, encoding='utf-8-sig')
             with open(backup_title_path, 'w', encoding='utf-8') as f:
                 f.write(str(twse_title))
+            
+            # 🚀 歷史歸檔機制：將「115年05月29日」精準轉為「20260529」作為檔名
+            date_match = re.search(r'(\d+)年(\d+)月(\d+)日', twse_title)
+            if date_match:
+                roc_yr, m, d = date_match.groups()
+                ad_yr = int(roc_yr) + 1911
+                date_key = f"{ad_yr}{int(m):02d}{int(d):02d}"
+            else:
+                date_key = datetime.datetime.now().strftime("%Y%m%d")
+                
+            market_hist_file = os.path.join(MARKET_HISTORY_DIR, f"market_{date_key}.csv")
+            twse_df.to_csv(market_hist_file, index=False, encoding='utf-8-sig')
         except:
             pass
     else:
-        # 🌙 遇到週末或股市休市 API 查無資料：自動載入留存紀錄
+        # 🌙 遇到週末或股市休市：全自動切換至上一交易日存檔數據
         if os.path.exists(backup_df_path) and os.path.exists(backup_title_path):
             try:
                 twse_df = pd.read_csv(backup_df_path, encoding='utf-8-sig')
@@ -1022,7 +1038,6 @@ def render_sidebar_market_summary():
                 pass
 
     if twse_df is not None and not twse_df.empty:
-        # 判定時間狀態
         now = datetime.datetime.now()
         current_time = now.time()
         
@@ -1037,10 +1052,7 @@ def render_sidebar_market_summary():
             try: return float(str(val_str).replace(',', '')) / 100000000
             except: return 0.0
 
-        net_buy_foreign = 0.0
-        net_buy_trust = 0.0
-        net_buy_dealer = 0.0
-        net_buy_total = 0.0
+        net_buy_foreign = 0.0; net_buy_trust = 0.0; net_buy_dealer = 0.0; net_buy_total = 0.0
 
         for index, row in twse_df.iterrows():
             unit_name = str(row['單位名稱']).strip()
@@ -2468,20 +2480,28 @@ else:
 st.write("---")
 st.markdown("<div id='section-6'></div>", unsafe_allow_html=True)
 st.subheader("💸 區塊 6：鉅額交易動向")
-# 🌟 更新：融入修正後的量化實戰看盤策略心法
 st.write("💡 鉅額交易常為大戶私下換手籌碼,避免股價盤中劇烈波動。成交價為「支撐/壓力」防守線或是「壓/拉尾盤」；短線跌破建議嚴設停損。")
 
 block_df = fetch_block_trades()
 backup_block_path = os.path.join(DATA_DIR, "block_trades_backup.csv")
 
 if block_df is not None and not block_df.empty:
-    # 🟢 盤後成功抓到新數據：立刻寫入本地做週末/休市備援
+    # 🟢 盤後成功抓到新數據：即時更新日常備援，並寫入永久歷史庫
     try:
         block_df.to_csv(backup_block_path, index=False, encoding='utf-8-sig')
+        
+        # 🚀 歷史歸檔機制：自動抓取數據日期做為檔名
+        try: raw_date = get_data_date() 
+        except: raw_date = datetime.datetime.now().strftime("%Y%m%d")
+        if not raw_date or len(raw_date) != 8:
+            raw_date = datetime.datetime.now().strftime("%Y%m%d")
+            
+        block_hist_file = os.path.join(BLOCK_HISTORY_DIR, f"block_trades_{raw_date}.csv")
+        block_df.to_csv(block_hist_file, index=False, encoding='utf-8-sig')
     except:
         pass
 else:
-    # 🌙 遇休市/週末查無資料：自動提取上一次開盤日的存檔
+    # 🌙 遇休市/週末查無資料：自動提取上一次開盤日的備援存檔
     if os.path.exists(backup_block_path):
         try:
             block_df = pd.read_csv(backup_block_path, encoding='utf-8-sig')
@@ -2498,13 +2518,10 @@ if block_df is not None and not block_df.empty:
         block_df['成交股數_數值'] = pd.to_numeric(block_df['成交股數'].astype(str).str.replace(',', ''), errors='coerce').fillna(0)
         block_df['成交金額_數值'] = pd.to_numeric(block_df['成交金額'].astype(str).str.replace(',', ''), errors='coerce').fillna(0)
         
-        # 抹除小數點，並加上 ▼ 符號
         block_df['▼成交價'] = pd.to_numeric(block_df[price_col].astype(str).str.replace(',', ''), errors='coerce').fillna(0).round(0).astype(int)
         
         block_df = block_df[block_df['成交股數_數值'] > 0].copy()
         block_df['成交張數'] = (block_df['成交股數_數值'] / 1000).astype(int)
-        
-        # 單位變更：改為以「億元」為單位，並消除贅字
         block_df['成交總額(億)'] = (block_df['成交金額_數值'] / 100000000).apply(lambda x: f"{x:.2f}".rstrip('0').rstrip('.'))
         
         block_df['乾淨代號'] = block_df['證券代號'].astype(str).str.replace(r'\D', '', regex=True)
@@ -2533,7 +2550,6 @@ if block_df is not None and not block_df.empty:
         
         block_df['▼收盤價'] = block_df['乾淨代號'].map(close_price_dict).fillna('-')
         
-        # 群聚排序引擎逻辑
         def get_color_rank(close_val, block_val):
             try:
                 c = float(str(close_val).replace(',', ''))
@@ -2541,8 +2557,7 @@ if block_df is not None and not block_df.empty:
                 if c > b: return 1   
                 elif c == b: return 2 
                 else: return 3       
-            except:
-                return 4 
+            except: return 4 
 
         block_df['__color_rank'] = block_df.apply(lambda r: get_color_rank(r['▼收盤價'], r['▼成交價']), axis=1)
         
@@ -2562,8 +2577,7 @@ if block_df is not None and not block_df.empty:
         display_df = block_df[display_cols].copy()
         
         display_df = display_df.rename(columns={
-            '乾淨代號': '代號',
-            '證券名稱': '股票名稱'
+            '乾淨代號': '代號', '證券名稱': '股票名稱'
         })
         
         def highlight_block_row(row):
@@ -2571,15 +2585,12 @@ if block_df is not None and not block_df.empty:
             try:
                 close_p = float(str(row['▼收盤價']).replace(',', ''))
                 block_p = float(str(row['▼成交價']).replace(',', ''))
-                
                 if close_p > block_p: color = '#FF4B4B'       
                 elif close_p == block_p: color = '#FFA500'    
                 else: color = '#00E272'                       
-                
                 idx = row.index.get_loc('▼成交價')
                 styles[idx] = f'color: {color}; font-weight: bold;'
-            except:
-                pass 
+            except: pass 
             return styles
             
         styled_df = display_df.style.apply(highlight_block_row, axis=1)
