@@ -13,30 +13,28 @@ import pytz
 # ==========================================
 st.set_page_config(page_title="台股籌碼五大核心矩陣儀表板", layout="wide")
 
+# 👉 步驟 1：先集中宣告所有的路徑變數
 DATA_DIR = "./Goodinfo_Rankings"
 SCORE_HISTORY_DIR = os.path.join(DATA_DIR, "ScoreHistory")
-# ==========================================
-# 🧹 清道夫：強制刪除 05/28 殘留的測試假檔案
-# ==========================================
-# 確保所有資料夾在雲端都會被自動建立
+MARKET_HISTORY_DIR = os.path.join(DATA_DIR, "MarketHistory")
+BLOCK_HISTORY_DIR = os.path.join(DATA_DIR, "BlockHistory")
+
+# 👉 步驟 2：變數都認識了，再一次性幫它們建立資料夾
 for folder in [SCORE_HISTORY_DIR, MARKET_HISTORY_DIR, BLOCK_HISTORY_DIR]:
     if not os.path.exists(folder):
         os.makedirs(folder)
 
+# ==========================================
+# 🧹 清道夫：強制刪除 05/28 殘留的測試假檔案
+# ==========================================
 fake_score_file = os.path.join(SCORE_HISTORY_DIR, "scores_20260528.csv")
 if os.path.exists(fake_score_file):
     try:
         os.remove(fake_score_file)
     except:
         pass
-# ==========================================不好意思
-MARKET_HISTORY_DIR = os.path.join(DATA_DIR, "MarketHistory")
-BLOCK_HISTORY_DIR = os.path.join(DATA_DIR, "BlockHistory")
 
-# 確保所有資料夾在雲端都會被自動建立
-for folder in [SCORE_HISTORY_DIR, MARKET_HISTORY_DIR, BLOCK_HISTORY_DIR]:
-    if not os.path.exists(folder):
-        os.makedirs(folder)
+
 #======測試爬蟲=====
 
 #======測試爬蟲=====
