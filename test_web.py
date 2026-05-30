@@ -25,14 +25,19 @@ for folder in [SCORE_HISTORY_DIR, MARKET_HISTORY_DIR, BLOCK_HISTORY_DIR]:
         os.makedirs(folder)
 
 # ==========================================
-# 🧹 清道夫：強制刪除 05/28 殘留的測試假檔案
+# 🧹 清道夫：強制刪除週末錯誤生成的假檔案 (05/28, 05/30, 05/31)
 # ==========================================
-fake_score_file = os.path.join(SCORE_HISTORY_DIR, "scores_20260528.csv")
-if os.path.exists(fake_score_file):
-    try:
-        os.remove(fake_score_file)
-    except:
-        pass
+# 確保所有資料夾在雲端都會被自動建立
+for folder in [SCORE_HISTORY_DIR, MARKET_HISTORY_DIR, BLOCK_HISTORY_DIR]:
+    if not os.path.exists(folder):
+        os.makedirs(folder)
+
+for bad_date in ["20260528", "20260530", "20260531"]:
+    bad_file = os.path.join(SCORE_HISTORY_DIR, f"scores_{bad_date}.csv")
+    if os.path.exists(bad_file):
+        try: os.remove(bad_file)
+        except: pass
+# ==========================================
 
 
 #======測試爬蟲=====
@@ -2866,31 +2871,36 @@ with top_pool_container:
             st.session_state['top_pool_df'] = res_df
             # ==========================================
             # ==========================================
-            # 💾 核心引擎：選股池結果強制同步覆寫存檔
+            # 💾 核心引擎：選股池結果強制同步覆寫存檔 (方案 A：交易日鎖死法)
             # ==========================================
             if res_df is not None and not res_df.empty:
                 try:
-                    # 1. 自動對齊資料的真實日期 (避免用到週末的電腦時間)
-                    import datetime
-                    import re
-        
-                    # 嘗試從您剛剛寫好的大盤日期變數中提取，若無則預設抓今天
-                    file_date_str = datetime.datetime.now().strftime("%Y%m%d") 
-                    if 'twse_title' in locals() and twse_title:
-                        date_match = re.search(r'(\d+)年(\d+)月(\d+)日', twse_title)
-                        if date_match:
-                            roc_yr, m, d = date_match.groups()
-                            file_date_str = f"{int(roc_yr) + 1911}{int(m):02d}{int(d):02d}"
-
-                    # 2. 定義今日存檔路徑
-                    today_score_file = os.path.join(SCORE_HISTORY_DIR, f"scores_{file_date_str}.csv")
-        
-                    # 3. 🔴 關鍵動作：強制無條件覆寫！
-                    # 不論一天跑幾次，永遠把當下最新算出的 res_df 直接覆蓋進歷史檔
-                    res_df.to_csv(today_score_file, index=False, encoding='utf-8-sig')
-        
+                    import glob
+                    import os
+                    
+                    # 💡 終極解法：放棄電腦時間，直接去抓目錄下最新「持股排名變化」檔案的日期做為錨點
+                    txt_pattern = os.path.join(DATA_DIR, "*持股排名變化*.txt")
+                    all_txt_files = glob.glob(txt_pattern)
+                    
+                    anchor_date_str = "00000000" 
+                    if all_txt_files:
+                        latest_file = max(all_txt_files, key=os.path.basename)
+                        # 檔名前 8 碼通常是日期，例如 20260529
+                        date_label = os.path.basename(latest_file)[:8]
+                        if date_label.isdigit():
+                            anchor_date_str = date_label
+                    
+                    # 只要有抓到正確的交易日期，就強制覆寫該日的檔案！
+                    if anchor_date_str != "00000000":
+                        today_score_file = os.path.join(SCORE_HISTORY_DIR, f"scores_{anchor_date_str}.csv")
+                        res_df.to_csv(today_score_file, index=False, encoding='utf-8-sig')
+                        
                 except Exception as e:
                     pass
+
+            # ==========================================
+            # 🌟 Streamlit "歷史分數追蹤"分頁的頁籤功能 (Tabs)
+            # ==========================================
 
             # ==========================================
             # 🌟 Streamlit "🔥 今日最新排行", "📈 歷史分數追蹤表"分頁的頁籤功能 (Tabs)
