@@ -30,6 +30,7 @@ for folder in [SCORE_HISTORY_DIR, MARKET_HISTORY_DIR, BLOCK_HISTORY_DIR]:
 # ==========================================
 # ==========置頂區塊測試區==================
 # ==========置頂區塊測試區==================
+# ==========置頂區塊測試區==================
 # ==========================================
 # 🎯 區塊 00：選擇權莊家防守點位 (支撐/壓力雷達)
 # ==========================================
@@ -38,70 +39,65 @@ st.markdown("### 🎯 區塊 00：選擇權莊家防守點位雷達 (測試中)"
 st.write("💡 透過分析期交所臺指選擇權 (TXO) 近月合約的「最大未平倉量」，找出莊家重兵佈署的天花板(壓力)與地板(支撐)。")
 
 @st.cache_data(ttl=600)
-def fetch_options_support_resistance_lite():
-    """爬取期交所選擇權行情簡表，避開 lxml 套件依賴，純 BeautifulSoup 解析"""
+def fetch_options_support_resistance_bulletproof():
+    """無敵版爬蟲：不依賴 class 名稱，自動掃描含有關鍵字的表格"""
     import requests
     from bs4 import BeautifulSoup
     import datetime
 
     url = "https://www.taifex.com.tw/cht/3/optDailyMarketSummary"
-    
     today = datetime.datetime.now().strftime("%Y/%m/%d")
-    payload = {
-        'queryDate': today,
-        'MarketCode': '0'
-    }
-    headers = {
-        'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/91.0.4472.124 Safari/537.36'
-    }
+    payload = {'queryDate': today, 'MarketCode': '0'}
+    headers = {'User-Agent': 'Mozilla/5.0'}
 
     try:
         response = requests.post(url, data=payload, headers=headers, timeout=5)
         response.raise_for_status()
-        
         soup = BeautifulSoup(response.text, 'html.parser')
         
-        # 找到包含行情資料的主表格
-        tables = soup.find_all('table', class_='table_f')
-        if not tables:
-            return None, "找不到行情表格"
+        # 🔥 終極鎖定：一桌一桌找，只要包含「履約價」和「未平倉量」的表格就是目標！
+        target_table = None
+        for tbl in soup.find_all('table'):
+            text_content = tbl.get_text()
+            if '履約價' in text_content and '未平倉' in text_content and '買賣權' in text_content:
+                target_table = tbl
+                break
+                
+        if not target_table:
+            return None, "期交所網頁大改版，找不到特徵表格"
             
-        target_table = tables[0]
         rows = target_table.find_all('tr')
         
-        max_call_oi = 0
-        max_call_strike = 0
-        max_put_oi = 0
-        max_put_strike = 0
+        max_call_oi, max_call_strike = 0, 0
+        max_put_oi, max_put_strike = 0, 0
         contract_month = "未知"
         
         for row in rows:
             cols = row.find_all('td')
-            # 簡表通常有 14 欄：
-            # 契約, 到期月份, 履約價, 買賣權, 結算價, 開盤價, 最高價, 最低價, 最後成交價, 漲跌價, 漲跌%, 盤後成交量, 一般成交量, 未平倉量
-            if len(cols) >= 14:
+            # 確保是資料列 (通常欄位數會大於 10)
+            if len(cols) >= 10:
                 try:
                     product = cols[0].text.strip()
-                    if product != "TXO": # 只抓台指選擇權
+                    if product != "TXO": # 嚴格鎖定台指選擇權
                         continue
                         
                     month = cols[1].text.strip()
-                    strike = int(cols[2].text.strip().replace(',', ''))
-                    cp_type = cols[3].text.strip() # 'Call' 或 'Put'
-                    oi_str = cols[13].text.strip().replace(',', '')
                     
-                    if not oi_str.isdigit():
-                        continue
-                    oi = int(oi_str)
-                    
-                    # 記錄合約月份
+                    # 鎖定最新合約：遇到第一個 TXO 的月份就記下來，如果月份跳了就停止
+                    # 這樣能確保我們永遠只抓最精準的「近月/當週」熱門合約
                     if contract_month == "未知":
                         contract_month = month
-                    # 如果遇到下一個月份的合約，代表近月合約已經掃描完畢，提早跳出迴圈！
                     elif month != contract_month:
                         break
                         
-                    # 尋找最大未平倉
+                    strike = int(cols[2].text.strip().replace(',', ''))
+                    cp_type = cols[3].text.strip()
+                    
+                    # 期交所的未平倉量永遠在最後一欄
+                    oi_str = cols[-1].text.strip().replace(',', '')
+                    oi = int(oi_str) if oi_str.isdigit() else 0
+                    
+                    # 判斷是 Call 還是 Put，並更新最大值
                     if 'Call' in cp_type and oi > max_call_oi:
                         max_call_oi = oi
                         max_call_strike = strike
@@ -110,29 +106,27 @@ def fetch_options_support_resistance_lite():
                         max_put_strike = strike
                         
                 except Exception as row_e:
-                    continue # 單行解析錯誤跳過，繼續掃描下一行
-
+                    continue # 單一列解析出錯不影響大局，繼續跑
+                    
         if max_call_oi == 0 or max_put_oi == 0:
-             return None, "無法找到有效的未平倉數據"
+             return None, "表格找到了，但未能成功解析未平倉數字"
 
-        result = {
+        return {
             'month': contract_month,
             'resistance_price': max_call_strike,
             'resistance_oi': max_call_oi,
             'support_price': max_put_strike,
             'support_oi': max_put_oi
-        }
-        return result, "Success"
+        }, "Success"
             
     except Exception as e:
         return None, str(e)
 
 # 執行爬蟲
-opt_data, opt_msg = fetch_options_support_resistance_lite()
+opt_data, opt_msg = fetch_options_support_resistance_bulletproof()
 
 if opt_data:
     col1, col2 = st.columns(2)
-    
     with col1:
         st.markdown(f"""
         <div style='background-color: #3b2a2a; border-left: 5px solid #FF4B4B; padding: 15px; border-radius: 5px;'>
@@ -151,11 +145,13 @@ if opt_data:
         </div>
         """, unsafe_allow_html=True)
         
-    st.caption(f"📅 觀測合約月份: {opt_data['month']}")
+    st.caption(f"📅 觀測合約月份: {opt_data['month']} (系統已自動鎖定最熱絡合約)")
 else:
     st.warning(f"⚠️ 選擇權資料抓取失敗。錯誤訊息: {opt_msg}")
 
 st.write("---")
+# ==========================================
+# ==========================================
 # ==========================================
 # ==========================================
 # ==========================================
