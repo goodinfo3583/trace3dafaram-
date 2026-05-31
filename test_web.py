@@ -2532,7 +2532,7 @@ def render_styled_margin_table(clean_df):
                 # 讀取原始 clean_df 的數值做精確多空判斷
                 orig_val = clean_df.loc[row.name, change_col]
                 if float(orig_val) > 0:
-                    return ['color: #F05A5A; font-weight: bold;'] * len(row) # 🎯 升級護眼暗紅
+                    return ['color: #db7093; font-weight: bold;'] * len(row) # 🎯 升級護眼暗紅
             except: pass
         return styles
 
