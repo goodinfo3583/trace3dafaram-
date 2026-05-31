@@ -2731,7 +2731,7 @@ else:
         
         st.write("---")
         st.markdown("<div id='section-5'></div>", unsafe_allow_html=True)
-        st.markdown(f"## 💰 區塊 5：大股東動向 <span style='font-size: 0.4em; color: #00D2FF;'>({latest_date})</span>", unsafe_allow_html=True)
+        st.markdown(f"## 💰 區塊 5：大股東動向 <span style='font-size: 0.5em; color: #00D2FF;'>({latest_date})</span>", unsafe_allow_html=True)
         st.write("💡 400張以上大股東週更新資訊。")
         
         # 3. 計算週動態
