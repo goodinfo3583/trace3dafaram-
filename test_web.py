@@ -3303,69 +3303,55 @@ with top_pool_container:
             hist_combined = pd.DataFrame() # 預備給 Tab 2 使用
             
             try:
-                # 1. 讀取 Google Sheets 中的歷史資料
-                gs_history = conn.read(spreadsheet=SHEET_URL, worksheet="選股歷史")
+                # 1. 讀取 GS 歷史資料 (加上 ttl=0 強制解除快取，保證讀到最新)
+                gs_history = conn.read(spreadsheet=SHEET_URL, worksheet="選股歷史", ttl=0)
                 gs_history = gs_history.dropna(how="all")
                 
                 if not gs_history.empty and '紀錄日期' in gs_history.columns:
+                    # 🎯 防護罩 1：防止日期變成 20260529.0
+                    gs_history['紀錄日期'] = gs_history['紀錄日期'].astype(str).str.replace(r'\.0$', '', regex=True).str.zfill(8)
                     hist_combined = gs_history.copy()
-                    # 取得所有不重複的日期，並由新到舊排序
-                    available_dates = sorted(gs_history['紀錄日期'].astype(str).unique(), reverse=True)
                     
-                    # 只要有兩天以上的紀錄，就抓「上一天」(索引 1) 的資料來比對 Delta
+                    available_dates = sorted(gs_history['紀錄日期'].unique(), reverse=True)
+                    
                     if len(available_dates) >= 2:
                         prev_date = available_dates[1]
-                        prev_df = gs_history[gs_history['紀錄日期'].astype(str) == prev_date]
+                        prev_df = gs_history[gs_history['紀錄日期'] == prev_date]
                         
                         id_col = '代號' if '代號' in prev_df.columns else '股票代號' if '股票代號' in prev_df.columns else None
                         if id_col:
-                            prev_scores_dict = dict(zip(prev_df[id_col].astype(str).str.replace(r'\D', '', regex=True), prev_df['總分']))
+                            # 🎯 防護罩 2：先除掉結尾的 .0，再去除非數字，防止 3231.0 變 32310
+                            clean_ids = prev_df[id_col].astype(str).str.replace(r'\.0$', '', regex=True).str.replace(r'\D', '', regex=True)
+                            prev_scores_dict = dict(zip(clean_ids, prev_df['總分']))
             except Exception as e:
                 pass # 第一次可能還沒有資料表，忽略錯誤
 
             def calc_table_delta(row):
-                sid = str(row['代號']).replace(r'\D', '')
+                # 代號在前面已經被清理過了，所以這裡很乾淨
+                sid = str(row['代號']).strip()
+                try: curr_score = float(row.get('總分', 0))
+                except: curr_score = 0.0
                 
-                # 確保分數是乾淨的浮點數數字，避免文字型態干擾
-                try:
-                    curr_score = float(row.get('總分', 0))
-                except:
-                    curr_score = 0.0
-                
-                # 判斷是否為昨日榜單上的老面孔
                 if sid in prev_scores_dict:
-                    try:
-                        prev_score = float(prev_scores_dict[sid])
-                    except:
-                        prev_score = 0.0
-                        
+                    try: prev_score = float(prev_scores_dict[sid])
+                    except: prev_score = 0.0
                     delta = curr_score - prev_score
-                    
-                    # 使用 :.1f 強制鎖定文字輸出只顯示 1 位小數，徹底封殺浮點數尾數
-                    if delta > 0.01: 
-                        return f"+{delta:.1f}"
-                    elif delta < -0.01: 
-                        return f"{delta:.1f}"
-                    else: 
-                        return "0.0"
+                    if delta > 0.01: return f"+{delta:.1f}"
+                    elif delta < -0.01: return f"{delta:.1f}"
+                    else: return "0.0"
                 else:
-                    # 🆕 全新進榜：同樣鎖定 1 位小數
                     return f"🆕 +{curr_score:.1f}"
 
             if not res_df.empty and '總分' in res_df.columns:
                 res_df['▼變量'] = res_df.apply(calc_table_delta, axis=1)
 
             cols = [c for c in res_df.columns if c not in ['▼變量', '▼明細', '賣出警示']]
-            
             score_idx = cols.index('總分')
             cols.insert(score_idx + 1, '▼變量')
-            
             name_idx = cols.index('名稱')
             cols.insert(name_idx + 1, '▼明細')
-            
             rank_idx = cols.index('今日上榜')
             cols.insert(rank_idx + 1, '賣出警示')
-            
             res_df = res_df[cols]
 
             st.session_state['top_pool_df'] = res_df
@@ -3384,10 +3370,12 @@ with top_pool_container:
                         save_df.insert(0, '紀錄日期', anchor_date_str)
                         
                         try:
-                            old_df = conn.read(spreadsheet=SHEET_URL, worksheet="選股歷史")
+                            # 寫入前再次讀取最新狀態，避免覆蓋
+                            old_df = conn.read(spreadsheet=SHEET_URL, worksheet="選股歷史", ttl=0)
                             old_df = old_df.dropna(how="all")
                             if '紀錄日期' in old_df.columns:
-                                old_df = old_df[old_df['紀錄日期'].astype(str) != anchor_date_str]
+                                old_df['紀錄日期'] = old_df['紀錄日期'].astype(str).str.replace(r'\.0$', '', regex=True).str.zfill(8)
+                                old_df = old_df[old_df['紀錄日期'] != anchor_date_str]
                             final_save_df = pd.concat([old_df, save_df], ignore_index=True)
                         except:
                             final_save_df = save_df
@@ -3411,22 +3399,26 @@ with top_pool_container:
             with tab2:
                 try:
                     if not hist_combined.empty:
-                        recent_dates = sorted(hist_combined['紀錄日期'].astype(str).unique(), reverse=True)[:20]
-                        df_h = hist_combined[hist_combined['紀錄日期'].astype(str).isin(recent_dates)].copy()
+                        recent_dates = sorted(hist_combined['紀錄日期'].unique(), reverse=True)[:20]
+                        df_h = hist_combined[hist_combined['紀錄日期'].isin(recent_dates)].copy()
                         
                         id_col = '代號' if '代號' in df_h.columns else '股票代號' if '股票代號' in df_h.columns else None
                         
                         if id_col and '總分' in df_h.columns:
-                            df_h['日期'] = df_h['紀錄日期'].astype(str).apply(lambda x: f"{x[4:6]}/{x[6:]}" if len(x)==8 else x)
-                            df_h['代號'] = df_h[id_col].astype(str).str.replace(r'\D', '', regex=True)
+                            # 🎯 防護罩 3：修正 Tab2 顯示時，代號再次被 .0 破壞的 Bug
+                            df_h['日期'] = df_h['紀錄日期'].apply(lambda x: f"{x[4:6]}/{x[6:]}" if len(x)==8 else x)
+                            df_h['代號'] = df_h[id_col].astype(str).str.replace(r'\.0$', '', regex=True).str.replace(r'\D', '', regex=True)
                             df_h = df_h[['代號', '總分', '日期']]
                             
                             hist_pivot = df_h.pivot_table(index='代號', columns='日期', values='總分', aggfunc='first').reset_index()
-                            name_mapping = dict(zip(res_df['代號'].astype(str).str.replace(r'\D', '', regex=True), res_df['名稱']))
+                            name_mapping = dict(zip(res_df['代號'].astype(str).str.replace(r'\.0$', '', regex=True).str.replace(r'\D', '', regex=True), res_df['名稱']))
                             hist_pivot.insert(1, '名稱', hist_pivot['代號'].map(name_mapping).fillna('-'))
                             latest_day = hist_pivot.columns[-1]
                             hist_pivot = hist_pivot[hist_pivot['名稱'] != '-']
-                            hist_pivot = hist_pivot.sort_values(by=latest_day, ascending=False).reset_index(drop=True)
+                            
+                            if not hist_pivot.empty and latest_day in hist_pivot.columns:
+                                hist_pivot = hist_pivot.sort_values(by=latest_day, ascending=False).reset_index(drop=True)
+                                
                             st.dataframe(hist_pivot, use_container_width=True, hide_index=True)
                             st.info("💡 這裡統整了標的在過去20日選股池中的【總分變化】，可藉此觀察籌碼動能的延續性與驗證 ▼變量！")
                     else: 
