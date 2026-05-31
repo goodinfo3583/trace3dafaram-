@@ -2823,6 +2823,8 @@ st.markdown("<div id='section-6'></div>", unsafe_allow_html=True)
 st.markdown(f"### 💸 區塊 6：鉅額交易動向 <span style='font-size: 0.6em; color: #00D2FF;'>({formatted_date})</span>", unsafe_allow_html=True)
 st.write("💡 鉅額交易常為大戶私下換手籌碼，成交價可視為「支撐/壓力」防守線；短線跌破建議嚴設停損。")
 
+tab1, tab2 = st.tabs(["🆕 今日最新鉅額交易", "📅 歷史防守價追蹤表"])
+
 # ==========================================
 # 資料處理核心：寫入 Google Sheets
 # ==========================================
