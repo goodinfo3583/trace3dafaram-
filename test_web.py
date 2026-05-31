@@ -2796,14 +2796,12 @@ else:
 # ==========================================
 # 💸 區塊 6：盤後鉅額交易總表 (大戶暗盤雷達)
 # ==========================================
-st.write("---")
-st.markdown("<div id='section-6'></div>", unsafe_allow_html=True)
-st.subheader("💸 區塊 6：鉅額交易動向")
-st.write("💡 鉅額交易常為大戶私下換手籌碼,避免股價盤中劇烈波動。成交價為「支撐/壓力」防守線或是「壓/拉尾盤」；短線跌破建議嚴設停損。")
+import os, re, datetime
+import pandas as pd
+import yfinance as yf
 
 # 🛠️ 核心修復：強制去讀取側邊欄已經確認過的「真實大盤日期」，徹底封殺電腦週末時間！
 def get_real_market_date():
-    import os, re, datetime
     backup_title_path = os.path.join(DATA_DIR, "sidebar_twse_title_backup.txt")
     if os.path.exists(backup_title_path):
         try:
@@ -2816,9 +2814,18 @@ def get_real_market_date():
         except: pass
     return datetime.datetime.now().strftime("%Y%m%d")
 
+real_trade_date = get_real_market_date() # 🎯 抓取真實交易日 (例如 20260529，共8碼)
+date_mmdd = real_trade_date[-4:]         # 取後四碼 (例如 0529)
+dynamic_price_col = f"▼{date_mmdd}成交價" # 建立動態欄位名稱
+
+st.write("---")
+st.markdown("<div id='section-6'></div>", unsafe_allow_html=True)
+# 📝 標題改用 Markdown 寫法，加入 8 碼日期與指定顏色、字體大小
+st.markdown(f"### 💸 區塊 6：鉅額交易動向 <span style='font-size: 0.6em; color: #00D2FF;'>({real_trade_date})</span>", unsafe_allow_html=True)
+st.write("💡 鉅額交易常為大戶私下換手籌碼,避免股價盤中劇烈波動。成交價為「支撐/壓力」防守線或是「壓/拉尾盤」；短線跌破建議嚴設停損。")
+
 block_df = fetch_block_trades()
 backup_block_path = os.path.join(DATA_DIR, "block_trades_backup.csv")
-real_trade_date = get_real_market_date() # 🎯 抓取真實交易日 (例如 20260529)
 
 if block_df is not None and not block_df.empty:
     # 🟢 盤後成功抓到新數據：即時更新日常備援，並寫入永久歷史庫
@@ -2848,7 +2855,8 @@ if block_df is not None and not block_df.empty:
         block_df['成交股數_數值'] = pd.to_numeric(block_df['成交股數'].astype(str).str.replace(',', ''), errors='coerce').fillna(0)
         block_df['成交金額_數值'] = pd.to_numeric(block_df['成交金額'].astype(str).str.replace(',', ''), errors='coerce').fillna(0)
         
-        block_df['▼成交價'] = pd.to_numeric(block_df[price_col].astype(str).str.replace(',', ''), errors='coerce').fillna(0).round(0).astype(int)
+        # 🎯 改用動態欄位名稱 (如: ▼0529成交價)
+        block_df[dynamic_price_col] = pd.to_numeric(block_df[price_col].astype(str).str.replace(',', ''), errors='coerce').fillna(0).round(0).astype(int)
         
         block_df = block_df[block_df['成交股數_數值'] > 0].copy()
         block_df['成交張數'] = (block_df['成交股數_數值'] / 1000).astype(int)
@@ -2856,7 +2864,6 @@ if block_df is not None and not block_df.empty:
         
         block_df['乾淨代號'] = block_df['證券代號'].astype(str).str.replace(r'\D', '', regex=True)
         
-        import yfinance as yf
         close_price_dict = {}
         unique_ids = block_df['乾淨代號'].dropna().unique()
         
@@ -2889,7 +2896,8 @@ if block_df is not None and not block_df.empty:
                 else: return 3       
             except: return 4 
 
-        block_df['__color_rank'] = block_df.apply(lambda r: get_color_rank(r['▼收盤價'], r['▼成交價']), axis=1)
+        # 🎯 色彩判定邏輯也改吃動態欄位
+        block_df['__color_rank'] = block_df.apply(lambda r: get_color_rank(r['▼收盤價'], r[dynamic_price_col]), axis=1)
         
         stock_stats = block_df.groupby('乾淨代號').agg(
             stock_min_rank=('__color_rank', 'min'),
@@ -2903,7 +2911,8 @@ if block_df is not None and not block_df.empty:
             ascending=[True, False, True, True, False]
         )
         
-        display_cols = ['乾淨代號', '證券名稱', '▼成交價', '▼收盤價', '成交張數', '成交總額(億)']
+        # 🎯 更新顯示的欄位清單
+        display_cols = ['乾淨代號', '證券名稱', dynamic_price_col, '▼收盤價', '成交張數', '成交總額(億)']
         display_df = block_df[display_cols].copy()
         
         display_df = display_df.rename(columns={
@@ -2914,11 +2923,11 @@ if block_df is not None and not block_df.empty:
             styles = [''] * len(row)
             try:
                 close_p = float(str(row['▼收盤價']).replace(',', ''))
-                block_p = float(str(row['▼成交價']).replace(',', ''))
+                block_p = float(str(row[dynamic_price_col]).replace(',', ''))
                 if close_p > block_p: color = '#FF4B4B'        
                 elif close_p == block_p: color = '#FFA500'    
                 else: color = '#00E272'                        
-                idx = row.index.get_loc('▼成交價')
+                idx = row.index.get_loc(dynamic_price_col)
                 styles[idx] = f'color: {color}; font-weight: bold;'
             except: pass 
             return styles
@@ -2926,8 +2935,10 @@ if block_df is not None and not block_df.empty:
         styled_df = display_df.style.apply(highlight_block_row, axis=1)
         st.dataframe(styled_df, use_container_width=True, hide_index=True)
         
-        # 🎯 這裡也同步改為使用 real_trade_date
         st.success(f"更新 {real_trade_date} 共偵測到 {len(display_df)} 筆大戶暗盤資金換手紀錄。")
+
+        # 🎯 【關鍵新增】將處理好的結果存入 session_state 供其他分頁/搜尋區塊聯動讀取
+        st.session_state['df_blk6'] = display_df
 
     except Exception as e:
         st.warning(f"⚠️ 資料解析發生錯誤: {str(e)}。顯示證交所原始回傳數據：")
