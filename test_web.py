@@ -1199,16 +1199,16 @@ def render_sidebar_market_summary():
         st.sidebar.markdown("".join(html_lines), unsafe_allow_html=True)
         
         # 💎 額外升級：側邊欄雲端歷史趨勢展開面板
-        try:
-            hist_df = conn.read(spreadsheet=SHEET_URL, worksheet="大盤風向球")
-            hist_df = hist_df.dropna(how="all")
-            if not hist_df.empty and len(hist_df) > 1:
-                with st.sidebar.expander("📈 近期大盤歷史趨勢"):
-                    # 抓取最近 5 天資料反轉顯示
-                    recent_df = hist_df.tail(5).iloc[::-1][['日期', '外資現貨', '投信現貨', '融資增減']]
-                    recent_df['日期'] = recent_df['日期'].astype(str).str[-4:] # 只留 0529
-                    st.dataframe(recent_df, use_container_width=True, hide_index=True)
-        except: pass
+        #try:
+            #hist_df = conn.read(spreadsheet=SHEET_URL, worksheet="大盤風向球")
+            #hist_df = hist_df.dropna(how="all")
+            #if not hist_df.empty and len(hist_df) > 1:
+                #with st.sidebar.expander("📈 近期大盤歷史趨勢"):
+                    ## 抓取最近 5 天資料反轉顯示
+                    #recent_df = hist_df.tail(5).iloc[::-1][['日期', '外資現貨', '投信現貨', '融資增減']]
+                    #recent_df['日期'] = recent_df['日期'].astype(str).str[-4:] # 只留 0529
+                    #st.dataframe(recent_df, use_container_width=True, hide_index=True)
+        #except: pass
 
     else:
         st.sidebar.info("🕒 目前查無今日三大法人買賣與期貨資料，且雲端尚無備份。")
@@ -2749,7 +2749,8 @@ def get_historical_block_matrix_from_gs():
         if hist_df.empty or '日期' not in hist_df.columns:
             return None, []
             
-        hist_df['日期'] = hist_df['日期'].astype(str)
+        # 🎯 修復 29.0 的關鍵：強制去尾數，並補足 8 位數
+        hist_df['日期'] = hist_df['日期'].astype(str).str.replace(r'\.0$', '', regex=True).str.zfill(8)
         hist_df['代號'] = hist_df['代號'].astype(str).str.replace(r'\D', '', regex=True)
         
         date_list = sorted(hist_df['日期'].unique(), reverse=True)
@@ -2757,7 +2758,7 @@ def get_historical_block_matrix_from_gs():
         date_cols_list = []
         
         for d in date_list:
-            short_date = d[-4:] # 例如 0529
+            short_date = d[-4:] # 現在這裡絕對會是乾淨的 0529 了！
             block_col = f"▼{short_date}成交價"
             close_col = f"{short_date}收盤價"
             date_cols_list.append(block_col)
@@ -3300,41 +3301,7 @@ with top_pool_container:
                 except Exception as e: 
                     st.error(f"歷史分數讀取發生錯誤: {e}")
 
-# ==========================================
-# 🛠️ 臨時除錯區：雲端歷史檔案檢查器 (隨時可刪除)
-# ==========================================
-st.sidebar.write("---")
-st.sidebar.subheader("📁 雲端歷史檔案檢查器")
 
-if os.path.exists(SCORE_HISTORY_DIR):
-    # 抓取雲端目前存的所有分數 CSV
-    hist_files = glob.glob(os.path.join(SCORE_HISTORY_DIR, "scores_*.csv"))
-    
-    if hist_files:
-        st.sidebar.success(f"🟢 偵測到雲端硬碟目前存有 {len(hist_files)} 個歷史檔案：")
-        
-        # 依日期最新到最舊排序顯示
-        for fpath in sorted(hist_files, reverse=True):
-            fname = os.path.basename(fpath)
-            try:
-                # 讀取檔案內容試試看
-                tmp_df = pd.read_csv(fpath)
-                st.sidebar.text(f"📄 {fname} (共 {len(tmp_df)} 檔標的)")
-                
-                # 🔥 直接在網頁上做一個下載按鈕，您可以點擊下載回電腦看內容！
-                st.sidebar.download_button(
-                    label=f"📥 下載 {fname}",
-                    data=tmp_df.to_csv(index=False).encode('utf-8-sig'),
-                    file_name=fname,
-                    mime='text/csv',
-                    key=f"debug_dl_{fname}"
-                )
-            except Exception as e:
-                st.sidebar.error(f"讀取 {fname} 失敗: {str(e)}")
-    else:
-        st.sidebar.warning("⚠️ ScoreHistory 資料夾存在，但內部是空的（可能剛被雲端重置清空了）。")
-else:
-    st.sidebar.error("❌ 雲端目前連 ScoreHistory 資料夾都還沒建立。")
 # ==========================================
 # ==========================================
 # 🧪 測試區：Google Sheets 連線測試
