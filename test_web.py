@@ -2558,7 +2558,9 @@ st.write("---")
 st.markdown("<div id='section-4-1'></div>", unsafe_allow_html=True)
 
 date_41 = peek_data_date("融資減少幅度")
-st.header(f"🔄 區塊 4-1：融資減少動向 ({date_41})")
+# 使用 Markdown 語法，並透過 span 標籤嵌入 style
+st.markdown(f"""### 🔄 區塊 4-1：融資減少動向 <span style="font-size: 0.8em; color: #ff4b4b;">({date_41})</span>
+""", unsafe_allow_html=True)
 
 f_col1, f_col2, _ = st.columns([1, 1, 2])
 with f_col1: show_etf_41 = st.checkbox("顯示 ETF", value=True, key="margin_show_etf")
