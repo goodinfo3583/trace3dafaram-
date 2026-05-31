@@ -1017,14 +1017,11 @@ if search_query:
 # ==========================================
 # 🧭 側邊欄導航 (無感互動+休市備援版)
 # ==========================================
-# ==========================================
-# 🧭 側邊欄導航 (無感互動+休市備援版)
-# ==========================================
 # ------------------------------------------
-# 1. 大盤籌碼導航總覽引擎 (期現貨雙引擎：簡潔排版版)
+# 1. 大盤籌碼導航總覽引擎 (Google Sheets 雲端無敵版)
 # ------------------------------------------
 def render_sidebar_market_summary():
-    """自動連線證交所與期交所，抓取三大法人、融資餘額與TX未平倉，支援週末休市備援與自動日期對齊"""
+    """自動連線證交所與期交所，支援週末休市從 Google Sheets 雲端讀取備援，並寫入每日總結"""
     import datetime
     import pandas as pd
     import streamlit as st
@@ -1032,253 +1029,192 @@ def render_sidebar_market_summary():
     import requests
     import json
     from bs4 import BeautifulSoup
-    import os
+    
+    # 確保引用全域的連線物件 (對接程式碼最上方的設定)
+    global conn, SHEET_URL
 
     st.sidebar.markdown("<h2 style='margin-top: 0; margin-bottom: 5px;'>📊 大盤資金風向球</h2>", unsafe_allow_html=True)
 
     # ------------------------------------------
-    # A. 數據採集與永久歸檔核心
+    # A. 數據採集 (維持原有的爬蟲邏輯)
     # ------------------------------------------
     twse_title, twse_df = fetch_twse_institutional_data()
-
-    backup_df_path = os.path.join(DATA_DIR, "sidebar_twse_df_backup.csv")
-    backup_title_path = os.path.join(DATA_DIR, "sidebar_twse_title_backup.txt")
-    backup_margin_path = os.path.join(DATA_DIR, "sidebar_margin_backup.csv")
-    backup_oi_path = os.path.join(DATA_DIR, "sidebar_oi_backup.json")
-
     margin_today, margin_prev = None, None
     date_key = None
-    
-    # 初始化期貨數據容器
     oi_data = {"外資": 0, "投信": 0, "自營商": 0}
     oi_fetched = False
 
     if twse_df is not None and not twse_df.empty:
-        # 1. 處理三大法人資料
-        try:
-            twse_df.to_csv(backup_df_path, index=False, encoding='utf-8-sig')
-            with open(backup_title_path, 'w', encoding='utf-8') as f:
-                f.write(str(twse_title))
+        # 1. 處理日期
+        date_match = re.search(r'(\d+)年(\d+)月(\d+)日', twse_title)
+        date_key = f"{int(date_match.group(1))+1911}{int(date_match.group(2)):02d}{int(date_match.group(3)):02d}" if date_match else datetime.datetime.now().strftime("%Y%m%d")
             
-            date_match = re.search(r'(\d+)年(\d+)月(\d+)日', twse_title)
-            date_key = f"{int(date_match.group(1))+1911}{int(date_match.group(2)):02d}{int(date_match.group(3)):02d}" if date_match else datetime.datetime.now().strftime("%Y%m%d")
-                
-            market_hist_file = os.path.join(MARKET_HISTORY_DIR, f"market_{date_key}.csv")
-            twse_df.to_csv(market_hist_file, index=False, encoding='utf-8-sig')
-        except:
-            pass
-
-        # 2. 嘗試連線抓取今日融資
+        # 2. 抓取今日融資
         try:
             margin_url = "https://www.twse.com.tw/rwd/zh/margin/MI_MARGN?response=json&selectType=MS"
             res_margin = requests.get(margin_url, timeout=5)
             if res_margin.status_code == 200:
                 m_json = res_margin.json()
-                m_data = []
-                
-                if "data" in m_json and isinstance(m_json["data"], list):
-                    m_data = m_json["data"]
-                elif "tables" in m_json and isinstance(m_json["tables"], list) and len(m_json["tables"]) > 0:
-                    first_table = m_json["tables"][0]
-                    if isinstance(first_table, dict) and "data" in first_table:
-                        m_data = first_table["data"]
-                
-                if isinstance(m_data, list):
-                    for row in m_data:
-                        if row and len(row) >= 6 and "融資" in str(row[0]):
-                            margin_prev = float(str(row[4]).replace(',', '').strip())
-                            margin_today = float(str(row[5]).replace(',', '').strip())
-                            break
-                
-                if margin_today is not None:
-                    margin_temp_df = pd.DataFrame([{"today_bal": margin_today, "prev_bal": margin_prev}])
-                    margin_temp_df.to_csv(backup_margin_path, index=False, encoding='utf-8-sig')
-                    
-                    if date_key is not None:
-                        margin_hist_file = os.path.join(MARKET_HISTORY_DIR, f"margin_{date_key}.csv")
-                        margin_temp_df.to_csv(margin_hist_file, index=False, encoding='utf-8-sig')
-        except:
-            pass
+                m_data = m_json.get("data", []) if "data" in m_json else m_json.get("tables", [{}])[0].get("data", [])
+                for row in m_data:
+                    if row and len(row) >= 6 and "融資" in str(row[0]):
+                        margin_prev = float(str(row[4]).replace(',', '').strip())
+                        margin_today = float(str(row[5]).replace(',', '').strip())
+                        break
+        except: pass
 
-        # 3. 嘗試連線抓取期交所未平倉
+        # 3. 抓取期交所未平倉
         try:
-            query_date = datetime.datetime.now().strftime("%Y/%m/%d")
-            if twse_title:
-                date_match = re.search(r'(\d+)年(\d+)月(\d+)日', twse_title)
-                if date_match:
-                    roc_yr, m, d = date_match.groups()
-                    query_date = f"{int(roc_yr) + 1911}/{int(m):02d}/{int(d):02d}"
-
+            query_date = f"{int(date_key[:4])}/{date_key[4:6]}/{date_key[6:8]}" if date_key else datetime.datetime.now().strftime("%Y/%m/%d")
             url_taifex = "https://www.taifex.com.tw/cht/3/futContractsDate"
-            payload = {'queryDate': query_date}
-            headers = {'User-Agent': 'Mozilla/5.0'}
-            res_oi = requests.post(url_taifex, data=payload, headers=headers, timeout=5)
-            
+            res_oi = requests.post(url_taifex, data={'queryDate': query_date}, headers={'User-Agent': 'Mozilla/5.0'}, timeout=5)
             if res_oi.status_code == 200:
                 soup = BeautifulSoup(res_oi.text, 'html.parser')
-                rows = soup.find_all('tr')
                 current_product = ""
-                for row in rows:
-                    tds = row.find_all('td')
-                    texts = [td.get_text(strip=True) for td in tds]
+                for row in soup.find_all('tr'):
+                    texts = [td.get_text(strip=True) for td in row.find_all('td')]
                     if not texts or len(texts) < 10: continue
-                    
                     if "臺股期貨" in texts: current_product = "臺股期貨"
                     elif any("期貨" in t for t in texts[:2]): current_product = "其他"
-
+                    
                     if current_product == "臺股期貨":
-                        identity = None
-                        if "外資" in texts: identity = "外資"
-                        elif "投信" in texts: identity = "投信"
-                        elif "自營商" in texts: identity = "自營商"
-
+                        identity = "外資" if "外資" in texts else "投信" if "投信" in texts else "自營商" if "自營商" in texts else None
                         if identity:
-                            net_oi_str = texts[-2].replace(',', '')
-                            try:
-                                oi_data[identity] = int(net_oi_str)
-                                oi_fetched = True
-                            except: pass
-            
-            if oi_fetched:
-                # 覆寫日常備援
-                with open(backup_oi_path, 'w', encoding='utf-8') as f:
-                    json.dump(oi_data, f)
-                # 寫入永久歷史 CSV 庫
-                if date_key is not None:
-                    oi_temp_df = pd.DataFrame([oi_data])
-                    oi_hist_file = os.path.join(MARKET_HISTORY_DIR, f"oi_{date_key}.csv")
-                    oi_temp_df.to_csv(oi_hist_file, index=False, encoding='utf-8-sig')
-        except:
-            pass
-
-        # 4. 融資終極備援
-        if margin_today is None:
-            if os.path.exists(backup_margin_path):
-                try:
-                    margin_df_backup = pd.read_csv(backup_margin_path)
-                    if not margin_df_backup.empty:
-                        margin_today = float(margin_df_backup.iloc[0]['today_bal'])
-                        margin_prev = float(margin_df_backup.iloc[0]['prev_bal'])
-                except: pass
-
-    else:
-        # 🌙 全面斷線或休市狀況：提取所有備援資料
-        if os.path.exists(backup_df_path) and os.path.exists(backup_title_path):
-            try:
-                twse_df = pd.read_csv(backup_df_path, encoding='utf-8-sig')
-                with open(backup_title_path, 'r', encoding='utf-8') as f:
-                    twse_title = f.read().strip()
-            except: pass
-        if os.path.exists(backup_margin_path):
-            try:
-                margin_df_backup = pd.read_csv(backup_margin_path)
-                if not margin_df_backup.empty:
-                    margin_today = float(margin_df_backup.iloc[0]['today_bal'])
-                    margin_prev = float(margin_df_backup.iloc[0]['prev_bal'])
-            except: pass
-
-    if not oi_fetched and os.path.exists(backup_oi_path):
-        try:
-            with open(backup_oi_path, 'r', encoding='utf-8') as f:
-                oi_data = json.load(f)
+                            oi_data[identity] = int(texts[-2].replace(',', ''))
+                            oi_fetched = True
         except: pass
 
     # ------------------------------------------
-    # B. 計算與 UI 排版視覺化渲染
+    # B. 資料彙整與 Google Sheets 雲端存取
     # ------------------------------------------
-    if (twse_df is not None and not twse_df.empty) or (margin_today is not None):
+    # 初始化顯示用變數
+    net_buy_foreign = 0.0; net_buy_trust = 0.0; net_buy_dealer = 0.0; net_buy_total = 0.0
+    total_oi = 0
+    margin_diff_yi = 0.0; margin_today_yi = 0.0
+    date_str = "未知日期"
+    is_weekend_mode = False
+
+    def to_hundred_million(val_str):
+        try: return float(str(val_str).replace(',', '')) / 100000000
+        except: return 0.0
+
+    if twse_df is not None and not twse_df.empty:
+        # ✅ 情境 1：今天有開盤，成功抓到新資料，準備寫入雲端
+        for index, row in twse_df.iterrows():
+            unit_name = str(row['單位名稱']).strip()
+            net_val = to_hundred_million(row['買賣差額'])
+            if unit_name in ['外資及陸資(不含外資自營商)', '外資自營商']: net_buy_foreign += net_val
+            elif unit_name == '投信': net_buy_trust += net_val
+            elif unit_name in ['自營商(自行買賣)', '自營商(避險)']: net_buy_dealer += net_val
+            elif unit_name == '合計': net_buy_total = net_val
+            
+        total_oi = oi_data.get('外資', 0) + oi_data.get('投信', 0) + oi_data.get('自營商', 0)
         
-        date_str = "未知日期"
-        if twse_title:
-            date_match = re.search(r'(\d+)年(\d+)月(\d+)日', twse_title)
-            if date_match:
-                roc_yr, m, d = date_match.groups()
-                ad_yr = int(roc_yr) + 1911
-                date_str = f"{ad_yr}{int(m):02d}{int(d):02d}"
+        if margin_today is not None and margin_prev is not None:
+            margin_today_yi = margin_today / 100000
+            margin_prev_yi = margin_prev / 100000
+            margin_diff_yi = margin_today_yi - margin_prev_yi
+
+        date_str = date_key
+
+        # 🚀 將今日總結寫入 Google Sheets
+        today_record = {
+            "日期": str(date_str),
+            "外資現貨": round(net_buy_foreign, 2), "投信現貨": round(net_buy_trust, 2),
+            "自營商現貨": round(net_buy_dealer, 2), "合計現貨": round(net_buy_total, 2),
+            "外資OI": oi_data.get('外資', 0), "投信OI": oi_data.get('投信', 0),
+            "自營商OI": oi_data.get('自營商', 0), "合計OI": total_oi,
+            "融資增減": round(margin_diff_yi, 2), "融資餘額": round(margin_today_yi, 2)
+        }
         
+        try:
+            today_df = pd.DataFrame([today_record])
+            old_market_df = conn.read(spreadsheet=SHEET_URL, worksheet="大盤風向球")
+            old_market_df = old_market_df.dropna(how="all")
+            if '日期' in old_market_df.columns:
+                old_market_df = old_market_df[old_market_df['日期'].astype(str) != str(date_str)]
+            final_market_df = pd.concat([old_market_df, today_df], ignore_index=True)
+            conn.update(spreadsheet=SHEET_URL, worksheet="大盤風向球", data=final_market_df)
+        except Exception as e:
+            try: conn.update(spreadsheet=SHEET_URL, worksheet="大盤風向球", data=today_df)
+            except: pass
+
+    else:
+        # 🌙 情境 2：週末或休市，直接從 Google Sheets 提取最新一筆歷史紀錄
+        is_weekend_mode = True
+        try:
+            old_market_df = conn.read(spreadsheet=SHEET_URL, worksheet="大盤風向球")
+            old_market_df = old_market_df.dropna(how="all")
+            if not old_market_df.empty:
+                last_record = old_market_df.iloc[-1] # 取出最底下的一筆 (最新)
+                
+                date_str = str(last_record.get('日期', '未知日期'))
+                net_buy_foreign = float(last_record.get('外資現貨', 0))
+                net_buy_trust = float(last_record.get('投信現貨', 0))
+                net_buy_dealer = float(last_record.get('自營商現貨', 0))
+                net_buy_total = float(last_record.get('合計現貨', 0))
+                
+                oi_data['外資'] = int(last_record.get('外資OI', 0))
+                oi_data['投信'] = int(last_record.get('投信OI', 0))
+                oi_data['自營商'] = int(last_record.get('自營商OI', 0))
+                total_oi = int(last_record.get('合計OI', 0))
+                
+                margin_diff_yi = float(last_record.get('融資增減', 0))
+                margin_today_yi = float(last_record.get('融資餘額', 0))
+        except Exception as e:
+            st.sidebar.warning("無法連線讀取雲端備援資料。")
+
+    # ------------------------------------------
+    # C. UI 排版視覺化渲染
+    # ------------------------------------------
+    if date_str != "未知日期":
         now = datetime.datetime.now()
         current_time = now.time()
-        is_weekend_mode = not (twse_df is not None and not twse_df.empty and datetime.datetime.today().weekday() < 5)
         
         if current_time < datetime.time(14, 50) and not is_weekend_mode:
             status_badge = "⏳ <span style='color:#FFCC00;'>結算中</span>"
         else:
-            status_badge = "🌕 <span style='color:#00D2FF;'>完整版</span>"
-
-        def to_hundred_million(val_str):
-            try: return float(str(val_str).replace(',', '')) / 100000000
-            except: return 0.0
-
-        net_buy_foreign = 0.0; net_buy_trust = 0.0; net_buy_dealer = 0.0; net_buy_total = 0.0
-
-        if twse_df is not None and not twse_df.empty:
-            for index, row in twse_df.iterrows():
-                unit_name = str(row['單位名稱']).strip()
-                net_val = to_hundred_million(row['買賣差額'])
-                
-                if unit_name in ['外資及陸資(不含外資自營商)', '外資自營商']: net_buy_foreign += net_val
-                elif unit_name == '投信': net_buy_trust += net_val
-                elif unit_name in ['自營商(自行買賣)', '自營商(避險)']: net_buy_dealer += net_val
-                elif unit_name == '合計': net_buy_total = net_val
+            status_badge = "🌕 <span style='color:#00D2FF;'>雲端同步版</span>" if is_weekend_mode else "🌕 <span style='color:#00E272;'>即時更新版</span>"
 
         def get_cls(val): return '#FF4B4B' if val > 0 else '#00CC66' if val < 0 else 'white'
         def get_sign(val): return f"+{val:.1f}" if val > 0 else f"{val:.1f}"
         def get_oi_str(val): return "0" if val == 0 else f"+{val:,}" if val > 0 else f"{val:,}"
 
-        total_oi = oi_data.get('外資', 0) + oi_data.get('投信', 0) + oi_data.get('自營商', 0)
-
-        # 🔥 UI更新：單位移至標題，拿掉數值後方的字串
         html_lines = [
             f"<div style='background-color: #1e293b; padding: 12px; border-radius: 8px; margin-bottom: 10px;'>",
             f"<div style='font-size: 13px; color: #00D2FF; margin-bottom: 8px;'>📅 {date_str} | {status_badge}</div>",
             f"<table style='width:100%; border-collapse: collapse; table-layout: fixed; font-size: 14px; color: white;'>",
-            
-            # 標題列 (加上單位)
-            f"<tr style='border-bottom: 1px solid #334155; font-weight: bold;'>"
-            f"<td style='padding: 4px 0; width: 28%;'>法人</td>"
-            f"<td style='padding: 4px 0; text-align: right; width: 36%;'>現貨金額(億)</td>"
-            f"<td style='padding: 4px 0; text-align: right; width: 36%;'>TX未平倉(口)</td></tr>",
-            
-            # 外資 (移除 億/口)
-            f"<tr><td style='padding: 6px 0;'>🌐 外資</td>"
-            f"<td style='text-align: right; color: {get_cls(net_buy_foreign)}; font-weight: bold;'>{get_sign(net_buy_foreign)}</td>"
-            f"<td style='text-align: right; color: {get_cls(oi_data.get('外資',0))}; font-weight: bold;'>{get_oi_str(oi_data.get('外資',0))}</td></tr>",
-            
-            # 投信 (移除 億/口)
-            f"<tr><td style='padding: 6px 0;'>🏦 投信</td>"
-            f"<td style='text-align: right; color: {get_cls(net_buy_trust)}; font-weight: bold;'>{get_sign(net_buy_trust)}</td>"
-            f"<td style='text-align: right; color: {get_cls(oi_data.get('投信',0))}; font-weight: bold;'>{get_oi_str(oi_data.get('投信',0))}</td></tr>",
-            
-            # 自營商 (移除 億/口)
-            f"<tr><td style='padding: 6px 0;'>🏢 自營商</td>"
-            f"<td style='text-align: right; color: {get_cls(net_buy_dealer)}; font-weight: bold;'>{get_sign(net_buy_dealer)}</td>"
-            f"<td style='text-align: right; color: {get_cls(oi_data.get('自營商',0))}; font-weight: bold;'>{get_oi_str(oi_data.get('自營商',0))}</td></tr>",
-            
-            # 合計 (移除 億/口)
-            f"<tr style='border-top: 1px solid #334155;'><td style='padding: 6px 0; color: #FFD700; font-weight: bold;'>🔥 合計</td>"
-            f"<td style='text-align: right; color: {get_cls(net_buy_total)}; font-weight: bold;'>{get_sign(net_buy_total)}</td>"
-            f"<td style='text-align: right; color: {get_cls(total_oi)}; font-weight: bold;'>{get_oi_str(total_oi)}</td></tr>"
+            f"<tr style='border-bottom: 1px solid #334155; font-weight: bold;'><td style='padding: 4px 0; width: 28%;'>法人</td><td style='padding: 4px 0; text-align: right; width: 36%;'>現貨(億)</td><td style='padding: 4px 0; text-align: right; width: 36%;'>TX未平倉</td></tr>",
+            f"<tr><td style='padding: 6px 0;'>🌐 外資</td><td style='text-align: right; color: {get_cls(net_buy_foreign)}; font-weight: bold;'>{get_sign(net_buy_foreign)}</td><td style='text-align: right; color: {get_cls(oi_data.get('外資',0))}; font-weight: bold;'>{get_oi_str(oi_data.get('外資',0))}</td></tr>",
+            f"<tr><td style='padding: 6px 0;'>🏦 投信</td><td style='text-align: right; color: {get_cls(net_buy_trust)}; font-weight: bold;'>{get_sign(net_buy_trust)}</td><td style='text-align: right; color: {get_cls(oi_data.get('投信',0))}; font-weight: bold;'>{get_oi_str(oi_data.get('投信',0))}</td></tr>",
+            f"<tr><td style='padding: 6px 0;'>🏢 自營商</td><td style='text-align: right; color: {get_cls(net_buy_dealer)}; font-weight: bold;'>{get_sign(net_buy_dealer)}</td><td style='text-align: right; color: {get_cls(oi_data.get('自營商',0))}; font-weight: bold;'>{get_oi_str(oi_data.get('自營商',0))}</td></tr>",
+            f"<tr style='border-top: 1px solid #334155;'><td style='padding: 6px 0; color: #FFD700; font-weight: bold;'>🔥 合計</td><td style='text-align: right; color: {get_cls(net_buy_total)}; font-weight: bold;'>{get_sign(net_buy_total)}</td><td style='text-align: right; color: {get_cls(total_oi)}; font-weight: bold;'>{get_oi_str(total_oi)}</td></tr>"
         ]
 
-        if margin_today is not None and margin_prev is not None:
-            margin_today_yi = margin_today / 100000
-            margin_prev_yi = margin_prev / 100000
-            margin_diff_yi = margin_today_yi - margin_prev_yi
-            
-            # 融資列標題加上 (億)，並移除數值後方的億
+        if margin_diff_yi != 0 or margin_today_yi != 0:
             html_lines.append(f"<tr style='border-top: 1px dashed #334155;'><td style='padding: 8px 0 2px 0; color: white; font-weight: bold;' colspan='2'>📊 融資餘額增減(億)</td><td style='padding: 8px 0 2px 0; text-align: right; color: {get_cls(margin_diff_yi)}; font-weight: bold;'>{get_sign(margin_diff_yi)}</td></tr>")
             html_lines.append(f"<tr><td style='padding: 1px 0 4px 0; font-size: 12px; color: #94A3B8; font-weight: normal;' colspan='2'>└ 今日融資總餘額</td><td style='padding: 1px 0 4px 0; text-align: right; color: #94A3B8; font-size: 12px; font-weight: normal;'>{margin_today_yi:.1f}</td></tr>")
 
         html_lines.append("</table></div>")
+        st.sidebar.markdown("".join(html_lines), unsafe_allow_html=True)
         
-        card_html = "".join(html_lines)
-        st.sidebar.markdown(card_html, unsafe_allow_html=True)
+        # 💎 額外升級：側邊欄雲端歷史趨勢展開面板
+        try:
+            hist_df = conn.read(spreadsheet=SHEET_URL, worksheet="大盤風向球")
+            hist_df = hist_df.dropna(how="all")
+            if not hist_df.empty and len(hist_df) > 1:
+                with st.sidebar.expander("📈 近期大盤歷史趨勢"):
+                    # 抓取最近 5 天資料反轉顯示
+                    recent_df = hist_df.tail(5).iloc[::-1][['日期', '外資現貨', '投信現貨', '融資增減']]
+                    recent_df['日期'] = recent_df['日期'].astype(str).str[-4:] # 只留 0529
+                    st.dataframe(recent_df, use_container_width=True, hide_index=True)
+        except: pass
+
     else:
-        st.sidebar.info("🕒 目前查無今日三大法人買賣與期貨資料。")
+        st.sidebar.info("🕒 目前查無今日三大法人買賣與期貨資料，且雲端尚無備份。")
 
 # 執行渲染側邊欄大盤卡片
 render_sidebar_market_summary()
-
 
 # ------------------------------------------
 # 2. 大盤總體經濟指標
@@ -3291,24 +3227,46 @@ with top_pool_container:
             res_df = pd.DataFrame(results).sort_values(by='總分', ascending=False).drop_duplicates(subset=['代號']).reset_index(drop=True)
             
             # ==========================================
-            # 🔥 Delta (▼變量) 計算引擎
+            # 🔥 Delta (▼變量) 計算引擎 (升級為 Google Sheets 讀取版)
             # ==========================================
-            history_files = sorted(glob.glob(os.path.join(SCORE_HISTORY_DIR, "scores_*.csv")), reverse=True)
             prev_scores_dict = {}
-            if len(history_files) >= 2:
-                try:
-                    prev_df = pd.read_csv(history_files[1])
-                    id_col = '代號' if '代號' in prev_df.columns else '股票代號' if '股票代號' in prev_df.columns else None
-                    if id_col:
-                        prev_scores_dict = dict(zip(prev_df[id_col].astype(str).str.replace(r'\D', '', regex=True), prev_df['總分']))
-                except: pass
+            hist_combined = pd.DataFrame() # 預備給 Tab 2 使用
+            
+            try:
+                # 1. 讀取 Google Sheets 中的歷史資料
+                gs_history = conn.read(spreadsheet=SHEET_URL, worksheet="選股歷史")
+                gs_history = gs_history.dropna(how="all")
+                
+                if not gs_history.empty and '紀錄日期' in gs_history.columns:
+                    hist_combined = gs_history.copy()
+                    # 取得所有不重複的日期，並由新到舊排序
+                    available_dates = sorted(gs_history['紀錄日期'].astype(str).unique(), reverse=True)
+                    
+                    # 只要有兩天以上的紀錄，就抓「上一天」(索引 1) 的資料來比對 Delta
+                    if len(available_dates) >= 2:
+                        prev_date = available_dates[1]
+                        prev_df = gs_history[gs_history['紀錄日期'].astype(str) == prev_date]
+                        
+                        id_col = '代號' if '代號' in prev_df.columns else '股票代號' if '股票代號' in prev_df.columns else None
+                        if id_col:
+                            prev_scores_dict = dict(zip(prev_df[id_col].astype(str).str.replace(r'\D', '', regex=True), prev_df['總分']))
+            except Exception as e:
+                pass # 第一次可能還沒有資料表，忽略錯誤
 
             def calc_table_delta(row):
                 sid = str(row['代號']).replace(r'\D', '')
                 curr_score = row.get('總分', 0)
-                prev_score = prev_scores_dict.get(sid, curr_score) 
-                delta = round(curr_score - prev_score, 1)
-                return f"+{delta}" if delta > 0 else str(delta)
+                
+                # 判斷是否為昨日榜單上的老面孔
+                if sid in prev_scores_dict:
+                    prev_score = prev_scores_dict[sid]
+                    delta = round(curr_score - prev_score, 1)
+                    if delta > 0: return f"+{delta}"
+                    elif delta < 0: return str(delta)
+                    else: return "0.0"  # 昨天有，今天也有，且分數維持不變
+                else:
+                    # 🔥 昨天沒進榜，今天是全新衝進來！直接顯示為 +總分，並加上標記
+                    return f"🆕 +{curr_score}"
 
             if not res_df.empty and '總分' in res_df.columns:
                 res_df['▼變量'] = res_df.apply(calc_table_delta, axis=1)
@@ -3338,30 +3296,19 @@ with top_pool_container:
                         if date_label.isdigit(): anchor_date_str = date_label
                     
                     if anchor_date_str != "00000000":
-                        # 1. 幫今天的資料貼上日期標籤
                         save_df = res_df.copy()
-                        save_df.insert(0, '紀錄日期', anchor_date_str) # 將日期固定插在第一欄
-
-                        # 2. 讀取 Google Sheets 歷史資料
+                        save_df.insert(0, '紀錄日期', anchor_date_str)
+                        
                         try:
                             old_df = conn.read(spreadsheet=SHEET_URL, worksheet="選股歷史")
                             old_df = old_df.dropna(how="all")
-
-                            # 🛡️ 防呆機制：如果今天已經存過，就先剔除舊的今天紀錄，避免重複疊加
                             if '紀錄日期' in old_df.columns:
                                 old_df = old_df[old_df['紀錄日期'].astype(str) != anchor_date_str]
-
                             final_save_df = pd.concat([old_df, save_df], ignore_index=True)
                         except:
-                            # 若是第一次建立，或是抓不到舊分頁，直接使用今日資料
                             final_save_df = save_df
 
-                        # 3. 寫入專屬的「選股歷史」頁籤
-                        conn.update(
-                            spreadsheet=SHEET_URL,
-                            worksheet="選股歷史",
-                            data=final_save_df
-                        )
+                        conn.update(spreadsheet=SHEET_URL, worksheet="選股歷史", data=final_save_df)
                 except Exception as e: 
                     st.error(f"寫入 Google Sheets 發生錯誤: {e}")
 
@@ -3379,27 +3326,18 @@ with top_pool_container:
                 st.success(f"選股池掃描完成！今日共過濾出 {len(res_df)} 檔潛力標的。")
             with tab2:
                 try:
-                    all_hist_files = sorted(glob.glob(os.path.join(SCORE_HISTORY_DIR, "scores_*.csv")))
-                    if len(all_hist_files) > 0:
-                        hist_list = []
-                        for f in all_hist_files[-20:]:
-                            try:
-                                date_str = re.search(r'\d{8}', os.path.basename(f)).group(0)
-                                formatted_date = f"{date_str[4:6]}/{date_str[6:]}"
-                                df_h = pd.read_csv(f)
-                                
-                                id_col = '代號' if '代號' in df_h.columns else '股票代號' if '股票代號' in df_h.columns else None
-                                
-                                if id_col and '總分' in df_h.columns:
-                                    df_h['日期'] = formatted_date
-                                    df_h['代號'] = df_h[id_col].astype(str).str.replace(r'\D', '', regex=True)
-                                    df_h = df_h[['代號', '總分', '日期']]
-                                    hist_list.append(df_h)
-                            except: pass
+                    if not hist_combined.empty:
+                        recent_dates = sorted(hist_combined['紀錄日期'].astype(str).unique(), reverse=True)[:20]
+                        df_h = hist_combined[hist_combined['紀錄日期'].astype(str).isin(recent_dates)].copy()
                         
-                        if hist_list:
-                            hist_combined = pd.concat(hist_list, ignore_index=True)
-                            hist_pivot = hist_combined.pivot_table(index='代號', columns='日期', values='總分', aggfunc='first').reset_index()
+                        id_col = '代號' if '代號' in df_h.columns else '股票代號' if '股票代號' in df_h.columns else None
+                        
+                        if id_col and '總分' in df_h.columns:
+                            df_h['日期'] = df_h['紀錄日期'].astype(str).apply(lambda x: f"{x[4:6]}/{x[6:]}" if len(x)==8 else x)
+                            df_h['代號'] = df_h[id_col].astype(str).str.replace(r'\D', '', regex=True)
+                            df_h = df_h[['代號', '總分', '日期']]
+                            
+                            hist_pivot = df_h.pivot_table(index='代號', columns='日期', values='總分', aggfunc='first').reset_index()
                             name_mapping = dict(zip(res_df['代號'].astype(str).str.replace(r'\D', '', regex=True), res_df['名稱']))
                             hist_pivot.insert(1, '名稱', hist_pivot['代號'].map(name_mapping).fillna('-'))
                             latest_day = hist_pivot.columns[-1]
@@ -3407,9 +3345,10 @@ with top_pool_container:
                             hist_pivot = hist_pivot.sort_values(by=latest_day, ascending=False).reset_index(drop=True)
                             st.dataframe(hist_pivot, use_container_width=True, hide_index=True)
                             st.info("💡 這裡統整了標的在過去20日選股池中的【總分變化】，可藉此觀察籌碼動能的延續性與驗證 ▼變量！")
-                        else: st.warning("歷史資料格式不符，無法解析。")
-                    else: st.warning("尚無足夠的歷史分數紀錄。")
-                except Exception as e: st.error(f"歷史分數讀取發生錯誤: {e}")
+                    else: 
+                        st.warning("尚無足夠的歷史分數紀錄。")
+                except Exception as e: 
+                    st.error(f"歷史分數讀取發生錯誤: {e}")
 
 # ==========================================
 # 🛠️ 臨時除錯區：雲端歷史檔案檢查器 (隨時可刪除)
