@@ -2455,8 +2455,9 @@ def get_specific_margin_data(keyword):
         return df, file_name
     except Exception as e:
         return pd.DataFrame(), f"讀取崩潰 ({file_name}): {str(e)}"
-#==============表格欄位設計============
+#==============區塊四表格欄位設計============
 # 🛠️ 【不可省略】欄位清理與過濾函數
+#==============區塊四表格欄位設計============
 def process_margin_df(df, type_name, flag_etf, flag_bond):
     if df.empty: return df
     df = df.copy()
@@ -2531,7 +2532,7 @@ def render_styled_margin_table(clean_df):
                 # 讀取原始 clean_df 的數值做精確多空判斷
                 orig_val = clean_df.loc[row.name, change_col]
                 if float(orig_val) > 0:
-                    return ['color: #A71154; font-weight: bold;'] * len(row) # 🎯 升級護眼暗紅
+                    return ['color: #F05A5A; font-weight: bold;'] * len(row) # 🎯 升級護眼暗紅
             except: pass
         return styles
 
