@@ -2740,7 +2740,7 @@ import pandas as pd
 import yfinance as yf
 
 # 確保引用全域連線
-global conn, SHEET_URL
+#global conn, SHEET_URL
 
 @st.cache_data(ttl=600)
 def get_historical_block_matrix_from_gs():
