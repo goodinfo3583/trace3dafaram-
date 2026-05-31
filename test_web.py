@@ -2733,82 +2733,58 @@ else:
     else:
         st.error("無法合併資料。")
 # ==========================================
-# 💸 區塊 6：盤後鉅額交易總表 (大戶暗盤雷達)
+# 💸 區塊 6：盤後鉅額交易總表 (Google Sheets 雲端矩陣版)
 # ==========================================
-import os, re, glob, datetime
+import os, re, datetime
 import pandas as pd
 import yfinance as yf
 
-# -----------------------------------------------------------------------------
-# 💡 【快取函數區】這兩段函數具備自動記憶功能，能徹底解放網頁重新整理時的讀取效能
-# -----------------------------------------------------------------------------
+# 確保引用全域連線
+global conn, SHEET_URL
 
-@st.cache_data(ttl=3600)
-def cached_fetch_block_trades():
-    """快取網路抓取函數：一小時內重複重整網頁，絕不重複連網抓取，達到秒開效果"""
-    return fetch_block_trades()
-
-
-@st.cache_data
-def get_historical_block_matrix(block_history_dir):
-    """快取歷史檔案合併函數：只要歷史資料夾檔案沒變，重整網頁時直接從記憶體讀取，不重複讀取硬碟"""
-    hist_files = glob.glob(os.path.join(block_history_dir, "block_trades_*.csv"))
-    if not hist_files:
-        return None, []
-        
-    master_hist_df = None
-    date_cols_list = []
-    
-    for file in hist_files:
-        date_match = re.search(r'block_trades_(\d{8})\.csv', file)
-        if not date_match: continue
-        
-        short_date = date_match.group(1)[-4:] # 例如 0529
-        block_col = f"▼{short_date}成交價"
-        close_col = f"{short_date}收盤價"
-        
-        try:
-            df_temp = pd.read_csv(file, encoding='utf-8-sig')
+@st.cache_data(ttl=600)
+def get_historical_block_matrix_from_gs():
+    """從 Google Sheets 抓取扁平化歷史資料，並自動重組成帶有顏色的跨日矩陣"""
+    try:
+        hist_df = conn.read(spreadsheet=SHEET_URL, worksheet="鉅額交易")
+        hist_df = hist_df.dropna(how="all")
+        if hist_df.empty or '日期' not in hist_df.columns:
+            return None, []
             
-            # 相容性設計：判斷是舊版檔案(無收盤價)還是新版檔案(有收盤價)
-            if '▼收盤價' in df_temp.columns and block_col in df_temp.columns:
-                df_temp = df_temp.rename(columns={'▼收盤價': close_col})
-                df_temp = df_temp[['代號', '股票名稱', block_col, close_col]].copy()
-            else:
-                p_col = next((c for c in ['成交價', '成交價格', '成交單價'] if c in df_temp.columns), None)
-                if not p_col: continue
-                df_temp['代號'] = df_temp['證券代號'].astype(str).str.replace(r'\D', '', regex=True)
-                df_temp['股票名稱'] = df_temp['證券名稱']
-                df_temp[block_col] = pd.to_numeric(df_temp[p_col].astype(str).str.replace(',', ''), errors='coerce').fillna(0).round(0).astype(int).astype(str)
-                df_temp[close_col] = '-' 
+        hist_df['日期'] = hist_df['日期'].astype(str)
+        hist_df['代號'] = hist_df['代號'].astype(str).str.replace(r'\D', '', regex=True)
+        
+        date_list = sorted(hist_df['日期'].unique(), reverse=True)
+        master_hist_df = None
+        date_cols_list = []
+        
+        for d in date_list:
+            short_date = d[-4:] # 例如 0529
+            block_col = f"▼{short_date}成交價"
+            close_col = f"{short_date}收盤價"
+            date_cols_list.append(block_col)
             
-            # 若同一天有多筆成交價，將成交價以 / 隔開，並保留第一筆收盤價
-            df_grouped = df_temp.groupby(['代號', '股票名稱']).agg({
+            day_df = hist_df[hist_df['日期'] == d][['代號', '股票名稱', '成交價', '收盤價']].copy()
+            day_df = day_df.rename(columns={'成交價': block_col, '收盤價': close_col})
+            
+            # 若同一天有多筆成交價，將成交價以 / 隔開
+            day_df = day_df.groupby(['代號', '股票名稱']).agg({
                 block_col: lambda x: ' / '.join(sorted(set(x.astype(str)))),
                 close_col: 'first'
             }).reset_index()
             
             if master_hist_df is None:
-                master_hist_df = df_grouped
+                master_hist_df = day_df
             else:
-                master_hist_df = pd.merge(master_hist_df, df_grouped, on=['代號', '股票名稱'], how='outer')
-            
-            if block_col not in date_cols_list:
-                date_cols_list.append(block_col)
+                master_hist_df = pd.merge(master_hist_df, day_df, on=['代號', '股票名稱'], how='outer')
                 
-        except Exception: continue
-            
-    if master_hist_df is not None and not master_hist_df.empty:
         master_hist_df = master_hist_df.fillna('-')
-        
-        # 日期排序 (降冪排列)
-        date_cols_list = sorted(date_cols_list, reverse=True)
         
         # 🔥【自動刪除週末非交易日拷貝】
         cols_to_drop = []
         for i in range(len(date_cols_list) - 1):
-            new_col = date_cols_list[i]   # 較新的日期 (如 0530)
-            old_col = date_cols_list[i+1] # 較舊的日期 (如 0529)
+            new_col = date_cols_list[i]
+            old_col = date_cols_list[i+1]
             if master_hist_df[new_col].equals(master_hist_df[old_col]):
                 cols_to_drop.append(new_col)
                 cols_to_drop.append(new_col.replace('▼', '').replace('成交價', '收盤價'))
@@ -2816,30 +2792,20 @@ def get_historical_block_matrix(block_history_dir):
         master_hist_df = master_hist_df.drop(columns=[c for c in cols_to_drop if c in master_hist_df.columns])
         date_cols_list = [c for c in date_cols_list if c not in cols_to_drop]
         
-        # 排序：讓最近有鉅額交易的股票置頂
         if date_cols_list:
             master_hist_df = master_hist_df.sort_values(by=date_cols_list[0], ascending=False)
             
         return master_hist_df, date_cols_list
-    return None, []
+    except Exception as e:
+        return None, []
 
-
-# -----------------------------------------------------------------------------
-# 🎯 【主程式邏輯區】負責網頁畫面渲染與互動
-# -----------------------------------------------------------------------------
-
-# 🛠️ 核心修復：強制去讀取側邊欄已經確認過的「真實大盤日期」
 def get_real_market_date():
-    backup_title_path = os.path.join(DATA_DIR, "sidebar_twse_title_backup.txt")
-    if os.path.exists(backup_title_path):
-        try:
-            with open(backup_title_path, 'r', encoding='utf-8') as f:
-                title_text = f.read().strip()
-            date_match = re.search(r'(\d+)年(\d+)月(\d+)日', title_text)
-            if date_match:
-                roc_yr, m, d = date_match.groups()
-                return f"{int(roc_yr) + 1911}{int(m):02d}{int(d):02d}"
-        except: pass
+    try:
+        # 改從剛剛上雲端的大盤歷史抓最新日期，完全擺脫本地 TXT
+        hist_market = conn.read(spreadsheet=SHEET_URL, worksheet="大盤風向球").dropna(how="all")
+        if not hist_market.empty and '日期' in hist_market.columns:
+            return str(hist_market.sort_values(by='日期', ascending=False).iloc[0]['日期'])
+    except: pass
     return datetime.datetime.now().strftime("%Y%m%d")
 
 real_trade_date = get_real_market_date() 
@@ -2849,16 +2815,14 @@ dynamic_price_col = f"▼{date_mmdd}成交價"
 st.write("---")
 st.markdown("<div id='section-6'></div>", unsafe_allow_html=True)
 st.markdown(f"### 💸 區塊 6：鉅額交易動向 <span style='font-size: 0.6em; color: #00D2FF;'>({real_trade_date})</span>", unsafe_allow_html=True)
-st.write("💡 鉅額交易常為大戶私下換手籌碼,避免股價盤中劇烈波動。成交價為「支撐/壓力」防守線或是「壓/拉尾盤」；短線跌破建議嚴設停損。")
+st.write("💡 鉅額交易常為大戶私下換手籌碼，成交價可視為「支撐/壓力」防守線；短線跌破建議嚴設停損。")
 
-# 🗂️ 建立分頁系統
 tab1, tab2 = st.tabs(["🆕 今日最新鉅額交易", "📅 歷史防守價追蹤表"])
 
 # ==========================================
-# 資料處理核心：確保歷史檔案「帶有收盤價」
+# 資料處理核心：寫入 Google Sheets
 # ==========================================
-raw_block_df = cached_fetch_block_trades() # 🎯 使用快取網路抓取
-backup_processed_path = os.path.join(DATA_DIR, "block_trades_processed_backup.csv")
+raw_block_df = fetch_block_trades() # 您原本的爬蟲函數
 display_df = None
 is_weekend = False
 
@@ -2868,7 +2832,6 @@ if raw_block_df is not None and not raw_block_df.empty:
         if price_col:
             raw_block_df['成交股數_數值'] = pd.to_numeric(raw_block_df['成交股數'].astype(str).str.replace(',', ''), errors='coerce').fillna(0)
             raw_block_df['成交金額_數值'] = pd.to_numeric(raw_block_df['成交金額'].astype(str).str.replace(',', ''), errors='coerce').fillna(0)
-            
             raw_block_df[dynamic_price_col] = pd.to_numeric(raw_block_df[price_col].astype(str).str.replace(',', ''), errors='coerce').fillna(0).round(0).astype(int)
             raw_block_df = raw_block_df[raw_block_df['成交股數_數值'] > 0].copy()
             raw_block_df['成交張數'] = (raw_block_df['成交股數_數值'] / 1000).astype(int)
@@ -2892,8 +2855,7 @@ if raw_block_df is not None and not raw_block_df.empty:
                                 tkr = f"{sid}.TW"
                                 if tkr in close_data.columns:
                                     valid_prices = close_data[tkr].dropna()
-                                    if not valid_prices.empty:
-                                        close_price_dict[sid] = str(int(round(valid_prices.iloc[-1])))
+                                    if not valid_prices.empty: close_price_dict[sid] = str(int(round(valid_prices.iloc[-1])))
                 except: pass 
             
             raw_block_df['▼收盤價'] = raw_block_df['乾淨代號'].map(close_price_dict).fillna('-')
@@ -2902,44 +2864,53 @@ if raw_block_df is not None and not raw_block_df.empty:
                 try:
                     c = float(str(close_val).replace(',', ''))
                     b = float(str(block_val).replace(',', ''))
-                    if c > b: return 1   
-                    elif c == b: return 2 
-                    else: return 3       
+                    return 1 if c > b else 2 if c == b else 3       
                 except: return 4 
+                
             raw_block_df['__color_rank'] = raw_block_df.apply(lambda r: get_color_rank(r['▼收盤價'], r[dynamic_price_col]), axis=1)
-            
-            stock_stats = raw_block_df.groupby('乾淨代號').agg(
-                stock_min_rank=('__color_rank', 'min'), stock_total_amt=('成交金額_數值', 'sum')
-            ).reset_index()
-            
+            stock_stats = raw_block_df.groupby('乾淨代號').agg(stock_min_rank=('__color_rank', 'min'), stock_total_amt=('成交金額_數值', 'sum')).reset_index()
             raw_block_df = raw_block_df.merge(stock_stats, on='乾淨代號', how='left')
-            raw_block_df = raw_block_df.sort_values(
-                by=['stock_min_rank', 'stock_total_amt', '乾淨代號', '__color_rank', '成交金額_數值'],
-                ascending=[True, False, True, True, False]
-            )
+            raw_block_df = raw_block_df.sort_values(by=['stock_min_rank', 'stock_total_amt', '乾淨代號', '__color_rank', '成交金額_數值'], ascending=[True, False, True, True, False])
             
             display_cols = ['乾淨代號', '證券名稱', dynamic_price_col, '▼收盤價', '成交張數', '成交總額(億)']
             display_df = raw_block_df[display_cols].copy()
             display_df = display_df.rename(columns={'乾淨代號': '代號', '證券名稱': '股票名稱'})
             
-            # 將完整加工好（含收盤價）的資料存入歷史庫
-            block_hist_file = os.path.join(BLOCK_HISTORY_DIR, f"block_trades_{real_trade_date}.csv")
-            display_df.to_csv(block_hist_file, index=False, encoding='utf-8-sig')
-            display_df.to_csv(backup_processed_path, index=False, encoding='utf-8-sig')
-    except Exception as e:
-        st.warning(f"⚠️ 資料解析錯誤: {str(e)}")
+            # 🚀 寫入 Google Sheets
+            save_df = display_df.copy()
+            save_df.columns = ['代號', '股票名稱', '成交價', '收盤價', '成交張數', '成交總額(億)']
+            save_df.insert(0, '日期', real_trade_date)
+            
+            try:
+                old_gs = conn.read(spreadsheet=SHEET_URL, worksheet="鉅額交易")
+                old_gs = old_gs.dropna(how="all")
+                if '日期' in old_gs.columns:
+                    old_gs = old_gs[old_gs['日期'].astype(str) != str(real_trade_date)]
+                final_gs = pd.concat([old_gs, save_df], ignore_index=True)
+                conn.update(spreadsheet=SHEET_URL, worksheet="鉅額交易", data=final_gs)
+            except Exception as e:
+                try: conn.update(spreadsheet=SHEET_URL, worksheet="鉅額交易", data=save_df)
+                except: pass
+
+    except Exception as e: st.warning(f"⚠️ 資料解析錯誤: {str(e)}")
 else:
+    # 🌙 遇休市/週末：直接從 Google Sheets 讀取最新一天的備援資料
     is_weekend = True
-    if os.path.exists(backup_processed_path):
-        display_df = pd.read_csv(backup_processed_path, encoding='utf-8-sig')
+    try:
+        gs_backup = conn.read(spreadsheet=SHEET_URL, worksheet="鉅額交易").dropna(how="all")
+        if not gs_backup.empty and '日期' in gs_backup.columns:
+            latest_date = str(gs_backup['日期'].max())
+            backup_df = gs_backup[gs_backup['日期'].astype(str) == latest_date].copy()
+            backup_df = backup_df.rename(columns={'成交價': f"▼{latest_date[-4:]}成交價", '收盤價': '▼收盤價'})
+            display_df = backup_df.drop(columns=['日期'])
+    except: pass
 
 # ==========================================
 # Tab 1: 今日最新鉅額交易
 # ==========================================
 with tab1:
     if display_df is not None and not display_df.empty:
-        if is_weekend:
-            st.caption(f"🌙 週末/休市期間：自動啟用 {real_trade_date} 大戶暗盤數據")
+        if is_weekend: st.caption(f"🌙 休市期間：啟用 Google Sheets 雲端備援數據")
 
         def highlight_block_row(row):
             styles = [''] * len(row)
@@ -2959,53 +2930,41 @@ with tab1:
             
         styled_df = display_df.style.apply(highlight_block_row, axis=1)
         st.dataframe(styled_df, use_container_width=True, hide_index=True)
-        st.success(f"更新 {real_trade_date} 共偵測到 {len(display_df)} 筆大戶暗盤資金換手紀錄。")
-        st.session_state['df_blk6'] = display_df
     else:
-        st.info("🕒 目前查無今日鉅額交易資料，或證交所尚未結算公告。")
+        st.info("🕒 目前查無今日鉅額交易資料，且雲端尚無備份。")
 
 # ==========================================
-# Tab 2: 歷史防守價追蹤表 (調用快取並著色)
+# Tab 2: 歷史防守價追蹤表 (調用雲端矩陣)
 # ==========================================
 with tab2:
-    # 🎯 調用上方定義好、具備自動快取的矩陣合併函數
-    master_hist_df, date_cols_list = get_historical_block_matrix(BLOCK_HISTORY_DIR)
+    master_hist_df, date_cols_list = get_historical_block_matrix_from_gs()
     
     if master_hist_df is None or master_hist_df.empty:
-        st.info("📂 目前資料夾中尚未累積歷史交易檔案，或正在等待新交易日數據寫入。")
+        st.info("📂 目前 Google Sheets 尚未累積歷史交易檔案。")
     else:
-        # 🚀【歷史顏色還原引擎】
         def highlight_history(row):
             styles = [''] * len(row)
             for idx, col in enumerate(row.index):
                 if '成交價' in col:
                     date_str = col.replace('▼', '').replace('成交價', '')
                     close_col = f"{date_str}收盤價"
-                    
                     if close_col in row.index:
                         block_val = str(row[col])
                         close_val = str(row[close_col])
-                        
                         if block_val != '-' and close_val != '-':
                             try:
-                                # 若同一天有多筆成交價，取第一筆作為顏色對比基準
                                 first_block = float(block_val.split('/')[0].strip())
                                 close_p = float(close_val)
-                                
                                 if close_p > first_block: color = '#FF4B4B'
                                 elif close_p == first_block: color = '#FFA500'
                                 else: color = '#00E272'
-                                
                                 styles[idx] = f'color: {color}; font-weight: bold;'
                             except: pass
             return styles
 
-        # 渲染含有歷史色彩的矩陣表格，並優雅隱藏背景輔助用的收盤價欄位
         styled_hist = master_hist_df.style.apply(highlight_history, axis=1)
         hide_cols = [c for c in master_hist_df.columns if '收盤價' in c]
         styled_hist = styled_hist.hide(subset=hide_cols, axis="columns")
-        
-        st.write("💡 顯示各標的於不同交易日的鉅額成交價。同一天若有多筆不同價位，將以斜線 (/) 隔開。")
         st.dataframe(styled_hist, use_container_width=True, hide_index=True)
         
 # ==========================================以上網頁核心區塊 
