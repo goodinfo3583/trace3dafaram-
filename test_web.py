@@ -3053,7 +3053,7 @@ with top_pool_container:
                 sname = str(row.get('股票名稱', '')).strip()
                 b1_dyn = str(row.get(dyn_col, '')) if dyn_col else '-'
                 
-                if sid in block_sids: b1_dyn = f"{b1_dyn} | 🎯鉅額交易"
+                if sid in block_sids: b1_dyn = f"{b1_dyn} | 💸 鉅額交易"
                     
                 b1_rank = str(row.get(rank_col, '-')) if rank_col else '-'
                 score = 0.0
