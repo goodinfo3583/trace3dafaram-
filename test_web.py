@@ -32,6 +32,7 @@ for folder in [SCORE_HISTORY_DIR, MARKET_HISTORY_DIR, BLOCK_HISTORY_DIR]:
 # ==========置頂區塊測試區==================
 # ==========置頂區塊測試區==================
 # ==========置頂區塊測試區==================
+# ==========置頂區塊測試區==================
 # ==========================================
 # 🎯 區塊 00：選擇權莊家防守點位 (支撐/壓力雷達)
 # ==========================================
@@ -40,75 +41,91 @@ st.markdown("### 🎯 區塊 00：選擇權莊家防守點位雷達 (測試中)"
 st.write("💡 透過分析期交所臺指選擇權 (TXO) 近月合約的「最大未平倉量」，找出莊家重兵佈署的天花板(壓力)與地板(支撐)。")
 
 @st.cache_data(ttl=600)
-def fetch_options_support_resistance_final():
-    """終極無敵版：處理雙表格結構，並利用 GET 自動獲取最新交易日資料，免疫週末休市"""
+def fetch_options_support_resistance_pandas():
+    """終極核彈版：使用 Pandas 直接解析 HTML 表格，免疫一切欄位位移與隱藏符號問題"""
     import requests
-    from bs4 import BeautifulSoup
+    import pandas as pd
+    import datetime
+    from io import StringIO
 
-    # 改用這個您找到的「簡表」網址，資料最乾淨！
     url = "https://www.taifex.com.tw/cht/3/optDailyMarketSummary"
     headers = {'User-Agent': 'Mozilla/5.0'}
 
     try:
-        # 🔥 關鍵修改：直接用 GET 請求！不要給日期！
-        # 期交所會非常聰明地自動回傳「上一個最新交易日 (如 5/29)」的資料
+        # 發送 GET 請求取得最新資料
         response = requests.get(url, headers=headers, timeout=5)
         response.raise_for_status()
-        soup = BeautifulSoup(response.text, 'html.parser')
         
+        # 使用 StringIO 包裝 HTML 字串，這是新版 Pandas 的安全寫法
+        html_io = StringIO(response.text)
+        
+        # Pandas 發威：直接把網頁裡所有的表格抓出來，轉成 DataFrame 列表
+        dfs = pd.read_html(html_io)
+        
+        if not dfs:
+            return None, "網頁中找不到任何表格"
+            
         max_call_oi, max_call_strike = 0, 0
         max_put_oi, max_put_strike = 0, 0
         contract_month = "未知"
         
-        # 掃描網頁中所有的表格
-        for tbl in soup.find_all('table'):
-            text_content = tbl.get_text()
-            # 確保這是我們要的行情表
-            if '履約價' not in text_content or '未平倉' not in text_content:
-                continue 
+        # 尋找我們需要的資料表
+        for df in dfs:
+            # 將 DataFrame 轉成文字以利判斷
+            df_str = df.to_string()
+            if '履約價' not in df_str or '未平倉' not in df_str:
+                continue
+                
+            # 判斷這張表是買權還是賣權
+            is_call = '買權' in df_str[:300]
+            is_put = '賣權' in df_str[:300]
             
-            # 🔥 破解雙表結構：看表頭前 100 個字，就知道這桌是買權還是賣權
-            is_call = '買權' in text_content[:100]
-            is_put = '賣權' in text_content[:100]
+            # 清理 DataFrame：將所有欄位名稱變成字串，方便定位
+            df.columns = df.columns.astype(str)
             
-            for row in tbl.find_all('tr'):
-                cols = row.find_all('td')
-                # 簡表通常有 10 個欄位 (月份, 日期, 履約價, 最高, 最低, 最後, 結算, 漲跌, 成交量, 未平倉)
-                if len(cols) >= 9: 
-                    try:
-                        month = cols[0].text.strip()
-                        # 確保這是一筆有效的合約月份 (排除總計、小計列)
-                        if not month.startswith('20') or len(month) < 6:
-                            continue
-                            
-                        # 🔥 動態鎖定「近月/當週」主合約
-                        if contract_month == "未知":
-                            contract_month = month
-                        elif month != contract_month:
-                            continue # 只抓同一個主合約的資料，避開遠月合約雜訊
-                            
-                        strike_str = cols[2].text.strip().replace(',', '')
-                        if not strike_str.isdigit():
-                            continue
-                        strike = int(strike_str)
+            # 尋找真正包含「履約價」和「未平倉」的欄位名稱
+            strike_col = next((col for col in df.columns if '履約價' in col), None)
+            oi_col = next((col for col in df.columns if '未平倉' in col), None)
+            month_col = next((col for col in df.columns if '月份' in col or '契約' in col), None)
+            
+            if not strike_col or not oi_col or not month_col:
+                continue # 找不到關鍵欄位就跳過這個表
+                
+            # 遍歷資料列
+            for index, row in df.iterrows():
+                try:
+                    month = str(row[month_col]).strip()
+                    # 確保是有效的月份字串 (例如 202606W1)
+                    if not month.startswith('20') or len(month) < 6:
+                        continue
                         
-                        # 期交所的未平倉量永遠在最後一欄 (索引值 -1)
-                        oi_str = cols[-1].text.strip().replace(',', '')
-                        oi = int(oi_str) if oi_str.isdigit() else 0
+                    # 鎖定最近的一個主合約
+                    if contract_month == "未知":
+                        contract_month = month
+                    elif month != contract_month:
+                        continue 
                         
-                        # 記錄最大未平倉量
-                        if is_call and oi > max_call_oi:
-                            max_call_oi = oi
-                            max_call_strike = strike
-                        elif is_put and oi > max_put_oi:
-                            max_put_oi = oi
-                            max_put_strike = strike
-                                
-                    except Exception as row_e:
-                        continue # 單行出錯，繼續掃描下一行
-                        
-        if max_call_oi == 0 or max_put_oi == 0:
-            return None, "成功讀取網頁，但未平倉量皆為 0，或尚未開盤"
+                    # 安全轉換履約價和未平倉量
+                    strike_str = str(row[strike_col]).replace(',', '')
+                    oi_str = str(row[oi_col]).replace(',', '')
+                    
+                    if not strike_str.isdigit():
+                        continue
+                    strike = int(strike_str)
+                    oi = int(oi_str) if oi_str.isdigit() else 0
+                    
+                    # 記錄最大值
+                    if is_call and oi > max_call_oi:
+                        max_call_oi = oi
+                        max_call_strike = strike
+                    elif is_put and oi > max_put_oi:
+                        max_put_oi = oi
+                        max_put_strike = strike
+                except Exception as e:
+                    continue # 單行出錯跳過
+                    
+        if max_call_oi == 0 and max_put_oi == 0:
+            return None, "成功讀取網頁，但未平倉量皆為 0 (可能是盤前資料未更新)"
             
         return {
             'month': contract_month,
@@ -118,11 +135,13 @@ def fetch_options_support_resistance_final():
             'support_oi': max_put_oi
         }, "Success"
             
+    except ImportError:
+        return None, "系統缺少 lxml 套件，請通知管理員安裝 (pip install lxml)"
     except Exception as e:
         return None, str(e)
 
 # 執行爬蟲
-opt_data, opt_msg = fetch_options_support_resistance_final()
+opt_data, opt_msg = fetch_options_support_resistance_pandas()
 
 if opt_data:
     col1, col2 = st.columns(2)
@@ -150,12 +169,8 @@ else:
 
 st.write("---")
 # ==========================================
-# ==========================================
-# ==========================================
-# ==========================================
-# ==========================================
-# ==========================================
-# ==========================================
+
+
 # ==========================================
 # ==========================================
 # ==========================================
