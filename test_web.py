@@ -3424,51 +3424,9 @@ else:
 # ==========================================
 # 🧪 測試區：Google Sheets 連線測試
 # ==========================================
-import streamlit as st
-import pandas as pd
-import datetime
-from streamlit_gsheets import GSheetsConnection
-
-st.write("---")
-st.subheader("🧪 Google Sheets 連線測試區")
-
-# 1. 替換成您的 Google 試算表網址 (請保留前後的雙引號)
-sheet_url = "https://docs.google.com/spreadsheets/d/1TxHDahg8ul6lmUtDN-7X75cBXbkU0jaZ3M9zg6exBgU/edit?usp=sharing"
-
-if st.button("🚀 點我測試寫入資料到 Google Sheet"):
-    with st.spinner("機器人正在努力連線中..."):
-        try:
-            # 建立連線
-            conn = st.connection("gsheets", type=GSheetsConnection)
-            
-            # 建立一筆測試用的假資料
-            test_df = pd.DataFrame([{
-                "測試時間": datetime.datetime.now().strftime("%Y-%m-%d %H:%M:%S"),
-                "測試項目": "Google Sheets API 連線",
-                "狀態": "✅ 成功寫入！",
-                "代號": "2330"
-            }])
-            
-            # 嘗試讀取舊資料並接在後面 (防呆機制：如果表是空的會自動建立)
-            try:
-                # 💡 如果您的頁籤叫做 Sheet1，請把下方的 "工作表1" 改成 "Sheet1"
-                old_df = conn.read(spreadsheet=sheet_url, worksheet="工作表1")
-                old_df = old_df.dropna(how="all") # 清除預設的空白行
-                final_df = pd.concat([old_df, test_df], ignore_index=True)
-            except:
-                final_df = test_df
-                
-            # 執行寫入動作
-            conn.update(
-                spreadsheet=sheet_url, 
-                worksheet="工作表1", 
-                data=final_df
-            )
-            st.success("🎉 寫入成功！請立刻打開您的 Google 試算表檢查！")
-            st.balloons() # 放個慶祝氣球動畫
-            
-        except Exception as e:
-            st.error(f"❌ 寫入失敗，錯誤細節：{e}")
+# ==========================================
+# 🧪 測試區：Google Sheets 連線測試
+# ==========================================
 
 
 # ==========================================
