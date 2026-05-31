@@ -4,3 +4,4 @@ numpy
 plotly
 yfinance
 st-gsheets-connection
+lxml
