@@ -2652,6 +2652,9 @@ st.markdown("<div id='section-5'></div>", unsafe_allow_html=True)
 st.header("💰 區塊 5：大股東動向")
 st.write("💡 400張以上大股東週更新資訊。")
 
+test_date = peek_data_date("大股東動向")
+print(f"現在系統抓到的日期是：{test_date}")
+
 import re
 
 csv_pattern_b5 = os.path.join(DATA_DIR, "*神秘金字塔 - 股權類股排行(5日之400張以上股東排行)*.csv")
