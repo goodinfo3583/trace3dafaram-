@@ -12,7 +12,10 @@ import pytz
 # 1. 網頁基本設定 & 目錄路徑初始化
 # ==========================================
 st.set_page_config(page_title="台股籌碼五大核心矩陣儀表板", layout="wide")
-
+# 👇 新增啟動 Google Sheets 永久連線引擎紀錄爬蟲歷史成績
+from streamlit_gsheets import GSheetsConnection
+conn = st.connection("gsheets", type=GSheetsConnection)
+SHEET_URL = "https://docs.google.com/spreadsheets/d/1TxHDahg8ul6lmUtDN-7X75cBXbkU0jaZ3M9zg6exBgU/edit?usp=sharing"
 # 👉 步驟 1：先集中宣告所有的路徑變數
 DATA_DIR = "./Goodinfo_Rankings"
 SCORE_HISTORY_DIR = os.path.join(DATA_DIR, "ScoreHistory")
@@ -3325,7 +3328,7 @@ with top_pool_container:
 
             st.session_state['top_pool_df'] = res_df
             
-            # 💾 歷史紀錄存檔機制
+            # 💾 歷史紀錄存檔機制 (升級為 Google Sheets 永久雲端版)
             if res_df is not None and not res_df.empty:
                 try:
                     anchor_date_str = "00000000" 
@@ -3335,9 +3338,32 @@ with top_pool_container:
                         if date_label.isdigit(): anchor_date_str = date_label
                     
                     if anchor_date_str != "00000000":
-                        today_score_file = os.path.join(SCORE_HISTORY_DIR, f"scores_{anchor_date_str}.csv")
-                        res_df.to_csv(today_score_file, index=False, encoding='utf-8-sig')
-                except: pass
+                        # 1. 幫今天的資料貼上日期標籤
+                        save_df = res_df.copy()
+                        save_df.insert(0, '紀錄日期', anchor_date_str) # 將日期固定插在第一欄
+
+                        # 2. 讀取 Google Sheets 歷史資料
+                        try:
+                            old_df = conn.read(spreadsheet=SHEET_URL, worksheet="選股歷史")
+                            old_df = old_df.dropna(how="all")
+
+                            # 🛡️ 防呆機制：如果今天已經存過，就先剔除舊的今天紀錄，避免重複疊加
+                            if '紀錄日期' in old_df.columns:
+                                old_df = old_df[old_df['紀錄日期'].astype(str) != anchor_date_str]
+
+                            final_save_df = pd.concat([old_df, save_df], ignore_index=True)
+                        except:
+                            # 若是第一次建立，或是抓不到舊分頁，直接使用今日資料
+                            final_save_df = save_df
+
+                        # 3. 寫入專屬的「選股歷史」頁籤
+                        conn.update(
+                            spreadsheet=SHEET_URL,
+                            worksheet="選股歷史",
+                            data=final_save_df
+                        )
+                except Exception as e: 
+                    st.error(f"寫入 Google Sheets 發生錯誤: {e}")
 
             # 🌟 Streamlit 頁籤渲染
             tab1, tab2 = st.tabs(["🔥 今日最新排行", "📈 歷史分數追蹤表"])
