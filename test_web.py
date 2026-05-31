@@ -2647,20 +2647,20 @@ st.session_state['df_margin_plus_vol'] = df_vol_clean
 # ==========================================
 # 💰 區塊 5：大股東動向 (日期去重與去西元修復版)
 # ==========================================
-st.write("---")
-st.markdown("<div id='section-5'></div>", unsafe_allow_html=True)
-st.header("💰 區塊 5：大股東動向")
-st.write("💡 400張以上大股東週更新資訊。")
-
-test_date = peek_data_date("大股東動向")
-print(f"現在系統抓到的日期是：{test_date}")
-
 import re
+import os
+import glob
+import pandas as pd
 
 csv_pattern_b5 = os.path.join(DATA_DIR, "*神秘金字塔 - 股權類股排行(5日之400張以上股東排行)*.csv")
 all_files_b5 = glob.glob(csv_pattern_b5)
 
 if not all_files_b5:
+    # 找不到檔案時，維持顯示基本標題
+    st.write("---")
+    st.markdown("<div id='section-5'></div>", unsafe_allow_html=True)
+    st.markdown("## 💰 區塊 5：大股東動向", unsafe_allow_html=True)
+    st.write("💡 400張以上大股東週更新資訊。")
     st.warning("⚠️ 找不到相關 CSV 檔案。")
 else:
     # 依照檔名排序，確保最新的檔案在最前面
@@ -2675,7 +2675,7 @@ else:
             df = pd.read_csv(file, encoding='utf-8-sig')
             df.columns = [str(c).strip() for c in df.columns]
             
-            # 🔥 【核心修復 1】：即時偵測並刪除欄位名稱開頭的 "2026"
+            # 【核心修復 1】：即時偵測並刪除欄位名稱開頭的 "2026"
             standardized_cols = []
             for c in df.columns:
                 if re.match(r'^2026\d{4}$', c):  # 如果是 2026XXXX 格式
@@ -2684,7 +2684,7 @@ else:
                     standardized_cols.append(c)
             df.columns = standardized_cols
             
-            # 🔥 【核心修復 2】：刪除單檔內部可能重複的相同日期欄位
+            # 【核心修復 2】：刪除單檔內部可能重複的相同日期欄位
             df = df.loc[:, ~df.columns.duplicated()]
             
             # 分離代號與名稱
@@ -2725,6 +2725,14 @@ else:
         
         # 2. 排序日期欄位 (皆已轉為4碼，可直接降冪排序，越新越前面)
         sorted_dates = sorted(list(all_date_cols), reverse=True)
+        
+        # 🔥 【修改點 1】：在這裡抓出最新日期，並印出帶有樣式的標題
+        latest_date = sorted_dates[0] if sorted_dates else "無資料"
+        
+        st.write("---")
+        st.markdown("<div id='section-5'></div>", unsafe_allow_html=True)
+        st.markdown(f"## 💰 區塊 5：大股東動向 <span style='font-size: 0.6em; color: #00D2FF;'>({latest_date})</span>", unsafe_allow_html=True)
+        st.write("💡 400張以上大股東週更新資訊。")
         
         # 3. 計算週動態
         if len(sorted_dates) >= 2:
@@ -2774,9 +2782,13 @@ else:
             
         final_df = final_df.fillna("無資料")
         
+        # 🔥 【修改點 2】：表格輸出前，把最新日期的欄位名稱加上 ▼
+        if sorted_dates:
+            latest_col = sorted_dates[0]
+            final_df = final_df.rename(columns={latest_col: f"▼{latest_col}"})
         
         st.dataframe(final_df, use_container_width=True, hide_index=True)
-        #st.success(f"已成功串連 {len(final_df)} 筆股東數據")
+        
         # 將最終結果同步存入記憶體，供搜尋區塊聯動掃描
         st.session_state['df_blk5'] = final_df
     else:
