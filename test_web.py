@@ -3255,18 +3255,32 @@ with top_pool_container:
 
             def calc_table_delta(row):
                 sid = str(row['代號']).replace(r'\D', '')
-                curr_score = row.get('總分', 0)
+                
+                # 確保分數是乾淨的浮點數數字，避免文字型態干擾
+                try:
+                    curr_score = float(row.get('總分', 0))
+                except:
+                    curr_score = 0.0
                 
                 # 判斷是否為昨日榜單上的老面孔
                 if sid in prev_scores_dict:
-                    prev_score = prev_scores_dict[sid]
-                    delta = round(curr_score - prev_score, 1)
-                    if delta > 0: return f"+{delta}"
-                    elif delta < 0: return str(delta)
-                    else: return "0.0"  # 昨天有，今天也有，且分數維持不變
+                    try:
+                        prev_score = float(prev_scores_dict[sid])
+                    except:
+                        prev_score = 0.0
+                        
+                    delta = curr_score - prev_score
+                    
+                    # 使用 :.1f 強制鎖定文字輸出只顯示 1 位小數，徹底封殺浮點數尾數
+                    if delta > 0.01: 
+                        return f"+{delta:.1f}"
+                    elif delta < -0.01: 
+                        return f"{delta:.1f}"
+                    else: 
+                        return "0.0"
                 else:
-                    # 🔥 昨天沒進榜，今天是全新衝進來！直接顯示為 +總分，並加上標記
-                    return f"🆕 +{curr_score}"
+                    # 🆕 全新進榜：同樣鎖定 1 位小數
+                    return f"🆕 +{curr_score:.1f}"
 
             if not res_df.empty and '總分' in res_df.columns:
                 res_df['▼變量'] = res_df.apply(calc_table_delta, axis=1)
