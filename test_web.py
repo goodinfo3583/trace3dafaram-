@@ -28,6 +28,134 @@ for folder in [SCORE_HISTORY_DIR, MARKET_HISTORY_DIR, BLOCK_HISTORY_DIR]:
         os.makedirs(folder)
 # ==========置頂區塊測試區==================
 # ==========================================
+# ==========置頂區塊測試區==================
+# ==========================================
+# 🎯 區塊 00：選擇權莊家防守點位 (支撐/壓力雷達)
+# ==========================================
+st.markdown("<div id='section-00'></div>", unsafe_allow_html=True)
+st.markdown("### 🎯 區塊 00：選擇權莊家防守點位雷達 (測試中)")
+st.write("💡 透過分析期交所臺指選擇權 (TXO) 近月合約的「最大未平倉量」，找出莊家重兵佈署的天花板(壓力)與地板(支撐)。")
+
+@st.cache_data(ttl=600)
+def fetch_options_support_resistance():
+    """爬取期交所選擇權行情，計算近月合約的最大未平倉支撐與壓力點位"""
+    import requests
+    import pandas as pd
+    from bs4 import BeautifulSoup
+    import datetime
+
+    url = "https://www.taifex.com.tw/cht/3/optDailyMarketReport"
+    
+    # 預設抓取今天的資料 (如果今天是假日，期交所網站會自動回傳最後一個交易日的資料)
+    today = datetime.datetime.now().strftime("%Y/%m/%d")
+    payload = {
+        'queryType': '2',
+        'marketCode': '0',
+        'dateaddcnt': '',
+        'commodity_id': 'TXO',
+        'commodity_id2': '',
+        'queryDate': today,
+        'MarketCode': '0',
+        'commodity_idt': 'TXO',
+        'commodity_id2t': '',
+        'commodity_id2t2': ''
+    }
+    headers = {
+        'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/91.0.4472.124 Safari/537.36'
+    }
+
+    try:
+        response = requests.post(url, data=payload, headers=headers, timeout=5)
+        response.raise_for_status()
+        
+        # 使用 Pandas 直接解析 HTML 表格 (這是處理這種大型表格最快的方法)
+        dfs = pd.read_html(response.text)
+        
+        if len(dfs) >= 5:
+            # 通常行情表會在第 5 或第 6 個 table
+            df = dfs[4] 
+            
+            # 清理欄位名稱 (因為期交所的表格有多層表頭)
+            df.columns = ['_'.join(str(col).strip() for col in c if str(col).strip()) for c in df.columns]
+            
+            # 找到包含關鍵字的欄位
+            strike_col = next((c for c in df.columns if '履約價' in c), None)
+            cp_col = next((c for c in df.columns if '買賣權' in c), None)
+            oi_col = next((c for c in df.columns if '未平倉' in c), None)
+            month_col = next((c for c in df.columns if '到期月份' in c), None)
+            
+            if not all([strike_col, cp_col, oi_col, month_col]):
+                return None, "找不到對應的欄位"
+
+            # 提取實際資料行 (排除小計、總計等列)
+            valid_df = df[df[strike_col].astype(str).str.isnumeric()].copy()
+            
+            # 轉換資料型態
+            valid_df[strike_col] = valid_df[strike_col].astype(int)
+            valid_df[oi_col] = pd.to_numeric(valid_df[oi_col], errors='coerce').fillna(0).astype(int)
+            
+            # 找出「近月合約」 (通常是月份字串排序後的第一個，例如 202605W4 或 202606)
+            # 為了避開週選擇權的干擾，我們挑選資料筆數最多的那個月份作為主合約
+            month_counts = valid_df[month_col].value_counts()
+            main_month = month_counts.index[0]
+            
+            main_df = valid_df[valid_df[month_col] == main_month]
+            
+            # 分離 Call 和 Put
+            calls = main_df[main_df[cp_col].str.contains('買權|Call', case=False, na=False)]
+            puts = main_df[main_df[cp_col].str.contains('賣權|Put', case=False, na=False)]
+            
+            if calls.empty or puts.empty:
+                return None, "無法分離買賣權資料"
+
+            # 找出最大未平倉量
+            max_call = calls.loc[calls[oi_col].idxmax()]
+            max_put = puts.loc[puts[oi_col].idxmax()]
+            
+            result = {
+                'month': main_month,
+                'resistance_price': max_call[strike_col],
+                'resistance_oi': max_call[oi_col],
+                'support_price': max_put[strike_col],
+                'support_oi': max_put[oi_col]
+            }
+            return result, "Success"
+            
+    except Exception as e:
+        return None, str(e)
+    return None, "未知的解析錯誤"
+
+# 執行爬蟲
+opt_data, opt_msg = fetch_options_support_resistance()
+
+if opt_data:
+    col1, col2 = st.columns(2)
+    
+    with col1:
+        st.markdown(f"""
+        <div style='background-color: #3b2a2a; border-left: 5px solid #FF4B4B; padding: 15px; border-radius: 5px;'>
+            <h4 style='margin:0; color: #FF4B4B;'>📈 上檔壓力 (Call 最大未平倉)</h4>
+            <h2 style='margin:10px 0 0 0; color: white;'>{opt_data['resistance_price']:,} 點</h2>
+            <p style='margin:0; color: #aaaaaa; font-size: 14px;'>未平倉量: {opt_data['resistance_oi']:,} 口</p>
+        </div>
+        """, unsafe_allow_html=True)
+        
+    with col2:
+        st.markdown(f"""
+        <div style='background-color: #2a3b2f; border-left: 5px solid #00E272; padding: 15px; border-radius: 5px;'>
+            <h4 style='margin:0; color: #00E272;'>📉 下檔支撐 (Put 最大未平倉)</h4>
+            <h2 style='margin:10px 0 0 0; color: white;'>{opt_data['support_price']:,} 點</h2>
+            <p style='margin:0; color: #aaaaaa; font-size: 14px;'>未平倉量: {opt_data['support_oi']:,} 口</p>
+        </div>
+        """, unsafe_allow_html=True)
+        
+    st.caption(f"📅 觀測合約月份: {opt_data['month']}")
+else:
+    st.warning(f"⚠️ 選擇權資料抓取失敗 (這在週末或期交所網頁改版時可能會發生)。錯誤訊息: {opt_msg}")
+
+st.write("---")
+# ==========================================
+# ==========================================
 # ==========================================
 # ==========================================
 # 🧹 清道夫：強制刪除週末錯誤生成的假檔案 (05/28, 05/30, 05/31)
