@@ -2589,7 +2589,9 @@ st.write("---")
 st.markdown("<div id='section-4-2'></div>", unsafe_allow_html=True)
 
 date_42 = peek_data_date("借券賣出減少幅度")
-st.header(f"🔄 區塊 4-2：借券賣出減少動向 ({date_42})")
+# 使用 Markdown 語法，並透過 span 標籤嵌入 style
+st.markdown(f"""### 🔄 區塊 4-2：借券賣出減少動向 <span style="font-size: 0.6em; color: #00D2FF;">({date_42})</span>
+""", unsafe_allow_html=True)
 
 f_col1, f_col2, _ = st.columns([1, 1, 2])
 with f_col1: show_etf_42 = st.checkbox("顯示 ETF", value=True, key="stock_show_etf_42")
@@ -2618,7 +2620,8 @@ st.write("---")
 st.markdown("<div id='section-4-3'></div>", unsafe_allow_html=True)
 
 date_43 = peek_data_date("融券增加幅度")
-st.header(f"🔄 區塊 4-3：融券增加動向 ({date_43})")
+st.markdown(f"""### 🔄 區塊 4-3：融券增加動向 <span style="font-size: 0.6em; color: #00D2FF;">({date_43})</span>
+""", unsafe_allow_html=True)
 
 f_col1, f_col2, _ = st.columns([1, 1, 2])
 with f_col1: show_etf_43 = st.checkbox("顯示 ETF", value=True, key="stock_show_etf_43")
