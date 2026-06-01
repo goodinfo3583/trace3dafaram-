@@ -59,7 +59,7 @@ st.info(f"🔎 目前爬蟲模擬按下「送出查詢」的日期為：**{targe
 
 @st.cache_data(ttl=600)
 def fetch_options_support_resistance_pandas(query_date):
-    """POST 表單模擬版 (新增：實戰濾網，剃除極端造市雜訊)"""
+    """POST 表單模擬版 (新增：實戰濾網與自訂點位提取)"""
     import requests
     import pandas as pd
     import numpy as np
@@ -118,7 +118,7 @@ def fetch_options_support_resistance_pandas(query_date):
             result_data['pcr'] = pcr_value
 
             # ==========================================
-            # 2. 抓取 莊家防線 (最大未平倉 OI)
+            # 2. 抓取 莊家防線 (最大未平倉 OI) 與 指定點位
             # ==========================================
             response = requests.post(url_oi, data=payload_oi, headers=headers, timeout=15)
             response.raise_for_status() 
@@ -178,11 +178,21 @@ def fetch_options_support_resistance_pandas(query_date):
             contract_month = sorted(standard_months)[0] if standard_months else sorted(valid_months)[0]
             
             df_near = df[df[col_month] == contract_month]
+
+            # 🔥 新增：擷取自訂指定點位 (40000, 44000, 45000, 48000) 的未平倉量
+            target_strikes = [40000, 44000, 45000, 48000]
+            custom_strikes_data = {}
+            for strike in target_strikes:
+                c_oi, p_oi = 0, 0
+                c_df = df_near[(df_near[col_strike] == strike) & (df_near[col_type].str.contains('Call|買權', case=False, na=False))]
+                p_df = df_near[(df_near[col_strike] == strike) & (df_near[col_type].str.contains('Put|賣權', case=False, na=False))]
+                if not c_df.empty: c_oi = int(c_df[col_oi].iloc[0])
+                if not p_df.empty: p_oi = int(p_df[col_oi].iloc[0])
+                custom_strikes_data[strike] = {'call': c_oi, 'put': p_oi}
             
-            # ==========================================
+            result_data['custom_strikes'] = custom_strikes_data
+            
             # 🔥 實戰濾網引擎：找出合理的前線防禦範圍
-            # ==========================================
-            # 1. 計算所有有未平倉量合約的「成交量加權平均價格」(VWAP)，用以推估目前大盤大致點位
             col_vol = next((c for c in target_df.columns if '成交量' in c), None)
             if col_vol:
                 df_near[col_vol] = pd.to_numeric(df_near[col_vol].astype(str).str.replace(',', '').str.replace('-', '0'), errors='coerce').fillna(0)
@@ -190,18 +200,15 @@ def fetch_options_support_resistance_pandas(query_date):
                 if total_vol > 0:
                     estimated_index = (df_near[col_strike] * df_near[col_vol]).sum() / total_vol
                 else:
-                    estimated_index = df_near[col_strike].median() # 如果都沒成交量，取中位數
+                    estimated_index = df_near[col_strike].median()
             else:
                 estimated_index = df_near[col_strike].median()
 
-            # 2. 設定上下限 (以推估指數上下 12% 作為極限防守範圍，約 2500 點)
             upper_bound = estimated_index * 1.12
             lower_bound = estimated_index * 0.88
             
-            # 3. 過濾掉太誇張的芭樂單 (如 45000 點)
             df_near_filtered = df_near[(df_near[col_strike] >= lower_bound) & (df_near[col_strike] <= upper_bound)]
             
-            # 如果濾網太嚴格導致沒資料，就退回原本不過濾的狀態
             if df_near_filtered.empty:
                 df_near_filtered = df_near
             
@@ -265,7 +272,7 @@ if opt_data:
     </div>
     """, unsafe_allow_html=True)
 
-    # 左右兩側的支撐壓力區塊
+    # 左右兩側的動態最大支撐壓力區塊
     col1, col2 = st.columns(2)
     with col1:
         st.markdown(f"""
@@ -298,6 +305,28 @@ if opt_data:
         """, unsafe_allow_html=True)
         
     st.caption(f"📅 觀測合約月份: {opt_data['month']} (系統已嚴格過濾，自動鎖定最關鍵的純月選合約)")
+
+    # ==========================================
+    # 🔥 新增：自訂關注點位追蹤區塊
+    # ==========================================
+    st.markdown("---")
+    st.markdown("#### 🎯 自訂關鍵防守點位監控")
+    watch_strikes = [40000, 44000, 45000, 48000]
+    custom_data = opt_data.get('custom_strikes', {})
+    
+    cols = st.columns(4)
+    for i, strike in enumerate(watch_strikes):
+        with cols[i]:
+            c_oi = custom_data.get(strike, {}).get('call', 0)
+            p_oi = custom_data.get(strike, {}).get('put', 0)
+            st.markdown(f"""
+            <div style='background-color: #1E2633; padding: 15px; border-radius: 8px; border: 1px solid #444; text-align: center;'>
+                <h4 style='color: #FFD700; margin-top: 0;'>{strike:,} 點</h4>
+                <p style='color: #FF8A8A; margin:5px 0; font-size: 14px;'>🔻 壓 (Call): <br><b>{c_oi:,}</b> 口</p>
+                <p style='color: #8AFFB0; margin:5px 0; font-size: 14px;'>🔺 撐 (Put): <br><b>{p_oi:,}</b> 口</p>
+            </div>
+            """, unsafe_allow_html=True)
+
 else:
     st.warning(f"⚠️ 選擇權資料狀態: {opt_msg}")
 
