@@ -3281,7 +3281,9 @@ def build_historical_matrix(hist_df):
     if date_cols_list: master_hist_df = master_hist_df.sort_values(by=date_cols_list[0], ascending=False)
     return master_hist_df, date_cols_list
 
-
+# ==========================================
+# 🎯 區塊 6 主邏輯：單一雲端讀取 + 絕對防寫機制
+# ==========================================
 now = datetime.datetime.now()
 today_str = now.strftime("%Y%m%d")
 need_crawl = True
