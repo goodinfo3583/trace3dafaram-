@@ -42,88 +42,74 @@ st.write("💡 透過分析期交所臺指選擇權 (TXO) 近月合約的「最�
 
 @st.cache_data(ttl=600)
 def fetch_options_support_resistance_pandas():
-    """終極核彈版：使用 Pandas 直接解析 HTML 表格，免疫一切欄位位移與隱藏符號問題"""
+    """使用精準列印索引法解析期交所選擇權行情表"""
     import requests
     import pandas as pd
-    import datetime
     from io import StringIO
 
-    url = "https://www.taifex.com.tw/cht/3/optDailyMarketSummary"
+    # 這是您剛剛找到的精準網址
+    url = "https://www.taifex.com.tw/cht/3/optDailyMarketReport"
     headers = {'User-Agent': 'Mozilla/5.0'}
 
     try:
-        # 發送 GET 請求取得最新資料
         response = requests.get(url, headers=headers, timeout=5)
-        response.raise_for_status()
+        response.encoding = 'utf-8' # 確保中文不亂碼
         
-        # 使用 StringIO 包裝 HTML 字串，這是新版 Pandas 的安全寫法
+        # 使用 StringIO 包裝 HTML 字串，避免 Pandas 警告
         html_io = StringIO(response.text)
         
-        # Pandas 發威：直接把網頁裡所有的表格抓出來，轉成 DataFrame 列表
+        # 抓取網頁中所有的表格
         dfs = pd.read_html(html_io)
         
-        if not dfs:
-            return None, "網頁中找不到任何表格"
+        if len(dfs) < 5:
+            return None, "找不到指定格式的期交所表格 (表格數量不足)"
             
-        max_call_oi, max_call_strike = 0, 0
-        max_put_oi, max_put_strike = 0, 0
-        contract_month = "未知"
+        # 期交所的資料通常藏在第 5 個表格 (index 4)
+        df = dfs[4].copy()
         
-        # 尋找我們需要的資料表
-        for df in dfs:
-            # 將 DataFrame 轉成文字以利判斷
-            df_str = df.to_string()
-            if '履約價' not in df_str or '未平倉' not in df_str:
-                continue
-                
-            # 判斷這張表是買權還是賣權
-            is_call = '買權' in df_str[:300]
-            is_put = '賣權' in df_str[:300]
+        # 強制重鑄欄位名稱（無視原本的亂碼表頭）
+        df.columns = ['到期月份', '到期日', '履約價', '買賣權', '開盤價', '最高價', '最低價', 
+                      '最後成交價', '結算價', '漲跌價', '漲跌%', '成交量', '未沖銷契約量', 
+                      '最佳買價', '最佳賣價', '歷史最高價', '歷史最低價']
+        
+        # 清理髒資料：移除沒有履約價或未平倉量的列
+        df = df.dropna(subset=['履約價', '買賣權', '未沖銷契約量'])
+        
+        # 濾除非 TXO (臺指選擇權) 的雜魚合約
+        df = df[df['買賣權'].astype(str).str.contains('TXO', na=False)]
+        
+        # 數值轉型與清理 (去除逗號)
+        df['未沖銷契約量'] = pd.to_numeric(df['未沖銷契約量'].astype(str).str.replace(',', ''), errors='coerce').fillna(0)
+        df['履約價'] = pd.to_numeric(df['履約價'].astype(str).str.replace(',', ''), errors='coerce')
+        
+        # 找出最近的一個合約月份 (排除掉週選或遠月)
+        # 這裡的邏輯：抓取字串最短的，通常就是主合約 (例如 '202606' vs '202606W1')
+        all_months = df['到期月份'].astype(str).unique()
+        valid_months = [m for m in all_months if m.startswith('20')]
+        if not valid_months:
+            return None, "找不到有效合約月份"
             
-            # 清理 DataFrame：將所有欄位名稱變成字串，方便定位
-            df.columns = df.columns.astype(str)
+        # 預設抓取標準月選 (若要看週選可微調此處)
+        contract_month = min(valid_months, key=len) 
+        df_near = df[df['到期月份'].astype(str) == contract_month]
+        
+        # 切割 Call 與 Put
+        df_call = df_near[df_near['買賣權'].str.contains('Call', na=False)]
+        df_put = df_near[df_near['買賣權'].str.contains('Put', na=False)]
+        
+        # 找出最大未平倉量與其對應的履約價
+        if df_call.empty or df_put.empty:
+            return None, f"無法在合約 {contract_month} 中分離 Call/Put 資料"
             
-            # 尋找真正包含「履約價」和「未平倉」的欄位名稱
-            strike_col = next((col for col in df.columns if '履約價' in col), None)
-            oi_col = next((col for col in df.columns if '未平倉' in col), None)
-            month_col = next((col for col in df.columns if '月份' in col or '契約' in col), None)
-            
-            if not strike_col or not oi_col or not month_col:
-                continue # 找不到關鍵欄位就跳過這個表
-                
-            # 遍歷資料列
-            for index, row in df.iterrows():
-                try:
-                    month = str(row[month_col]).strip()
-                    # 確保是有效的月份字串 (例如 202606W1)
-                    if not month.startswith('20') or len(month) < 6:
-                        continue
-                        
-                    # 鎖定最近的一個主合約
-                    if contract_month == "未知":
-                        contract_month = month
-                    elif month != contract_month:
-                        continue 
-                        
-                    # 安全轉換履約價和未平倉量
-                    strike_str = str(row[strike_col]).replace(',', '')
-                    oi_str = str(row[oi_col]).replace(',', '')
-                    
-                    if not strike_str.isdigit():
-                        continue
-                    strike = int(strike_str)
-                    oi = int(oi_str) if oi_str.isdigit() else 0
-                    
-                    # 記錄最大值
-                    if is_call and oi > max_call_oi:
-                        max_call_oi = oi
-                        max_call_strike = strike
-                    elif is_put and oi > max_put_oi:
-                        max_put_oi = oi
-                        max_put_strike = strike
-                except Exception as e:
-                    continue # 單行出錯跳過
-                    
+        call_max_idx = df_call['未沖銷契約量'].idxmax()
+        put_max_idx = df_put['未沖銷契約量'].idxmax()
+        
+        max_call_oi = int(df_call.loc[call_max_idx, '未沖銷契約量'])
+        max_call_strike = int(df_call.loc[call_max_idx, '履約價'])
+        
+        max_put_oi = int(df_put.loc[put_max_idx, '未沖銷契約量'])
+        max_put_strike = int(df_put.loc[put_max_idx, '履約價'])
+        
         if max_call_oi == 0 and max_put_oi == 0:
             return None, "成功讀取網頁，但未平倉量皆為 0 (可能是盤前資料未更新)"
             
@@ -138,7 +124,7 @@ def fetch_options_support_resistance_pandas():
     except ImportError:
         return None, "系統缺少 lxml 套件，請通知管理員安裝 (pip install lxml)"
     except Exception as e:
-        return None, str(e)
+        return None, f"解析過程發生錯誤: {str(e)}"
 
 # 執行爬蟲
 opt_data, opt_msg = fetch_options_support_resistance_pandas()
@@ -163,9 +149,15 @@ if opt_data:
         </div>
         """, unsafe_allow_html=True)
         
-    st.caption(f"📅 觀測合約月份: {opt_data['month']} (系統已自動鎖定最熱絡合約)")
+    st.caption(f"📅 觀測合約月份: {opt_data['month']} (系統已自動鎖定最近期月選合約)")
 else:
     st.warning(f"⚠️ 選擇權資料抓取失敗。錯誤訊息: {opt_msg}")
+    # 救援包：若網頁結構改變，印出部分 HTML 以利除錯
+    try:
+        import requests
+        res = requests.get("https://www.taifex.com.tw/cht/3/optDailyMarketReport", timeout=5)
+        st.code(res.text[:1000], language='html')
+    except: pass
 
 st.write("---")
 # ==========================================
