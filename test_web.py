@@ -266,41 +266,39 @@ if opt_data:
     # 🔥 頂部 PCR 情緒儀表板
     st.markdown(f"""
     <div style='background-color: #1e293b; padding: 15px; border-radius: 8px; text-align: center; margin-bottom: 15px; border: 1px solid #334155;'>
-        <h3 style='margin:0; color: white;'>{pcr_icon} 選擇權 Put/Call Ratio (未平倉 PCR)</h3>
-        <h1 style='margin:10px 0; color: {pcr_color}; font-size: 36px;'>{pcr_display}</h1>
-        <p style='margin:0; color: #94A3B8; font-size: 15px;'>{pcr_desc}</p>
+    <h3 style='margin:0; color: white;'>{pcr_icon} 選擇權 Put/Call Ratio (未平倉 PCR)</h3>
+    <h1 style='margin:10px 0; color: {pcr_color}; font-size: 36px;'>{pcr_display}</h1>
+    <p style='margin:0; color: #94A3B8; font-size: 15px;'>{pcr_desc}</p>
     </div>
     """, unsafe_allow_html=True)
 
-    # 左右兩側的動態最大支撐壓力區塊
+    # 左右兩側的動態最大支撐壓力區塊 (已修復亂碼解析問題)
     col1, col2 = st.columns(2)
     with col1:
         st.markdown(f"""
         <div style='background-color: #3b2a2a; border-left: 5px solid #FF4B4B; padding: 15px; border-radius: 5px; height: 100%;'>
-            <h4 style='margin:0; color: #FF4B4B;'>📈 最大壓力區 (Call)</h4>
-            <h2 style='margin:10px 0 0 0; color: white;'>{opt_data['res1_price']:,} 點</h2>
-            <p style='margin:0 0 10px 0; color: #aaaaaa; font-size: 14px;'>未平倉量: {opt_data['res1_oi']:,} 口</p>
-            
-            <div style='border-top: 1px dashed #553333; margin: 10px 0; padding-top: 10px;'>
-                <h5 style='margin:0; color: #FF8A8A;'>🔸 次大壓力區</h5>
-                <h3 style='margin:5px 0 0 0; color: white;'>{opt_data['res2_price']:,} 點</h3>
-                <p style='margin:0; color: #aaaaaa; font-size: 13px;'>未平倉量: {opt_data['res2_oi']:,} 口</p>
-            </div>
+        <h4 style='margin:0; color: #FF4B4B;'>📈 最大壓力區 (Call)</h4>
+        <h2 style='margin:10px 0 0 0; color: white;'>{opt_data['res1_price']:,} 點</h2>
+        <p style='margin:0 0 10px 0; color: #aaaaaa; font-size: 14px;'>未平倉量: {opt_data['res1_oi']:,} 口</p>
+        <div style='border-top: 1px dashed #553333; margin: 10px 0; padding-top: 10px;'>
+        <h5 style='margin:0; color: #FF8A8A;'>🔸 次大壓力區</h5>
+        <h3 style='margin:5px 0 0 0; color: white;'>{opt_data['res2_price']:,} 點</h3>
+        <p style='margin:0; color: #aaaaaa; font-size: 13px;'>未平倉量: {opt_data['res2_oi']:,} 口</p>
+        </div>
         </div>
         """, unsafe_allow_html=True)
         
     with col2:
         st.markdown(f"""
         <div style='background-color: #2a3b2f; border-left: 5px solid #00E272; padding: 15px; border-radius: 5px; height: 100%;'>
-            <h4 style='margin:0; color: #00E272;'>📉 最大支撐區 (Put)</h4>
-            <h2 style='margin:10px 0 0 0; color: white;'>{opt_data['sup1_price']:,} 點</h2>
-            <p style='margin:0 0 10px 0; color: #aaaaaa; font-size: 14px;'>未平倉量: {opt_data['sup1_oi']:,} 口</p>
-            
-            <div style='border-top: 1px dashed #335544; margin: 10px 0; padding-top: 10px;'>
-                <h5 style='margin:0; color: #8AFFB0;'>🔸 次大支撐區</h5>
-                <h3 style='margin:5px 0 0 0; color: white;'>{opt_data['sup2_price']:,} 點</h3>
-                <p style='margin:0; color: #aaaaaa; font-size: 13px;'>未平倉量: {opt_data['sup2_oi']:,} 口</p>
-            </div>
+        <h4 style='margin:0; color: #00E272;'>📉 最大支撐區 (Put)</h4>
+        <h2 style='margin:10px 0 0 0; color: white;'>{opt_data['sup1_price']:,} 點</h2>
+        <p style='margin:0 0 10px 0; color: #aaaaaa; font-size: 14px;'>未平倉量: {opt_data['sup1_oi']:,} 口</p>
+        <div style='border-top: 1px dashed #335544; margin: 10px 0; padding-top: 10px;'>
+        <h5 style='margin:0; color: #8AFFB0;'>🔸 次大支撐區</h5>
+        <h3 style='margin:5px 0 0 0; color: white;'>{opt_data['sup2_price']:,} 點</h3>
+        <p style='margin:0; color: #aaaaaa; font-size: 13px;'>未平倉量: {opt_data['sup2_oi']:,} 口</p>
+        </div>
         </div>
         """, unsafe_allow_html=True)
         
@@ -321,9 +319,9 @@ if opt_data:
             p_oi = custom_data.get(strike, {}).get('put', 0)
             st.markdown(f"""
             <div style='background-color: #1E2633; padding: 15px; border-radius: 8px; border: 1px solid #444; text-align: center;'>
-                <h4 style='color: #FFD700; margin-top: 0;'>{strike:,} 點</h4>
-                <p style='color: #FF8A8A; margin:5px 0; font-size: 14px;'>🔻 壓 (Call): <br><b>{c_oi:,}</b> 口</p>
-                <p style='color: #8AFFB0; margin:5px 0; font-size: 14px;'>🔺 撐 (Put): <br><b>{p_oi:,}</b> 口</p>
+            <h4 style='color: #FFD700; margin-top: 0;'>{strike:,} 點</h4>
+            <p style='color: #FF8A8A; margin:5px 0; font-size: 14px;'>🔻 壓 (Call): <br><b>{c_oi:,}</b> 口</p>
+            <p style='color: #8AFFB0; margin:5px 0; font-size: 14px;'>🔺 撐 (Put): <br><b>{p_oi:,}</b> 口</p>
             </div>
             """, unsafe_allow_html=True)
 
@@ -335,6 +333,7 @@ if raw_df is not None:
         st.dataframe(raw_df, use_container_width=True)
 
 st.write("---")
+# ==========================================
 # ==========================================
 # ==========================================
 
