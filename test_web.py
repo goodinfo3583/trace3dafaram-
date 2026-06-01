@@ -3206,230 +3206,7 @@ else:
     else:
         st.error("無法合併資料。")
 # ==========================================
-# 💸 區塊 6：盤後鉅額交易總表 (看門狗防禦 + 純粹矩陣版)
-# ==========================================
-import os, re, datetime
-import pandas as pd
-import yfinance as yf
-import streamlit as st
-
-# 💥 數字脫水機：專門洗掉 Google Sheets 讀回來產生的 .0 或 .000000
-def clean_number_for_display(val):
-    try:
-        if pd.isna(val) or str(val).strip() == '-': return '-'
-        f = float(str(val).replace(',', ''))
-        return str(int(f)) if f.is_integer() else str(f).rstrip('0').rstrip('.')
-    except:
-        return str(val)
-
-# 使用 Streamlit 快取確保效能，避免重複抓取 (記憶 10 分鐘)
-@st.cache_data(ttl=600)
-def get_historical_block_matrix_from_gs():
-    """從 Google Sheets 抓取扁平化歷史資料，自動重組成純價格跨日矩陣 (移除收盤價)"""
-    try:
-        hist_df = conn.read(spreadsheet=SHEET_URL, worksheet="鉅額交易").dropna(how="all")
-        if hist_df.empty or '日期' not in hist_df.columns: return None, []
-            
-        # 🎯 確保日期與代號乾淨
-        hist_df['日期'] = hist_df['日期'].astype(str).str.replace(r'\.0$', '', regex=True).str.zfill(8)
-        hist_df['代號'] = hist_df['代號'].astype(str).str.replace(r'\.0$', '', regex=True).str.replace(r'\D', '', regex=True)
-        
-        if '成交價' in hist_df.columns:
-            hist_df['成交價'] = hist_df['成交價'].apply(clean_number_for_display)
-            
-        date_list = sorted(hist_df['日期'].unique(), reverse=True)
-        master_hist_df = None
-        date_cols_list = []
-        
-        # 🎯 歷史矩陣重組：僅保留成交價，徹底捨棄收盤價
-        for d in date_list:
-            short_date = d[-4:] 
-            block_col = f"▼{short_date}成交價"
-            date_cols_list.append(block_col)
-            
-            day_df = hist_df[hist_df['日期'] == d][['代號', '股票名稱', '成交價']].copy()
-            day_df = day_df.rename(columns={'成交價': block_col})
-            
-            # 若同一天有多筆成交價，將成交價以 / 隔開
-            day_df = day_df.groupby(['代號', '股票名稱']).agg({
-                block_col: lambda x: ' / '.join(sorted(set(x.astype(str))))
-            }).reset_index()
-            
-            if master_hist_df is None:
-                master_hist_df = day_df
-            else:
-                master_hist_df = pd.merge(master_hist_df, day_df, on=['代號', '股票名稱'], how='outer')
-                
-        master_hist_df = master_hist_df.fillna('-')
-        
-        # 防呆機制：刪除重複記錄的空包彈
-        cols_to_drop = []
-        for i in range(len(date_cols_list) - 1):
-            new_col = date_cols_list[i]
-            old_col = date_cols_list[i+1]
-            if master_hist_df[new_col].equals(master_hist_df[old_col]):
-                cols_to_drop.append(new_col)
-        
-        master_hist_df = master_hist_df.drop(columns=[c for c in cols_to_drop if c in master_hist_df.columns])
-        date_cols_list = [c for c in date_cols_list if c not in cols_to_drop]
-        
-        if date_cols_list: master_hist_df = master_hist_df.sort_values(by=date_cols_list[0], ascending=False)
-            
-        return master_hist_df, date_cols_list
-    except Exception as e:
-        return None, []
-
-# ==========================================
-# 💸 區塊 6：盤後鉅額交易總表 (強制對齊防禦 + 絕對防寫保護版)
-# ==========================================
-import os, re, datetime
-import pandas as pd
-import yfinance as yf
-import streamlit as st
-
-# 💥 數字脫水機：專門洗掉 Google Sheets 讀回來產生的 .0 或 .000000
-def clean_number_for_display(val):
-    try:
-        if pd.isna(val) or str(val).strip() == '-': return '-'
-        f = float(str(val).replace(',', ''))
-        return str(int(f)) if f.is_integer() else str(f).rstrip('0').rstrip('.')
-    except:
-        return str(val)
-
-# 標準欄位名稱 (防護罩核心)
-EXPECTED_COLS = ['日期', '代號', '股票名稱', '成交價', '收盤價', '成交張數', '成交總額(億)']
-
-# 使用 Streamlit 快取確保效能，避免重複抓取
-@st.cache_data(ttl=600)
-def get_historical_block_matrix_from_gs():
-    """從 Google Sheets 抓取歷史資料，並重組成矩陣"""
-    try:
-        hist_df = conn.read(spreadsheet=SHEET_URL, worksheet="鉅額交易").dropna(how="all")
-        if hist_df.empty or '日期' not in hist_df.columns: return None, []
-        
-        # 🛡️ 強制只抓取我們定義好的 7 個欄位，無視後方鬼影空白欄
-        if set(EXPECTED_COLS).issubset(hist_df.columns):
-            hist_df = hist_df[EXPECTED_COLS].copy()
-            
-        hist_df['日期'] = hist_df['日期'].astype(str).str.replace(r'\.0$', '', regex=True).str.zfill(8)
-        hist_df['代號'] = hist_df['代號'].astype(str).str.replace(r'\.0$', '', regex=True).str.replace(r'\D', '', regex=True)
-        
-        if '成交價' in hist_df.columns:
-            hist_df['成交價'] = hist_df['成交價'].apply(clean_number_for_display)
-            
-        date_list = sorted(hist_df['日期'].unique(), reverse=True)
-        master_hist_df = None
-        date_cols_list = []
-        
-        for d in date_list:
-            short_date = d[-4:] 
-            block_col = f"▼{short_date}成交價"
-            date_cols_list.append(block_col)
-            
-            day_df = hist_df[hist_df['日期'] == d][['代號', '股票名稱', '成交價']].copy()
-            day_df = day_df.rename(columns={'成交價': block_col})
-            
-            day_df = day_df.groupby(['代號', '股票名稱']).agg({
-                block_col: lambda x: ' / '.join(sorted(set(x.astype(str))))
-            }).reset_index()
-            
-            if master_hist_df is None: master_hist_df = day_df
-            else: master_hist_df = pd.merge(master_hist_df, day_df, on=['代號', '股票名稱'], how='outer')
-                
-        master_hist_df = master_hist_df.fillna('-')
-        
-        cols_to_drop = []
-        for i in range(len(date_cols_list) - 1):
-            new_col, old_col = date_cols_list[i], date_cols_list[i+1]
-            if master_hist_df[new_col].equals(master_hist_df[old_col]):
-                cols_to_drop.append(new_col)
-        
-        master_hist_df = master_hist_df.drop(columns=[c for c in cols_to_drop if c in master_hist_df.columns])
-        date_cols_list = [c for c in date_cols_list if c not in cols_to_drop]
-        
-        if date_cols_list: master_hist_df = master_hist_df.sort_values(by=date_cols_list[0], ascending=False)
-        return master_hist_df, date_cols_list
-    except Exception as e:
-        return None, []
-
-# ==========================================
-# 💸 區塊 6：盤後鉅額交易總表 (防呆型別保護 + 歷史10天限制版)
-# ==========================================
-import os, re, datetime
-import pandas as pd
-import yfinance as yf
-import streamlit as st
-
-# 💥 數字脫水機：專門洗掉 Google Sheets 讀回來產生的 .0 或 .000000
-def clean_number_for_display(val):
-    try:
-        if pd.isna(val) or str(val).strip() == '-': return '-'
-        f = float(str(val).replace(',', ''))
-        return str(int(f)) if f.is_integer() else str(f).rstrip('0').rstrip('.')
-    except:
-        return str(val)
-
-# 標準欄位名稱 (防護罩核心)
-EXPECTED_COLS = ['日期', '代號', '股票名稱', '成交價', '收盤價', '成交張數', '成交總額(億)']
-
-# 使用 Streamlit 快取確保效能，避免重複抓取
-@st.cache_data(ttl=600)
-def get_historical_block_matrix_from_gs():
-    """從 Google Sheets 抓取歷史資料，並重組成矩陣 (限制過去10天)"""
-    try:
-        # 🛡️ 加上 subset=['日期']，只要日期是空的垃圾行直接丟棄
-        hist_df = conn.read(spreadsheet=SHEET_URL, worksheet="鉅額交易").dropna(subset=['日期'])
-        if hist_df.empty: return None, []
-        
-        # 🛡️ 強制只抓取我們定義好的 7 個欄位，無視後方鬼影空白欄
-        if set(EXPECTED_COLS).issubset(hist_df.columns):
-            hist_df = hist_df[EXPECTED_COLS].copy()
-            
-        hist_df['日期'] = hist_df['日期'].astype(str).str.replace(r'\.0$', '', regex=True).str.zfill(8)
-        hist_df['代號'] = hist_df['代號'].astype(str).str.replace(r'\.0$', '', regex=True).str.replace(r'\D', '', regex=True)
-        
-        if '成交價' in hist_df.columns:
-            hist_df['成交價'] = hist_df['成交價'].apply(clean_number_for_display)
-            
-        # 🔥 歷史追蹤表瘦身：擷取日期後，強制只保留最近 10 天！
-        date_list = sorted(hist_df['日期'].unique(), reverse=True)[:10]
-        
-        master_hist_df = None
-        date_cols_list = []
-        
-        for d in date_list:
-            short_date = d[-4:] 
-            block_col = f"▼{short_date}成交價"
-            date_cols_list.append(block_col)
-            
-            day_df = hist_df[hist_df['日期'] == d][['代號', '股票名稱', '成交價']].copy()
-            day_df = day_df.rename(columns={'成交價': block_col})
-            
-            day_df = day_df.groupby(['代號', '股票名稱']).agg({
-                block_col: lambda x: ' / '.join(sorted(set(x.astype(str))))
-            }).reset_index()
-            
-            if master_hist_df is None: master_hist_df = day_df
-            else: master_hist_df = pd.merge(master_hist_df, day_df, on=['代號', '股票名稱'], how='outer')
-                
-        master_hist_df = master_hist_df.fillna('-')
-        
-        cols_to_drop = []
-        for i in range(len(date_cols_list) - 1):
-            new_col, old_col = date_cols_list[i], date_cols_list[i+1]
-            if master_hist_df[new_col].equals(master_hist_df[old_col]):
-                cols_to_drop.append(new_col)
-        
-        master_hist_df = master_hist_df.drop(columns=[c for c in cols_to_drop if c in master_hist_df.columns])
-        date_cols_list = [c for c in date_cols_list if c not in cols_to_drop]
-        
-        if date_cols_list: master_hist_df = master_hist_df.sort_values(by=date_cols_list[0], ascending=False)
-        return master_hist_df, date_cols_list
-    except Exception as e:
-        return None, []
-
-# ==========================================
-# 💸 區塊 6：盤後鉅額交易總表 (單一讀取核心 + 歷史矩陣即時版)
+# 💸 區塊 6：盤後鉅額交易總表 (單一雲端核心 + 絕對防禦版)
 # ==========================================
 import os, re, datetime
 import pandas as pd
@@ -3504,9 +3281,7 @@ def build_historical_matrix(hist_df):
     if date_cols_list: master_hist_df = master_hist_df.sort_values(by=date_cols_list[0], ascending=False)
     return master_hist_df, date_cols_list
 
-# ==========================================
-# 🎯 區塊 6 主邏輯：單一雲端讀取 + 絕對防寫機制
-# ==========================================
+
 now = datetime.datetime.now()
 today_str = now.strftime("%Y%m%d")
 need_crawl = True
@@ -3592,7 +3367,7 @@ if need_crawl:
                 display_df = raw_block_df[['乾淨代號', '證券名稱', dynamic_price_col, '▼收盤價', '成交張數', '成交總額(億)']].copy()
                 display_df = display_df.rename(columns={'乾淨代號': '代號', '證券名稱': '股票名稱'})
                 
-                # 🚀 寫入保護機制
+                # 🚀 寫入保護機制 (結合反序排列)
                 if not is_already_saved:
                     save_df = display_df.copy()
                     save_df.columns = EXPECTED_COLS[1:] # 代號到成交總額
@@ -3601,7 +3376,13 @@ if need_crawl:
                     try:
                         if not gs_backup_raw.empty and '日期' in gs_backup_raw.columns:
                             gs_backup_raw = gs_backup_raw[gs_backup_raw['日期'].astype(str) != str(real_trade_date)]
+                        
                         final_gs = pd.concat([gs_backup_raw, save_df], ignore_index=True)
+                        
+                        # 🔥 強制依照日期由新到舊排列
+                        final_gs['日期'] = pd.to_numeric(final_gs['日期'], errors='coerce')
+                        final_gs = final_gs.sort_values(by='日期', ascending=False)
+                        final_gs['日期'] = final_gs['日期'].astype(int).astype(str).str.zfill(8)
                         
                         # 🔒 鎖死 A~G 欄，徹底防禦 H 欄以後的靈異事件
                         final_gs = final_gs[EXPECTED_COLS]
