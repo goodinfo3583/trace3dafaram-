@@ -3280,32 +3280,112 @@ def get_historical_block_matrix_from_gs():
         return None, []
 
 # ==========================================
-# 🎯 區塊 6 主邏輯：看門狗防禦 + 智慧備援與資料寫入
+# 💸 區塊 6：盤後鉅額交易總表 (強制對齊防禦 + 絕對防寫保護版)
+# ==========================================
+import os, re, datetime
+import pandas as pd
+import yfinance as yf
+import streamlit as st
+
+# 💥 數字脫水機：專門洗掉 Google Sheets 讀回來產生的 .0 或 .000000
+def clean_number_for_display(val):
+    try:
+        if pd.isna(val) or str(val).strip() == '-': return '-'
+        f = float(str(val).replace(',', ''))
+        return str(int(f)) if f.is_integer() else str(f).rstrip('0').rstrip('.')
+    except:
+        return str(val)
+
+# 標準欄位名稱 (防護罩核心)
+EXPECTED_COLS = ['日期', '代號', '股票名稱', '成交價', '收盤價', '成交張數', '成交總額(億)']
+
+# 使用 Streamlit 快取確保效能，避免重複抓取
+@st.cache_data(ttl=600)
+def get_historical_block_matrix_from_gs():
+    """從 Google Sheets 抓取歷史資料，並重組成矩陣"""
+    try:
+        hist_df = conn.read(spreadsheet=SHEET_URL, worksheet="鉅額交易").dropna(how="all")
+        if hist_df.empty or '日期' not in hist_df.columns: return None, []
+        
+        # 🛡️ 強制只抓取我們定義好的 7 個欄位，無視後方鬼影空白欄
+        if set(EXPECTED_COLS).issubset(hist_df.columns):
+            hist_df = hist_df[EXPECTED_COLS].copy()
+            
+        hist_df['日期'] = hist_df['日期'].astype(str).str.replace(r'\.0$', '', regex=True).str.zfill(8)
+        hist_df['代號'] = hist_df['代號'].astype(str).str.replace(r'\.0$', '', regex=True).str.replace(r'\D', '', regex=True)
+        
+        if '成交價' in hist_df.columns:
+            hist_df['成交價'] = hist_df['成交價'].apply(clean_number_for_display)
+            
+        date_list = sorted(hist_df['日期'].unique(), reverse=True)
+        master_hist_df = None
+        date_cols_list = []
+        
+        for d in date_list:
+            short_date = d[-4:] 
+            block_col = f"▼{short_date}成交價"
+            date_cols_list.append(block_col)
+            
+            day_df = hist_df[hist_df['日期'] == d][['代號', '股票名稱', '成交價']].copy()
+            day_df = day_df.rename(columns={'成交價': block_col})
+            
+            day_df = day_df.groupby(['代號', '股票名稱']).agg({
+                block_col: lambda x: ' / '.join(sorted(set(x.astype(str))))
+            }).reset_index()
+            
+            if master_hist_df is None: master_hist_df = day_df
+            else: master_hist_df = pd.merge(master_hist_df, day_df, on=['代號', '股票名稱'], how='outer')
+                
+        master_hist_df = master_hist_df.fillna('-')
+        
+        cols_to_drop = []
+        for i in range(len(date_cols_list) - 1):
+            new_col, old_col = date_cols_list[i], date_cols_list[i+1]
+            if master_hist_df[new_col].equals(master_hist_df[old_col]):
+                cols_to_drop.append(new_col)
+        
+        master_hist_df = master_hist_df.drop(columns=[c for c in cols_to_drop if c in master_hist_df.columns])
+        date_cols_list = [c for c in date_cols_list if c not in cols_to_drop]
+        
+        if date_cols_list: master_hist_df = master_hist_df.sort_values(by=date_cols_list[0], ascending=False)
+        return master_hist_df, date_cols_list
+    except Exception as e:
+        return None, []
+
+# ==========================================
+# 🎯 區塊 6 主邏輯：看門狗防禦 + 絕對防寫機制
 # ==========================================
 now = datetime.datetime.now()
 today_str = now.strftime("%Y%m%d")
 need_crawl = True
+is_already_saved = False
 gs_backup_raw = pd.DataFrame()
 
-# 🚨 看門狗機制 (Database-First)：先查雲端，有資料就絕對不爬蟲！
+# 🚨 看門狗機制 (Database-First)：先查雲端！
 try:
     gs_backup_raw = conn.read(spreadsheet=SHEET_URL, worksheet="鉅額交易").dropna(how="all")
     if not gs_backup_raw.empty and '日期' in gs_backup_raw.columns:
+        # 🛡️ 欄位強制對齊清洗
+        if set(EXPECTED_COLS).issubset(gs_backup_raw.columns):
+            gs_backup_raw = gs_backup_raw[EXPECTED_COLS].copy()
+            
         gs_backup_raw['日期'] = gs_backup_raw['日期'].astype(str).str.replace(r'\.0$', '', regex=True).str.zfill(8)
         if '代號' in gs_backup_raw.columns:
             gs_backup_raw['代號'] = gs_backup_raw['代號'].astype(str).str.replace(r'\.0$', '', regex=True)
             
-        gs_latest_date = gs_backup_raw['日期'].max()
-        
-        if now.weekday() >= 5: need_crawl = False # 週末休市不爬蟲
-        elif now.time() < datetime.time(14, 30): need_crawl = False # 鉅額交易盤後才有，14:30 前不爬蟲
-        elif gs_latest_date == today_str: need_crawl = False # 🔥 今天已經抓過了，強烈封鎖爬蟲保護 IP！
+        # 🔥 終極判斷：只要這張表裡面有今天的日期，直接判定已存檔！絕對不爬！
+        if today_str in gs_backup_raw['日期'].values:
+            need_crawl = False
+            is_already_saved = True
+            
+        if now.weekday() >= 5: need_crawl = False 
+        elif now.time() < datetime.time(14, 30): need_crawl = False 
 except Exception: pass
 
 display_df = None
 real_trade_date = today_str # 預設
 
-# 如果看門狗放行，才去呼叫證交所
+# 如果看門狗放行 (今天完全沒資料)，才去呼叫證交所
 if need_crawl:
     raw_block_df = fetch_block_trades() 
     is_new_data = raw_block_df is not None and not raw_block_df.empty
@@ -3326,7 +3406,7 @@ if need_crawl:
                 raw_block_df['成交總額(億)'] = (raw_block_df['成交金額_數值'] / 100000000).apply(lambda x: f"{x:.2f}".rstrip('0').rstrip('.'))
                 raw_block_df['乾淨代號'] = raw_block_df['證券代號'].astype(str).str.replace(r'\.0$', '', regex=True).str.replace(r'\D', '', regex=True)
                 
-                # --- 抓取今日收盤價供 Tab 1 比對 ---
+                # --- 抓收盤價 ---
                 close_price_dict = {}
                 unique_ids = raw_block_df['乾淨代號'].dropna().unique()
                 if len(unique_ids) > 0:
@@ -3349,10 +3429,7 @@ if need_crawl:
                 raw_block_df['▼收盤價'] = raw_block_df['乾淨代號'].map(close_price_dict).fillna('-')
                 
                 def get_color_rank(close_val, block_val):
-                    try:
-                        c = float(str(close_val).replace(',', ''))
-                        b = float(str(block_val).replace(',', ''))
-                        return 1 if c > b else 2 if c == b else 3       
+                    try: return 1 if float(str(close_val).replace(',','')) > float(str(block_val).replace(',','')) else 2 if float(str(close_val).replace(',','')) == float(str(block_val).replace(',','')) else 3       
                     except: return 4 
                 raw_block_df['__color_rank'] = raw_block_df.apply(lambda r: get_color_rank(r['▼收盤價'], r[dynamic_price_col]), axis=1)
                 raw_block_df = raw_block_df.sort_values(by=['__color_rank', '乾淨代號'], ascending=[True, True])
@@ -3360,24 +3437,26 @@ if need_crawl:
                 display_df = raw_block_df[['乾淨代號', '證券名稱', dynamic_price_col, '▼收盤價', '成交張數', '成交總額(億)']].copy()
                 display_df = display_df.rename(columns={'乾淨代號': '代號', '證券名稱': '股票名稱'})
                 
-                # 🚀 寫入 Google Sheets (雙重防重複保護)
-                save_df = display_df.copy()
-                save_df.columns = ['代號', '股票名稱', '成交價', '收盤價', '成交張數', '成交總額(億)']
-                save_df.insert(0, '日期', real_trade_date)
-                
-                try:
-                    if not gs_backup_raw.empty and '日期' in gs_backup_raw.columns:
-                        gs_backup_raw = gs_backup_raw[gs_backup_raw['日期'].astype(str) != str(real_trade_date)]
-                    final_gs = pd.concat([gs_backup_raw, save_df], ignore_index=True)
-                    conn.update(spreadsheet=SHEET_URL, worksheet="鉅額交易", data=final_gs)
-                except Exception:
-                    try: conn.update(spreadsheet=SHEET_URL, worksheet="鉅額交易", data=save_df)
-                    except: pass
+                # 🚀 絕對防護寫入機制：只在 is_already_saved 是 False 的時候寫入！
+                if not is_already_saved:
+                    save_df = display_df.copy()
+                    save_df.columns = ['代號', '股票名稱', '成交價', '收盤價', '成交張數', '成交總額(億)']
+                    save_df.insert(0, '日期', real_trade_date)
+                    
+                    try:
+                        if not gs_backup_raw.empty and '日期' in gs_backup_raw.columns:
+                            gs_backup_raw = gs_backup_raw[gs_backup_raw['日期'].astype(str) != str(real_trade_date)]
+                        final_gs = pd.concat([gs_backup_raw, save_df], ignore_index=True)
+                        # 寫入前最後攔截：強迫只能有 A~G 欄，敢給我多出來就殺掉！
+                        final_gs = final_gs[EXPECTED_COLS]
+                        conn.update(spreadsheet=SHEET_URL, worksheet="鉅額交易", data=final_gs)
+                        is_already_saved = True # 鎖門！
+                    except Exception: pass
         except Exception as e: st.warning(f"⚠️ 資料解析錯誤: {str(e)}")
     else:
-        need_crawl = False # 去爬了但沒資料，切換為雲端備援模式
+        need_crawl = False # 沒資料退回備援
 
-# 🔥 啟動 Google Sheets 智慧備援 (週末/盤中/今天已抓過/爬無資料)
+# 🔥 啟動 Google Sheets 智慧備援模式
 if not need_crawl or display_df is None:
     if not gs_backup_raw.empty and '日期' in gs_backup_raw.columns:
         real_trade_date = gs_backup_raw['日期'].max()
@@ -3386,16 +3465,13 @@ if not need_crawl or display_df is None:
         
         backup_df = gs_backup_raw[gs_backup_raw['日期'] == real_trade_date].copy()
         backup_df = backup_df.rename(columns={'成交價': dynamic_price_col, '收盤價': '▼收盤價'})
-        display_df = backup_df.drop(columns=['日期'])
+        if '日期' in backup_df.columns: display_df = backup_df.drop(columns=['日期'])
+        else: display_df = backup_df
         
-        if dynamic_price_col in display_df.columns:
-            display_df[dynamic_price_col] = display_df[dynamic_price_col].apply(clean_number_for_display)
-        if '▼收盤價' in display_df.columns:
-            display_df['▼收盤價'] = display_df['▼收盤價'].apply(clean_number_for_display)
-        if '成交張數' in display_df.columns:
-            display_df['成交張數'] = display_df['成交張數'].apply(clean_number_for_display)
-        if '成交總額(億)' in display_df.columns:
-            display_df['成交總額(億)'] = pd.to_numeric(display_df['成交總額(億)'], errors='coerce').fillna(0).apply(lambda x: f"{x:.2f}".rstrip('0').rstrip('.'))
+        if dynamic_price_col in display_df.columns: display_df[dynamic_price_col] = display_df[dynamic_price_col].apply(clean_number_for_display)
+        if '▼收盤價' in display_df.columns: display_df['▼收盤價'] = display_df['▼收盤價'].apply(clean_number_for_display)
+        if '成交張數' in display_df.columns: display_df['成交張數'] = display_df['成交張數'].apply(clean_number_for_display)
+        if '成交總額(億)' in display_df.columns: display_df['成交總額(億)'] = pd.to_numeric(display_df['成交總額(億)'], errors='coerce').fillna(0).apply(lambda x: f"{x:.2f}".rstrip('0').rstrip('.'))
 
 # ==========================================
 # 渲染 UI (前端畫面)
@@ -3404,7 +3480,8 @@ formatted_date = f"{real_trade_date[:4]}/{real_trade_date[4:6]}/{real_trade_date
 
 st.write("---")
 st.markdown("<div id='section-6'></div>", unsafe_allow_html=True)
-status_icon = "🌕" if not need_crawl else "🟢"
+# 若是從雲端拿資料(或是爬完已經安全存檔了)，顯示黃燈；若是真的有跑去爬蟲，顯示綠燈
+status_icon = "🌕" if (not need_crawl or is_already_saved) else "🟢"
 st.markdown(f"### 💸 區塊 6：鉅額交易動向 <span style='font-size: 0.6em; color: #00D2FF;'>({formatted_date} {status_icon})</span>", unsafe_allow_html=True)
 st.write("💡 鉅額交易常為大戶私下換手籌碼，成交價可視為「支撐/壓力」防守線；短線跌破建議嚴設停損。")
 
@@ -3412,7 +3489,6 @@ tab1, tab2 = st.tabs(["🆕 今日最新鉅額交易", "📅 歷史防守價追�
 
 with tab1:
     if display_df is not None and not display_df.empty:
-        # Tab 1 保留紅綠燈顏色提醒 (比對收盤價與鉅額價)
         def highlight_block_row(row):
             styles = [''] * len(row)
             try:
@@ -3433,7 +3509,6 @@ with tab1:
 with tab2:
     master_hist_df, date_cols_list = get_historical_block_matrix_from_gs()
     if master_hist_df is not None and not master_hist_df.empty:
-        # Tab 2 已拔除收盤價，直接顯示乾淨的歷史矩陣即可
         st.dataframe(master_hist_df, use_container_width=True, hide_index=True)
     else: 
         st.info("📂 目前 Google Sheets 尚未累積歷史交易檔案，或資料處理中。")
