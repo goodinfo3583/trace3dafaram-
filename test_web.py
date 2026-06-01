@@ -36,303 +36,303 @@ for folder in [SCORE_HISTORY_DIR, MARKET_HISTORY_DIR, BLOCK_HISTORY_DIR]:
 # ==========================================
 # 🎯 區塊 00：選擇權莊家防守點位 (支撐/壓力雷達)
 # ==========================================
-import time
-import streamlit as st
+#import time
+#import streamlit as st
 
-st.markdown("<div id='section-00'></div>", unsafe_allow_html=True)
-st.markdown("### 🎯 區塊 00：選擇權莊家防守點位雷達 (測試中)")
-st.write("💡 透過分析期交所臺指選擇權 (TXO) 近月合約，過濾極端雜訊，精準找出莊家重兵佈署的前線防禦網，並利用 PCR 判斷市場多空情緒。")
+#st.markdown("<div id='section-00'></div>", unsafe_allow_html=True)
+#st.markdown("### 🎯 區塊 00：選擇權莊家防守點位雷達 (測試中)")
+#st.write("💡 透過分析期交所臺指選擇權 (TXO) 近月合約，過濾極端雜訊，精準找出莊家重兵佈署的前線防禦網，並利用 PCR 判斷市場多空情緒。")
 
 # 🎯 自動抓取雲端「最後交易日」，確保查的是有開盤的那天
-def get_cloud_synced_date_for_opt():
-    try:
-        df_market = conn.read(spreadsheet=SHEET_URL, worksheet="大盤風向球")
-        if not df_market.empty and '日期' in df_market.columns:
-            date_str = str(df_market['日期'].iloc[-1]).replace('.0', '')
-            if len(date_str) == 8:
-                return f"{date_str[:4]}/{date_str[4:6]}/{date_str[6:8]}"
-    except: pass
-    return "2026/05/29" 
+#def get_cloud_synced_date_for_opt():
+    #try:
+        #df_market = conn.read(spreadsheet=SHEET_URL, worksheet="大盤風向球")
+        #if not df_market.empty and '日期' in df_market.columns:
+            #date_str = str(df_market['日期'].iloc[-1]).replace('.0', '')
+            #if len(date_str) == 8:
+                #return f"{date_str[:4]}/{date_str[4:6]}/{date_str[6:8]}"
+    #except: pass
+    #return "2026/05/29" 
 
-target_opt_date = get_cloud_synced_date_for_opt()
-st.info(f"🔎 目前爬蟲模擬按下「送出查詢」的日期為：**{target_opt_date}**")
+#target_opt_date = get_cloud_synced_date_for_opt()
+#st.info(f"🔎 目前爬蟲模擬按下「送出查詢」的日期為：**{target_opt_date}**")
 
-@st.cache_data(ttl=600)
-def fetch_options_support_resistance_pandas(query_date):
-    """POST 表單模擬版 (新增：實戰濾網與自訂點位提取)"""
-    import requests
-    import pandas as pd
-    import numpy as np
-    from io import StringIO
+#@st.cache_data(ttl=600)
+#def fetch_options_support_resistance_pandas(query_date):
+    #"""POST 表單模擬版 (新增：實戰濾網與自訂點位提取)"""
+    #import requests
+    #import pandas as pd
+    #import numpy as np
+    #from io import StringIO
 
-    url_oi = "https://www.taifex.com.tw/cht/3/optDailyMarketReport"
-    url_pcr = "https://www.taifex.com.tw/cht/3/pcRatio"
+    #url_oi = "https://www.taifex.com.tw/cht/3/optDailyMarketReport"
+    #url_pcr = "https://www.taifex.com.tw/cht/3/pcRatio"
     
-    headers = {
-        'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36',
-        'Content-Type': 'application/x-www-form-urlencoded'
-    }
+    #headers = {
+        #'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36',
+        #'Content-Type': 'application/x-www-form-urlencoded'
+    #}
     
-    payload_oi = {
-        "queryType": "2", "marketCode": "0", "commodity_id": "TXO",
-        "queryDate": query_date, "MarketCode": "0", "commodity_idt": "TXO"
-    }
+    #payload_oi = {
+        #"queryType": "2", "marketCode": "0", "commodity_id": "TXO",
+        #"queryDate": query_date, "MarketCode": "0", "commodity_idt": "TXO"
+    #}
     
-    payload_pcr = {
-        "queryStartDate": query_date,
-        "queryEndDate": query_date
-    }
+    #payload_pcr = {
+        #"queryStartDate": query_date,
+        #"queryEndDate": query_date
+    #}
     
-    debug_raw_df = None 
-    result_data = {}
+    #debug_raw_df = None 
+    #result_data = {}
     
-    max_retries = 3
-    for attempt in range(max_retries):
-        try:
+    #max_retries = 3
+    #for attempt in range(max_retries):
+        #try:
             # ==========================================
             # 1. 抓取 Put/Call Ratio (PCR)
             # ==========================================
-            pcr_value = 0.0
-            try:
-                res_pcr = requests.post(url_pcr, data=payload_pcr, headers=headers, timeout=10)
-                res_pcr.raise_for_status()
-                res_pcr.encoding = 'utf-8'
-                dfs_pcr = pd.read_html(StringIO(res_pcr.text))
+            #pcr_value = 0.0
+            #try:
+                #res_pcr = requests.post(url_pcr, data=payload_pcr, headers=headers, timeout=10)
+                #res_pcr.raise_for_status()
+                #res_pcr.encoding = 'utf-8'
+                #dfs_pcr = pd.read_html(StringIO(res_pcr.text))
                 
-                for df in dfs_pcr:
-                    df_str = df.to_string()
-                    if '買賣權未平倉量比率' in df_str:
-                        if isinstance(df.columns, pd.MultiIndex):
-                            df.columns = ['_'.join(map(str, col)).strip() for col in df.columns]
-                        else:
-                            df.columns = df.columns.astype(str)
+                #for df in dfs_pcr:
+                    #df_str = df.to_string()
+                    #if '買賣權未平倉量比率' in df_str:
+                        #if isinstance(df.columns, pd.MultiIndex):
+                            #df.columns = ['_'.join(map(str, col)).strip() for col in df.columns]
+                        #else:
+                            #df.columns = df.columns.astype(str)
                             
-                        oi_ratio_col = next((c for c in df.columns if '買賣權未平倉量比率' in c), None)
-                        if oi_ratio_col:
-                            val = df[oi_ratio_col].dropna().iloc[-1]
-                            pcr_value = float(str(val).replace('%', ''))
-                            break
-            except Exception as e:
-                pass 
+                        #oi_ratio_col = next((c for c in df.columns if '買賣權未平倉量比率' in c), None)
+                        #if oi_ratio_col:
+                            #val = df[oi_ratio_col].dropna().iloc[-1]
+                            #pcr_value = float(str(val).replace('%', ''))
+                            #break
+            #except Exception as e:
+                #pass 
             
-            result_data['pcr'] = pcr_value
+            #result_data['pcr'] = pcr_value
 
             # ==========================================
             # 2. 抓取 莊家防線 (最大未平倉 OI) 與 指定點位
             # ==========================================
-            response = requests.post(url_oi, data=payload_oi, headers=headers, timeout=15)
-            response.raise_for_status() 
-            response.encoding = 'utf-8' 
-            html_io = StringIO(response.text)
-            dfs = pd.read_html(html_io)
+            #response = requests.post(url_oi, data=payload_oi, headers=headers, timeout=15)
+            #response.raise_for_status() 
+            #response.encoding = 'utf-8' 
+            #html_io = StringIO(response.text)
+            #dfs = pd.read_html(html_io)
             
-            target_df = None
-            for df in dfs:
-                if '履約價' in df.to_string() and ('未沖銷' in df.to_string() or '未平倉' in df.to_string()):
-                    target_df = df.copy()
-                    break
+            #target_df = None
+            #for df in dfs:
+                #if '履約價' in df.to_string() and ('未沖銷' in df.to_string() or '未平倉' in df.to_string()):
+                    #target_df = df.copy()
+                    #break
                     
-            if target_df is None:
-                return None, f"在 {query_date} 的網頁中找不到選擇權資料表", None
+            #if target_df is None:
+                #return None, f"在 {query_date} 的網頁中找不到選擇權資料表", None
 
-            if isinstance(target_df.columns, pd.MultiIndex):
-                target_df.columns = ['_'.join(map(str, col)).strip() for col in target_df.columns]
-            else:
-                target_df.columns = target_df.columns.astype(str)
+            #if isinstance(target_df.columns, pd.MultiIndex):
+                #target_df.columns = ['_'.join(map(str, col)).strip() for col in target_df.columns]
+            #else:
+                #target_df.columns = target_df.columns.astype(str)
 
-            col_month = next((c for c in target_df.columns if '到期' in c or '月份' in c), None)
-            col_strike = next((c for c in target_df.columns if '履約價' in c), None)
-            col_type = next((c for c in target_df.columns if '買賣權' in c), None)
-            col_oi = next((c for c in target_df.columns if '未沖銷' in c or '未平倉' in c), None)
+            #col_month = next((c for c in target_df.columns if '到期' in c or '月份' in c), None)
+            #col_strike = next((c for c in target_df.columns if '履約價' in c), None)
+            #col_type = next((c for c in target_df.columns if '買賣權' in c), None)
+            #col_oi = next((c for c in target_df.columns if '未沖銷' in c or '未平倉' in c), None)
 
-            if not all([col_month, col_strike, col_type, col_oi]):
-                for idx in range(min(5, len(target_df))):
-                    row_str = str(target_df.iloc[idx].tolist())
-                    if '履約價' in row_str and ('未沖銷' in row_str or '未平倉' in row_str):
-                        target_df.columns = target_df.iloc[idx].astype(str)
-                        target_df = target_df.iloc[idx+1:].reset_index(drop=True)
+            #if not all([col_month, col_strike, col_type, col_oi]):
+                #for idx in range(min(5, len(target_df))):
+                    #row_str = str(target_df.iloc[idx].tolist())
+                    #if '履約價' in row_str and ('未沖銷' in row_str or '未平倉' in row_str):
+                        #target_df.columns = target_df.iloc[idx].astype(str)
+                        #target_df = target_df.iloc[idx+1:].reset_index(drop=True)
                         
-                        col_month = next((c for c in target_df.columns if '到期' in c or '月份' in c), None)
-                        col_strike = next((c for c in target_df.columns if '履約價' in c), None)
-                        col_type = next((c for c in target_df.columns if '買賣權' in c), None)
-                        col_oi = next((c for c in target_df.columns if '未沖銷' in c or '未平倉' in c), None)
-                        break
+                        #col_month = next((c for c in target_df.columns if '到期' in c or '月份' in c), None)
+                        #col_strike = next((c for c in target_df.columns if '履約價' in c), None)
+                        #col_type = next((c for c in target_df.columns if '買賣權' in c), None)
+                        #col_oi = next((c for c in target_df.columns if '未沖銷' in c or '未平倉' in c), None)
+                        #break
 
-            debug_raw_df = target_df.copy()
+            #debug_raw_df = target_df.copy()
 
-            if not all([col_month, col_strike, col_type, col_oi]):
-                return None, "表格解析失敗：無法鎖定關鍵欄位", debug_raw_df
+            #if not all([col_month, col_strike, col_type, col_oi]):
+                #return None, "表格解析失敗：無法鎖定關鍵欄位", debug_raw_df
 
-            df = target_df.dropna(subset=[col_strike, col_type, col_oi]).copy()
-            df[col_oi] = pd.to_numeric(df[col_oi].astype(str).str.replace(',', '').str.replace('-', '0'), errors='coerce').fillna(0)
-            df[col_strike] = pd.to_numeric(df[col_strike].astype(str).str.replace(',', ''), errors='coerce')
+            #df = target_df.dropna(subset=[col_strike, col_type, col_oi]).copy()
+            #df[col_oi] = pd.to_numeric(df[col_oi].astype(str).str.replace(',', '').str.replace('-', '0'), errors='coerce').fillna(0)
+            #df[col_strike] = pd.to_numeric(df[col_strike].astype(str).str.replace(',', ''), errors='coerce')
             
-            df[col_month] = df[col_month].astype(str).str.strip()
-            all_months = df[col_month].unique()
-            valid_months = [m for m in all_months if m.startswith('20')]
+            #df[col_month] = df[col_month].astype(str).str.strip()
+            #all_months = df[col_month].unique()
+            #valid_months = [m for m in all_months if m.startswith('20')]
             
-            if not valid_months:
-                return None, "找不到有效的合約月份", debug_raw_df
+            #if not valid_months:
+                #return None, "找不到有效的合約月份", debug_raw_df
                 
-            standard_months = [m for m in valid_months if len(m) == 6 and m.isdigit()]
-            contract_month = sorted(standard_months)[0] if standard_months else sorted(valid_months)[0]
+            #standard_months = [m for m in valid_months if len(m) == 6 and m.isdigit()]
+            #contract_month = sorted(standard_months)[0] if standard_months else sorted(valid_months)[0]
             
-            df_near = df[df[col_month] == contract_month]
+            #df_near = df[df[col_month] == contract_month]
 
             # 🔥 新增：擷取自訂指定點位 (40000, 44000, 45000, 48000) 的未平倉量
-            target_strikes = [40000, 44000, 45000, 48000]
-            custom_strikes_data = {}
-            for strike in target_strikes:
-                c_oi, p_oi = 0, 0
-                c_df = df_near[(df_near[col_strike] == strike) & (df_near[col_type].str.contains('Call|買權', case=False, na=False))]
-                p_df = df_near[(df_near[col_strike] == strike) & (df_near[col_type].str.contains('Put|賣權', case=False, na=False))]
-                if not c_df.empty: c_oi = int(c_df[col_oi].iloc[0])
-                if not p_df.empty: p_oi = int(p_df[col_oi].iloc[0])
-                custom_strikes_data[strike] = {'call': c_oi, 'put': p_oi}
+            #target_strikes = [40000, 44000, 45000, 48000]
+            #custom_strikes_data = {}
+            #for strike in target_strikes:
+                #c_oi, p_oi = 0, 0
+                #c_df = df_near[(df_near[col_strike] == strike) & (df_near[col_type].str.contains('Call|買權', case=False, na=False))]
+                #p_df = df_near[(df_near[col_strike] == strike) & (df_near[col_type].str.contains('Put|賣權', case=False, na=False))]
+                #if not c_df.empty: c_oi = int(c_df[col_oi].iloc[0])
+                #if not p_df.empty: p_oi = int(p_df[col_oi].iloc[0])
+                #custom_strikes_data[strike] = {'call': c_oi, 'put': p_oi}
             
-            result_data['custom_strikes'] = custom_strikes_data
+            #result_data['custom_strikes'] = custom_strikes_data
             
             # 🔥 實戰濾網引擎：找出合理的前線防禦範圍
-            col_vol = next((c for c in target_df.columns if '成交量' in c), None)
-            if col_vol:
-                df_near[col_vol] = pd.to_numeric(df_near[col_vol].astype(str).str.replace(',', '').str.replace('-', '0'), errors='coerce').fillna(0)
-                total_vol = df_near[col_vol].sum()
-                if total_vol > 0:
-                    estimated_index = (df_near[col_strike] * df_near[col_vol]).sum() / total_vol
-                else:
-                    estimated_index = df_near[col_strike].median()
-            else:
-                estimated_index = df_near[col_strike].median()
+            #col_vol = next((c for c in target_df.columns if '成交量' in c), None)
+            #if col_vol:
+                #df_near[col_vol] = pd.to_numeric(df_near[col_vol].astype(str).str.replace(',', '').str.replace('-', '0'), errors='coerce').fillna(0)
+                #total_vol = df_near[col_vol].sum()
+                #if total_vol > 0:
+                    #estimated_index = (df_near[col_strike] * df_near[col_vol]).sum() / total_vol
+                #else:
+                    #estimated_index = df_near[col_strike].median()
+            #else:
+                #estimated_index = df_near[col_strike].median()
 
-            upper_bound = estimated_index * 1.12
-            lower_bound = estimated_index * 0.88
+            #upper_bound = estimated_index * 1.12
+            #lower_bound = estimated_index * 0.88
             
-            df_near_filtered = df_near[(df_near[col_strike] >= lower_bound) & (df_near[col_strike] <= upper_bound)]
+            #df_near_filtered = df_near[(df_near[col_strike] >= lower_bound) & (df_near[col_strike] <= upper_bound)]
             
-            if df_near_filtered.empty:
-                df_near_filtered = df_near
+            #if df_near_filtered.empty:
+                #df_near_filtered = df_near
             
-            df_call = df_near_filtered[df_near_filtered[col_type].str.contains('Call|買權', case=False, na=False)]
-            df_put = df_near_filtered[df_near_filtered[col_type].str.contains('Put|賣權', case=False, na=False)]
+            #df_call = df_near_filtered[df_near_filtered[col_type].str.contains('Call|買權', case=False, na=False)]
+            #df_put = df_near_filtered[df_near_filtered[col_type].str.contains('Put|賣權', case=False, na=False)]
             
-            if df_call.empty or df_put.empty:
-                return None, f"在合約 {contract_month} 中找不到 Call/Put 分類", debug_raw_df
+            #if df_call.empty or df_put.empty:
+                #return None, f"在合約 {contract_month} 中找不到 Call/Put 分類", debug_raw_df
                 
-            top_calls = df_call.nlargest(2, col_oi).reset_index(drop=True)
-            top_puts = df_put.nlargest(2, col_oi).reset_index(drop=True)
+            #top_calls = df_call.nlargest(2, col_oi).reset_index(drop=True)
+            #top_puts = df_put.nlargest(2, col_oi).reset_index(drop=True)
             
-            result_data.update({
-                'month': contract_month,
-                'res1_price': int(top_calls.loc[0, col_strike]) if len(top_calls) >= 1 else 0,
-                'res1_oi': int(top_calls.loc[0, col_oi]) if len(top_calls) >= 1 else 0,
-                'res2_price': int(top_calls.loc[1, col_strike]) if len(top_calls) >= 2 else 0,
-                'res2_oi': int(top_calls.loc[1, col_oi]) if len(top_calls) >= 2 else 0,
-                'sup1_price': int(top_puts.loc[0, col_strike]) if len(top_puts) >= 1 else 0,
-                'sup1_oi': int(top_puts.loc[0, col_oi]) if len(top_puts) >= 1 else 0,
-                'sup2_price': int(top_puts.loc[1, col_strike]) if len(top_puts) >= 2 else 0,
-                'sup2_oi': int(top_puts.loc[1, col_oi]) if len(top_puts) >= 2 else 0,
-            })
+            #result_data.update({
+                #'month': contract_month,
+                #'res1_price': int(top_calls.loc[0, col_strike]) if len(top_calls) >= 1 else 0,
+                #'res1_oi': int(top_calls.loc[0, col_oi]) if len(top_calls) >= 1 else 0,
+                #'res2_price': int(top_calls.loc[1, col_strike]) if len(top_calls) >= 2 else 0,
+                #'res2_oi': int(top_calls.loc[1, col_oi]) if len(top_calls) >= 2 else 0,
+                #'sup1_price': int(top_puts.loc[0, col_strike]) if len(top_puts) >= 1 else 0,
+                #'sup1_oi': int(top_puts.loc[0, col_oi]) if len(top_puts) >= 1 else 0,
+                #'sup2_price': int(top_puts.loc[1, col_strike]) if len(top_puts) >= 2 else 0,
+                #'sup2_oi': int(top_puts.loc[1, col_oi]) if len(top_puts) >= 2 else 0,
+            #})
             
-            if result_data['res1_oi'] == 0 and result_data['sup1_oi'] == 0:
-                return None, "未平倉量皆為 0 (可能是盤前或休市)", debug_raw_df
+            #if result_data['res1_oi'] == 0 and result_data['sup1_oi'] == 0:
+                #return None, "未平倉量皆為 0 (可能是盤前或休市)", debug_raw_df
                 
-            return result_data, "Success", debug_raw_df
+            #return result_data, "Success", debug_raw_df
 
-        except requests.exceptions.Timeout:
-            if attempt < max_retries - 1:
-                time.sleep(2)
-                continue
-            else:
-                return None, "期交所伺服器回應超時 (Timeout)，請稍後再試", debug_raw_df
-        except Exception as e:
-            return None, f"解析發生例外錯誤: {str(e)}", debug_raw_df
+        #except requests.exceptions.Timeout:
+            #if attempt < max_retries - 1:
+                #time.sleep(2)
+                #continue
+            #else:
+                #return None, "期交所伺服器回應超時 (Timeout)，請稍後再試", debug_raw_df
+        #except Exception as e:
+            #return None, f"解析發生例外錯誤: {str(e)}", debug_raw_df
 
 # 執行爬蟲與渲染
-with st.spinner("⏳ 正在連線期交所解析莊家防線與 PCR 數據，請稍候..."):
-    opt_data, opt_msg, raw_df = fetch_options_support_resistance_pandas(target_opt_date)
+#with st.spinner("⏳ 正在連線期交所解析莊家防線與 PCR 數據，請稍候..."):
+    #opt_data, opt_msg, raw_df = fetch_options_support_resistance_pandas(target_opt_date)
 
-if opt_data:
+#if opt_data:
     # 判斷 PCR 情緒與顏色
-    pcr = opt_data.get('pcr', 0.0)
-    if pcr >= 110:
-        pcr_color, pcr_desc, pcr_icon = "#00E272", "市場偏多 (莊家積極賣出 Put 佈局支撐)", "🐂"
-    elif pcr <= 90:
-        pcr_color, pcr_desc, pcr_icon = "#FF4B4B", "市場偏空 (莊家積極賣出 Call 壓制上漲)", "🐻"
-    else:
-        pcr_color, pcr_desc, pcr_icon = "#FFA500", "多空震盪 (市場籌碼勢均力敵)", "⚖️"
+    #pcr = opt_data.get('pcr', 0.0)
+    #if pcr >= 110:
+        #pcr_color, pcr_desc, pcr_icon = "#00E272", "市場偏多 (莊家積極賣出 Put 佈局支撐)", "🐂"
+    #elif pcr <= 90:
+        #pcr_color, pcr_desc, pcr_icon = "#FF4B4B", "市場偏空 (莊家積極賣出 Call 壓制上漲)", "🐻"
+    #else:
+        #pcr_color, pcr_desc, pcr_icon = "#FFA500", "多空震盪 (市場籌碼勢均力敵)", "⚖️"
 
-    pcr_display = f"{pcr}%" if pcr > 0 else "未取得"
+    #pcr_display = f"{pcr}%" if pcr > 0 else "未取得"
 
     # 🔥 頂部 PCR 情緒儀表板
-    st.markdown(f"""
-    <div style='background-color: #1e293b; padding: 15px; border-radius: 8px; text-align: center; margin-bottom: 15px; border: 1px solid #334155;'>
-    <h3 style='margin:0; color: white;'>{pcr_icon} 選擇權 Put/Call Ratio (未平倉 PCR)</h3>
-    <h1 style='margin:10px 0; color: {pcr_color}; font-size: 36px;'>{pcr_display}</h1>
-    <p style='margin:0; color: #94A3B8; font-size: 15px;'>{pcr_desc}</p>
-    </div>
-    """, unsafe_allow_html=True)
+    #st.markdown(f"""
+    #<div style='background-color: #1e293b; padding: 15px; border-radius: 8px; text-align: center; margin-bottom: 15px; border: 1px solid #334155;'>
+    #<h3 style='margin:0; color: white;'>{pcr_icon} 選擇權 Put/Call Ratio (未平倉 PCR)</h3>
+    #<h1 style='margin:10px 0; color: {pcr_color}; font-size: 36px;'>{pcr_display}</h1>
+    #<p style='margin:0; color: #94A3B8; font-size: 15px;'>{pcr_desc}</p>
+    #</div>
+    #""", unsafe_allow_html=True)
 
     # 左右兩側的動態最大支撐壓力區塊 (已修復亂碼解析問題)
-    col1, col2 = st.columns(2)
-    with col1:
-        st.markdown(f"""
-        <div style='background-color: #3b2a2a; border-left: 5px solid #FF4B4B; padding: 15px; border-radius: 5px; height: 100%;'>
-        <h4 style='margin:0; color: #FF4B4B;'>📈 最大壓力區 (Call)</h4>
-        <h2 style='margin:10px 0 0 0; color: white;'>{opt_data['res1_price']:,} 點</h2>
-        <p style='margin:0 0 10px 0; color: #aaaaaa; font-size: 14px;'>未平倉量: {opt_data['res1_oi']:,} 口</p>
-        <div style='border-top: 1px dashed #553333; margin: 10px 0; padding-top: 10px;'>
-        <h5 style='margin:0; color: #FF8A8A;'>🔸 次大壓力區</h5>
-        <h3 style='margin:5px 0 0 0; color: white;'>{opt_data['res2_price']:,} 點</h3>
-        <p style='margin:0; color: #aaaaaa; font-size: 13px;'>未平倉量: {opt_data['res2_oi']:,} 口</p>
-        </div>
-        </div>
-        """, unsafe_allow_html=True)
+    #col1, col2 = st.columns(2)
+    #with col1:
+        #st.markdown(f"""
+        #<div style='background-color: #3b2a2a; border-left: 5px solid #FF4B4B; padding: 15px; border-radius: 5px; height: 100%;'>
+        #<h4 style='margin:0; color: #FF4B4B;'>📈 最大壓力區 (Call)</h4>
+        #<h2 style='margin:10px 0 0 0; color: white;'>{opt_data['res1_price']:,} 點</h2>
+        #<p style='margin:0 0 10px 0; color: #aaaaaa; font-size: 14px;'>未平倉量: {opt_data['res1_oi']:,} 口</p>
+        #<div style='border-top: 1px dashed #553333; margin: 10px 0; padding-top: 10px;'>
+        #<h5 style='margin:0; color: #FF8A8A;'>🔸 次大壓力區</h5>
+        #<h3 style='margin:5px 0 0 0; color: white;'>{opt_data['res2_price']:,} 點</h3>
+        #<p style='margin:0; color: #aaaaaa; font-size: 13px;'>未平倉量: {opt_data['res2_oi']:,} 口</p>
+        #</div>
+        #</div>
+        #""", unsafe_allow_html=True)
         
-    with col2:
-        st.markdown(f"""
-        <div style='background-color: #2a3b2f; border-left: 5px solid #00E272; padding: 15px; border-radius: 5px; height: 100%;'>
-        <h4 style='margin:0; color: #00E272;'>📉 最大支撐區 (Put)</h4>
-        <h2 style='margin:10px 0 0 0; color: white;'>{opt_data['sup1_price']:,} 點</h2>
-        <p style='margin:0 0 10px 0; color: #aaaaaa; font-size: 14px;'>未平倉量: {opt_data['sup1_oi']:,} 口</p>
-        <div style='border-top: 1px dashed #335544; margin: 10px 0; padding-top: 10px;'>
-        <h5 style='margin:0; color: #8AFFB0;'>🔸 次大支撐區</h5>
-        <h3 style='margin:5px 0 0 0; color: white;'>{opt_data['sup2_price']:,} 點</h3>
-        <p style='margin:0; color: #aaaaaa; font-size: 13px;'>未平倉量: {opt_data['sup2_oi']:,} 口</p>
-        </div>
-        </div>
-        """, unsafe_allow_html=True)
+    #with col2:
+        #st.markdown(f"""
+        #<div style='background-color: #2a3b2f; border-left: 5px solid #00E272; padding: 15px; border-radius: 5px; height: 100%;'>
+        #<h4 style='margin:0; color: #00E272;'>📉 最大支撐區 (Put)</h4>
+        #<h2 style='margin:10px 0 0 0; color: white;'>{opt_data['sup1_price']:,} 點</h2>
+        #<p style='margin:0 0 10px 0; color: #aaaaaa; font-size: 14px;'>未平倉量: {opt_data['sup1_oi']:,} 口</p>
+        #<div style='border-top: 1px dashed #335544; margin: 10px 0; padding-top: 10px;'>
+        #<h5 style='margin:0; color: #8AFFB0;'>🔸 次大支撐區</h5>
+        #<h3 style='margin:5px 0 0 0; color: white;'>{opt_data['sup2_price']:,} 點</h3>
+        #<p style='margin:0; color: #aaaaaa; font-size: 13px;'>未平倉量: {opt_data['sup2_oi']:,} 口</p>
+        #</div>
+        #</div>
+        #""", unsafe_allow_html=True)
         
-    st.caption(f"📅 觀測合約月份: {opt_data['month']} (系統已嚴格過濾，自動鎖定最關鍵的純月選合約)")
+    #st.caption(f"📅 觀測合約月份: {opt_data['month']} (系統已嚴格過濾，自動鎖定最關鍵的純月選合約)")
 
     # ==========================================
     # 🔥 新增：自訂關注點位追蹤區塊
     # ==========================================
-    st.markdown("---")
-    st.markdown("#### 🎯 自訂關鍵防守點位監控")
-    watch_strikes = [40000, 44000, 45000, 48000]
-    custom_data = opt_data.get('custom_strikes', {})
+    #st.markdown("---")
+    #st.markdown("#### 🎯 自訂關鍵防守點位監控")
+    #watch_strikes = [40000, 44000, 45000, 48000]
+    #custom_data = opt_data.get('custom_strikes', {})
     
-    cols = st.columns(4)
-    for i, strike in enumerate(watch_strikes):
-        with cols[i]:
-            c_oi = custom_data.get(strike, {}).get('call', 0)
-            p_oi = custom_data.get(strike, {}).get('put', 0)
-            st.markdown(f"""
-            <div style='background-color: #1E2633; padding: 15px; border-radius: 8px; border: 1px solid #444; text-align: center;'>
-            <h4 style='color: #FFD700; margin-top: 0;'>{strike:,} 點</h4>
-            <p style='color: #FF8A8A; margin:5px 0; font-size: 14px;'>🔻 壓 (Call): <br><b>{c_oi:,}</b> 口</p>
-            <p style='color: #8AFFB0; margin:5px 0; font-size: 14px;'>🔺 撐 (Put): <br><b>{p_oi:,}</b> 口</p>
-            </div>
-            """, unsafe_allow_html=True)
+    #cols = st.columns(4)
+    #for i, strike in enumerate(watch_strikes):
+        #with cols[i]:
+            #c_oi = custom_data.get(strike, {}).get('call', 0)
+            #p_oi = custom_data.get(strike, {}).get('put', 0)
+            #st.markdown(f"""
+            #<div style='background-color: #1E2633; padding: 15px; border-radius: 8px; border: 1px solid #444; text-align: center;'>
+            #<h4 style='color: #FFD700; margin-top: 0;'>{strike:,} 點</h4>
+            #<p style='color: #FF8A8A; margin:5px 0; font-size: 14px;'>🔻 壓 (Call): <br><b>{c_oi:,}</b> 口</p>
+            #<p style='color: #8AFFB0; margin:5px 0; font-size: 14px;'>🔺 撐 (Put): <br><b>{p_oi:,}</b> 口</p>
+            #</div>
+            #""", unsafe_allow_html=True)
 
-else:
-    st.warning(f"⚠️ 選擇權資料狀態: {opt_msg}")
+#else:
+    #st.warning(f"⚠️ 選擇權資料狀態: {opt_msg}")
 
-if raw_df is not None:
-    with st.expander("🔍 點此展開：查看爬蟲抓取的原始資料表 (除錯專區)"):
-        st.dataframe(raw_df, use_container_width=True)
+#if raw_df is not None:
+    #with st.expander("🔍 點此展開：查看爬蟲抓取的原始資料表 (除錯專區)"):
+        #st.dataframe(raw_df, use_container_width=True)
 
-st.write("---")
+#st.write("---")
 # ==========================================
 # ==========================================
 # ==========================================
