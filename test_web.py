@@ -40,9 +40,23 @@ st.markdown("<div id='section-00'></div>", unsafe_allow_html=True)
 st.markdown("### 🎯 區塊 00：選擇權莊家防守點位雷達 (測試中)")
 st.write("💡 透過分析期交所臺指選擇權 (TXO) 近月合約的「最大未平倉量」，找出莊家重兵佈署的天花板(壓力)與地板(支撐)。")
 
+# 🎯 自動抓取雲端「最後交易日」，確保查的是有開盤的那天
+def get_cloud_synced_date_for_opt():
+    try:
+        df_market = conn.read(spreadsheet=SHEET_URL, worksheet="大盤風向球")
+        if not df_market.empty and '日期' in df_market.columns:
+            date_str = str(df_market['日期'].iloc[-1]).replace('.0', '')
+            if len(date_str) == 8:
+                return f"{date_str[:4]}/{date_str[4:6]}/{date_str[6:8]}"
+    except: pass
+    return "2026/05/29" # 預設救援日期
+
+target_opt_date = get_cloud_synced_date_for_opt()
+st.info(f"🔎 目前爬蟲模擬按下「送出查詢」的日期為：**{target_opt_date}**")
+
 @st.cache_data(ttl=600)
-def fetch_options_support_resistance_pandas():
-    """除錯版：將抓取到的原始資料表回傳，讓使用者肉眼確認"""
+def fetch_options_support_resistance_pandas(query_date):
+    """POST 表單模擬版：直接指定日期向期交所要資料"""
     import requests
     import pandas as pd
     from io import StringIO
@@ -50,32 +64,40 @@ def fetch_options_support_resistance_pandas():
     url = "https://www.taifex.com.tw/cht/3/optDailyMarketReport"
     headers = {'User-Agent': 'Mozilla/5.0'}
     
-    # 準備用來回傳給 UI 顯示的除錯表格
+    # 🔥 核心秘訣：模擬真人在網頁上填表單並按下「送出查詢」
+    payload = {
+        "queryType": "2",
+        "marketCode": "0",
+        "dateaddcnt": "",
+        "commodity_id": "TXO",
+        "commodity_id2": "",
+        "queryDate": query_date, # 自動帶入 2026/05/29
+        "MarketCode": "0",
+        "commodity_idt": "TXO"
+    }
+    
     debug_raw_df = None 
 
     try:
-        response = requests.get(url, headers=headers, timeout=5)
+        # 將原本的 get 改為 post，並附上 payload
+        response = requests.post(url, data=payload, headers=headers, timeout=5)
         response.encoding = 'utf-8' 
         html_io = StringIO(response.text)
         dfs = pd.read_html(html_io)
         
         target_df = None
-        # 1. 尋找目標表格
         for df in dfs:
             if '履約價' in df.to_string() and ('未沖銷' in df.to_string() or '未平倉' in df.to_string()):
                 target_df = df.copy()
                 break
                 
         if target_df is None:
-            return None, "找不到包含「履約價」與「未沖銷」的資料表格", None
+            return None, f"在 {query_date} 的網頁中找不到資料表格", None
 
-        # 2. 處理表頭
         if isinstance(target_df.columns, pd.MultiIndex):
             target_df.columns = ['_'.join(map(str, col)).strip() for col in target_df.columns]
         else:
             target_df.columns = target_df.columns.astype(str)
-
-        debug_raw_df = target_df.copy() # 備份原始狀態，供畫面顯示
 
         col_month = next((c for c in target_df.columns if '到期' in c or '月份' in c), None)
         col_strike = next((c for c in target_df.columns if '履約價' in c), None)
@@ -95,22 +117,21 @@ def fetch_options_support_resistance_pandas():
                     col_oi = next((c for c in target_df.columns if '未沖銷' in c or '未平倉' in c), None)
                     break
 
-        # 將處理過表頭的 DataFrame 也存入 debug 變數，讓您看最乾淨的版本
         debug_raw_df = target_df.copy()
 
         if not all([col_month, col_strike, col_type, col_oi]):
-            return None, f"表格解析失敗：無法鎖定關鍵欄位。已鎖定到: {col_month}, {col_strike}, {col_type}, {col_oi}", debug_raw_df
+            return None, "表格解析失敗：無法鎖定關鍵欄位", debug_raw_df
 
-        # 3. 資料清理與轉型
         df = target_df.dropna(subset=[col_strike, col_type, col_oi]).copy()
-        df[col_oi] = pd.to_numeric(df[col_oi].astype(str).str.replace(',', ''), errors='coerce').fillna(0)
+        # 把 '-' 或奇怪的符號全部強制轉為 0
+        df[col_oi] = pd.to_numeric(df[col_oi].astype(str).str.replace(',', '').str.replace('-', '0'), errors='coerce').fillna(0)
         df[col_strike] = pd.to_numeric(df[col_strike].astype(str).str.replace(',', ''), errors='coerce')
         
         all_months = df[col_month].astype(str).unique()
         valid_months = [m for m in all_months if m.startswith('20')]
         
         if not valid_months:
-            return None, f"找不到有效的合約月份。目前網頁有的月份字串: {all_months}", debug_raw_df
+            return None, "找不到有效的合約月份", debug_raw_df
             
         standard_months = [m for m in valid_months if 'W' not in m]
         contract_month = sorted(standard_months)[0] if standard_months else sorted(valid_months)[0]
@@ -133,7 +154,7 @@ def fetch_options_support_resistance_pandas():
         max_put_strike = int(df_put.loc[put_max_idx, col_strike])
         
         if max_call_oi == 0 and max_put_oi == 0:
-            return None, "成功讀取網頁，但未平倉量皆為 0 (可能是盤前資料清空狀態，或欄位抓錯了，請看下方表格確認)", debug_raw_df
+            return None, "未平倉量皆為 0 (可能是盤前或休市)", debug_raw_df
             
         return {
             'month': contract_month,
@@ -146,8 +167,8 @@ def fetch_options_support_resistance_pandas():
     except Exception as e:
         return None, f"解析發生例外錯誤: {str(e)}", debug_raw_df
 
-# 執行爬蟲與渲染
-opt_data, opt_msg, raw_df = fetch_options_support_resistance_pandas()
+# 執行爬蟲與渲染 (傳入日期)
+opt_data, opt_msg, raw_df = fetch_options_support_resistance_pandas(target_opt_date)
 
 if opt_data:
     col1, col2 = st.columns(2)
@@ -173,13 +194,12 @@ if opt_data:
 else:
     st.warning(f"⚠️ 選擇權資料狀態: {opt_msg}")
 
-# 🔥 新增：強制顯示原始表格的除錯專區
 if raw_df is not None:
-    with st.expander("🔍 點此展開：查看爬蟲抓取的原始資料表 (除錯專區)", expanded=True):
-        st.info("💡 請觀察以下表格：1. 欄位名稱是否正確？ 2. 「未沖銷」那一欄的數字是不是真的都是 0 還是有其他符號（例如 -）？")
+    with st.expander("🔍 點此展開：查看爬蟲抓取的原始資料表 (除錯專區)"):
         st.dataframe(raw_df, use_container_width=True)
 
 st.write("---")
+# ==========================================
 # ==========================================
 
 
