@@ -3211,6 +3211,16 @@ else:
 import os, re, datetime
 import pandas as pd
 import yfinance as yf
+import streamlit as st
+
+# 💥 新增：數字脫水機 (用來洗掉 Google Sheets 讀回來產生的 .0 或 .000000)
+def clean_number_for_display(val):
+    try:
+        if pd.isna(val) or str(val).strip() == '-': return '-'
+        f = float(str(val).replace(',', ''))
+        return str(int(f)) if f.is_integer() else str(f).rstrip('0').rstrip('.')
+    except:
+        return str(val)
 
 # 使用 Streamlit 快取確保效能，避免重複抓取 (記憶 10 分鐘)
 @st.cache_data(ttl=600)
@@ -3226,6 +3236,12 @@ def get_historical_block_matrix_from_gs():
         hist_df['日期'] = hist_df['日期'].astype(str).str.replace(r'\.0$', '', regex=True).str.zfill(8)
         hist_df['代號'] = hist_df['代號'].astype(str).str.replace(r'\.0$', '', regex=True).str.replace(r'\D', '', regex=True)
         
+        # 🎯 修復歷史防守價 (Tab 2) 產生的尾數 .0
+        if '成交價' in hist_df.columns:
+            hist_df['成交價'] = hist_df['成交價'].apply(clean_number_for_display)
+        if '收盤價' in hist_df.columns:
+            hist_df['收盤價'] = hist_df['收盤價'].apply(clean_number_for_display)
+            
         date_list = sorted(hist_df['日期'].unique(), reverse=True)
         master_hist_df = None
         date_cols_list = []
@@ -3387,6 +3403,17 @@ else:
             
             backup_df = backup_df.rename(columns={'成交價': f"▼{short_date}成交價", '收盤價': '▼收盤價'})
             display_df = backup_df.drop(columns=['日期'])
+            
+            # 💥 修復今日最新交易 (Tab 1) 產生的尾數 .000000 亂象
+            if f"▼{short_date}成交價" in display_df.columns:
+                display_df[f"▼{short_date}成交價"] = display_df[f"▼{short_date}成交價"].apply(clean_number_for_display)
+            if '▼收盤價' in display_df.columns:
+                display_df['▼收盤價'] = display_df['▼收盤價'].apply(clean_number_for_display)
+            if '成交張數' in display_df.columns:
+                display_df['成交張數'] = display_df['成交張數'].apply(clean_number_for_display)
+            if '成交總額(億)' in display_df.columns:
+                # 確保金額格式停留在最多小數點後 2 位
+                display_df['成交總額(億)'] = pd.to_numeric(display_df['成交總額(億)'], errors='coerce').fillna(0).apply(lambda x: f"{x:.2f}".rstrip('0').rstrip('.'))
     except: pass
 
 # ==========================================
