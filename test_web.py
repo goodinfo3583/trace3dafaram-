@@ -2875,16 +2875,16 @@ def get_historical_block_matrix_from_gs():
         if hist_df.empty or '日期' not in hist_df.columns:
             return None, []
             
-        # 🎯 修復 29.0 的關鍵：強制去尾數，並補足 8 位數
+        # 🎯 修復日期與代號的關鍵：強制去尾數 .0，避免 float 轉換導致多出 0
         hist_df['日期'] = hist_df['日期'].astype(str).str.replace(r'\.0$', '', regex=True).str.zfill(8)
-        hist_df['代號'] = hist_df['代號'].astype(str).str.replace(r'\D', '', regex=True)
+        hist_df['代號'] = hist_df['代號'].astype(str).str.replace(r'\.0$', '', regex=True).str.replace(r'\D', '', regex=True)
         
         date_list = sorted(hist_df['日期'].unique(), reverse=True)
         master_hist_df = None
         date_cols_list = []
         
         for d in date_list:
-            short_date = d[-4:] # 現在這裡絕對會是乾淨的 0529 了！
+            short_date = d[-4:] # 擷取如 0529
             block_col = f"▼{short_date}成交價"
             close_col = f"{short_date}收盤價"
             date_cols_list.append(block_col)
@@ -2968,7 +2968,9 @@ if raw_block_df is not None and not raw_block_df.empty:
             raw_block_df = raw_block_df[raw_block_df['成交股數_數值'] > 0].copy()
             raw_block_df['成交張數'] = (raw_block_df['成交股數_數值'] / 1000).astype(int)
             raw_block_df['成交總額(億)'] = (raw_block_df['成交金額_數值'] / 100000000).apply(lambda x: f"{x:.2f}".rstrip('0').rstrip('.'))
-            raw_block_df['乾淨代號'] = raw_block_df['證券代號'].astype(str).str.replace(r'\D', '', regex=True)
+            
+            # 🎯 雙重保險：寫入前也確保乾淨代號沒有 .0 殘留
+            raw_block_df['乾淨代號'] = raw_block_df['證券代號'].astype(str).str.replace(r'\.0$', '', regex=True).str.replace(r'\D', '', regex=True)
             
             # --- 抓取收盤價 ---
             close_price_dict = {}
@@ -3026,12 +3028,15 @@ else:
     try:
         gs_backup = conn.read(spreadsheet=SHEET_URL, worksheet="鉅額交易").dropna(how="all")
         if not gs_backup.empty and '日期' in gs_backup.columns:
-            # 🎯 裝上防護罩：把雲端讀下來的 529.0 強制轉字串、去尾數、補足 8 位數
             gs_backup['日期'] = gs_backup['日期'].astype(str).str.replace(r'\.0$', '', regex=True).str.zfill(8)
+            
+            # 🎯 週末備援防護罩：確保讀取今日資料時也不會顯示 2330.0
+            if '代號' in gs_backup.columns:
+                gs_backup['代號'] = gs_backup['代號'].astype(str).str.replace(r'\.0$', '', regex=True)
             
             latest_date = gs_backup['日期'].max()
             backup_df = gs_backup[gs_backup['日期'] == latest_date].copy()
-            short_date = latest_date[-4:] # 這裡就會是乾淨的 0529 了！
+            short_date = latest_date[-4:] 
             
             backup_df = backup_df.rename(columns={'成交價': f"▼{short_date}成交價", '收盤價': '▼收盤價'})
             display_df = backup_df.drop(columns=['日期'])
@@ -3042,7 +3047,6 @@ else:
 # ==========================================
 with tab1:
     if display_df is not None and not display_df.empty:
-        # 🎯 已經將「休市期間...」的提示文字刪除
         def highlight_block_row(row):
             styles = [''] * len(row)
             try:
@@ -3086,7 +3090,6 @@ with tab2:
         st.dataframe(styled_hist, use_container_width=True, hide_index=True)
     else: 
         st.info("📂 目前 Google Sheets 尚未累積歷史交易檔案。")
-
 # ==========================================以上網頁核心區塊
 # ==========================================
 # 🏆 頂級選股池核心引擎 (精確量化權重 + 暗盤連動 + 歷史追蹤分頁)
