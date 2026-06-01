@@ -1181,7 +1181,7 @@ def render_sidebar_market_summary():
     # 🐶 =========================================
     now = datetime.datetime.now()
     today_str = now.strftime("%Y%m%d")
-    need_crawl = True # 預設要爬蟲
+    need_crawl = True 
     gs_backup = pd.DataFrame()
     
     try:
@@ -1189,14 +1189,21 @@ def render_sidebar_market_summary():
         if not gs_backup.empty and '日期' in gs_backup.columns:
             gs_latest_date = str(gs_backup['日期'].iloc[-1]).replace('.0', '')
             
+            # 🔥 修正 1：讀取雲端最後一筆融資餘額，判斷晚上是否需要補抓
+            gs_margin = 0.0
+            if '融資餘額' in gs_backup.columns:
+                try: gs_margin = float(gs_backup['融資餘額'].iloc[-1])
+                except: pass
+            
             if now.weekday() >= 5: 
                 need_crawl = False # 週末：不爬蟲
             elif now.time() < datetime.time(14, 50):
-                need_crawl = False # 平日15:00前(抓14:50緩衝)：今日資料未出，不爬蟲
-            elif gs_latest_date == today_str:
-                need_crawl = False # 平日15:00後：檢查雲端，如果今天已經抓過，不爬蟲！
+                need_crawl = False # 平日15:00前：今日資料未出，不爬蟲
+            elif gs_latest_date == today_str and gs_margin > 0:
+                # 🔥 修正 2：只有當今天已經抓過，且「融資餘額 > 0(代表晚間已出爐)」時，才真正鎖死爬蟲引擎
+                need_crawl = False 
     except Exception as e:
-        pass # 若雲端連線異常，強制放行爬蟲去抓資料
+        pass 
 
     # ------------------------------------------
     # A. 數據採集 (看門狗放行才會執行)
@@ -1218,7 +1225,8 @@ def render_sidebar_market_summary():
                 if res_margin.status_code == 200:
                     m_data = res_margin.json().get("data", []) if "data" in res_margin.json() else res_margin.json().get("tables", [{}])[0].get("data", [])
                     for row in m_data:
-                        if row and len(row) >= 6 and "融資" in str(row[0]):
+                        # 🔥 修正 3：必須比對「融資金額」而不是「融資」，否則會抓到張數
+                        if row and len(row) >= 6 and "融資金額" in str(row[0]):
                             margin_prev = float(str(row[4]).replace(',', '').strip())
                             margin_today = float(str(row[5]).replace(',', '').strip())
                             break
@@ -1319,16 +1327,17 @@ def render_sidebar_market_summary():
             f"<tr style='border-top: 1px solid #334155;'><td style='padding: 6px 0; color: #FFD700; font-weight: bold;'>🔥 合計</td><td style='text-align: right; color: {get_cls(net_buy_total)}; font-weight: bold;'>{get_sign(net_buy_total)}</td><td style='text-align: right; color: {get_cls(total_oi)}; font-weight: bold;'>{get_oi_str(total_oi)}</td></tr>"
         ]
 
-        if margin_diff_yi != 0 or margin_today_yi != 0:
+        # 🔥 修正 4：保證融資區塊永遠不會消失，若未出爐則給予明確提示
+        if margin_today_yi > 0:
             html_lines.append(f"<tr style='border-top: 1px dashed #334155;'><td style='padding: 8px 0 2px 0; color: white; font-weight: bold;' colspan='2'>📊 融資餘額增減(億)</td><td style='padding: 8px 0 2px 0; text-align: right; color: {get_cls(margin_diff_yi)}; font-weight: bold;'>{get_sign(margin_diff_yi)}</td></tr>")
             html_lines.append(f"<tr><td style='padding: 1px 0 4px 0; font-size: 12px; color: #94A3B8; font-weight: normal;' colspan='2'>└ 今日融資總餘額</td><td style='padding: 1px 0 4px 0; text-align: right; color: #94A3B8; font-size: 12px; font-weight: normal;'>{margin_today_yi:.1f}</td></tr>")
+        else:
+            html_lines.append(f"<tr style='border-top: 1px dashed #334155;'><td style='padding: 8px 0 2px 0; color: white; font-weight: bold;' colspan='2'>📊 融資餘額增減(億)</td><td style='padding: 8px 0 2px 0; text-align: right; color: #94A3B8; font-weight: bold;'>⏳ 晚間出爐</td></tr>")
 
         html_lines.append("</table></div>")
         st.sidebar.markdown("".join(html_lines), unsafe_allow_html=True)
     else:
         st.sidebar.info("🕒 目前查無今日三大法人買賣資料。")
-
-
 
 # 執行渲染側邊欄大盤卡片
 render_sidebar_market_summary()
