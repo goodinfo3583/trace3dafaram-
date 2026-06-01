@@ -3206,7 +3206,7 @@ else:
     else:
         st.error("無法合併資料。")
 # ==========================================
-# 💸 區塊 6：盤後鉅額交易總表 (智慧日期備援 + 純粹矩陣版)
+# 💸 區塊 6：盤後鉅額交易總表 (看門狗防禦 + 純粹矩陣版)
 # ==========================================
 import os, re, datetime
 import pandas as pd
@@ -3262,7 +3262,7 @@ def get_historical_block_matrix_from_gs():
                 
         master_hist_df = master_hist_df.fillna('-')
         
-        # 防呆機制：刪除週末重複記錄的空包彈
+        # 防呆機制：刪除重複記錄的空包彈
         cols_to_drop = []
         for i in range(len(date_cols_list) - 1):
             new_col = date_cols_list[i]
@@ -3280,114 +3280,122 @@ def get_historical_block_matrix_from_gs():
         return None, []
 
 # ==========================================
-# 🎯 區塊 6 主邏輯：智慧備援與資料寫入
+# 🎯 區塊 6 主邏輯：看門狗防禦 + 智慧備援與資料寫入
 # ==========================================
 now = datetime.datetime.now()
 today_str = now.strftime("%Y%m%d")
+need_crawl = True
+gs_backup_raw = pd.DataFrame()
 
-# 1. 嘗試抓取今日最新資料
-raw_block_df = fetch_block_trades() 
-is_new_data = raw_block_df is not None and not raw_block_df.empty
+# 🚨 看門狗機制 (Database-First)：先查雲端，有資料就絕對不爬蟲！
+try:
+    gs_backup_raw = conn.read(spreadsheet=SHEET_URL, worksheet="鉅額交易").dropna(how="all")
+    if not gs_backup_raw.empty and '日期' in gs_backup_raw.columns:
+        gs_backup_raw['日期'] = gs_backup_raw['日期'].astype(str).str.replace(r'\.0$', '', regex=True).str.zfill(8)
+        if '代號' in gs_backup_raw.columns:
+            gs_backup_raw['代號'] = gs_backup_raw['代號'].astype(str).str.replace(r'\.0$', '', regex=True)
+            
+        gs_latest_date = gs_backup_raw['日期'].max()
+        
+        if now.weekday() >= 5: need_crawl = False # 週末休市不爬蟲
+        elif now.time() < datetime.time(14, 30): need_crawl = False # 鉅額交易盤後才有，14:30 前不爬蟲
+        elif gs_latest_date == today_str: need_crawl = False # 🔥 今天已經抓過了，強烈封鎖爬蟲保護 IP！
+except Exception: pass
 
 display_df = None
-real_trade_date = today_str # 預設為今天
+real_trade_date = today_str # 預設
 
-if is_new_data:
-    # 🔥 爬蟲有抓到資料，強制認證日期為「今天」
-    real_trade_date = today_str
-    date_mmdd = real_trade_date[-4:]
-    dynamic_price_col = f"▼{date_mmdd}成交價"
-    
-    try:
-        price_col = next((c for c in ['成交價', '成交價格', '成交單價'] if c in raw_block_df.columns), None)
-        if price_col:
-            raw_block_df['成交股數_數值'] = pd.to_numeric(raw_block_df['成交股數'].astype(str).str.replace(',', ''), errors='coerce').fillna(0)
-            raw_block_df['成交金額_數值'] = pd.to_numeric(raw_block_df['成交金額'].astype(str).str.replace(',', ''), errors='coerce').fillna(0)
-            raw_block_df[dynamic_price_col] = pd.to_numeric(raw_block_df[price_col].astype(str).str.replace(',', ''), errors='coerce').fillna(0).round(0).astype(int)
-            raw_block_df = raw_block_df[raw_block_df['成交股數_數值'] > 0].copy()
-            raw_block_df['成交張數'] = (raw_block_df['成交股數_數值'] / 1000).astype(int)
-            raw_block_df['成交總額(億)'] = (raw_block_df['成交金額_數值'] / 100000000).apply(lambda x: f"{x:.2f}".rstrip('0').rstrip('.'))
-            raw_block_df['乾淨代號'] = raw_block_df['證券代號'].astype(str).str.replace(r'\.0$', '', regex=True).str.replace(r'\D', '', regex=True)
-            
-            # --- 抓取今日收盤價供 Tab 1 比對 ---
-            close_price_dict = {}
-            unique_ids = raw_block_df['乾淨代號'].dropna().unique()
-            if len(unique_ids) > 0:
-                yf_tickers = " ".join([f"{sid}.TW" for sid in unique_ids])
-                try:
-                    df_yf = yf.download(yf_tickers, period="5d", progress=False)
-                    if not df_yf.empty and 'Close' in df_yf:
-                        close_data = df_yf['Close']
-                        if len(unique_ids) == 1:
-                            price = close_data.dropna().iloc[-1]
-                            close_price_dict[unique_ids[0]] = str(int(round(price)))
-                        else:
-                            for sid in unique_ids:
-                                tkr = f"{sid}.TW"
-                                if tkr in close_data.columns:
-                                    valid_prices = close_data[tkr].dropna()
-                                    if not valid_prices.empty: close_price_dict[sid] = str(int(round(valid_prices.iloc[-1])))
-                except: pass 
-            
-            raw_block_df['▼收盤價'] = raw_block_df['乾淨代號'].map(close_price_dict).fillna('-')
-            
-            # 排序：跌破成交價(1) > 平盤(2) > 守住(3)
-            def get_color_rank(close_val, block_val):
-                try:
-                    c = float(str(close_val).replace(',', ''))
-                    b = float(str(block_val).replace(',', ''))
-                    return 1 if c > b else 2 if c == b else 3       
-                except: return 4 
-            raw_block_df['__color_rank'] = raw_block_df.apply(lambda r: get_color_rank(r['▼收盤價'], r[dynamic_price_col]), axis=1)
-            raw_block_df = raw_block_df.sort_values(by=['__color_rank', '乾淨代號'], ascending=[True, True])
-            
-            display_df = raw_block_df[['乾淨代號', '證券名稱', dynamic_price_col, '▼收盤價', '成交張數', '成交總額(億)']].copy()
-            display_df = display_df.rename(columns={'乾淨代號': '代號', '證券名稱': '股票名稱'})
-            
-            # 🚀 寫入 Google Sheets (只寫入最新這一筆)
-            save_df = display_df.copy()
-            save_df.columns = ['代號', '股票名稱', '成交價', '收盤價', '成交張數', '成交總額(億)']
-            save_df.insert(0, '日期', real_trade_date)
-            
-            try:
-                old_gs = conn.read(spreadsheet=SHEET_URL, worksheet="鉅額交易").dropna(how="all")
-                if '日期' in old_gs.columns:
-                    old_gs = old_gs[old_gs['日期'].astype(str) != str(real_trade_date)]
-                final_gs = pd.concat([old_gs, save_df], ignore_index=True)
-                conn.update(spreadsheet=SHEET_URL, worksheet="鉅額交易", data=final_gs)
-            except Exception:
-                try: conn.update(spreadsheet=SHEET_URL, worksheet="鉅額交易", data=save_df)
-                except: pass
-    except Exception as e: st.warning(f"⚠️ 資料解析錯誤: {str(e)}")
+# 如果看門狗放行，才去呼叫證交所
+if need_crawl:
+    raw_block_df = fetch_block_trades() 
+    is_new_data = raw_block_df is not None and not raw_block_df.empty
 
-else:
-    # 🔥 爬蟲無資料 (週末/國定假日/盤前)：啟動 Google Sheets 智慧備援
-    try:
-        gs_backup = conn.read(spreadsheet=SHEET_URL, worksheet="鉅額交易").dropna(how="all")
-        if not gs_backup.empty and '日期' in gs_backup.columns:
-            gs_backup['日期'] = gs_backup['日期'].astype(str).str.replace(r'\.0$', '', regex=True).str.zfill(8)
-            if '代號' in gs_backup.columns:
-                gs_backup['代號'] = gs_backup['代號'].astype(str).str.replace(r'\.0$', '', regex=True)
-            
-            # 找到雲端最新交易日，取代 today_str
-            real_trade_date = gs_backup['日期'].max()
-            date_mmdd = real_trade_date[-4:] 
-            dynamic_price_col = f"▼{date_mmdd}成交價"
-            
-            backup_df = gs_backup[gs_backup['日期'] == real_trade_date].copy()
-            backup_df = backup_df.rename(columns={'成交價': dynamic_price_col, '收盤價': '▼收盤價'})
-            display_df = backup_df.drop(columns=['日期'])
-            
-            # 數字脫水：把 .00000 拔除
-            if dynamic_price_col in display_df.columns:
-                display_df[dynamic_price_col] = display_df[dynamic_price_col].apply(clean_number_for_display)
-            if '▼收盤價' in display_df.columns:
-                display_df['▼收盤價'] = display_df['▼收盤價'].apply(clean_number_for_display)
-            if '成交張數' in display_df.columns:
-                display_df['成交張數'] = display_df['成交張數'].apply(clean_number_for_display)
-            if '成交總額(億)' in display_df.columns:
-                display_df['成交總額(億)'] = pd.to_numeric(display_df['成交總額(億)'], errors='coerce').fillna(0).apply(lambda x: f"{x:.2f}".rstrip('0').rstrip('.'))
-    except: pass
+    if is_new_data:
+        real_trade_date = today_str
+        date_mmdd = real_trade_date[-4:]
+        dynamic_price_col = f"▼{date_mmdd}成交價"
+        
+        try:
+            price_col = next((c for c in ['成交價', '成交價格', '成交單價'] if c in raw_block_df.columns), None)
+            if price_col:
+                raw_block_df['成交股數_數值'] = pd.to_numeric(raw_block_df['成交股數'].astype(str).str.replace(',', ''), errors='coerce').fillna(0)
+                raw_block_df['成交金額_數值'] = pd.to_numeric(raw_block_df['成交金額'].astype(str).str.replace(',', ''), errors='coerce').fillna(0)
+                raw_block_df[dynamic_price_col] = pd.to_numeric(raw_block_df[price_col].astype(str).str.replace(',', ''), errors='coerce').fillna(0).round(0).astype(int)
+                raw_block_df = raw_block_df[raw_block_df['成交股數_數值'] > 0].copy()
+                raw_block_df['成交張數'] = (raw_block_df['成交股數_數值'] / 1000).astype(int)
+                raw_block_df['成交總額(億)'] = (raw_block_df['成交金額_數值'] / 100000000).apply(lambda x: f"{x:.2f}".rstrip('0').rstrip('.'))
+                raw_block_df['乾淨代號'] = raw_block_df['證券代號'].astype(str).str.replace(r'\.0$', '', regex=True).str.replace(r'\D', '', regex=True)
+                
+                # --- 抓取今日收盤價供 Tab 1 比對 ---
+                close_price_dict = {}
+                unique_ids = raw_block_df['乾淨代號'].dropna().unique()
+                if len(unique_ids) > 0:
+                    yf_tickers = " ".join([f"{sid}.TW" for sid in unique_ids])
+                    try:
+                        df_yf = yf.download(yf_tickers, period="5d", progress=False)
+                        if not df_yf.empty and 'Close' in df_yf:
+                            close_data = df_yf['Close']
+                            if len(unique_ids) == 1:
+                                price = close_data.dropna().iloc[-1]
+                                close_price_dict[unique_ids[0]] = str(int(round(price)))
+                            else:
+                                for sid in unique_ids:
+                                    tkr = f"{sid}.TW"
+                                    if tkr in close_data.columns:
+                                        valid_prices = close_data[tkr].dropna()
+                                        if not valid_prices.empty: close_price_dict[sid] = str(int(round(valid_prices.iloc[-1])))
+                    except: pass 
+                
+                raw_block_df['▼收盤價'] = raw_block_df['乾淨代號'].map(close_price_dict).fillna('-')
+                
+                def get_color_rank(close_val, block_val):
+                    try:
+                        c = float(str(close_val).replace(',', ''))
+                        b = float(str(block_val).replace(',', ''))
+                        return 1 if c > b else 2 if c == b else 3       
+                    except: return 4 
+                raw_block_df['__color_rank'] = raw_block_df.apply(lambda r: get_color_rank(r['▼收盤價'], r[dynamic_price_col]), axis=1)
+                raw_block_df = raw_block_df.sort_values(by=['__color_rank', '乾淨代號'], ascending=[True, True])
+                
+                display_df = raw_block_df[['乾淨代號', '證券名稱', dynamic_price_col, '▼收盤價', '成交張數', '成交總額(億)']].copy()
+                display_df = display_df.rename(columns={'乾淨代號': '代號', '證券名稱': '股票名稱'})
+                
+                # 🚀 寫入 Google Sheets (雙重防重複保護)
+                save_df = display_df.copy()
+                save_df.columns = ['代號', '股票名稱', '成交價', '收盤價', '成交張數', '成交總額(億)']
+                save_df.insert(0, '日期', real_trade_date)
+                
+                try:
+                    if not gs_backup_raw.empty and '日期' in gs_backup_raw.columns:
+                        gs_backup_raw = gs_backup_raw[gs_backup_raw['日期'].astype(str) != str(real_trade_date)]
+                    final_gs = pd.concat([gs_backup_raw, save_df], ignore_index=True)
+                    conn.update(spreadsheet=SHEET_URL, worksheet="鉅額交易", data=final_gs)
+                except Exception:
+                    try: conn.update(spreadsheet=SHEET_URL, worksheet="鉅額交易", data=save_df)
+                    except: pass
+        except Exception as e: st.warning(f"⚠️ 資料解析錯誤: {str(e)}")
+    else:
+        need_crawl = False # 去爬了但沒資料，切換為雲端備援模式
+
+# 🔥 啟動 Google Sheets 智慧備援 (週末/盤中/今天已抓過/爬無資料)
+if not need_crawl or display_df is None:
+    if not gs_backup_raw.empty and '日期' in gs_backup_raw.columns:
+        real_trade_date = gs_backup_raw['日期'].max()
+        date_mmdd = real_trade_date[-4:] 
+        dynamic_price_col = f"▼{date_mmdd}成交價"
+        
+        backup_df = gs_backup_raw[gs_backup_raw['日期'] == real_trade_date].copy()
+        backup_df = backup_df.rename(columns={'成交價': dynamic_price_col, '收盤價': '▼收盤價'})
+        display_df = backup_df.drop(columns=['日期'])
+        
+        if dynamic_price_col in display_df.columns:
+            display_df[dynamic_price_col] = display_df[dynamic_price_col].apply(clean_number_for_display)
+        if '▼收盤價' in display_df.columns:
+            display_df['▼收盤價'] = display_df['▼收盤價'].apply(clean_number_for_display)
+        if '成交張數' in display_df.columns:
+            display_df['成交張數'] = display_df['成交張數'].apply(clean_number_for_display)
+        if '成交總額(億)' in display_df.columns:
+            display_df['成交總額(億)'] = pd.to_numeric(display_df['成交總額(億)'], errors='coerce').fillna(0).apply(lambda x: f"{x:.2f}".rstrip('0').rstrip('.'))
 
 # ==========================================
 # 渲染 UI (前端畫面)
@@ -3396,7 +3404,8 @@ formatted_date = f"{real_trade_date[:4]}/{real_trade_date[4:6]}/{real_trade_date
 
 st.write("---")
 st.markdown("<div id='section-6'></div>", unsafe_allow_html=True)
-st.markdown(f"### 💸 區塊 6：鉅額交易動向 <span style='font-size: 0.6em; color: #00D2FF;'>({formatted_date})</span>", unsafe_allow_html=True)
+status_icon = "🌕" if not need_crawl else "🟢"
+st.markdown(f"### 💸 區塊 6：鉅額交易動向 <span style='font-size: 0.6em; color: #00D2FF;'>({formatted_date} {status_icon})</span>", unsafe_allow_html=True)
 st.write("💡 鉅額交易常為大戶私下換手籌碼，成交價可視為「支撐/壓力」防守線；短線跌破建議嚴設停損。")
 
 tab1, tab2 = st.tabs(["🆕 今日最新鉅額交易", "📅 歷史防守價追蹤表"])
