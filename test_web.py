@@ -1327,7 +1327,7 @@ if search_query:
 
     
 # ==========================================
-# 🧭 側邊欄導航 (無感互動+休市備援版) + 選擇權防禦網
+# 🧭 側邊欄導航 (無感互動+大盤與選擇權雲端記憶版)
 # ==========================================
 import datetime
 import time
@@ -1338,15 +1338,16 @@ import requests
 from bs4 import BeautifulSoup
 from io import StringIO
 
-# ==========================================
-# 🎯 選擇權爬蟲引擎 (獨立於頂部，利用快取機制)
-# ==========================================
-@st.cache_data(ttl=600)
-def fetch_options_support_resistance_pandas(query_date):
+# ------------------------------------------
+# 🎯 選擇權爬蟲與雲端記憶引擎 (Google Sheet 聯動)
+# ------------------------------------------
+@st.cache_data(ttl=60)
+def fetch_taifex_options_raw(query_date):
+    """純爬蟲：向期交所要資料 (只有在雲端沒資料時才會觸發)"""
     url_oi = "https://www.taifex.com.tw/cht/3/optDailyMarketReport"
     url_pcr = "https://www.taifex.com.tw/cht/3/pcRatio"
     headers = {
-        'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36',
+        'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36',
         'Content-Type': 'application/x-www-form-urlencoded'
     }
     payload_oi = {"queryType": "2", "marketCode": "0", "commodity_id": "TXO", "queryDate": query_date, "MarketCode": "0", "commodity_idt": "TXO"}
@@ -1355,11 +1356,10 @@ def fetch_options_support_resistance_pandas(query_date):
     result_data = {}
     for attempt in range(3):
         try:
-            # 1. 抓取 PCR
+            # 1. PCR 爬取
             pcr_value = 0.0
             try:
                 res_pcr = requests.post(url_pcr, data=payload_pcr, headers=headers, timeout=10)
-                res_pcr.raise_for_status()
                 res_pcr.encoding = 'utf-8'
                 dfs_pcr = pd.read_html(StringIO(res_pcr.text))
                 for df in dfs_pcr:
@@ -1375,101 +1375,135 @@ def fetch_options_support_resistance_pandas(query_date):
             except Exception: pass 
             result_data['pcr'] = pcr_value
 
-            # 2. 抓取未平倉量 (OI)
+            # 2. 未平倉量 爬取
             response = requests.post(url_oi, data=payload_oi, headers=headers, timeout=15)
-            response.raise_for_status() 
             response.encoding = 'utf-8' 
             dfs = pd.read_html(StringIO(response.text))
-            
             target_df = next((df for df in dfs if '履約價' in df.to_string() and ('未沖銷' in df.to_string() or '未平倉' in df.to_string())), None)
-            if target_df is None: return None, "找不到資料表"
-
-            if isinstance(target_df.columns, pd.MultiIndex):
-                target_df.columns = ['_'.join(map(str, col)).strip() for col in target_df.columns]
+            if target_df is None: return None
+            if isinstance(target_df.columns, pd.MultiIndex): target_df.columns = ['_'.join(map(str, col)).strip() for col in target_df.columns]
             else: target_df.columns = target_df.columns.astype(str)
-
             col_month = next((c for c in target_df.columns if '到期' in c or '月份' in c), None)
             col_strike = next((c for c in target_df.columns if '履約價' in c), None)
             col_type = next((c for c in target_df.columns if '買賣權' in c), None)
             col_oi = next((c for c in target_df.columns if '未沖銷' in c or '未平倉' in c), None)
-
             if not all([col_month, col_strike, col_type, col_oi]):
                 for idx in range(min(5, len(target_df))):
                     row_str = str(target_df.iloc[idx].tolist())
                     if '履約價' in row_str and ('未沖銷' in row_str or '未平倉' in row_str):
                         target_df.columns = target_df.iloc[idx].astype(str)
                         target_df = target_df.iloc[idx+1:].reset_index(drop=True)
-                        col_month = next((c for c in target_df.columns if '到期' in c or '月份' in c), None)
-                        col_strike = next((c for c in target_df.columns if '履約價' in c), None)
-                        col_type = next((c for c in target_df.columns if '買賣權' in c), None)
-                        col_oi = next((c for c in target_df.columns if '未沖銷' in c or '未平倉' in c), None)
+                        col_month, col_strike, col_type, col_oi = next((c for c in target_df.columns if '到期' in c or '月份' in c), None), next((c for c in target_df.columns if '履約價' in c), None), next((c for c in target_df.columns if '買賣權' in c), None), next((c for c in target_df.columns if '未沖銷' in c or '未平倉' in c), None)
                         break
-
             df = target_df.dropna(subset=[col_strike, col_type, col_oi]).copy()
             df[col_oi] = pd.to_numeric(df[col_oi].astype(str).str.replace(',', '').str.replace('-', '0'), errors='coerce').fillna(0)
             df[col_strike] = pd.to_numeric(df[col_strike].astype(str).str.replace(',', ''), errors='coerce')
             df[col_month] = df[col_month].astype(str).str.strip()
-            
             valid_months = [m for m in df[col_month].unique() if m.startswith('20')]
-            if not valid_months: return None, "找不到合約月份"
-                
+            if not valid_months: return None
             standard_months = [m for m in valid_months if len(m) == 6 and m.isdigit()]
             contract_month = sorted(standard_months)[0] if standard_months else sorted(valid_months)[0]
             df_near = df[df[col_month] == contract_month]
 
-            # 擷取自訂點位
-            target_strikes = [40000, 44000, 45000, 48000]
+            # 抓自訂點位
             custom_strikes_data = {}
-            for strike in target_strikes:
+            for strike in [40000, 44000, 45000, 48000]:
                 c_oi, p_oi = 0, 0
                 c_df = df_near[(df_near[col_strike] == strike) & (df_near[col_type].str.contains('Call|買權', case=False, na=False))]
                 p_df = df_near[(df_near[col_strike] == strike) & (df_near[col_type].str.contains('Put|賣權', case=False, na=False))]
                 if not c_df.empty: c_oi = int(c_df[col_oi].iloc[0])
                 if not p_df.empty: p_oi = int(p_df[col_oi].iloc[0])
                 custom_strikes_data[strike] = {'call': c_oi, 'put': p_oi}
-            result_data['custom_strikes'] = custom_strikes_data
             
-            # 實戰濾網 (過濾極端值)
+            # 過濾並抓最大壓力/支撐
             col_vol = next((c for c in target_df.columns if '成交量' in c), None)
             if col_vol:
                 df_near[col_vol] = pd.to_numeric(df_near[col_vol].astype(str).str.replace(',', '').str.replace('-', '0'), errors='coerce').fillna(0)
                 total_vol = df_near[col_vol].sum()
-                estimated_index = (df_near[col_strike] * df_near[col_vol]).sum() / total_vol if total_vol > 0 else df_near[col_strike].median()
-            else:
-                estimated_index = df_near[col_strike].median()
-
-            df_near_filtered = df_near[(df_near[col_strike] >= estimated_index * 0.88) & (df_near[col_strike] <= estimated_index * 1.12)]
-            if df_near_filtered.empty: df_near_filtered = df_near
+                est_idx = (df_near[col_strike] * df_near[col_vol]).sum() / total_vol if total_vol > 0 else df_near[col_strike].median()
+            else: est_idx = df_near[col_strike].median()
             
+            df_near_filtered = df_near[(df_near[col_strike] >= est_idx * 0.88) & (df_near[col_strike] <= est_idx * 1.12)]
+            if df_near_filtered.empty: df_near_filtered = df_near
             df_call = df_near_filtered[df_near_filtered[col_type].str.contains('Call|買權', case=False, na=False)]
             df_put = df_near_filtered[df_near_filtered[col_type].str.contains('Put|賣權', case=False, na=False)]
-            
             top_calls = df_call.nlargest(2, col_oi).reset_index(drop=True)
             top_puts = df_put.nlargest(2, col_oi).reset_index(drop=True)
             
-            result_data.update({
-                'month': contract_month,
-                'res1_price': int(top_calls.loc[0, col_strike]) if len(top_calls) >= 1 else 0,
-                'res1_oi': int(top_calls.loc[0, col_oi]) if len(top_calls) >= 1 else 0,
-                'res2_price': int(top_calls.loc[1, col_strike]) if len(top_calls) >= 2 else 0,
-                'res2_oi': int(top_calls.loc[1, col_oi]) if len(top_calls) >= 2 else 0,
-                'sup1_price': int(top_puts.loc[0, col_strike]) if len(top_puts) >= 1 else 0,
-                'sup1_oi': int(top_puts.loc[0, col_oi]) if len(top_puts) >= 1 else 0,
-                'sup2_price': int(top_puts.loc[1, col_strike]) if len(top_puts) >= 2 else 0,
-                'sup2_oi': int(top_puts.loc[1, col_oi]) if len(top_puts) >= 2 else 0,
-            })
-            return result_data, "Success"
-        except Exception: time.sleep(2)
-    return None, "解析失敗"
+            return {
+                '合約月份': contract_month, 'PCR': pcr_value,
+                '最大壓力點': int(top_calls.loc[0, col_strike]) if len(top_calls) >= 1 else 0,
+                '最大壓力OI': int(top_calls.loc[0, col_oi]) if len(top_calls) >= 1 else 0,
+                '次大壓力點': int(top_calls.loc[1, col_strike]) if len(top_calls) >= 2 else 0,
+                '次大壓力OI': int(top_calls.loc[1, col_oi]) if len(top_calls) >= 2 else 0,
+                '最大支撐點': int(top_puts.loc[0, col_strike]) if len(top_puts) >= 1 else 0,
+                '最大支撐OI': int(top_puts.loc[0, col_oi]) if len(top_puts) >= 1 else 0,
+                '次大支撐點': int(top_puts.loc[1, col_strike]) if len(top_puts) >= 2 else 0,
+                '次大支撐OI': int(top_puts.loc[1, col_oi]) if len(top_puts) >= 2 else 0,
+                'C40000': custom_strikes_data[40000]['call'], 'P40000': custom_strikes_data[40000]['put'],
+                'C44000': custom_strikes_data[44000]['call'], 'P44000': custom_strikes_data[44000]['put'],
+                'C45000': custom_strikes_data[45000]['call'], 'P45000': custom_strikes_data[45000]['put'],
+                'C48000': custom_strikes_data[48000]['call'], 'P48000': custom_strikes_data[48000]['put']
+            }
+        except Exception: time.sleep(1)
+    return None
+
+def sync_options_with_gs(date_str_yyyymmdd):
+    """選擇權看門狗：比對 GS，有資料秒回傳，沒資料才爬蟲"""
+    global conn, SHEET_URL
+    gs_opt = pd.DataFrame()
+    try:
+        gs_opt = conn.read(spreadsheet=SHEET_URL, worksheet="選擇權紀錄").dropna(how="all")
+    except: pass
+
+    today_data, prev_data = None, None
+    need_opt_crawl = True
+    
+    if not gs_opt.empty and '日期' in gs_opt.columns:
+        gs_opt['日期'] = gs_opt['日期'].astype(str).str.replace('.0', '', regex=False)
+        today_rows = gs_opt[gs_opt['日期'] == date_str_yyyymmdd]
+        if not today_rows.empty:
+            today_data = today_rows.iloc[-1].to_dict()
+            need_opt_crawl = False # 雲端已有今天資料，封鎖爬蟲！
+        
+        past_rows = gs_opt[gs_opt['日期'] < date_str_yyyymmdd]
+        if not past_rows.empty:
+            prev_data = past_rows.iloc[-1].to_dict()
+
+    if need_opt_crawl:
+        date_str_slash = f"{date_str_yyyymmdd[:4]}/{date_str_yyyymmdd[4:6]}/{date_str_yyyymmdd[6:8]}"
+        crawled_data = fetch_taifex_options_raw(date_str_slash)
+        if crawled_data:
+            crawled_data['日期'] = date_str_yyyymmdd
+            today_data = crawled_data
+            try:
+                df_to_append = pd.DataFrame([today_data])
+                if not gs_opt.empty:
+                    gs_opt = gs_opt[gs_opt['日期'] != date_str_yyyymmdd]
+                    updated_df = pd.concat([gs_opt, df_to_append], ignore_index=True)
+                else: updated_df = df_to_append
+                conn.update(spreadsheet=SHEET_URL, worksheet="選擇權紀錄", data=updated_df)
+            except: pass
+
+    return today_data, prev_data
+
+def get_diff_ui(today_val, prev_val):
+    """計算口數差額並產生 UI 字串 (+綠/-紅)"""
+    if prev_val is None or pd.isna(prev_val): return ""
+    try:
+        diff = int(today_val) - int(prev_val)
+        if diff == 0: return ""
+        sign = "+" if diff > 0 else ""
+        color = "#FF4B4B" if diff > 0 else "#00E272" # 紅色代表增兵，綠色代表撤退
+        return f"<span style='color:{color}; font-size:11px; margin-left:4px;'>({sign}{diff:,})</span>"
+    except: return ""
 
 # ------------------------------------------
 # 1. 大盤籌碼導航總覽引擎 (Google Sheets 看門狗極速版)
 # ------------------------------------------
 def render_sidebar_market_summary():
-    """自動連線證交所，搭載看門狗機制，已存雲端的資料絕不重複爬取，達成 0.1 秒極速載入"""
     global conn, SHEET_URL
     st.sidebar.markdown("<h2 style='margin-top: 0; margin-bottom: 5px;'>📊 大盤資金風向球</h2>", unsafe_allow_html=True)
-
     now = datetime.datetime.now()
     today_str = now.strftime("%Y%m%d")
     need_crawl = True 
@@ -1479,24 +1513,16 @@ def render_sidebar_market_summary():
         gs_backup = conn.read(spreadsheet=SHEET_URL, worksheet="大盤風向球").dropna(how="all")
         if not gs_backup.empty and '日期' in gs_backup.columns:
             gs_latest_date = str(gs_backup['日期'].iloc[-1]).replace('.0', '')
-            
             gs_margin = 0.0
             if '融資餘額' in gs_backup.columns:
                 try: gs_margin = float(gs_backup['融資餘額'].iloc[-1])
                 except: pass
-            
-            if now.weekday() >= 5: 
-                need_crawl = False # 週末：不爬蟲
-            elif now.time() < datetime.time(14, 50):
-                need_crawl = False # 平日15:00前：今日資料未出，不爬蟲
-            elif gs_latest_date == today_str and gs_margin > 0:
-                need_crawl = False 
+            if now.weekday() >= 5: need_crawl = False
+            elif now.time() < datetime.time(14, 50): need_crawl = False
+            elif gs_latest_date == today_str and gs_margin > 0: need_crawl = False 
     except Exception: pass 
 
-    # --- A. 數據採集 ---
-    twse_title, twse_df = None, None
-    margin_today, margin_prev = None, None
-    date_key = None
+    twse_title, twse_df, margin_today, margin_prev, date_key = None, None, None, None, None
     oi_data = {"外資": 0, "投信": 0, "自營商": 0}
     
     if need_crawl:
@@ -1505,21 +1531,17 @@ def render_sidebar_market_summary():
             date_match = re.search(r'(\d+)年(\d+)月(\d+)日', str(twse_title))
             if date_match:
                 date_key = f"{int(date_match.group(1))+1911}{int(date_match.group(2)):02d}{int(date_match.group(3)):02d}"
-                
-            try: # 融資爬蟲
+            try: 
                 res_margin = requests.get("https://www.twse.com.tw/rwd/zh/margin/MI_MARGN?response=json&selectType=MS", timeout=5)
                 if res_margin.status_code == 200:
                     m_data = res_margin.json().get("data", []) if "data" in res_margin.json() else res_margin.json().get("tables", [{}])[0].get("data", [])
                     for row in m_data:
                         if row and len(row) >= 6 and "融資金額" in str(row[0]):
-                            margin_prev = float(str(row[4]).replace(',', '').strip())
-                            margin_today = float(str(row[5]).replace(',', '').strip())
+                            margin_prev, margin_today = float(str(row[4]).replace(',', '').strip()), float(str(row[5]).replace(',', '').strip())
                             break
             except: pass
-
-            try: # 期貨未平倉爬蟲
-                query_date = f"{int(date_key[:4])}/{date_key[4:6]}/{date_key[6:8]}" if date_key else now.strftime("%Y/%m/%d")
-                res_oi = requests.post("https://www.taifex.com.tw/cht/3/futContractsDate", data={'queryDate': query_date}, headers={'User-Agent': 'Mozilla/5.0'}, timeout=5)
+            try: 
+                res_oi = requests.post("https://www.taifex.com.tw/cht/3/futContractsDate", data={'queryDate': f"{int(date_key[:4])}/{date_key[4:6]}/{date_key[6:8]}" if date_key else now.strftime("%Y/%m/%d")}, headers={'User-Agent': 'Mozilla/5.0'}, timeout=5)
                 if res_oi.status_code == 200:
                     for row in BeautifulSoup(res_oi.text, 'html.parser').find_all('tr'):
                         texts = [td.get_text(strip=True) for td in row.find_all('td')]
@@ -1529,18 +1551,15 @@ def render_sidebar_market_summary():
                             if identity: oi_data[identity] = int(texts[-2].replace(',', ''))
             except: pass
 
-    # --- B. 資料彙整與呈現 ---
-    net_buy_foreign = 0.0; net_buy_trust = 0.0; net_buy_dealer = 0.0; net_buy_total = 0.0
-    total_oi = 0; margin_diff_yi = 0.0; margin_today_yi = 0.0
-    date_str = "未知日期"
-    is_weekend_mode = False
+    net_buy_foreign, net_buy_trust, net_buy_dealer, net_buy_total = 0.0, 0.0, 0.0, 0.0
+    total_oi, margin_diff_yi, margin_today_yi = 0, 0.0, 0.0
+    date_str, is_weekend_mode = "未知日期", False
 
     if twse_df is not None and not twse_df.empty:
         for _, row in twse_df.iterrows():
             unit_name = str(row['單位名稱']).strip()
             try: net_val = float(str(row['買賣差額']).replace(',', '')) / 100000000
             except: net_val = 0.0
-            
             if unit_name in ['外資及陸資(不含外資自營商)', '外資自營商']: net_buy_foreign += net_val
             elif unit_name == '投信': net_buy_trust += net_val
             elif unit_name in ['自營商(自行買賣)', '自營商(避險)']: net_buy_dealer += net_val
@@ -1548,48 +1567,26 @@ def render_sidebar_market_summary():
             
         total_oi = sum(oi_data.values())
         if margin_today and margin_prev:
-            margin_today_yi = margin_today / 100000
-            margin_diff_yi = margin_today_yi - (margin_prev / 100000)
-
+            margin_today_yi, margin_diff_yi = margin_today / 100000, (margin_today - margin_prev) / 100000
         date_str = date_key if date_key else today_str
         
-        today_record = {
-            "日期": str(date_str), "外資現貨": round(net_buy_foreign, 2), "投信現貨": round(net_buy_trust, 2),
-            "自營商現貨": round(net_buy_dealer, 2), "合計現貨": round(net_buy_total, 2),
-            "外資OI": oi_data.get('外資', 0), "投信OI": oi_data.get('投信', 0),
-            "自營商OI": oi_data.get('自營商', 0), "合計OI": total_oi,
-            "融資增減": round(margin_diff_yi, 2), "融資餘額": round(margin_today_yi, 2)
-        }
         try:
+            today_record = {"日期": str(date_str), "外資現貨": round(net_buy_foreign, 2), "投信現貨": round(net_buy_trust, 2), "自營商現貨": round(net_buy_dealer, 2), "合計現貨": round(net_buy_total, 2), "外資OI": oi_data.get('外資', 0), "投信OI": oi_data.get('投信', 0), "自營商OI": oi_data.get('自營商', 0), "合計OI": total_oi, "融資增減": round(margin_diff_yi, 2), "融資餘額": round(margin_today_yi, 2)}
             today_df = pd.DataFrame([today_record])
-            if not gs_backup.empty and '日期' in gs_backup.columns:
-                gs_backup = gs_backup[gs_backup['日期'].astype(str) != str(date_str)]
+            if not gs_backup.empty and '日期' in gs_backup.columns: gs_backup = gs_backup[gs_backup['日期'].astype(str) != str(date_str)]
             conn.update(spreadsheet=SHEET_URL, worksheet="大盤風向球", data=pd.concat([gs_backup, today_df], ignore_index=True) if not gs_backup.empty else today_df)
         except: pass
-
     else:
         is_weekend_mode = True
         if not gs_backup.empty:
             last_record = gs_backup.iloc[-1]
             date_str = str(last_record.get('日期', '未知日期')).replace('.0', '')
-            net_buy_foreign = float(last_record.get('外資現貨', 0))
-            net_buy_trust = float(last_record.get('投信現貨', 0))
-            net_buy_dealer = float(last_record.get('自營商現貨', 0))
-            net_buy_total = float(last_record.get('合計現貨', 0))
-            oi_data['外資'] = int(last_record.get('外資OI', 0))
-            oi_data['投信'] = int(last_record.get('投信OI', 0))
-            oi_data['自營商'] = int(last_record.get('自營商OI', 0))
-            total_oi = int(last_record.get('合計OI', 0))
-            margin_diff_yi = float(last_record.get('融資增減', 0))
-            margin_today_yi = float(last_record.get('融資餘額', 0))
+            net_buy_foreign, net_buy_trust, net_buy_dealer, net_buy_total = float(last_record.get('外資現貨', 0)), float(last_record.get('投信現貨', 0)), float(last_record.get('自營商現貨', 0)), float(last_record.get('合計現貨', 0))
+            oi_data['外資'], oi_data['投信'], oi_data['自營商'], total_oi = int(last_record.get('外資OI', 0)), int(last_record.get('投信OI', 0)), int(last_record.get('自營商OI', 0)), int(last_record.get('合計OI', 0))
+            margin_diff_yi, margin_today_yi = float(last_record.get('融資增減', 0)), float(last_record.get('融資餘額', 0))
 
-    # --- C. UI 排版視覺化渲染 ---
     if date_str != "未知日期":
-        if is_weekend_mode and need_crawl == False and now.time() >= datetime.time(14, 50):
-            status_badge = "⚡ <span style='color:#00E272;'>雲端極速載入</span>"
-        else:
-            status_badge = "🌕 <span style='color:#00D2FF;'>雲端同步版</span>" if is_weekend_mode else "🌕 <span style='color:#00E272;'>即時更新版</span>"
-
+        status_badge = "⚡ <span style='color:#00E272;'>雲端極速載入</span>" if (is_weekend_mode and need_crawl == False and now.time() >= datetime.time(14, 50)) else ("🌕 <span style='color:#00D2FF;'>雲端同步版</span>" if is_weekend_mode else "🌕 <span style='color:#00E272;'>即時更新版</span>")
         def get_cls(val): return '#FF4B4B' if val > 0 else '#00CC66' if val < 0 else 'white'
         def get_sign(val): return f"+{val:.1f}" if val > 0 else f"{val:.1f}"
         def get_oi_str(val): return "0" if val == 0 else f"+{val:,}" if val > 0 else f"{val:,}"
@@ -1604,85 +1601,95 @@ def render_sidebar_market_summary():
             f"<tr><td style='padding: 6px 0;'>🏢 自營商</td><td style='text-align: right; color: {get_cls(net_buy_dealer)}; font-weight: bold;'>{get_sign(net_buy_dealer)}</td><td style='text-align: right; color: {get_cls(oi_data.get('自營商',0))}; font-weight: bold;'>{get_oi_str(oi_data.get('自營商',0))}</td></tr>",
             f"<tr style='border-top: 1px solid #334155;'><td style='padding: 6px 0; color: #FFD700; font-weight: bold;'>🔥 合計</td><td style='text-align: right; color: {get_cls(net_buy_total)}; font-weight: bold;'>{get_sign(net_buy_total)}</td><td style='text-align: right; color: {get_cls(total_oi)}; font-weight: bold;'>{get_oi_str(total_oi)}</td></tr>"
         ]
-
         if margin_today_yi > 0:
             html_lines.append(f"<tr style='border-top: 1px dashed #334155;'><td style='padding: 8px 0 2px 0; color: white; font-weight: bold;' colspan='2'>📊 融資餘額增減(億)</td><td style='padding: 8px 0 2px 0; text-align: right; color: {get_cls(margin_diff_yi)}; font-weight: bold;'>{get_sign(margin_diff_yi)}</td></tr>")
             html_lines.append(f"<tr><td style='padding: 1px 0 4px 0; font-size: 12px; color: #94A3B8; font-weight: normal;' colspan='2'>└ 今日融資總餘額</td><td style='padding: 1px 0 4px 0; text-align: right; color: #94A3B8; font-size: 12px; font-weight: normal;'>{margin_today_yi:.1f}</td></tr>")
         else:
             html_lines.append(f"<tr style='border-top: 1px dashed #334155;'><td style='padding: 8px 0 2px 0; color: white; font-weight: bold;' colspan='2'>📊 融資餘額增減(億)</td><td style='padding: 8px 0 2px 0; text-align: right; color: #94A3B8; font-weight: bold;'>⏳ 晚間出爐</td></tr>")
-
         html_lines.append("</table></div>")
         st.sidebar.markdown("".join(html_lines), unsafe_allow_html=True)
-    else:
-        st.sidebar.info("🕒 目前查無今日三大法人買賣資料。")
-        
-    return date_str  # 回傳日期給選擇權使用
+    else: st.sidebar.info("🕒 目前查無今日三大法人買賣資料。")
+    return date_str
 
-# 執行渲染側邊欄大盤卡片，並取得日期
 current_market_date = render_sidebar_market_summary()
 
 # ------------------------------------------
-# 🎯 附加：選擇權攻防 (側邊欄緊湊排版)
+# 🎯 附加：選擇權攻防 (Google Sheet 動態兵力位移版)
 # ------------------------------------------
 if current_market_date and current_market_date != "未知日期":
-    # 把 20260529 轉成 2026/05/29 的格式給期交所爬蟲用
-    target_opt_date = f"{current_market_date[:4]}/{current_market_date[4:6]}/{current_market_date[6:8]}"
-    opt_data, opt_msg = fetch_options_support_resistance_pandas(target_opt_date)
+    today_opt, prev_opt = sync_options_with_gs(current_market_date)
 
-    if opt_data:
-        pcr = opt_data.get('pcr', 0.0)
+    if today_opt:
+        pcr = today_opt.get('PCR', 0.0)
         pcr_color = "#00E272" if pcr >= 110 else "#FF4B4B" if pcr <= 90 else "#FFA500"
         
-        # 🔥 UI 升級版：將「口數」重新加回最大支撐與壓力中，並採用左右對齊排版
-        st.sidebar.markdown(f"""
-        <div style='background-color: #1e293b; padding: 12px; border-radius: 8px; margin-bottom: 10px; border: 1px solid #334155;'>
-            <div style='display: flex; justify-content: space-between; align-items: center; margin-bottom: 8px;'>
-                <span style='font-weight: bold; color: white; font-size: 14px;'>🎯 選擇權攻防 (合約:{opt_data['month']})</span>
-                <span style='color: {pcr_color}; font-weight: bold; font-size: 14px;'>PCR: {pcr}%</span>
-            </div>
-            
-            <div style='background-color: #3b2a2a; border-left: 4px solid #FF4B4B; padding: 8px; border-radius: 4px; margin-bottom: 6px;'>
-                <div style='color: #FF4B4B; font-weight: bold; font-size: 13px; display: flex; justify-content: space-between;'>
-                    <span>📈 最大壓力: {opt_data['res1_price']:,}</span>
-                    <span>{opt_data['res1_oi']:,} 口</span>
-                </div>
-                <div style='color: #FF8A8A; font-size: 11px; display: flex; justify-content: space-between; margin-top: 3px;'>
-                    <span>🔸 次大壓力: {opt_data['res2_price']:,}</span>
-                    <span>{opt_data['res2_oi']:,} 口</span>
-                </div>
-            </div>
-            
-            <div style='background-color: #2a3b2f; border-left: 4px solid #00E272; padding: 8px; border-radius: 4px; margin-bottom: 6px;'>
-                <div style='color: #00E272; font-weight: bold; font-size: 13px; display: flex; justify-content: space-between;'>
-                    <span>📉 最大支撐: {opt_data['sup1_price']:,}</span>
-                    <span>{opt_data['sup1_oi']:,} 口</span>
-                </div>
-                <div style='color: #8AFFB0; font-size: 11px; display: flex; justify-content: space-between; margin-top: 3px;'>
-                    <span>🔸 次大支撐: {opt_data['sup2_price']:,}</span>
-                    <span>{opt_data['sup2_oi']:,} 口</span>
-                </div>
-            </div>
-            
-            <div style='font-size: 12px; color: #94A3B8; margin-top: 8px; margin-bottom: 4px;'>📍 關鍵點位監控 (單位:口)</div>
-            <table style='width:100%; font-size:12px; text-align:center; border-collapse: collapse; background-color: #0f172a; border-radius:4px;'>
-                <tr style='color:#FFD700; border-bottom:1px solid #334155;'>
-                    <th style='padding: 4px 0;'>40,000</th><th style='padding: 4px 0;'>44,000</th><th style='padding: 4px 0;'>45,000</th><th style='padding: 4px 0;'>48,000</th>
-                </tr>
-                <tr>
-                    <td style='color:#FF8A8A; padding-top:4px;'>壓<br><span style='font-weight:bold;'>{opt_data.get('custom_strikes', {}).get(40000, {}).get('call', 0):,}</span></td>
-                    <td style='color:#FF8A8A; padding-top:4px;'>壓<br><span style='font-weight:bold;'>{opt_data.get('custom_strikes', {}).get(44000, {}).get('call', 0):,}</span></td>
-                    <td style='color:#FF8A8A; padding-top:4px;'>壓<br><span style='font-weight:bold;'>{opt_data.get('custom_strikes', {}).get(45000, {}).get('call', 0):,}</span></td>
-                    <td style='color:#FF8A8A; padding-top:4px;'>壓<br><span style='font-weight:bold;'>{opt_data.get('custom_strikes', {}).get(48000, {}).get('call', 0):,}</span></td>
-                </tr>
-                <tr>
-                    <td style='color:#8AFFB0; padding-bottom:4px; padding-top:2px;'>撐<br><span style='font-weight:bold;'>{opt_data.get('custom_strikes', {}).get(40000, {}).get('put', 0):,}</span></td>
-                    <td style='color:#8AFFB0; padding-bottom:4px; padding-top:2px;'>撐<br><span style='font-weight:bold;'>{opt_data.get('custom_strikes', {}).get(44000, {}).get('put', 0):,}</span></td>
-                    <td style='color:#8AFFB0; padding-bottom:4px; padding-top:2px;'>撐<br><span style='font-weight:bold;'>{opt_data.get('custom_strikes', {}).get(45000, {}).get('put', 0):,}</span></td>
-                    <td style='color:#8AFFB0; padding-bottom:4px; padding-top:2px;'>撐<br><span style='font-weight:bold;'>{opt_data.get('custom_strikes', {}).get(48000, {}).get('put', 0):,}</span></td>
-                </tr>
-            </table>
-        </div>
-        """, unsafe_allow_html=True)
+        # 確保月份一樣才算差額，不然換月合約比較會沒有意義
+        is_same_month = prev_opt and (str(today_opt.get('合約月份')) == str(prev_opt.get('合約月份')))
+        
+        d_r1 = get_diff_ui(today_opt.get('最大壓力OI'), prev_opt.get('最大壓力OI')) if is_same_month else ""
+        d_r2 = get_diff_ui(today_opt.get('次大壓力OI'), prev_opt.get('次大壓力OI')) if is_same_month else ""
+        d_s1 = get_diff_ui(today_opt.get('最大支撐OI'), prev_opt.get('最大支撐OI')) if is_same_month else ""
+        d_s2 = get_diff_ui(today_opt.get('次大支撐OI'), prev_opt.get('次大支撐OI')) if is_same_month else ""
+        
+        c40, p40 = today_opt.get('C40000', 0), today_opt.get('P40000', 0)
+        c44, p44 = today_opt.get('C44000', 0), today_opt.get('P44000', 0)
+        c45, p45 = today_opt.get('C45000', 0), today_opt.get('P45000', 0)
+        c48, p48 = today_opt.get('C48000', 0), today_opt.get('P48000', 0)
+        
+        d_c40 = get_diff_ui(c40, prev_opt.get('C40000')) if is_same_month else ""
+        d_p40 = get_diff_ui(p40, prev_opt.get('P40000')) if is_same_month else ""
+        d_c44 = get_diff_ui(c44, prev_opt.get('C44000')) if is_same_month else ""
+        d_p44 = get_diff_ui(p44, prev_opt.get('P44000')) if is_same_month else ""
+        d_c45 = get_diff_ui(c45, prev_opt.get('C45000')) if is_same_month else ""
+        d_p45 = get_diff_ui(p45, prev_opt.get('P45000')) if is_same_month else ""
+        d_c48 = get_diff_ui(c48, prev_opt.get('C48000')) if is_same_month else ""
+        d_p48 = get_diff_ui(p48, prev_opt.get('P48000')) if is_same_month else ""
+
+        # 🔥 注意：下面的 HTML 標籤已緊貼最左邊（零縮排），保證不亂碼！
+        st.sidebar.markdown(f"""<div style='background-color: #1e293b; padding: 12px; border-radius: 8px; margin-bottom: 10px; border: 1px solid #334155;'>
+<div style='display: flex; justify-content: space-between; align-items: center; margin-bottom: 8px;'>
+<span style='font-weight: bold; color: white; font-size: 14px;'>🎯 選擇權攻防 (合約:{today_opt['合約月份']})</span>
+<span style='color: {pcr_color}; font-weight: bold; font-size: 14px;'>PCR: {pcr}%</span>
+</div>
+<div style='background-color: #3b2a2a; border-left: 4px solid #FF4B4B; padding: 8px; border-radius: 4px; margin-bottom: 6px;'>
+<div style='color: #FF4B4B; font-weight: bold; font-size: 13px; display: flex; justify-content: space-between;'>
+<span>📈 最大壓力: {int(today_opt['最大壓力點']):,}</span>
+<span>{int(today_opt['最大壓力OI']):,}{d_r1}</span>
+</div>
+<div style='color: #FF8A8A; font-size: 11px; display: flex; justify-content: space-between; margin-top: 3px;'>
+<span>🔸 次大壓力: {int(today_opt['次大壓力點']):,}</span>
+<span>{int(today_opt['次大壓力OI']):,}{d_r2}</span>
+</div>
+</div>
+<div style='background-color: #2a3b2f; border-left: 4px solid #00E272; padding: 8px; border-radius: 4px; margin-bottom: 6px;'>
+<div style='color: #00E272; font-weight: bold; font-size: 13px; display: flex; justify-content: space-between;'>
+<span>📉 最大支撐: {int(today_opt['最大支撐點']):,}</span>
+<span>{int(today_opt['最大支撐OI']):,}{d_s1}</span>
+</div>
+<div style='color: #8AFFB0; font-size: 11px; display: flex; justify-content: space-between; margin-top: 3px;'>
+<span>🔸 次大支撐: {int(today_opt['次大支撐點']):,}</span>
+<span>{int(today_opt['次大支撐OI']):,}{d_s2}</span>
+</div>
+</div>
+<div style='font-size: 12px; color: #94A3B8; margin-top: 8px; margin-bottom: 4px;'>📍 關鍵點位口數與變化</div>
+<table style='width:100%; font-size:12px; text-align:center; border-collapse: collapse; background-color: #0f172a; border-radius:4px;'>
+<tr style='color:#FFD700; border-bottom:1px solid #334155;'>
+<th style='padding: 4px 0;'>40,000</th><th style='padding: 4px 0;'>44,000</th><th style='padding: 4px 0;'>45,000</th><th style='padding: 4px 0;'>48,000</th>
+</tr>
+<tr>
+<td style='color:#FF8A8A; padding-top:4px;'>壓<br><span style='font-weight:bold;'>{c40:,}</span><br>{d_c40}</td>
+<td style='color:#FF8A8A; padding-top:4px;'>壓<br><span style='font-weight:bold;'>{c44:,}</span><br>{d_c44}</td>
+<td style='color:#FF8A8A; padding-top:4px;'>壓<br><span style='font-weight:bold;'>{c45:,}</span><br>{d_c45}</td>
+<td style='color:#FF8A8A; padding-top:4px;'>壓<br><span style='font-weight:bold;'>{c48:,}</span><br>{d_c48}</td>
+</tr>
+<tr>
+<td style='color:#8AFFB0; padding-bottom:4px; padding-top:2px;'>撐<br><span style='font-weight:bold;'>{p40:,}</span><br>{d_p40}</td>
+<td style='color:#8AFFB0; padding-bottom:4px; padding-top:2px;'>撐<br><span style='font-weight:bold;'>{p44:,}</span><br>{d_p44}</td>
+<td style='color:#8AFFB0; padding-bottom:4px; padding-top:2px;'>撐<br><span style='font-weight:bold;'>{p45:,}</span><br>{d_p45}</td>
+<td style='color:#8AFFB0; padding-bottom:4px; padding-top:2px;'>撐<br><span style='font-weight:bold;'>{p48:,}</span><br>{d_p48}</td>
+</tr>
+</table>
+</div>""", unsafe_allow_html=True)
 
 # ------------------------------------------
 # 2. 大盤總體經濟指標
@@ -1691,10 +1698,8 @@ st.sidebar.markdown("---")
 st.sidebar.subheader("📊 大盤總體經濟指標")
 
 c_btn1, c_btn2 = st.sidebar.columns(2)
-with c_btn1:
-    st.link_button("📈 恐懼貪婪", "https://www.wantgoo.com/global/macroeconomics/fearandgreed", use_container_width=True)
-with c_btn2:
-    st.link_button("⚠️ VIX 指數", "https://www.wantgoo.com/global/vix", use_container_width=True)
+with c_btn1: st.link_button("📈 恐懼貪婪", "https://www.wantgoo.com/global/macroeconomics/fearandgreed", use_container_width=True)
+with c_btn2: st.link_button("⚠️ VIX 指數", "https://www.wantgoo.com/global/vix", use_container_width=True)
 
 # ------------------------------------------
 # 3. 戰情室快速導航
