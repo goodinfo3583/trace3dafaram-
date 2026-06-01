@@ -41,7 +41,7 @@ import streamlit as st
 
 st.markdown("<div id='section-00'></div>", unsafe_allow_html=True)
 st.markdown("### 🎯 區塊 00：選擇權莊家防守點位雷達 (測試中)")
-st.write("💡 透過分析期交所臺指選擇權 (TXO) 近月合約，找出莊家重兵佈署的防線，並利用 PCR 判斷市場多空情緒。")
+st.write("💡 透過分析期交所臺指選擇權 (TXO) 近月合約，過濾極端雜訊，精準找出莊家重兵佈署的前線防禦網，並利用 PCR 判斷市場多空情緒。")
 
 # 🎯 自動抓取雲端「最後交易日」，確保查的是有開盤的那天
 def get_cloud_synced_date_for_opt():
@@ -59,9 +59,10 @@ st.info(f"🔎 目前爬蟲模擬按下「送出查詢」的日期為：**{targe
 
 @st.cache_data(ttl=600)
 def fetch_options_support_resistance_pandas(query_date):
-    """POST 表單模擬版 (雙檔位防線 + PCR 數據抓取)"""
+    """POST 表單模擬版 (新增：實戰濾網，剃除極端造市雜訊)"""
     import requests
     import pandas as pd
+    import numpy as np
     from io import StringIO
 
     url_oi = "https://www.taifex.com.tw/cht/3/optDailyMarketReport"
@@ -106,15 +107,13 @@ def fetch_options_support_resistance_pandas(query_date):
                         else:
                             df.columns = df.columns.astype(str)
                             
-                        # 尋找包含 OI Ratio 的欄位
                         oi_ratio_col = next((c for c in df.columns if '買賣權未平倉量比率' in c), None)
                         if oi_ratio_col:
-                            # 取最後一筆有效數據
                             val = df[oi_ratio_col].dropna().iloc[-1]
                             pcr_value = float(str(val).replace('%', ''))
                             break
             except Exception as e:
-                pass # 若 PCR 抓取失敗，先不中斷防線的抓取
+                pass 
             
             result_data['pcr'] = pcr_value
 
@@ -180,8 +179,34 @@ def fetch_options_support_resistance_pandas(query_date):
             
             df_near = df[df[col_month] == contract_month]
             
-            df_call = df_near[df_near[col_type].str.contains('Call|買權', case=False, na=False)]
-            df_put = df_near[df_near[col_type].str.contains('Put|賣權', case=False, na=False)]
+            # ==========================================
+            # 🔥 實戰濾網引擎：找出合理的前線防禦範圍
+            # ==========================================
+            # 1. 計算所有有未平倉量合約的「成交量加權平均價格」(VWAP)，用以推估目前大盤大致點位
+            col_vol = next((c for c in target_df.columns if '成交量' in c), None)
+            if col_vol:
+                df_near[col_vol] = pd.to_numeric(df_near[col_vol].astype(str).str.replace(',', '').str.replace('-', '0'), errors='coerce').fillna(0)
+                total_vol = df_near[col_vol].sum()
+                if total_vol > 0:
+                    estimated_index = (df_near[col_strike] * df_near[col_vol]).sum() / total_vol
+                else:
+                    estimated_index = df_near[col_strike].median() # 如果都沒成交量，取中位數
+            else:
+                estimated_index = df_near[col_strike].median()
+
+            # 2. 設定上下限 (以推估指數上下 12% 作為極限防守範圍，約 2500 點)
+            upper_bound = estimated_index * 1.12
+            lower_bound = estimated_index * 0.88
+            
+            # 3. 過濾掉太誇張的芭樂單 (如 45000 點)
+            df_near_filtered = df_near[(df_near[col_strike] >= lower_bound) & (df_near[col_strike] <= upper_bound)]
+            
+            # 如果濾網太嚴格導致沒資料，就退回原本不過濾的狀態
+            if df_near_filtered.empty:
+                df_near_filtered = df_near
+            
+            df_call = df_near_filtered[df_near_filtered[col_type].str.contains('Call|買權', case=False, na=False)]
+            df_put = df_near_filtered[df_near_filtered[col_type].str.contains('Put|賣權', case=False, na=False)]
             
             if df_call.empty or df_put.empty:
                 return None, f"在合約 {contract_month} 中找不到 Call/Put 分類", debug_raw_df
