@@ -3464,7 +3464,7 @@ with tab2:
         st.info("📂 目前 Google Sheets 尚未累積歷史交易檔案，或資料處理中。")
 # ==========================================以上網頁核心區塊
 # ==========================================
-# 🏆 頂級選股池核心引擎 (精確量化權重 + 暗盤連動 + 歷史追蹤分頁)
+# 🏆 頂級選股池核心引擎 (動態日期捕捉 + 暗盤連動)
 # ==========================================
 with top_pool_container:
     st.write("---")
@@ -3476,16 +3476,22 @@ with top_pool_container:
     import json
     import pandas as pd
 
-    # 1. 自動掃描最新資料日期
-    txt_pattern = os.path.join(DATA_DIR, "*持股排名變化*.txt") 
-    all_txt_files = glob.glob(txt_pattern)
-    latest_date_str = "未知日期"
+    # 1. 自動掃描最新資料日期 (🔥 升級：從所有檔案抓取最大日期，保護舊資料不被覆蓋)
+    all_files = glob.glob(os.path.join(DATA_DIR, "*"))
+    anchor_date_str = "00000000"
+    
+    for f in all_files:
+        # 尋找檔名中 8 位數的日期 (例如 20260601)
+        match = re.search(r'(202\d{5})', os.path.basename(f))
+        if match:
+            file_date = match.group(1)
+            if file_date > anchor_date_str:
+                anchor_date_str = file_date
 
-    if all_txt_files:
-        latest_file = max(all_txt_files, key=os.path.basename)
-        date_label = os.path.basename(latest_file)[:8]
-        if date_label.isdigit():
-            latest_date_str = f"{date_label[:4]}/{date_label[4:6]}/{date_label[6:]}"
+    if anchor_date_str != "00000000":
+        latest_date_str = f"{anchor_date_str[:4]}/{anchor_date_str[4:6]}/{anchor_date_str[6:]}"
+    else:
+        latest_date_str = "未知日期"
 
     st.markdown(f"## 🏆 數據分析觀察名單 <span style='font-size:18px; color:#00D2FF; font-weight:500;'>(最新數據: {latest_date_str})</span>", unsafe_allow_html=True)
     st.info("💡 **權重評分**：法人持股上榜搭配其他數據分析積分,請參考短動態。(評分數據僅供參考)")
@@ -3684,15 +3690,13 @@ with top_pool_container:
             # 🔥 Delta (▼變量) 計算引擎 (升級為 Google Sheets 讀取版)
             # ==========================================
             prev_scores_dict = {}
-            hist_combined = pd.DataFrame() # 預備給 Tab 2 使用
+            hist_combined = pd.DataFrame() 
             
             try:
-                # 1. 讀取 GS 歷史資料 (加上 ttl=0 強制解除快取，保證讀到最新)
                 gs_history = conn.read(spreadsheet=SHEET_URL, worksheet="選股歷史", ttl=0)
                 gs_history = gs_history.dropna(how="all")
                 
                 if not gs_history.empty and '紀錄日期' in gs_history.columns:
-                    # 🎯 防護罩 1：防止日期變成 20260529.0
                     gs_history['紀錄日期'] = gs_history['紀錄日期'].astype(str).str.replace(r'\.0$', '', regex=True).str.zfill(8)
                     hist_combined = gs_history.copy()
                     
@@ -3704,14 +3708,12 @@ with top_pool_container:
                         
                         id_col = '代號' if '代號' in prev_df.columns else '股票代號' if '股票代號' in prev_df.columns else None
                         if id_col:
-                            # 🎯 防護罩 2：先除掉結尾的 .0，再去除非數字，防止 3231.0 變 32310
                             clean_ids = prev_df[id_col].astype(str).str.replace(r'\.0$', '', regex=True).str.replace(r'\D', '', regex=True)
                             prev_scores_dict = dict(zip(clean_ids, prev_df['總分']))
             except Exception as e:
-                pass # 第一次可能還沒有資料表，忽略錯誤
+                pass 
 
             def calc_table_delta(row):
-                # 代號在前面已經被清理過了，所以這裡很乾淨
                 sid = str(row['代號']).strip()
                 try: curr_score = float(row.get('總分', 0))
                 except: curr_score = 0.0
@@ -3740,25 +3742,19 @@ with top_pool_container:
 
             st.session_state['top_pool_df'] = res_df
             
-            # 💾 歷史紀錄存檔機制 (升級為 Google Sheets 永久雲端版)
+            # 💾 歷史紀錄存檔機制 (嚴格依據動態日期 anchor_date_str 寫入)
             if res_df is not None and not res_df.empty:
                 try:
-                    anchor_date_str = "00000000" 
-                    if all_txt_files:
-                        latest_file = max(all_txt_files, key=os.path.basename)
-                        date_label = os.path.basename(latest_file)[:8]
-                        if date_label.isdigit(): anchor_date_str = date_label
-                    
                     if anchor_date_str != "00000000":
                         save_df = res_df.copy()
                         save_df.insert(0, '紀錄日期', anchor_date_str)
                         
                         try:
-                            # 寫入前再次讀取最新狀態，避免覆蓋
                             old_df = conn.read(spreadsheet=SHEET_URL, worksheet="選股歷史", ttl=0)
                             old_df = old_df.dropna(how="all")
                             if '紀錄日期' in old_df.columns:
                                 old_df['紀錄日期'] = old_df['紀錄日期'].astype(str).str.replace(r'\.0$', '', regex=True).str.zfill(8)
+                                # 🔥 關鍵防護：只刪除「相同日期」的舊資料，絕對不刪除前一天的紀錄！
                                 old_df = old_df[old_df['紀錄日期'] != anchor_date_str]
                             final_save_df = pd.concat([old_df, save_df], ignore_index=True)
                         except:
@@ -3789,7 +3785,6 @@ with top_pool_container:
                         id_col = '代號' if '代號' in df_h.columns else '股票代號' if '股票代號' in df_h.columns else None
                         
                         if id_col and '總分' in df_h.columns:
-                            # 🎯 防護罩 3：修正 Tab2 顯示時，代號再次被 .0 破壞的 Bug
                             df_h['日期'] = df_h['紀錄日期'].apply(lambda x: f"{x[4:6]}/{x[6:]}" if len(x)==8 else x)
                             df_h['代號'] = df_h[id_col].astype(str).str.replace(r'\.0$', '', regex=True).str.replace(r'\D', '', regex=True)
                             df_h = df_h[['代號', '總分', '日期']]
