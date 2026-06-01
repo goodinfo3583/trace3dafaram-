@@ -1633,37 +1633,56 @@ if current_market_date and current_market_date != "未知日期":
         pcr = opt_data.get('pcr', 0.0)
         pcr_color = "#00E272" if pcr >= 110 else "#FF4B4B" if pcr <= 90 else "#FFA500"
         
-        # 🔥 注意：下面的 HTML 必須「緊貼最左邊」，絕對不能有空白縮排，否則又會變成亂碼！
-        st.sidebar.markdown(f"""<div style='background-color: #1e293b; padding: 12px; border-radius: 8px; margin-bottom: 10px; border: 1px solid #334155;'>
-<div style='display: flex; justify-content: space-between; align-items: center; margin-bottom: 8px;'>
-<span style='font-weight: bold; color: white; font-size: 14px;'>🎯 選擇權攻防 (合約:{opt_data['month']})</span>
-<span style='color: {pcr_color}; font-weight: bold; font-size: 14px;'>PCR: {pcr}%</span>
-</div>
-<div style='background-color: #3b2a2a; border-left: 4px solid #FF4B4B; padding: 8px; border-radius: 4px; margin-bottom: 6px;'>
-<div style='color: #FF4B4B; font-weight: bold; font-size: 13px;'>📈 最大壓力: {opt_data['res1_price']:,} <span style='color:#ccc; font-weight:normal; font-size:11px;'>(次:{opt_data['res2_price']:,})</span></div>
-</div>
-<div style='background-color: #2a3b2f; border-left: 4px solid #00E272; padding: 8px; border-radius: 4px; margin-bottom: 6px;'>
-<div style='color: #00E272; font-weight: bold; font-size: 13px;'>📉 最大支撐: {opt_data['sup1_price']:,} <span style='color:#ccc; font-weight:normal; font-size:11px;'>(次:{opt_data['sup2_price']:,})</span></div>
-</div>
-<div style='font-size: 12px; color: #94A3B8; margin-top: 8px; margin-bottom: 4px;'>📍 關鍵點位監控</div>
-<table style='width:100%; font-size:12px; text-align:center; border-collapse: collapse; background-color: #0f172a; border-radius:4px;'>
-<tr style='color:#FFD700; border-bottom:1px solid #334155;'>
-<th style='padding: 4px 0;'>40,000</th><th style='padding: 4px 0;'>44,000</th><th style='padding: 4px 0;'>45,000</th><th style='padding: 4px 0;'>48,000</th>
-</tr>
-<tr>
-<td style='color:#FF8A8A; padding-top:4px;'>壓:{opt_data.get('custom_strikes', {}).get(40000, {}).get('call', 0)}</td>
-<td style='color:#FF8A8A; padding-top:4px;'>壓:{opt_data.get('custom_strikes', {}).get(44000, {}).get('call', 0)}</td>
-<td style='color:#FF8A8A; padding-top:4px;'>壓:{opt_data.get('custom_strikes', {}).get(45000, {}).get('call', 0)}</td>
-<td style='color:#FF8A8A; padding-top:4px;'>壓:{opt_data.get('custom_strikes', {}).get(48000, {}).get('call', 0)}</td>
-</tr>
-<tr>
-<td style='color:#8AFFB0; padding-bottom:4px;'>撐:{opt_data.get('custom_strikes', {}).get(40000, {}).get('put', 0)}</td>
-<td style='color:#8AFFB0; padding-bottom:4px;'>撐:{opt_data.get('custom_strikes', {}).get(44000, {}).get('put', 0)}</td>
-<td style='color:#8AFFB0; padding-bottom:4px;'>撐:{opt_data.get('custom_strikes', {}).get(45000, {}).get('put', 0)}</td>
-<td style='color:#8AFFB0; padding-bottom:4px;'>撐:{opt_data.get('custom_strikes', {}).get(48000, {}).get('put', 0)}</td>
-</tr>
-</table>
-</div>""", unsafe_allow_html=True)
+        # 🔥 UI 升級版：將「口數」重新加回最大支撐與壓力中，並採用左右對齊排版
+        st.sidebar.markdown(f"""
+        <div style='background-color: #1e293b; padding: 12px; border-radius: 8px; margin-bottom: 10px; border: 1px solid #334155;'>
+            <div style='display: flex; justify-content: space-between; align-items: center; margin-bottom: 8px;'>
+                <span style='font-weight: bold; color: white; font-size: 14px;'>🎯 選擇權攻防 (合約:{opt_data['month']})</span>
+                <span style='color: {pcr_color}; font-weight: bold; font-size: 14px;'>PCR: {pcr}%</span>
+            </div>
+            
+            <div style='background-color: #3b2a2a; border-left: 4px solid #FF4B4B; padding: 8px; border-radius: 4px; margin-bottom: 6px;'>
+                <div style='color: #FF4B4B; font-weight: bold; font-size: 13px; display: flex; justify-content: space-between;'>
+                    <span>📈 最大壓力: {opt_data['res1_price']:,}</span>
+                    <span>{opt_data['res1_oi']:,} 口</span>
+                </div>
+                <div style='color: #FF8A8A; font-size: 11px; display: flex; justify-content: space-between; margin-top: 3px;'>
+                    <span>🔸 次大壓力: {opt_data['res2_price']:,}</span>
+                    <span>{opt_data['res2_oi']:,} 口</span>
+                </div>
+            </div>
+            
+            <div style='background-color: #2a3b2f; border-left: 4px solid #00E272; padding: 8px; border-radius: 4px; margin-bottom: 6px;'>
+                <div style='color: #00E272; font-weight: bold; font-size: 13px; display: flex; justify-content: space-between;'>
+                    <span>📉 最大支撐: {opt_data['sup1_price']:,}</span>
+                    <span>{opt_data['sup1_oi']:,} 口</span>
+                </div>
+                <div style='color: #8AFFB0; font-size: 11px; display: flex; justify-content: space-between; margin-top: 3px;'>
+                    <span>🔸 次大支撐: {opt_data['sup2_price']:,}</span>
+                    <span>{opt_data['sup2_oi']:,} 口</span>
+                </div>
+            </div>
+            
+            <div style='font-size: 12px; color: #94A3B8; margin-top: 8px; margin-bottom: 4px;'>📍 關鍵點位監控 (單位:口)</div>
+            <table style='width:100%; font-size:12px; text-align:center; border-collapse: collapse; background-color: #0f172a; border-radius:4px;'>
+                <tr style='color:#FFD700; border-bottom:1px solid #334155;'>
+                    <th style='padding: 4px 0;'>40,000</th><th style='padding: 4px 0;'>44,000</th><th style='padding: 4px 0;'>45,000</th><th style='padding: 4px 0;'>48,000</th>
+                </tr>
+                <tr>
+                    <td style='color:#FF8A8A; padding-top:4px;'>壓<br><span style='font-weight:bold;'>{opt_data.get('custom_strikes', {}).get(40000, {}).get('call', 0):,}</span></td>
+                    <td style='color:#FF8A8A; padding-top:4px;'>壓<br><span style='font-weight:bold;'>{opt_data.get('custom_strikes', {}).get(44000, {}).get('call', 0):,}</span></td>
+                    <td style='color:#FF8A8A; padding-top:4px;'>壓<br><span style='font-weight:bold;'>{opt_data.get('custom_strikes', {}).get(45000, {}).get('call', 0):,}</span></td>
+                    <td style='color:#FF8A8A; padding-top:4px;'>壓<br><span style='font-weight:bold;'>{opt_data.get('custom_strikes', {}).get(48000, {}).get('call', 0):,}</span></td>
+                </tr>
+                <tr>
+                    <td style='color:#8AFFB0; padding-bottom:4px; padding-top:2px;'>撐<br><span style='font-weight:bold;'>{opt_data.get('custom_strikes', {}).get(40000, {}).get('put', 0):,}</span></td>
+                    <td style='color:#8AFFB0; padding-bottom:4px; padding-top:2px;'>撐<br><span style='font-weight:bold;'>{opt_data.get('custom_strikes', {}).get(44000, {}).get('put', 0):,}</span></td>
+                    <td style='color:#8AFFB0; padding-bottom:4px; padding-top:2px;'>撐<br><span style='font-weight:bold;'>{opt_data.get('custom_strikes', {}).get(45000, {}).get('put', 0):,}</span></td>
+                    <td style='color:#8AFFB0; padding-bottom:4px; padding-top:2px;'>撐<br><span style='font-weight:bold;'>{opt_data.get('custom_strikes', {}).get(48000, {}).get('put', 0):,}</span></td>
+                </tr>
+            </table>
+        </div>
+        """, unsafe_allow_html=True)
 
 # ------------------------------------------
 # 2. 大盤總體經濟指標
