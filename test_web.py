@@ -1672,21 +1672,21 @@ if current_market_date and current_market_date != "未知日期":
 </div>
 <div style='border-left: 4px solid #FF4B4B; padding: 8px; border-radius: 4px; margin-bottom: 6px;'>
 <div style='color: #FF4B4B; font-weight: bold; font-size: 13px; display: flex; justify-content: space-between;'>
-<span>📈 最大壓力: {int(today_opt['最大壓力點']):,}</span>
+<span>⚔️ 最大壓力: {int(today_opt['最大壓力點']):,}</span>
 <span>{int(today_opt['最大壓力OI']):,}{d_r1}</span>
 </div>
 <div style='color: #FF8A8A; font-size: 11px; display: flex; justify-content: space-between; margin-top: 3px;'>
-<span>🔸 次大壓力: {int(today_opt['次大壓力點']):,}</span>
+<span>⚔️ 次大壓力: {int(today_opt['次大壓力點']):,}</span>
 <span>{int(today_opt['次大壓力OI']):,}{d_r2}</span>
 </div>
 </div>
 <div style='border-left: 4px solid #00E272; padding: 8px; border-radius: 4px; margin-bottom: 6px;'>
 <div style='color: #00E272; font-weight: bold; font-size: 13px; display: flex; justify-content: space-between;'>
-<span>📉 最大支撐: {int(today_opt['最大支撐點']):,}</span>
+<span>🛡 最大支撐: {int(today_opt['最大支撐點']):,}</span>
 <span>{int(today_opt['最大支撐OI']):,}{d_s1}</span>
 </div>
 <div style='color: #8AFFB0; font-size: 11px; display: flex; justify-content: space-between; margin-top: 3px;'>
-<span>🔸 次大支撐: {int(today_opt['次大支撐點']):,}</span>
+<span>🛡 次大支撐: {int(today_opt['次大支撐點']):,}</span>
 <span>{int(today_opt['次大支撐OI']):,}{d_s2}</span>
 </div>
 </div>
