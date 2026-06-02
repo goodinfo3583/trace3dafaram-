@@ -1156,7 +1156,9 @@ def sync_options_with_gs(date_str_yyyymmdd):
     global conn, SHEET_URL
     gs_opt = pd.DataFrame()
     try:
-        gs_opt = conn.read(spreadsheet=SHEET_URL, worksheet="選擇權紀錄").dropna(how="all")
+        # 🔧 【修復點 1】：加入 ttl=0 強制更新快取，並清除欄位名稱的多餘空白
+        gs_opt = conn.read(spreadsheet=SHEET_URL, worksheet="選擇權紀錄", ttl=0).dropna(how="all")
+        gs_opt.columns = gs_opt.columns.astype(str).str.strip()
     except: pass
 
     today_data, prev_data = None, None
@@ -1167,7 +1169,7 @@ def sync_options_with_gs(date_str_yyyymmdd):
         today_rows = gs_opt[gs_opt['日期'] == date_str_yyyymmdd]
         if not today_rows.empty:
             today_data = today_rows.iloc[-1].to_dict()
-            need_opt_crawl = False # 雲端已有今天資料，封鎖爬蟲！
+            need_opt_crawl = False # 雲端已有資料，封鎖爬蟲！
         
         past_rows = gs_opt[gs_opt['日期'] < date_str_yyyymmdd]
         if not past_rows.empty:
@@ -1191,13 +1193,12 @@ def sync_options_with_gs(date_str_yyyymmdd):
     return today_data, prev_data
 
 def get_diff_ui(today_val, prev_val):
-    """計算口數差額並產生 UI 字串 (+綠/-紅)"""
     if prev_val is None or pd.isna(prev_val): return ""
     try:
         diff = int(today_val) - int(prev_val)
         if diff == 0: return ""
         sign = "+" if diff > 0 else ""
-        color = "#FF4B4B" if diff > 0 else "#00E272" # 紅色代表增兵，綠色代表撤退
+        color = "#FF4B4B" if diff > 0 else "#00E272" 
         return f"<span style='color:{color}; font-size:11px; margin-left:4px;'>({sign}{diff:,})</span>"
     except: return ""
 
@@ -1215,7 +1216,6 @@ def render_sidebar_market_summary():
     
     st.markdown("<h2 style='margin-top: 0; margin-bottom: 5px;'>📊 大盤資金風向球</h2>", unsafe_allow_html=True)
     
-    # 🌟 鎖定台北時間
     tw_tz = pytz.timezone('Asia/Taipei')
     now = datetime.datetime.now(tw_tz)
     today_str = now.strftime("%Y%m%d")
@@ -1224,11 +1224,16 @@ def render_sidebar_market_summary():
     need_crawl = True if force_update else True 
     gs_backup = pd.DataFrame()
     
-    # 🔒 鎖死標準欄位名稱，拒絕往右邊長出奇怪的欄位
     STD_COLS = ["日期", "外資", "投信", "自營商", "合計", "外資期貨", "投信期貨", "自營商期貨", "期貨合計", "融資增減", "融資餘額"]
     
+    # 🔧 【修復點 2】：設定大盤預設的顯示日期
+    display_date_key = today_str 
+
     try:
-        gs_backup = conn.read(spreadsheet=SHEET_URL, worksheet="大盤風向球").dropna(how="all")
+        # 加入 ttl=0 防止卡在舊的空白快取，並清除欄位多餘空白
+        gs_backup = conn.read(spreadsheet=SHEET_URL, worksheet="大盤風向球", ttl=0 if force_update else 600).dropna(how="all")
+        gs_backup.columns = gs_backup.columns.astype(str).str.strip()
+        
         if not gs_backup.empty and '日期' in gs_backup.columns:
             gs_latest_date = str(gs_backup['日期'].iloc[-1]).replace('.0', '')
             gs_margin = 0.0
@@ -1258,8 +1263,8 @@ def render_sidebar_market_summary():
                 date_match = re.search(r'(\d+)年(\d+)月(\d+)日', str(twse_title))
                 if date_match:
                     date_key = f"{int(date_match.group(1))+1911}{int(date_match.group(2)):02d}{int(date_match.group(3)):02d}"
+                    display_date_key = date_key # 🌟 更新為實際爬到的日期
                 
-                # 融資 API 加上強制日期綁定
                 if force_update or now.time() >= datetime.time(22, 0):
                     try: 
                         margin_url = f"https://www.twse.com.tw/rwd/zh/margin/MI_MARGN?response=json&date={date_key}&selectType=MS"
@@ -1331,7 +1336,6 @@ def render_sidebar_market_summary():
                 gs_backup = gs_backup[gs_backup['日期'] != date_key]
                 
             updated_df = pd.concat([gs_backup, new_row], ignore_index=True)
-            
             for c in STD_COLS:
                 if c not in updated_df.columns:
                     updated_df[c] = 0
@@ -1344,9 +1348,10 @@ def render_sidebar_market_summary():
         is_weekend_mode = (now.weekday() >= 5)
         if not gs_backup.empty:
             last_row = gs_backup.iloc[-1]
-            date_str = f"📅 {str(last_row.get('日期', '未知')).replace('.0', '')} | 🌕 雲端同步版"
+            # 🌟 取出雲端真實儲存的日期，而不是當前時間
+            display_date_key = str(last_row.get('日期', today_str)).replace('.0', '') 
+            date_str = f"📅 {display_date_key} | 🌕 雲端同步版"
             
-            # 🔧 【修復點】：使用 .get() 並加上安全轉換，即使遇到 GS 完全沒這些欄位也不會報錯
             def safe_float(col):
                 try: return float(last_row.get(col, 0.0))
                 except: return 0.0
@@ -1402,16 +1407,19 @@ def render_sidebar_market_summary():
         html += "</div>"
         
     st.markdown(html, unsafe_allow_html=True)
-    return today_str
+    
+    # 🔧 【修復點 3】：回傳實際有資料的日期，而不是物理時間的「今天」
+    return display_date_key 
 
 # ------------------------------------------
 # 2. 選擇權關鍵兵力分布 
 # ------------------------------------------
-def render_options_dashboard(today_str):
+def render_options_dashboard(target_date_str):
     st.markdown("<hr style='margin:15px 0;'>", unsafe_allow_html=True)
     st.markdown("<h2 style='margin-top: 0; margin-bottom: 5px;'>🏰 選擇權關鍵兵力分布</h2>", unsafe_allow_html=True)
     
-    today_opt, prev_opt = sync_options_with_gs(today_str)
+    # 將大盤傳遞過來的真實日期交給選擇權
+    today_opt, prev_opt = sync_options_with_gs(target_date_str)
     
     if not today_opt:
         st.warning("目前尚無選擇權籌碼資料。")
@@ -1471,11 +1479,14 @@ def render_options_dashboard(today_str):
 
 
 # ==========================================
-# 執行側邊欄渲染 (隱藏版看門狗按鈕在最下方)
+# 執行側邊欄渲染
 # ==========================================
 with tab1:
-    today_str_sync = render_sidebar_market_summary()
-    render_options_dashboard(today_str_sync)
+    # 現在大盤風向球會回傳它「實際顯示」的日期
+    actual_data_date = render_sidebar_market_summary()
+    
+    # 選擇權乖乖跟著大盤的日期去抓資料
+    render_options_dashboard(actual_data_date)
     
     # 🤫 隱藏版看門狗按鈕 (放置在側邊欄最下方右下角)
     st.markdown("<br><br><br>", unsafe_allow_html=True) 
