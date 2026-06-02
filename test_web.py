@@ -1460,7 +1460,7 @@ with tab2:
     st.markdown("[🔄 區塊4-1：融資減少動向](#section-4-1)")
     st.markdown("[🔄 區塊4-2：借券賣出減少動向](#section-4-2)")
     st.markdown("[🔄 區塊4-3：融券增加動向](#section-4-3)")
-    st.markdown("[🔄 區塊4-4：短線套牢名單](#section-4-4)")
+    st.markdown("[🔄 區塊4-5：短線套牢名單](#section-4-5)")
     st.markdown("[💰 區塊5：大股東動向](#section-5)")
     st.markdown("[💸 區塊6：鉅額交易動向](#section-6)")
     
@@ -2675,10 +2675,8 @@ with c2:
 
 st.session_state['df_margin_plus_pct'] = df_pct_clean
 st.session_state['df_margin_plus_vol'] = df_vol_clean
-
-
 # ==========================================
-# 🚨 區塊 4-4：短線避險雷達 (法人倒貨 + 融資套牢 + 空軍狙擊)
+# 🚀 區塊 4-4：短線軋空雷達 (法人點火 + 空軍認錯 + 散戶放空)
 # ==========================================
 import streamlit as st
 import pandas as pd
@@ -2687,6 +2685,239 @@ import glob
 import re
 
 st.markdown("<div id='section-4-4'></div>", unsafe_allow_html=True)
+
+def robust_read_csv_local(file_path):
+    for encoding in ['cp950', 'utf-8-sig', 'utf-8']:
+        try:
+            df = pd.read_csv(file_path, encoding=encoding)
+            if not df.empty and len(df.columns) > 1 and '撖' in str(df.iloc[0, 1]): 
+                continue
+            return df
+        except:
+            continue
+    return pd.read_csv(file_path, encoding='cp950', errors='ignore')
+
+def build_squeeze_radar():
+    # 🎯 抓取軋空所需的 4 個關鍵檔案
+    buy_pattern = os.path.join(DATA_DIR, "*三大法人買超佔成交比*.csv")
+    margin_dec_pattern = os.path.join(DATA_DIR, "*融資減少幅度*.csv")       # 散戶下車
+    sbl_dec_pattern = os.path.join(DATA_DIR, "*借券賣出減少幅度*.csv")   # 空軍回補
+    short_inc_pattern = os.path.join(DATA_DIR, "*融券增加幅度*.csv")       # 散戶逆勢放空
+    
+    buy_files = sorted(glob.glob(buy_pattern), reverse=True)
+    margin_dec_files = sorted(glob.glob(margin_dec_pattern), reverse=True)
+    sbl_dec_files = sorted(glob.glob(sbl_dec_pattern), reverse=True)
+    short_inc_files = sorted(glob.glob(short_inc_pattern), reverse=True)
+    
+    if not buy_files:
+        return pd.DataFrame(), "找不到三大法人買超檔案", "", False
+
+    # ⏳ 解析檔名日期功能
+    def get_date(filepath):
+        match = re.search(r'(\d{8})', os.path.basename(filepath))
+        return match.group(1) if match else ""
+    
+    dates = [
+        get_date(buy_files[0]) if buy_files else "",
+        get_date(margin_dec_files[0]) if margin_dec_files else "",
+        get_date(sbl_dec_files[0]) if sbl_dec_files else "",
+        get_date(short_inc_files[0]) if short_inc_files else ""
+    ]
+    
+    # 過濾掉空字串後檢查日期是否全部一致
+    valid_dates = [d for d in dates if d]
+    is_sync = len(set(valid_dates)) == 1 if valid_dates else False
+    display_date = f"{dates[0][:4]}/{dates[0][4:6]}/{dates[0][6:]}" if len(dates[0]) == 8 else dates[0]
+
+    try:
+        # 1. 處理母表 (三大法人買超)
+        df_buy = robust_read_csv_local(buy_files[0])
+        df_buy.columns = [str(c).replace(" ", "").replace("\n", "").replace("\ufeff", "").strip() for c in df_buy.columns]
+        
+        id_col = next((c for c in df_buy.columns if '代號' in c), df_buy.columns[1])
+        name_col = next((c for c in df_buy.columns if '名稱' in c), df_buy.columns[2])
+        df_buy = df_buy.rename(columns={id_col: '代號', name_col: '名稱'})
+        df_buy['代號'] = df_buy['代號'].astype(str).str.strip()
+        
+        # 📝 指定保留的欄位
+        keep_cols = ['代號', '名稱', '成交', '漲跌價', '漲跌幅']
+        for keyword in ['當日', '2日', '3日', '5日']:
+            matched_cols = [c for c in df_buy.columns if keyword in c and '買賣超佔成交' in c]
+            if matched_cols:
+                keep_cols.append(matched_cols[0])
+                
+        # 過濾出我們需要的欄位
+        keep_cols = list(dict.fromkeys(keep_cols)) # 保持順序且去重
+        # 如果有些欄位檔案裡沒有，就只拿存在的
+        keep_cols = [c for c in keep_cols if c in df_buy.columns]
+        df_squeeze = df_buy[keep_cols].copy()
+        
+        # 📝 更改欄位名稱 (買賣超佔成交 -> 買佔成交)
+        rename_mapping = {}
+        for col in df_squeeze.columns:
+            if '買賣超佔成交' in col:
+                rename_mapping[col] = col.replace('買賣超佔成交', '買佔成交')
+        df_squeeze = df_squeeze.rename(columns=rename_mapping)
+        
+        # 數值轉型
+        for col in df_squeeze.columns:
+            if col not in ['代號', '名稱']:
+                df_squeeze[col] = pd.to_numeric(df_squeeze[col].astype(str).str.replace('%', '', regex=False), errors='coerce')
+                if pd.api.types.is_float_dtype(df_squeeze[col]):
+                    df_squeeze[col] = df_squeeze[col].round(2)
+        
+        # 💡 軋空邏輯：只保留「漲跌幅 >= 0」的上漲/持平股票
+        df_squeeze = df_squeeze[df_squeeze['漲跌幅'] >= 0]
+        
+    except Exception as e:
+        return pd.DataFrame(), f"讀取買超母表失敗: {str(e)}", "", False
+
+    # 2. 處理交集名單
+    def get_danger_ids(files):
+        danger_ids = set()
+        if files:
+            try:
+                df_temp = robust_read_csv_local(files[0])
+                t_id_col = next((c for c in df_temp.columns if '代號' in c), None)
+                if t_id_col:
+                    danger_ids = set(df_temp[t_id_col].astype(str).str.replace(r'\D', '', regex=True))
+            except: pass
+        return danger_ids
+
+    margin_dec_ids = get_danger_ids(margin_dec_files)
+    sbl_dec_ids = get_danger_ids(sbl_dec_files)
+    short_inc_ids = get_danger_ids(short_inc_files)
+
+    # 3. 標記與算分
+    df_squeeze['📉融資減'] = df_squeeze['代號'].apply(lambda x: "✔️" if x in margin_dec_ids else "")
+    df_squeeze['📉借券減'] = df_squeeze['代號'].apply(lambda x: "✔️" if x in sbl_dec_ids else "")
+    df_squeeze['📈融券增'] = df_squeeze['代號'].apply(lambda x: "✔️" if x in short_inc_ids else "")
+    
+    # 計算軋空指數 (最高 4 分)
+    df_squeeze['軋空指數'] = 1 + (df_squeeze['📉融資減'] == "✔️").astype(int) + (df_squeeze['📉借券減'] == "✔️").astype(int) + (df_squeeze['📈融券增'] == "✔️").astype(int)
+    
+    # 排序：指數越高的排前面，同分則看漲幅誰大
+    df_squeeze = df_squeeze.sort_values(by=['軋空指數', '漲跌幅'], ascending=[False, False]).reset_index(drop=True)
+    
+    # 📝 動態標籤
+    def get_squeeze_tag(score):
+        if score == 4: return "💥 終極"
+        elif score == 3: return "🚀 強軋"
+        elif score == 2: return "🔥 點火"
+        return "🔼 進駐"
+        
+    df_squeeze.insert(2, '軋空評估', df_squeeze['軋空指數'].apply(get_squeeze_tag))
+    df_squeeze = df_squeeze.drop(columns=['軋空指數'])
+    
+    return df_squeeze, "Success", display_date, is_sync
+
+# ==========================================
+# 執行與渲染
+# ==========================================
+with st.spinner("⏳ 正在掃描全市場軋空名單..."):
+    df_squeeze_radar, msg, radar_date, is_radar_sync = build_squeeze_radar()
+
+header_html = "🚀 區塊 4-4：短線軋空雷達 (強勢爆發名單) "
+if radar_date:
+    if is_radar_sync:
+        header_html += f"<span style='color: #00D2FF; font-size: 0.7em;'>({radar_date})</span>"
+    else:
+        header_html += f"<span style='color: #00D2FF; font-size: 0.7em;'>({radar_date})</span> <span style='color: #ffa500; font-size: 0.5em;'>⏳籌碼待更新</span>"
+
+st.markdown(f"<h2>{header_html}</h2>", unsafe_allow_html=True)
+st.write("💡 三大法人買超，伴隨融資退場、借券回補或融券逆勢增加的潛在軋空標的。")
+
+if not df_squeeze_radar.empty:
+    show_all = st.checkbox("顯示榜內被法人買超的上漲標的，但籌碼未見軋空特徵", value=False)
+    
+    if not show_all:
+        # 只顯示 2 分以上的標的 (有任何一個軋空特徵)
+        df_squeeze_radar = df_squeeze_radar[df_squeeze_radar['軋空評估'].str.contains("💥|🚀|🔥", regex=True)]
+
+    if df_squeeze_radar.empty:
+        st.success("🎉 目前沒有同時出現法人買超與軋空特徵的強勢名單！")
+    else:
+        # 重設索引
+        df_squeeze_radar = df_squeeze_radar.reset_index(drop=True)
+        df_squeeze_radar.insert(0, '索引', range(1, len(df_squeeze_radar) + 1))
+        
+        def style_table(df):
+            try:
+                styler = df.style.hide(axis='index')
+            except:
+                styler = df.style.hide_index()
+            
+            def highlight_squeeze(row):
+                styles = []
+                for col_name in row.index:
+                    base_style = 'background-color: #262730;'
+                    
+                    # 🔴 數值三雄改成台股的「上漲紅」
+                    if col_name in ['成交', '漲跌價', '漲跌幅']:
+                        styles.append(base_style + ' color: #ff4b4b;')
+                    else:
+                        styles.append(base_style + ' color: #e0e0e0;')
+                return styles
+            
+            styler = styler.apply(highlight_squeeze, axis=1)
+            
+            border_css = '1px solid #808495'
+            styler = styler.set_table_styles([
+                {'selector': 'table', 'props': [('width', '100%'), ('border-collapse', 'collapse'), ('font-family', 'sans-serif'), ('font-size', '13px')]},
+                {'selector': 'th', 'props': [
+                    ('background-color', '#1e1e24'), 
+                    ('color', '#ffffff'), 
+                    ('font-weight', 'normal'),
+                    ('border', border_css),
+                    ('padding', '6px 4px'), 
+                    ('text-align', 'center'),
+                    ('position', 'sticky'),  
+                    ('top', '0'),            
+                    ('z-index', '1')         
+                ]},
+                {'selector': 'td', 'props': [
+                    ('border', border_css),
+                    ('padding', '4px'), 
+                    ('text-align', 'center'),
+                    ('transition', 'all 0.2s ease-in-out') 
+                ]},
+                # 🌟 滑鼠 Hover 動態光暈效果 
+                {'selector': 'tbody tr:hover td', 'props': [
+                    ('background-color', 'rgba(4, 8, 20, 0.85) !important'), 
+                    ('text-shadow', '0 0 8px rgba(255, 255, 255, 0.5) !important') 
+                ]}
+            ])
+            
+            num_cols = df.select_dtypes(include=['number']).columns.tolist()
+            if '索引' in num_cols:
+                num_cols.remove('索引')
+                
+            styler = styler.format({col: "{:.2f}" for col in num_cols})
+            
+            return styler.to_html()
+
+        html_table = style_table(df_squeeze_radar)
+        
+        # 📏 高度控制 (顯示約 10~12 筆)
+        scrollable_div = f"""
+        <div style="max-height: 420px; overflow-y: auto; border: 1px solid #808495; border-radius: 5px;">
+            {html_table}
+        </div>
+        """
+        st.markdown(scrollable_div, unsafe_allow_html=True)
+else:
+    st.warning(f"軋空雷達載入失敗：{msg}")
+
+# ==========================================
+# 🚨 區塊 4-5：短線避險雷達 (法人倒貨 + 融資套牢 + 空軍狙擊)
+# ==========================================
+import streamlit as st
+import pandas as pd
+import os
+import glob
+import re
+
+st.markdown("<div id='section-4-5'></div>", unsafe_allow_html=True)
 
 def robust_read_csv_local(file_path):
     for encoding in ['cp950', 'utf-8-sig', 'utf-8']:
@@ -2798,7 +3029,7 @@ def build_risk_radar():
 with st.spinner("⏳ 正在掃描全市場避險名單..."):
     df_risk_radar, msg, radar_date, is_radar_sync = build_risk_radar()
 
-header_html = "🚨 區塊 4-4：短線套牢名單 "
+header_html = "🚨 區塊 4-5：短線套牢名單 "
 if radar_date:
     if is_radar_sync:
         header_html += f"<span style='color: #00D2FF; font-size: 0.7em;'>({radar_date})</span>"
