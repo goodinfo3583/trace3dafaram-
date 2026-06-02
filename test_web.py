@@ -1639,74 +1639,98 @@ if current_market_date and current_market_date != "未知日期":
         pcr = today_opt.get('PCR', 0.0)
         pcr_color = "#00E272" if pcr >= 110 else "#FF4B4B" if pcr <= 90 else "#FFA500"
         
-        # 確保月份一樣才算差額，不然換月合約比較會沒有意義
         is_same_month = prev_opt and (str(today_opt.get('合約月份')) == str(prev_opt.get('合約月份')))
-        
-        d_r1 = get_diff_ui(today_opt.get('最大壓力OI'), prev_opt.get('最大壓力OI')) if is_same_month else ""
-        d_r2 = get_diff_ui(today_opt.get('次大壓力OI'), prev_opt.get('次大壓力OI')) if is_same_month else ""
-        d_s1 = get_diff_ui(today_opt.get('最大支撐OI'), prev_opt.get('最大支撐OI')) if is_same_month else ""
-        d_s2 = get_diff_ui(today_opt.get('次大支撐OI'), prev_opt.get('次大支撐OI')) if is_same_month else ""
-        
-        c40, p40 = today_opt.get('C40000', 0), today_opt.get('P40000', 0)
-        c44, p44 = today_opt.get('C44000', 0), today_opt.get('P44000', 0)
-        c45, p45 = today_opt.get('C45000', 0), today_opt.get('P45000', 0)
-        c48, p48 = today_opt.get('C48000', 0), today_opt.get('P48000', 0)
-        
-        d_c40 = get_diff_ui(c40, prev_opt.get('C40000')) if is_same_month else ""
-        d_p40 = get_diff_ui(p40, prev_opt.get('P40000')) if is_same_month else ""
-        d_c44 = get_diff_ui(c44, prev_opt.get('C44000')) if is_same_month else ""
-        d_p44 = get_diff_ui(p44, prev_opt.get('P44000')) if is_same_month else ""
-        d_c45 = get_diff_ui(c45, prev_opt.get('C45000')) if is_same_month else ""
-        d_p45 = get_diff_ui(p45, prev_opt.get('P45000')) if is_same_month else ""
-        d_c48 = get_diff_ui(c48, prev_opt.get('C48000')) if is_same_month else ""
-        d_p48 = get_diff_ui(p48, prev_opt.get('P48000')) if is_same_month else ""
-
-        # 🎯 【修改處】清理合約月份的 ".0"
         display_contract_month = str(today_opt['合約月份']).replace('.0', '')
+        
+        # 1. 判斷資料來源狀態徽章 (與大盤風向球邏輯一致)
+        now = datetime.datetime.now()
+        is_weekend = now.weekday() >= 5
+        # 簡單判斷：如果是從 fetch_taifex_options_raw 剛爬下來的，通常不會立刻寫入 GS，或者剛寫入
+        # 這裡借用大盤的 date_str 來判斷，如果時間過了 18:00 且不是假日，通常是即時更新
+        opt_status_badge = "⚡ <span style='color:#00E272;'>雲端極速載入</span>" if (is_weekend or now.time() < datetime.time(18, 0)) else "🌕 <span style='color:#00E272;'>即時更新版</span>"
 
-        # 🔥 注意：下面的 HTML 標籤已緊貼最左邊（零縮排），並已移除壓力與支撐的背景顏色 顯示PCR
-        st.sidebar.markdown(f"""<div style='background-color: #1e293b; padding: 12px; border-radius: 8px; margin-bottom: 10px; border: 1px solid #334155;'>
+        # 2. 準備點位資料
+        max_call_strike = int(today_opt.get('最大壓力點', 0))
+        sec_call_strike = int(today_opt.get('次大壓力點', 0))
+        max_put_strike = int(today_opt.get('最大支撐點', 0))
+        sec_put_strike = int(today_opt.get('次大支撐點', 0))
+
+        # 定義我們要顯示的所有自訂點位
+        custom_strikes = [48000, 45000, 44000, 40000]
+        
+        # 將壓力與支撐點位也加入列表中，並去重複、排序 (由大到小)
+        all_strikes = set(custom_strikes + [max_call_strike, sec_call_strike, max_put_strike, sec_put_strike])
+        all_strikes.discard(0) # 移除可能出現的 0 點位
+        sorted_strikes = sorted(list(all_strikes), reverse=True)
+
+        # 3. 建立表格 HTML 行
+        table_rows_html = ""
+        for strike in sorted_strikes:
+            # 判斷標籤
+            label_suffix = ""
+            if strike == max_call_strike: label_suffix = "<br><span style='font-size:10px; color:#FF4B4B;'>(最壓)</span>"
+            elif strike == sec_call_strike: label_suffix = "<br><span style='font-size:10px; color:#FF8A8A;'>(次壓)</span>"
+            elif strike == max_put_strike: label_suffix = "<br><span style='font-size:10px; color:#00E272;'>(最撐)</span>"
+            elif strike == sec_put_strike: label_suffix = "<br><span style='font-size:10px; color:#8AFFB0;'>(次撐)</span>"
+
+            # 抓取該點位的 Call 和 Put 數據 (如果不是自訂點位，可能需要額外計算，這裡簡化處理，假設從 today_opt 拿，如果沒有就顯示 -)
+            # 為了讓非自訂點位也能顯示口數，建議 fetch_taifex_options_raw 應該要回傳所有需要的點位口數，
+            # 或者在這裡我們只顯示該點位是最大壓力/支撐的口數。
+            
+            c_oi, p_oi = 0, 0
+            d_c_ui, d_p_ui = "", ""
+            
+            # 這裡我們做一個妥協：如果是自訂點位，我們知道確切的 Call/Put 口數
+            if strike in custom_strikes:
+                c_oi = today_opt.get(f'C{strike}', 0)
+                p_oi = today_opt.get(f'P{strike}', 0)
+                if is_same_month and prev_opt:
+                    d_c_ui = get_diff_ui(c_oi, prev_opt.get(f'C{strike}'))
+                    d_p_ui = get_diff_ui(p_oi, prev_opt.get(f'P{strike}'))
+            else:
+                # 如果是動態抓出來的最大/次大點位，我們把數據塞進對應的 Call 或 Put 欄位
+                if strike == max_call_strike:
+                    c_oi = today_opt.get('最大壓力OI', 0)
+                    if is_same_month: d_c_ui = get_diff_ui(c_oi, prev_opt.get('最大壓力OI'))
+                elif strike == sec_call_strike:
+                    c_oi = today_opt.get('次大壓力OI', 0)
+                    if is_same_month: d_c_ui = get_diff_ui(c_oi, prev_opt.get('次大壓力OI'))
+                elif strike == max_put_strike:
+                    p_oi = today_opt.get('最大支撐OI', 0)
+                    if is_same_month: d_p_ui = get_diff_ui(p_oi, prev_opt.get('最大支撐OI'))
+                elif strike == sec_put_strike:
+                    p_oi = today_opt.get('次大支撐OI', 0)
+                    if is_same_month: d_p_ui = get_diff_ui(p_oi, prev_opt.get('次大支撐OI'))
+
+            # 格式化顯示 (如果是 0 就顯示空白或橫槓)
+            c_oi_str = f"{c_oi:,}" if c_oi > 0 else "-"
+            p_oi_str = f"{p_oi:,}" if p_oi > 0 else "-"
+
+            table_rows_html += f"""
+            <tr style='border-bottom: 1px solid #334155;'>
+                <td style='padding: 6px 0; color: white; font-weight: bold;'>{strike:,}{label_suffix}</td>
+                <td style='padding: 6px 0; color: #FF8A8A; font-weight: bold;'>{c_oi_str}</td>
+                <td style='padding: 6px 0;'>{d_c_ui}</td>
+                <td style='padding: 6px 0; color: #8AFFB0; font-weight: bold;'>{p_oi_str}</td>
+                <td style='padding: 6px 0;'>{d_p_ui}</td>
+            </tr>
+            """
+
+        st.sidebar.markdown(f"""<div style='background-color: #1e293b; padding: 12px; border-radius: 8px; margin-bottom: 10px;'>
+<div style='font-size: 13px; color: #00D2FF; margin-bottom: 8px;'>📅 {display_contract_month} | {opt_status_badge}</div>
 <div style='display: flex; justify-content: space-between; align-items: center; margin-bottom: 8px;'>
-<span style='font-weight: bold; color: white; font-size: 14px;'>🏰 選擇權 ({display_contract_month})</span>
-<span style='color: {pcr_color}; font-weight: bold; font-size: 14px;'>{pcr}%</span>
+<span style='font-weight: bold; color: white; font-size: 14px;'>🏰 選擇權關鍵兵力分布</span>
+<span style='color: {pcr_color}; font-weight: bold; font-size: 14px;'>PCR: {pcr}%</span>
 </div>
-<div style='border-left: 4px solid #FF4B4B; padding: 8px; border-radius: 4px; margin-bottom: 6px;'>
-<div style='color: #FF4B4B; font-weight: bold; font-size: 13px; display: flex; justify-content: space-between;'>
-<span>⚔️ 最大壓力: {int(today_opt['最大壓力點']):,}</span>
-<span>{int(today_opt['最大壓力OI']):,}{d_r1}</span>
-</div>
-<div style='color: #FF8A8A; font-size: 11px; display: flex; justify-content: space-between; margin-top: 3px;'>
-<span>⚔️ 次大壓力: {int(today_opt['次大壓力點']):,}</span>
-<span>{int(today_opt['次大壓力OI']):,}{d_r2}</span>
-</div>
-</div>
-<div style='border-left: 4px solid #00E272; padding: 8px; border-radius: 4px; margin-bottom: 6px;'>
-<div style='color: #00E272; font-weight: bold; font-size: 13px; display: flex; justify-content: space-between;'>
-<span>🛡 最大支撐: {int(today_opt['最大支撐點']):,}</span>
-<span>{int(today_opt['最大支撐OI']):,}{d_s1}</span>
-</div>
-<div style='color: #8AFFB0; font-size: 11px; display: flex; justify-content: space-between; margin-top: 3px;'>
-<span>🛡 次大支撐: {int(today_opt['次大支撐點']):,}</span>
-<span>{int(today_opt['次大支撐OI']):,}{d_s2}</span>
-</div>
-</div>
-<div style='font-size: 12px; color: #94A3B8; margin-top: 8px; margin-bottom: 4px;'>📍 關鍵點位口數與變化</div>
-<table style='width:100%; font-size:12px; text-align:center; border-collapse: collapse; background-color: #0f172a; border-radius:4px;'>
+<table style='width:100%; font-size:12px; text-align:center; border-collapse: collapse;'>
 <tr style='color:#FFD700; border-bottom:1px solid #334155;'>
-<th style='padding: 4px 0;'>40,000</th><th style='padding: 4px 0;'>44,000</th><th style='padding: 4px 0;'>45,000</th><th style='padding: 4px 0;'>48,000</th>
+<th style='padding: 4px 0; width: 25%;'>點位</th>
+<th style='padding: 4px 0; width: 20%;'>⚔️口</th>
+<th style='padding: 4px 0; width: 17%;'>變化量</th>
+<th style='padding: 4px 0; width: 20%;'>🛡️口</th>
+<th style='padding: 4px 0; width: 17%;'>變化量</th>
 </tr>
-<tr>
-<td style='color:#FF8A8A; padding-top:4px;'>壓<br><span style='font-weight:bold;'>{c40:,}</span><br>{d_c40}</td>
-<td style='color:#FF8A8A; padding-top:4px;'>壓<br><span style='font-weight:bold;'>{c44:,}</span><br>{d_c44}</td>
-<td style='color:#FF8A8A; padding-top:4px;'>壓<br><span style='font-weight:bold;'>{c45:,}</span><br>{d_c45}</td>
-<td style='color:#FF8A8A; padding-top:4px;'>壓<br><span style='font-weight:bold;'>{c48:,}</span><br>{d_c48}</td>
-</tr>
-<tr>
-<td style='color:#8AFFB0; padding-bottom:4px; padding-top:2px;'>撐<br><span style='font-weight:bold;'>{p40:,}</span><br>{d_p40}</td>
-<td style='color:#8AFFB0; padding-bottom:4px; padding-top:2px;'>撐<br><span style='font-weight:bold;'>{p44:,}</span><br>{d_p44}</td>
-<td style='color:#8AFFB0; padding-bottom:4px; padding-top:2px;'>撐<br><span style='font-weight:bold;'>{p45:,}</span><br>{d_p45}</td>
-<td style='color:#8AFFB0; padding-bottom:4px; padding-top:2px;'>撐<br><span style='font-weight:bold;'>{p48:,}</span><br>{d_p48}</td>
-</tr>
+{table_rows_html}
 </table>
 </div>""", unsafe_allow_html=True)
 # ------------------------------------------
