@@ -2791,26 +2791,34 @@ if not df_risk_radar.empty:
     if df_risk_radar.empty:
         st.success("🎉 目前沒有同時出現『法人賣超』與『籌碼惡化』的危險重榜名單！")
     else:
-        # 🎨 表格美化設定 (已更新為深藍黑底色)
+        # 🎨 表格美化設定 (統一底色、取消粗體、保留淺淺分隔線)
         def style_table(df):
             def highlight_risk(row):
+                # 定義共同的基礎樣式：深藍黑底色、一般字體、淺色半透明分隔線
+                base_style = 'background-color: #262730; font-weight: normal; border: 1px solid rgba(255, 255, 255, 0.1);'
+                
                 if "☠️" in row['避險狀態']:
-                    # 深藍黑底色 + 亮紅色粗體字
-                    return ['background-color: #262730; color: #ff4b4b; font-weight: bold;'] * len(row)
+                    # 極度危險：統一底色 + 紅色文字
+                    return [base_style + ' color: #ff4b4b;'] * len(row)
                 elif "🚨" in row['避險狀態']:
-                    # 深藍黑底色 + 亮橘色粗體字
-                    return ['background-color: #262730; color: #ffa500; font-weight: bold;'] * len(row)
-                return [''] * len(row)
+                    # 高度警戒：統一底色 + 橘色文字
+                    return [base_style + ' color: #ffa500;'] * len(row)
+                else:
+                    # 法人調節：統一底色 + 預設白色/淺灰文字
+                    return [base_style + ' color: #e0e0e0;'] * len(row)
             
             styler = df.style.apply(highlight_risk, axis=1)
             
-            # 確保表頭也是深色調，視覺統一
+            # 確保表頭也是深色調、一般字體，並補上相同的分隔線
             styler = styler.set_table_styles([
-                {'selector': 'th', 'props': [('background-color', '#1e1e24'), ('color', '#ffffff'), ('font-weight', 'bold')]}
+                {'selector': 'th', 'props': [
+                    ('background-color', '#1e1e24'), 
+                    ('color', '#ffffff'), 
+                    ('font-weight', 'normal'),
+                    ('border', '1px solid rgba(255, 255, 255, 0.1)')
+                ]}
             ])
             
-            # 💡 【修正】：改用 pandas 自動抓取真正的數字欄位 (select_dtypes)
-            # 這樣無論我們之後新增多少文字或符號欄位，都不會再引發 ValueError！
             num_cols = df.select_dtypes(include=['number']).columns.tolist()
             styler = styler.format({col: "{:.2f}" for col in num_cols})
             
