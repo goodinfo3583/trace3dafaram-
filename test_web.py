@@ -1642,45 +1642,31 @@ if current_market_date and current_market_date != "未知日期":
         is_same_month = prev_opt and (str(today_opt.get('合約月份')) == str(prev_opt.get('合約月份')))
         display_contract_month = str(today_opt['合約月份']).replace('.0', '')
         
-        # 1. 判斷資料來源狀態徽章 (與大盤風向球邏輯一致)
         now = datetime.datetime.now()
         is_weekend = now.weekday() >= 5
-        # 簡單判斷：如果是從 fetch_taifex_options_raw 剛爬下來的，通常不會立刻寫入 GS，或者剛寫入
-        # 這裡借用大盤的 date_str 來判斷，如果時間過了 18:00 且不是假日，通常是即時更新
         opt_status_badge = "⚡ <span style='color:#00E272;'>雲端極速載入</span>" if (is_weekend or now.time() < datetime.time(18, 0)) else "🌕 <span style='color:#00E272;'>即時更新版</span>"
 
-        # 2. 準備點位資料
         max_call_strike = int(today_opt.get('最大壓力點', 0))
         sec_call_strike = int(today_opt.get('次大壓力點', 0))
         max_put_strike = int(today_opt.get('最大支撐點', 0))
         sec_put_strike = int(today_opt.get('次大支撐點', 0))
 
-        # 定義我們要顯示的所有自訂點位
         custom_strikes = [48000, 45000, 44000, 40000]
-        
-        # 將壓力與支撐點位也加入列表中，並去重複、排序 (由大到小)
         all_strikes = set(custom_strikes + [max_call_strike, sec_call_strike, max_put_strike, sec_put_strike])
-        all_strikes.discard(0) # 移除可能出現的 0 點位
+        all_strikes.discard(0) 
         sorted_strikes = sorted(list(all_strikes), reverse=True)
 
-        # 3. 建立表格 HTML 行
         table_rows_html = ""
         for strike in sorted_strikes:
-            # 判斷標籤
             label_suffix = ""
             if strike == max_call_strike: label_suffix = "<br><span style='font-size:10px; color:#FF4B4B;'>(最壓)</span>"
             elif strike == sec_call_strike: label_suffix = "<br><span style='font-size:10px; color:#FF8A8A;'>(次壓)</span>"
             elif strike == max_put_strike: label_suffix = "<br><span style='font-size:10px; color:#00E272;'>(最撐)</span>"
             elif strike == sec_put_strike: label_suffix = "<br><span style='font-size:10px; color:#8AFFB0;'>(次撐)</span>"
 
-            # 抓取該點位的 Call 和 Put 數據 (如果不是自訂點位，可能需要額外計算，這裡簡化處理，假設從 today_opt 拿，如果沒有就顯示 -)
-            # 為了讓非自訂點位也能顯示口數，建議 fetch_taifex_options_raw 應該要回傳所有需要的點位口數，
-            # 或者在這裡我們只顯示該點位是最大壓力/支撐的口數。
-            
             c_oi, p_oi = 0, 0
             d_c_ui, d_p_ui = "", ""
             
-            # 這裡我們做一個妥協：如果是自訂點位，我們知道確切的 Call/Put 口數
             if strike in custom_strikes:
                 c_oi = today_opt.get(f'C{strike}', 0)
                 p_oi = today_opt.get(f'P{strike}', 0)
@@ -1688,7 +1674,6 @@ if current_market_date and current_market_date != "未知日期":
                     d_c_ui = get_diff_ui(c_oi, prev_opt.get(f'C{strike}'))
                     d_p_ui = get_diff_ui(p_oi, prev_opt.get(f'P{strike}'))
             else:
-                # 如果是動態抓出來的最大/次大點位，我們把數據塞進對應的 Call 或 Put 欄位
                 if strike == max_call_strike:
                     c_oi = today_opt.get('最大壓力OI', 0)
                     if is_same_month: d_c_ui = get_diff_ui(c_oi, prev_opt.get('最大壓力OI'))
@@ -1702,9 +1687,15 @@ if current_market_date and current_market_date != "未知日期":
                     p_oi = today_opt.get('次大支撐OI', 0)
                     if is_same_month: d_p_ui = get_diff_ui(p_oi, prev_opt.get('次大支撐OI'))
 
-            # 格式化顯示 (如果是 0 就顯示空白或橫槓)
-            c_oi_str = f"{c_oi:,}" if c_oi > 0 else "-"
-            p_oi_str = f"{p_oi:,}" if p_oi > 0 else "-"
+            # 🔥 強制轉換為整數，去除 .0 的小數點尾巴
+            try: c_oi_int = int(float(c_oi))
+            except: c_oi_int = 0
+            try: p_oi_int = int(float(p_oi))
+            except: p_oi_int = 0
+
+            # 使用轉換後的整數進行格式化
+            c_oi_str = f"{c_oi_int:,}" if c_oi_int > 0 else "-"
+            p_oi_str = f"{p_oi_int:,}" if p_oi_int > 0 else "-"
 
             table_rows_html += f"""
             <tr style='border-bottom: 1px solid #334155;'>
