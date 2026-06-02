@@ -2792,36 +2792,33 @@ if not df_risk_radar.empty:
     if df_risk_radar.empty:
         st.success("🎉 目前沒有同時出現『法人賣超』與『籌碼惡化』的危險重榜名單！")
     else:
-        # 🎨 表格美化設定 (終極解法：轉為純 HTML 渲染，強制顯示格線)
+        # 🎨 表格美化設定
         def style_table(df):
-            # 1. 隱藏最左邊的 index 數字列
             try:
                 styler = df.style.hide(axis='index')
             except:
-                styler = df.style.hide_index() # 相容舊版 pandas
+                styler = df.style.hide_index()
             
-            # 2. 設定統一的儲存格底色與字體顏色 (深藍黑底 + 淺灰字)
             def highlight_risk(row):
                 base_style = 'background-color: #262730; color: #e0e0e0;'
                 return [base_style] * len(row)
             
             styler = styler.apply(highlight_risk, axis=1)
             
-            # 3. 💥 強制寫入 CSS 網格線 (Table, Th, Td 全部綁定 border)
-            border_css = '1px solid #808495' # 亮灰藍色的線條
+            border_css = '1px solid #808495'
             styler = styler.set_table_styles([
-                # Table 本身滿版、邊框合併
                 {'selector': 'table', 'props': [('width', '100%'), ('border-collapse', 'collapse'), ('font-family', 'sans-serif')]},
-                # 表頭樣式
                 {'selector': 'th', 'props': [
                     ('background-color', '#1e1e24'), 
                     ('color', '#ffffff'), 
                     ('font-weight', 'normal'),
                     ('border', border_css),
                     ('padding', '10px'),
-                    ('text-align', 'center')
+                    ('text-align', 'center'),
+                    ('position', 'sticky'),  # 💡 讓表頭固定不動
+                    ('top', '0'),            # 💡 固定在最頂部
+                    ('z-index', '1')         # 💡 確保表頭不會被資料列蓋住
                 ]},
-                # 儲存格樣式 (在這裡強制加上框線)
                 {'selector': 'td', 'props': [
                     ('border', border_css),
                     ('padding', '8px'),
@@ -2829,16 +2826,20 @@ if not df_risk_radar.empty:
                 ]}
             ])
             
-            # 4. 數字欄位小數點格式化
             num_cols = df.select_dtypes(include=['number']).columns.tolist()
             styler = styler.format({col: "{:.2f}" for col in num_cols})
             
-            # 5. 將設定好的 Styler 轉換為純 HTML 字串
             return styler.to_html()
 
-        # 🚀 透過 markdown 渲染 HTML，徹底突破 st.dataframe 的格線限制
         html_table = style_table(df_risk_radar)
-        st.markdown(html_table, unsafe_allow_html=True)
+        
+        # 🚀 建立捲動容器：max-height: 450px 大約可以顯示 10~15 筆資料
+        scrollable_div = f"""
+        <div style="max-height: 450px; overflow-y: auto; border: 1px solid #808495; border-radius: 5px;">
+            {html_table}
+        </div>
+        """
+        st.markdown(scrollable_div, unsafe_allow_html=True)
 else:
     st.warning(f"避險雷達載入失敗：{msg}")
 
