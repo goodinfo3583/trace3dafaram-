@@ -2701,7 +2701,7 @@ def robust_read_csv_local(file_path):
     return pd.read_csv(file_path, encoding='cp950', errors='ignore')
 
 def build_risk_radar():
-    # 🎯 這裡就是以「法人賣超」作為母表打底
+    # 🎯 以「法人賣超」作為母表打底
     sell_pattern = os.path.join(DATA_DIR, "*三大法人賣超佔成交比*.csv")
     margin_pattern = os.path.join(DATA_DIR, "*融資增加幅度*.csv")
     short_pattern = os.path.join(DATA_DIR, "*借券賣出增加幅度*.csv")
@@ -2809,7 +2809,9 @@ if not df_risk_radar.empty:
                 {'selector': 'th', 'props': [('background-color', '#1e1e24'), ('color', '#ffffff'), ('font-weight', 'bold')]}
             ])
             
-            num_cols = [c for c in df.columns if c not in ['股票代號', '股票名稱', '避險狀態', '⚠️法人賣超', '🚨融亡套牢', '📉借券大增']]
+            # 💡 【修正】：改用 pandas 自動抓取真正的數字欄位 (select_dtypes)
+            # 這樣無論我們之後新增多少文字或符號欄位，都不會再引發 ValueError！
+            num_cols = df.select_dtypes(include=['number']).columns.tolist()
             styler = styler.format({col: "{:.2f}" for col in num_cols})
             
             return styler
