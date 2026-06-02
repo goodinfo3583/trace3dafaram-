@@ -2798,7 +2798,7 @@ def build_risk_radar():
 with st.spinner("⏳ 正在掃描全市場避險名單..."):
     df_risk_radar, msg, radar_date, is_radar_sync = build_risk_radar()
 
-header_html = "🚨 區塊 4-4：短線避險雷達 (高風險名單) "
+header_html = "🚨 區塊 4-4：短線套牢名單 "
 if radar_date:
     if is_radar_sync:
         header_html += f"<span style='color: #00D2FF; font-size: 0.7em;'>({radar_date})</span>"
@@ -2806,7 +2806,7 @@ if radar_date:
         header_html += f"<span style='color: #00D2FF; font-size: 0.7em;'>({radar_date})</span> <span style='color: #ffa500; font-size: 0.5em;'>⏳融券資待更新</span>"
 
 st.markdown(f"<h2>{header_html}</h2>", unsafe_allow_html=True)
-st.write("💡 三大法人賣超，融資套牢或借券增加的籌碼惡化標的,若當日成交轉正有望剔除。")
+st.write("💡 三大法人賣超,融資套牢或借券增加的籌碼惡化標的,若當日成交轉正有望回溫。")
 
 if not df_risk_radar.empty:
     show_all = st.checkbox("顯示榜內被法人賣超的下跌/持平標的但融資借券未上榜", value=False)
