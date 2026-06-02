@@ -1019,7 +1019,7 @@ if search_query:
     st.subheader("💰 區塊 5：大戶動向診斷") # 👈 將原本的 st.write("#### ...") 統一改為 st.subheader
     scan_and_display("400張以上大戶動向", 'df_blk5', search_query)
 
-    
+############################################    
 # ==========================================
 # 🧭 側邊欄導航 (無感互動+大盤與選擇權雲端記憶版)
 # ==========================================
@@ -1220,16 +1220,15 @@ with tab1:
 # ------------------------------------------
 def render_sidebar_market_summary():
     global conn, SHEET_URL
-    import pytz # 確保載入時區套件
+    import pytz 
     
     st.markdown("<h2 style='margin-top: 0; margin-bottom: 5px;'>📊 大盤資金風向球</h2>", unsafe_allow_html=True)
     
-    # 🌟 關鍵修復：強制鎖定台北時間，避免雲端 UTC 時差導致看門狗失效
+    # 🌟 鎖定台北時間
     tw_tz = pytz.timezone('Asia/Taipei')
     now = datetime.datetime.now(tw_tz)
     today_str = now.strftime("%Y%m%d")
     
-    # 檢查是否有人按了強制更新按鈕
     force_update = st.session_state.pop('force_update', False)
     need_crawl = True if force_update else True 
     gs_backup = pd.DataFrame()
@@ -1243,19 +1242,17 @@ def render_sidebar_market_summary():
                 try: gs_margin = float(gs_backup['融資餘額'].iloc[-1])
                 except: pass
             
-            # ==========================================
-            # 🕰️ 看門狗時間鎖設定：18:00 與 22:00 分段式更新 (台北時間)
-            # ==========================================
-            if not force_update: # 如果是手動更新，就無視時間鎖
+            # 看門狗時間鎖
+            if not force_update: 
                 if now.weekday() >= 5: 
                     need_crawl = False
                 elif now.time() < datetime.time(18, 0): 
-                    need_crawl = False # 18:00 前完全不敲門
+                    need_crawl = False 
                 elif gs_latest_date == today_str:
                     if gs_margin > 0:
-                        need_crawl = False # 如果融資資料也有了，徹底收工
+                        need_crawl = False 
                     elif now.time() < datetime.time(22, 0):
-                        need_crawl = False # 已經有三大法人，但還沒到22點，別急著重複去敲門
+                        need_crawl = False 
     except Exception: pass 
 
     twse_title, twse_df, margin_today, margin_prev, date_key = None, None, None, None, None
@@ -1269,9 +1266,7 @@ def render_sidebar_market_summary():
                 if date_match:
                     date_key = f"{int(date_match.group(1))+1911}{int(date_match.group(2)):02d}{int(date_match.group(3)):02d}"
                 
-                # ==========================================
-                # 🕰️ 融資獨立時間鎖：22:00 後才允許敲門 (或手動強制)
-                # ==========================================
+                # 融資時間鎖
                 if force_update or now.time() >= datetime.time(22, 0):
                     try: 
                         res_margin = requests.get("https://www.twse.com.tw/rwd/zh/margin/MI_MARGN?response=json&selectType=MS", timeout=5)
@@ -1284,7 +1279,6 @@ def render_sidebar_market_summary():
                     except: pass
                     
                 try: 
-                    # 抓取期貨資料
                     res_oi = requests.post("https://www.taifex.com.tw/cht/3/futContractsDate", data={'queryDate': f"{int(date_key[:4])}/{date_key[4:6]}/{date_key[6:8]}" if date_key else now.strftime("%Y/%m/%d")}, headers={'User-Agent': 'Mozilla/5.0'}, timeout=5)
                     if res_oi.status_code == 200:
                         from bs4 import BeautifulSoup
@@ -1316,7 +1310,6 @@ def render_sidebar_market_summary():
             margin_today_yi = margin_today / 100000
         date_str = f"📅 {date_key} | 🔄 看門狗即時更新"
         
-        # 寫入 Google Sheets
         try:
             new_row = pd.DataFrame([{
                 "日期": date_key, "外資": round(net_buy_foreign, 1), "投信": round(net_buy_trust, 1),
@@ -1329,10 +1322,9 @@ def render_sidebar_market_summary():
                 gs_backup = gs_backup.iloc[:-1]
             updated_df = pd.concat([gs_backup, new_row], ignore_index=True)
             conn.update(spreadsheet=SHEET_URL, worksheet="大盤風向球", data=updated_df)
-            st.cache_data.clear() # 寫入後馬上清除快取，保證下一秒讀出的是最新資料
+            st.cache_data.clear() 
         except: pass
     else:
-        # 如果無法爬蟲 (例如假日或尚未到時間)，就讀取備份
         is_weekend_mode = (now.weekday() >= 5)
         if not gs_backup.empty:
             last_row = gs_backup.iloc[-1]
@@ -1341,7 +1333,6 @@ def render_sidebar_market_summary():
             oi_data["外資"], oi_data["投信"], oi_data["自營商"], total_oi = map(lambda x: int(last_row[x]) if pd.notna(last_row[x]) else 0, ["外資期貨", "投信期貨", "自營商期貨", "期貨合計"])
             margin_diff_yi, margin_today_yi = float(last_row.get("融資增減", 0.0)), float(last_row.get("融存餘額", 0.0))
 
-    # ====== 渲染 HTML 表格 (這部分保留你原本的程式碼即可) ======
     def get_color(val, is_float=True):
         if val > 0: return "#ff4b4b", f"+{val:,.1f}" if is_float else f"+{val:,}"
         elif val < 0: return "#00e676", f"{val:,.1f}" if is_float else f"{val:,}"
@@ -1360,31 +1351,111 @@ def render_sidebar_market_summary():
     m_c, m_s = get_color(margin_diff_yi)
 
     html = f"""
-<div style="font-size: 13px; color: #ccc;">{date_str}</div>
-<table style="width: 100%; text-align: center; border-collapse: collapse; margin-top: 5px; font-size: 14px;">
-<tr style="border-bottom: 1px solid #555; background-color: #262730;">
-<th style="padding: 5px;">法人</th><th style="padding: 5px;">現貨(億)</th><th style="padding: 5px;">TX未平倉</th>
-</tr>
-<tr><td style="padding: 4px;">🌐 外資</td><td style="color: {f_c};">{f_s}</td><td style="color: {fo_c};">{fo_s}</td></tr>
-<tr><td style="padding: 4px;">🏦 投信</td><td style="color: {t_c};">{t_s}</td><td style="color: {to_oc};">{to_os}</td></tr>
-<tr><td style="padding: 4px;">🏢 自營商</td><td style="color: {d_c};">{d_s}</td><td style="color: {do_c};">{do_os}</td></tr>
-<tr style="border-top: 1px solid #555; font-weight: bold;">
-<td style="padding: 4px;">🔥 合計</td><td style="color: {to_c};">{to_s}</td><td style="color: {too_c};">{too_os}</td>
-</tr>
-</table>
-"""
+    <div style="font-size: 13px; color: #ccc;">{date_str}</div>
+    <table style="width: 100%; text-align: center; border-collapse: collapse; margin-top: 5px; font-size: 14px;">
+        <tr style="border-bottom: 1px solid #555; background-color: #262730;">
+            <th style="padding: 5px;">法人</th><th style="padding: 5px;">現貨(億)</th><th style="padding: 5px;">TX未平倉</th>
+        </tr>
+        <tr><td style="padding: 4px;">🌐 外資</td><td style="color: {f_c};">{f_s}</td><td style="color: {fo_c};">{fo_s}</td></tr>
+        <tr><td style="padding: 4px;">🏦 投信</td><td style="color: {t_c};">{t_s}</td><td style="color: {to_oc};">{to_os}</td></tr>
+        <tr><td style="padding: 4px;">🏢 自營商</td><td style="color: {d_c};">{d_s}</td><td style="color: {do_c};">{do_os}</td></tr>
+        <tr style="border-top: 1px solid #555; font-weight: bold;">
+            <td style="padding: 4px;">🔥 合計</td><td style="color: {to_c};">{to_s}</td><td style="color: {too_c};">{too_os}</td>
+        </tr>
+    </table>
+    """
     if margin_diff_yi != 0.0 or margin_today_yi != 0.0:
         html += f"""
-<div style="margin-top: 5px; padding: 5px; background-color: #262730; border-radius: 5px; font-size: 13px;">
-<div>📊 融資餘額增減(億) <span style="color: {m_c}; font-weight: bold; float: right;">{m_s}</span></div>
-<div style="color: #aaa; margin-top: 3px;">└ 今日融資總餘額 <span style="float: right;">{margin_today_yi:,.1f}</span></div>
-</div>
-"""
+        <div style="margin-top: 5px; padding: 5px; background-color: #262730; border-radius: 5px; font-size: 13px;">
+            <div>📊 融資餘額增減(億) <span style="color: {m_c}; font-weight: bold; float: right;">{m_s}</span></div>
+            <div style="color: #aaa; margin-top: 3px;">└ 今日融資總餘額 <span style="float: right;">{margin_today_yi:,.1f}</span></div>
+        </div>
+        """
     st.markdown(html, unsafe_allow_html=True)
+    return today_str
 
-# 執行側邊欄渲染 (這段也要記得放)
+# ------------------------------------------
+# 2. 選擇權關鍵兵力分布 (修復重見天日版)
+# ------------------------------------------
+def render_options_dashboard(today_str):
+    st.markdown("<hr style='margin:15px 0;'>", unsafe_allow_html=True)
+    st.markdown("<h2 style='margin-top: 0; margin-bottom: 5px;'>🏰 選擇權關鍵兵力分布</h2>", unsafe_allow_html=True)
+    
+    today_opt, prev_opt = sync_options_with_gs(today_str)
+    
+    if not today_opt:
+        st.warning("目前尚無選擇權籌碼資料。")
+        return
+
+    # 渲染 PCR
+    pcr_val = today_opt.get('PCR', 0.0)
+    pcr_color = "#FF4B4B" if pcr_val > 100 else "#00E272"
+    st.markdown(f"**PCR:** <span style='color:{pcr_color}; font-size: 16px;'>{pcr_val}%</span>", unsafe_allow_html=True)
+
+    # 建立千點關卡的列表 (從最大壓力往下排到最大支撐)
+    max_pressure = today_opt.get('最大壓力點', 0)
+    max_support = today_opt.get('最大支撐點', 0)
+    
+    if max_pressure == 0 or max_support == 0:
+        st.info("無法解析最大壓力/支撐點位")
+        return
+
+    # 取出 39000 到 50000 的範圍，但只顯示壓力與支撐之間的合理區間 (+- 2000點)
+    display_strikes = [s for s in range(max_pressure + 2000, max_support - 3000, -1000)]
+    
+    html_opt = """
+    <table style="width: 100%; text-align: center; border-collapse: collapse; margin-top: 5px; font-size: 13px;">
+        <tr style="border-bottom: 1px solid #555; background-color: #262730;">
+            <th style="padding: 5px;">點位</th><th style="padding: 5px;">⚔️ Call (口)</th><th style="padding: 5px;">🛡️ Put (口)</th>
+        </tr>
+    """
+    
+    for strike in display_strikes:
+        c_key = f"C{strike}"
+        p_key = f"P{strike}"
+        
+        c_oi = today_opt.get(c_key, 0)
+        p_oi = today_opt.get(p_key, 0)
+        
+        if c_oi == 0 and p_oi == 0:
+            continue # 如果這個點位完全沒人，就跳過
+            
+        c_diff_ui = get_diff_ui(c_oi, prev_opt.get(c_key) if prev_opt else None)
+        p_diff_ui = get_diff_ui(p_oi, prev_opt.get(p_key) if prev_opt else None)
+        
+        # 標記特殊點位
+        strike_label = str(strike)
+        if strike == max_pressure:
+            strike_label += "<br><span style='color:#FF4B4B; font-size:10px;'>(最壓)</span>"
+        elif strike == today_opt.get('次大壓力點', 0):
+            strike_label += "<br><span style='color:#ffa500; font-size:10px;'>(次壓)</span>"
+        elif strike == max_support:
+            strike_label += "<br><span style='color:#00E272; font-size:10px;'>(最撐)</span>"
+        elif strike == today_opt.get('次大支撐點', 0):
+            strike_label += "<br><span style='color:#00a352; font-size:10px;'>(次撐)</span>"
+
+        # 數字格式化處理
+        c_oi_str = f"{c_oi:,}" if c_oi > 0 else "-"
+        p_oi_str = f"{p_oi:,}" if p_oi > 0 else "-"
+
+        html_opt += f"""
+        <tr style="border-bottom: 1px solid #333;">
+            <td style="padding: 6px; font-weight: bold;">{strike_label}</td>
+            <td style="padding: 6px; color: #FF4B4B;">{c_oi_str}{c_diff_ui}</td>
+            <td style="padding: 6px; color: #00E272;">{p_oi_str}{p_diff_ui}</td>
+        </tr>
+        """
+        
+    html_opt += "</table>"
+    st.markdown(html_opt, unsafe_allow_html=True)
+
+
+# ==========================================
+# 執行側邊欄渲染
+# ==========================================
 with tab1:
-    render_sidebar_market_summary()
+    today_str_sync = render_sidebar_market_summary()
+    render_options_dashboard(today_str_sync)
 
 
 # ==========================================
