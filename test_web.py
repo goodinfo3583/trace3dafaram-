@@ -1460,6 +1460,7 @@ with tab2:
     st.markdown("[🔄 區塊4-1：融資減少動向](#section-4-1)")
     st.markdown("[🔄 區塊4-2：借券賣出減少動向](#section-4-2)")
     st.markdown("[🔄 區塊4-3：融券增加動向](#section-4-3)")
+    st.markdown("[🔄 區塊4-4：可能軋空名單](#section-4-4)")
     st.markdown("[🔄 區塊4-5：短線套牢名單](#section-4-5)")
     st.markdown("[💰 區塊5：大股東動向](#section-5)")
     st.markdown("[💸 區塊6：鉅額交易動向](#section-6)")
@@ -2817,7 +2818,7 @@ def build_squeeze_radar():
 with st.spinner("⏳ 正在掃描全市場軋空名單..."):
     df_squeeze_radar, msg, radar_date, is_radar_sync = build_squeeze_radar()
 
-header_html = "🚀 區塊 4-4：短線軋空雷達 (強勢爆發名單) "
+header_html = "🚀 區塊 4-4：可能軋空雷達 "
 if radar_date:
     if is_radar_sync:
         header_html += f"<span style='color: #00D2FF; font-size: 0.7em;'>({radar_date})</span>"
