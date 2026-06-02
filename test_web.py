@@ -2767,8 +2767,7 @@ def build_squeeze_radar():
         rename_mapping = {}      
         for col in df_squeeze.columns:
             if '買賣超佔成交' in col:
-                
-                rename_mapping[col] = col.replace('買賣超佔成交', '買佔成交')
+                new_name = col.replace('買賣超佔成交', '買佔成交')
                 if '當日' in new_name:
                     new_name = new_name.replace('當日', '▼當日')
                 rename_mapping[col] = new_name                
