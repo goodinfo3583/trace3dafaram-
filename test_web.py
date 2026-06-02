@@ -2768,10 +2768,11 @@ def build_risk_radar():
     df_risk['危險指數'] = 1 + (df_risk['🚨融資套牢'] == "✔️").astype(int) + (df_risk['📉借券大增'] == "✔️").astype(int)
     df_risk = df_risk.sort_values(by=['危險指數', '漲跌幅'], ascending=[False, True]).reset_index(drop=True)
     
+    # 💥 【修改點 1】：強化 1 分的標籤字眼
     def get_risk_tag(score):
         if score == 3: return "☠️ 極度危險 (三重重榜)"
         elif score == 2: return "🚨 高度警戒 (雙重重榜)"
-        return "⚠️ 法人調節"
+        return "⚠️ 法人倒貨 (初級警戒)"
         
     df_risk.insert(2, '避險狀態', df_risk['危險指數'].apply(get_risk_tag))
     df_risk = df_risk.drop(columns=['危險指數'])
@@ -2791,31 +2792,28 @@ if not df_risk_radar.empty:
     if df_risk_radar.empty:
         st.success("🎉 目前沒有同時出現『法人賣超』與『籌碼惡化』的危險重榜名單！")
     else:
-        # 🎨 表格美化設定 (統一底色、取消粗體、保留淺淺分隔線)
+        # 🎨 表格美化設定 
         def style_table(df):
             def highlight_risk(row):
-                # 定義共同的基礎樣式：深藍黑底色、一般字體、淺色半透明分隔線
-                base_style = 'background-color: #262730; font-weight: normal; border: 1px solid rgba(255, 255, 255, 0.1);'
+                # 💥 【修改點 2】：強化格線顏色，從透明改成實心的灰藍色 (#525465)
+                base_style = 'background-color: #262730; font-weight: normal; border: 1px solid #525465;'
                 
                 if "☠️" in row['避險狀態']:
-                    # 極度危險：統一底色 + 紅色文字
                     return [base_style + ' color: #ff4b4b;'] * len(row)
                 elif "🚨" in row['避險狀態']:
-                    # 高度警戒：統一底色 + 橘色文字
                     return [base_style + ' color: #ffa500;'] * len(row)
                 else:
-                    # 法人調節：統一底色 + 預設白色/淺灰文字
                     return [base_style + ' color: #e0e0e0;'] * len(row)
             
             styler = df.style.apply(highlight_risk, axis=1)
             
-            # 確保表頭也是深色調、一般字體，並補上相同的分隔線
+            # 確保表頭也有一致的明顯格線
             styler = styler.set_table_styles([
                 {'selector': 'th', 'props': [
                     ('background-color', '#1e1e24'), 
                     ('color', '#ffffff'), 
                     ('font-weight', 'normal'),
-                    ('border', '1px solid rgba(255, 255, 255, 0.1)')
+                    ('border', '1px solid #525465')
                 ]}
             ])
             
