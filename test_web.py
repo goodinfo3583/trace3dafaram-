@@ -1517,9 +1517,19 @@ def render_sidebar_market_summary():
             if '融資餘額' in gs_backup.columns:
                 try: gs_margin = float(gs_backup['融資餘額'].iloc[-1])
                 except: pass
-            if now.weekday() >= 5: need_crawl = False
-            elif now.time() < datetime.time(14, 50): need_crawl = False
-            elif gs_latest_date == today_str and gs_margin > 0: need_crawl = False 
+            
+            # ==========================================
+            # 🕰️ 看門狗時間鎖設定：18:00 與 22:00 分段式更新
+            # ==========================================
+            if now.weekday() >= 5: 
+                need_crawl = False
+            elif now.time() < datetime.time(18, 0): 
+                need_crawl = False # 18:00 前完全不敲門
+            elif gs_latest_date == today_str:
+                if gs_margin > 0:
+                    need_crawl = False # 如果融資資料也有了，徹底收工
+                elif now.time() < datetime.time(22, 0):
+                    need_crawl = False # 已經有三大法人，但還沒到22點，別急著重複去敲門
     except Exception: pass 
 
     twse_title, twse_df, margin_today, margin_prev, date_key = None, None, None, None, None
@@ -1531,15 +1541,21 @@ def render_sidebar_market_summary():
             date_match = re.search(r'(\d+)年(\d+)月(\d+)日', str(twse_title))
             if date_match:
                 date_key = f"{int(date_match.group(1))+1911}{int(date_match.group(2)):02d}{int(date_match.group(3)):02d}"
-            try: 
-                res_margin = requests.get("https://www.twse.com.tw/rwd/zh/margin/MI_MARGN?response=json&selectType=MS", timeout=5)
-                if res_margin.status_code == 200:
-                    m_data = res_margin.json().get("data", []) if "data" in res_margin.json() else res_margin.json().get("tables", [{}])[0].get("data", [])
-                    for row in m_data:
-                        if row and len(row) >= 6 and "融資金額" in str(row[0]):
-                            margin_prev, margin_today = float(str(row[4]).replace(',', '').strip()), float(str(row[5]).replace(',', '').strip())
-                            break
-            except: pass
+            
+            # ==========================================
+            # 🕰️ 融資獨立時間鎖：22:00 後才允許敲門
+            # ==========================================
+            if now.time() >= datetime.time(22, 0):
+                try: 
+                    res_margin = requests.get("https://www.twse.com.tw/rwd/zh/margin/MI_MARGN?response=json&selectType=MS", timeout=5)
+                    if res_margin.status_code == 200:
+                        m_data = res_margin.json().get("data", []) if "data" in res_margin.json() else res_margin.json().get("tables", [{}])[0].get("data", [])
+                        for row in m_data:
+                            if row and len(row) >= 6 and "融資金額" in str(row[0]):
+                                margin_prev, margin_today = float(str(row[4]).replace(',', '').strip()), float(str(row[5]).replace(',', '').strip())
+                                break
+                except: pass
+                
             try: 
                 res_oi = requests.post("https://www.taifex.com.tw/cht/3/futContractsDate", data={'queryDate': f"{int(date_key[:4])}/{date_key[4:6]}/{date_key[6:8]}" if date_key else now.strftime("%Y/%m/%d")}, headers={'User-Agent': 'Mozilla/5.0'}, timeout=5)
                 if res_oi.status_code == 200:
@@ -1586,7 +1602,7 @@ def render_sidebar_market_summary():
             margin_diff_yi, margin_today_yi = float(last_record.get('融資增減', 0)), float(last_record.get('融資餘額', 0))
 
     if date_str != "未知日期":
-        status_badge = "⚡ <span style='color:#00E272;'>雲端極速載入</span>" if (is_weekend_mode and need_crawl == False and now.time() >= datetime.time(14, 50)) else ("🌕 <span style='color:#00D2FF;'>雲端同步版</span>" if is_weekend_mode else "🌕 <span style='color:#00E272;'>即時更新版</span>")
+        status_badge = "⚡ <span style='color:#00E272;'>雲端極速載入</span>" if (is_weekend_mode and need_crawl == False and now.time() >= datetime.time(18, 0)) else ("🌕 <span style='color:#00D2FF;'>雲端同步版</span>" if is_weekend_mode else "🌕 <span style='color:#00E272;'>即時更新版</span>")
         def get_cls(val): return '#FF4B4B' if val > 0 else '#00CC66' if val < 0 else 'white'
         def get_sign(val): return f"+{val:.1f}" if val > 0 else f"{val:.1f}"
         def get_oi_str(val): return "0" if val == 0 else f"+{val:,}" if val > 0 else f"{val:,}"
@@ -1605,7 +1621,7 @@ def render_sidebar_market_summary():
             html_lines.append(f"<tr style='border-top: 1px dashed #334155;'><td style='padding: 8px 0 2px 0; color: white; font-weight: bold;' colspan='2'>📊 融資餘額增減(億)</td><td style='padding: 8px 0 2px 0; text-align: right; color: {get_cls(margin_diff_yi)}; font-weight: bold;'>{get_sign(margin_diff_yi)}</td></tr>")
             html_lines.append(f"<tr><td style='padding: 1px 0 4px 0; font-size: 12px; color: #94A3B8; font-weight: normal;' colspan='2'>└ 今日融資總餘額</td><td style='padding: 1px 0 4px 0; text-align: right; color: #94A3B8; font-size: 12px; font-weight: normal;'>{margin_today_yi:.1f}</td></tr>")
         else:
-            html_lines.append(f"<tr style='border-top: 1px dashed #334155;'><td style='padding: 8px 0 2px 0; color: white; font-weight: bold;' colspan='2'>📊 融資餘額增減(億)</td><td style='padding: 8px 0 2px 0; text-align: right; color: #94A3B8; font-weight: bold;'>⏳ 晚間出爐</td></tr>")
+            html_lines.append(f"<tr style='border-top: 1px dashed #334155;'><td style='padding: 8px 0 2px 0; color: white; font-weight: bold;' colspan='2'>📊 融資餘額增減(億)</td><td style='padding: 8px 0 2px 0; text-align: right; color: #94A3B8; font-weight: bold;'>⏳ 晚間 22:00 出爐</td></tr>")
         html_lines.append("</table></div>")
         st.sidebar.markdown("".join(html_lines), unsafe_allow_html=True)
     else: st.sidebar.info("🕒 目前查無今日三大法人買賣資料。")
@@ -1645,13 +1661,16 @@ if current_market_date and current_market_date != "未知日期":
         d_c48 = get_diff_ui(c48, prev_opt.get('C48000')) if is_same_month else ""
         d_p48 = get_diff_ui(p48, prev_opt.get('P48000')) if is_same_month else ""
 
-        # 🔥 注意：下面的 HTML 標籤已緊貼最左邊（零縮排），保證不亂碼！
+        # 🎯 【修改處】清理合約月份的 ".0"
+        display_contract_month = str(today_opt['合約月份']).replace('.0', '')
+
+        # 🔥 注意：下面的 HTML 標籤已緊貼最左邊（零縮排），並已移除壓力與支撐的背景顏色
         st.sidebar.markdown(f"""<div style='background-color: #1e293b; padding: 12px; border-radius: 8px; margin-bottom: 10px; border: 1px solid #334155;'>
 <div style='display: flex; justify-content: space-between; align-items: center; margin-bottom: 8px;'>
-<span style='font-weight: bold; color: white; font-size: 14px;'>🎯 選擇權攻防 (合約:{today_opt['合約月份']})</span>
+<span style='font-weight: bold; color: white; font-size: 14px;'>🎯 選擇權攻防 (合約:{display_contract_month})</span>
 <span style='color: {pcr_color}; font-weight: bold; font-size: 14px;'>PCR: {pcr}%</span>
 </div>
-<div style='background-color: #3b2a2a; border-left: 4px solid #FF4B4B; padding: 8px; border-radius: 4px; margin-bottom: 6px;'>
+<div style='border-left: 4px solid #FF4B4B; padding: 8px; border-radius: 4px; margin-bottom: 6px;'>
 <div style='color: #FF4B4B; font-weight: bold; font-size: 13px; display: flex; justify-content: space-between;'>
 <span>📈 最大壓力: {int(today_opt['最大壓力點']):,}</span>
 <span>{int(today_opt['最大壓力OI']):,}{d_r1}</span>
@@ -1661,7 +1680,7 @@ if current_market_date and current_market_date != "未知日期":
 <span>{int(today_opt['次大壓力OI']):,}{d_r2}</span>
 </div>
 </div>
-<div style='background-color: #2a3b2f; border-left: 4px solid #00E272; padding: 8px; border-radius: 4px; margin-bottom: 6px;'>
+<div style='border-left: 4px solid #00E272; padding: 8px; border-radius: 4px; margin-bottom: 6px;'>
 <div style='color: #00E272; font-weight: bold; font-size: 13px; display: flex; justify-content: space-between;'>
 <span>📉 最大支撐: {int(today_opt['最大支撐點']):,}</span>
 <span>{int(today_opt['最大支撐OI']):,}{d_s1}</span>
@@ -1690,7 +1709,6 @@ if current_market_date and current_market_date != "未知日期":
 </tr>
 </table>
 </div>""", unsafe_allow_html=True)
-
 # ------------------------------------------
 # 2. 大盤總體經濟指標
 # ------------------------------------------
@@ -3695,7 +3713,7 @@ with top_pool_container:
             hist_combined = pd.DataFrame() 
             
             try:
-                gs_history = conn.read(spreadsheet=SHEET_URL, worksheet="選股歷史", ttl=0)
+                gs_history = conn.read(spreadsheet=SHEET_URL, worksheet="選股歷史", ttl=600)
                 gs_history = gs_history.dropna(how="all")
                 
                 if not gs_history.empty and '紀錄日期' in gs_history.columns:
@@ -3752,7 +3770,7 @@ with top_pool_container:
                         save_df.insert(0, '紀錄日期', anchor_date_str)
                         
                         try:
-                            old_df = conn.read(spreadsheet=SHEET_URL, worksheet="選股歷史", ttl=0)
+                            old_df = conn.read(spreadsheet=SHEET_URL, worksheet="選股歷史", ttl=600)
                             old_df = old_df.dropna(how="all")
                             if '紀錄日期' in old_df.columns:
                                 old_df['紀錄日期'] = old_df['紀錄日期'].astype(str).str.replace(r'\.0$', '', regex=True).str.zfill(8)
