@@ -2757,7 +2757,7 @@ def build_risk_radar():
                     df_risk[col] = df_risk[col].round(2)
         
         df_risk = df_risk[df_risk['漲跌幅'] <= 0]
-        df_risk['⚠️法人賣超'] = "✔️"
+        # 🗑️ 【修改點】：已移除 df_risk['⚠️法人賣超'] = "✔️"
         
     except Exception as e:
         return pd.DataFrame(), f"讀取賣超母表失敗: {str(e)}", "", False
@@ -2786,13 +2786,13 @@ def build_risk_radar():
     df_risk['危險指數'] = 1 + (df_risk['🚨融資套牢'] == "✔️").astype(int) + (df_risk['📉借券大增'] == "✔️").astype(int)
     df_risk = df_risk.sort_values(by=['危險指數', '漲跌幅'], ascending=[False, True]).reset_index(drop=True)
     
-    # 📝 【修改點 2】：簡化標籤文字
+    # 📝 簡化標籤文字
     def get_risk_tag(score):
         if score == 3: return "☠️ 極度危險"
         elif score == 2: return "🚨 高度警戒"
         return "⚠️ 初級警戒"
         
-    # 📝 【修改點 3】：將欄位名稱改為「套牢評估」
+    # 📝 將欄位名稱改為「套牢評估」
     df_risk.insert(2, '套牢評估', df_risk['危險指數'].apply(get_risk_tag))
     df_risk = df_risk.drop(columns=['危險指數'])
     
@@ -2810,7 +2810,7 @@ if radar_date:
         header_html += f"<span style='color: #00D2FF; font-size: 0.7em;'>({radar_date})</span> <span style='color: #ffa500; font-size: 0.5em;'>⏳融券資待更新</span>"
 
 st.markdown(f"<h2>{header_html}</h2>", unsafe_allow_html=True)
-st.write("💡 三大法人賣超，融資套牢或借券增加的籌碼惡化標的。。")
+st.write("💡 三大法人賣超，融資套牢或借券增加的籌碼惡化標的,若當日成交轉正有望剔除。")
 
 if not df_risk_radar.empty:
     show_all = st.checkbox("顯示榜內被法人賣超的下跌/持平標的但融資借券未上榜", value=False)
@@ -2821,19 +2821,26 @@ if not df_risk_radar.empty:
     if df_risk_radar.empty:
         st.success("🎉 目前沒有同時出現法人賣超與籌碼惡化的危險名單！")
     else:
+        # 🔢 【修改點】：重新整理索引，並插入「索引」欄位（放在篩選之後，確保編號連續）
+        df_risk_radar = df_risk_radar.reset_index(drop=True)
+        df_risk_radar.insert(0, '索引', range(1, len(df_risk_radar) + 1))
+        
         def style_table(df):
             try:
                 styler = df.style.hide(axis='index')
             except:
                 styler = df.style.hide_index()
             
-            # 🎨 【修改點 4】：特別針對「成交、漲跌價、漲跌幅」三欄染上台股下跌的綠色
             def highlight_risk(row):
                 styles = []
                 for col_name in row.index:
                     base_style = 'background-color: #262730;'
+                    
                     if col_name in ['成交', '漲跌價', '漲跌幅']:
                         styles.append(base_style + ' color: #00e676;') # 亮綠色
+                    # 🔴 【修改點】：檢查是否為▼當日賣佔成交且大於 0 (法人轉買)
+                    elif col_name == '▼當日賣佔成交' and pd.to_numeric(row[col_name], errors='coerce') > 0:
+                        styles.append(base_style + ' color: #ff4b4b;') # 亮紅色
                     else:
                         styles.append(base_style + ' color: #e0e0e0;') # 其他預設淺灰色
                 return styles
@@ -2862,13 +2869,17 @@ if not df_risk_radar.empty:
             ])
             
             num_cols = df.select_dtypes(include=['number']).columns.tolist()
+            # 確保新加入的「索引」欄位不會被強加小數點 ".00"
+            if '索引' in num_cols:
+                num_cols.remove('索引')
+                
             styler = styler.format({col: "{:.2f}" for col in num_cols})
             
             return styler.to_html()
 
         html_table = style_table(df_risk_radar)
         
-        # 📏 【修改點 5】：將 max-height 增加到 600px，確保能顯示約 10 檔
+        # 📏 確保能顯示約 10 檔
         scrollable_div = f"""
         <div style="max-height: 600px; overflow-y: auto; border: 1px solid #808495; border-radius: 5px;">
             {html_table}
