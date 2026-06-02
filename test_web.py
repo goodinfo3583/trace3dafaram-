@@ -2863,7 +2863,7 @@ if not df_risk_radar.empty:
                 ]},
                 # 💥 【修改點】：滑鼠 Hover 動態光暈效果 (戰情室導航風格)
                 {'selector': 'tbody tr:hover td', 'props': [
-                    ('background-color', 'rgba(20, 30, 71, 0.85) !important'), # 亮黃色帶透明度，透出暗黑底色
+                    ('background-color', 'rgba(11, 17, 41, 0.85) !important'), # 亮黃色帶透明度，透出暗黑底色
                     #('box-shadow', 'inset 0 0 10px rgba(255, 215, 0, 0.4) !important'), # 儲存格黃色內光暈
                     ('text-shadow', '0 0 8px rgba(255, 255, 255, 0.5) !important') # 讓原本的字體微微發光
                 ]}
