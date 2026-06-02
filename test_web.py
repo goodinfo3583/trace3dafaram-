@@ -1425,17 +1425,28 @@ def render_options_dashboard(target_date_str):
         st.warning("目前尚無選擇權籌碼資料。")
         return
 
-    pcr_val = today_opt.get('PCR', 0.0)
+    # 確保 PCR 轉型正確
+    try:
+        pcr_val = float(today_opt.get('PCR', 0.0))
+    except:
+        pcr_val = 0.0
+        
     pcr_color = "#FF4B4B" if pcr_val > 100 else "#00E272"
     st.markdown(f"**PCR:** <span style='color:{pcr_color}; font-size: 16px;'>{pcr_val}%</span>", unsafe_allow_html=True)
 
-    max_pressure = today_opt.get('最大壓力點', 0)
-    max_support = today_opt.get('最大支撐點', 0)
+    # 🔧 【核心修復】：強制轉型為 int，破除 TypeError
+    try:
+        max_pressure = int(float(today_opt.get('最大壓力點', 0)))
+        max_support = int(float(today_opt.get('最大支撐點', 0)))
+    except:
+        max_pressure = 0
+        max_support = 0
     
     if max_pressure == 0 or max_support == 0:
         st.info("無法解析最大壓力/支撐點位")
         return
 
+    # 現在 max_pressure 和 max_support 絕對是乾淨的整數，range() 不會再報錯
     display_strikes = [s for s in range(max_pressure + 2000, max_support - 3000, -1000)]
     
     html_opt = "<table style='width: 100%; text-align: center; border-collapse: collapse; margin-top: 5px; font-size: 13px;'>"
@@ -1446,8 +1457,12 @@ def render_options_dashboard(target_date_str):
         c_key = f"C{strike}"
         p_key = f"P{strike}"
         
-        c_oi = today_opt.get(c_key, 0)
-        p_oi = today_opt.get(p_key, 0)
+        # 🔧 將所有讀出的口數也強制轉 int，避免顯示為 1500.0 的怪異格式
+        try: c_oi = int(float(today_opt.get(c_key, 0)))
+        except: c_oi = 0
+            
+        try: p_oi = int(float(today_opt.get(p_key, 0)))
+        except: p_oi = 0
         
         if c_oi == 0 and p_oi == 0:
             continue
@@ -1456,13 +1471,20 @@ def render_options_dashboard(target_date_str):
         p_diff_ui = get_diff_ui(p_oi, prev_opt.get(p_key) if prev_opt else None)
         
         strike_label = str(strike)
+        
+        # 次壓/次撐也要安全轉型
+        try: second_pressure = int(float(today_opt.get('次大壓力點', 0)))
+        except: second_pressure = 0
+        try: second_support = int(float(today_opt.get('次大支撐點', 0)))
+        except: second_support = 0
+
         if strike == max_pressure:
             strike_label += "<br><span style='color:#FF4B4B; font-size:10px;'>(最壓)</span>"
-        elif strike == today_opt.get('次大壓力點', 0):
+        elif strike == second_pressure:
             strike_label += "<br><span style='color:#ffa500; font-size:10px;'>(次壓)</span>"
         elif strike == max_support:
             strike_label += "<br><span style='color:#00E272; font-size:10px;'>(最撐)</span>"
-        elif strike == today_opt.get('次大支撐點', 0):
+        elif strike == second_support:
             strike_label += "<br><span style='color:#00a352; font-size:10px;'>(次撐)</span>"
 
         c_oi_str = f"{c_oi:,}" if c_oi > 0 else "-"
@@ -1476,7 +1498,6 @@ def render_options_dashboard(target_date_str):
         
     html_opt += "</table>"
     st.markdown(html_opt, unsafe_allow_html=True)
-
 
 # ==========================================
 # 執行側邊欄渲染
