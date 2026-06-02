@@ -1381,12 +1381,15 @@ def fetch_taifex_options_raw(query_date):
             dfs = pd.read_html(StringIO(response.text))
             target_df = next((df for df in dfs if '履約價' in df.to_string() and ('未沖銷' in df.to_string() or '未平倉' in df.to_string())), None)
             if target_df is None: return None
+            
             if isinstance(target_df.columns, pd.MultiIndex): target_df.columns = ['_'.join(map(str, col)).strip() for col in target_df.columns]
             else: target_df.columns = target_df.columns.astype(str)
+            
             col_month = next((c for c in target_df.columns if '到期' in c or '月份' in c), None)
             col_strike = next((c for c in target_df.columns if '履約價' in c), None)
             col_type = next((c for c in target_df.columns if '買賣權' in c), None)
             col_oi = next((c for c in target_df.columns if '未沖銷' in c or '未平倉' in c), None)
+            
             if not all([col_month, col_strike, col_type, col_oi]):
                 for idx in range(min(5, len(target_df))):
                     row_str = str(target_df.iloc[idx].tolist())
@@ -1395,19 +1398,22 @@ def fetch_taifex_options_raw(query_date):
                         target_df = target_df.iloc[idx+1:].reset_index(drop=True)
                         col_month, col_strike, col_type, col_oi = next((c for c in target_df.columns if '到期' in c or '月份' in c), None), next((c for c in target_df.columns if '履約價' in c), None), next((c for c in target_df.columns if '買賣權' in c), None), next((c for c in target_df.columns if '未沖銷' in c or '未平倉' in c), None)
                         break
+                        
             df = target_df.dropna(subset=[col_strike, col_type, col_oi]).copy()
             df[col_oi] = pd.to_numeric(df[col_oi].astype(str).str.replace(',', '').str.replace('-', '0'), errors='coerce').fillna(0)
             df[col_strike] = pd.to_numeric(df[col_strike].astype(str).str.replace(',', ''), errors='coerce')
             df[col_month] = df[col_month].astype(str).str.strip()
+            
             valid_months = [m for m in df[col_month].unique() if m.startswith('20')]
             if not valid_months: return None
             standard_months = [m for m in valid_months if len(m) == 6 and m.isdigit()]
             contract_month = sorted(standard_months)[0] if standard_months else sorted(valid_months)[0]
             df_near = df[df[col_month] == contract_month]
 
-            # 抓自訂點位
+            # 🔥 抓取千點自訂點位 (從 39000 一路抓到 50000 備用)
+            target_strikes = list(range(39000, 51000, 1000))
             custom_strikes_data = {}
-            for strike in [40000, 44000, 45000, 48000]:
+            for strike in target_strikes:
                 c_oi, p_oi = 0, 0
                 c_df = df_near[(df_near[col_strike] == strike) & (df_near[col_type].str.contains('Call|買權', case=False, na=False))]
                 p_df = df_near[(df_near[col_strike] == strike) & (df_near[col_type].str.contains('Put|賣權', case=False, na=False))]
@@ -1430,7 +1436,7 @@ def fetch_taifex_options_raw(query_date):
             top_calls = df_call.nlargest(2, col_oi).reset_index(drop=True)
             top_puts = df_put.nlargest(2, col_oi).reset_index(drop=True)
             
-            return {
+            result_dict = {
                 '合約月份': contract_month, 'PCR': pcr_value,
                 '最大壓力點': int(top_calls.loc[0, col_strike]) if len(top_calls) >= 1 else 0,
                 '最大壓力OI': int(top_calls.loc[0, col_oi]) if len(top_calls) >= 1 else 0,
@@ -1439,15 +1445,18 @@ def fetch_taifex_options_raw(query_date):
                 '最大支撐點': int(top_puts.loc[0, col_strike]) if len(top_puts) >= 1 else 0,
                 '最大支撐OI': int(top_puts.loc[0, col_oi]) if len(top_puts) >= 1 else 0,
                 '次大支撐點': int(top_puts.loc[1, col_strike]) if len(top_puts) >= 2 else 0,
-                '次大支撐OI': int(top_puts.loc[1, col_oi]) if len(top_puts) >= 2 else 0,
-                'C40000': custom_strikes_data[40000]['call'], 'P40000': custom_strikes_data[40000]['put'],
-                'C44000': custom_strikes_data[44000]['call'], 'P44000': custom_strikes_data[44000]['put'],
-                'C45000': custom_strikes_data[45000]['call'], 'P45000': custom_strikes_data[45000]['put'],
-                'C48000': custom_strikes_data[48000]['call'], 'P48000': custom_strikes_data[48000]['put']
+                '次大支撐OI': int(top_puts.loc[1, col_oi]) if len(top_puts) >= 2 else 0
             }
+            
+            # 🔥 將所有千點口數併入回傳字典
+            for strike in target_strikes:
+                result_dict[f'C{strike}'] = custom_strikes_data[strike]['call']
+                result_dict[f'P{strike}'] = custom_strikes_data[strike]['put']
+                
+            return result_dict
         except Exception: time.sleep(1)
     return None
-
+#=========================以上選擇權抓取點位
 def sync_options_with_gs(date_str_yyyymmdd):
     """選擇權看門狗：比對 GS，有資料秒回傳，沒資料才爬蟲"""
     global conn, SHEET_URL
@@ -1632,6 +1641,9 @@ current_market_date = render_sidebar_market_summary()
 # ------------------------------------------
 # 🎯 附加：選擇權攻防 (Google Sheet 動態兵力位移版)
 # ------------------------------------------
+# ------------------------------------------
+# 🎯 附加：選擇權攻防 (Google Sheet 動態兵力位移版)
+# ------------------------------------------
 if current_market_date and current_market_date != "未知日期":
     today_opt, prev_opt = sync_options_with_gs(current_market_date)
 
@@ -1651,7 +1663,9 @@ if current_market_date and current_market_date != "未知日期":
         max_put_strike = int(today_opt.get('最大支撐點', 0))
         sec_put_strike = int(today_opt.get('次大支撐點', 0))
 
-        custom_strikes = [48000, 45000, 44000, 40000]
+        # 🔥 自動生成 40000 到 48000 的千點陣列，再也不用手動打
+        custom_strikes = list(range(40000, 49000, 1000))
+        
         all_strikes = set(custom_strikes + [max_call_strike, sec_call_strike, max_put_strike, sec_put_strike])
         all_strikes.discard(0) 
         sorted_strikes = sorted(list(all_strikes), reverse=True)
@@ -1695,7 +1709,6 @@ if current_market_date and current_market_date != "未知日期":
             c_oi_str = f"{c_oi_int:,}" if c_oi_int > 0 else "-"
             p_oi_str = f"{p_oi_int:,}" if p_oi_int > 0 else "-"
 
-            # 🔥 注意：下面的 HTML 標籤已緊貼最左邊，消除縮排，避免被當成程式碼區塊顯示
             table_rows_html += f"""<tr style='border-bottom: 1px solid #334155;'>
 <td style='padding: 6px 0; color: white; font-weight: bold;'>{strike:,}{label_suffix}</td>
 <td style='padding: 6px 0; color: #FF8A8A; font-weight: bold;'>{c_oi_str}</td>
