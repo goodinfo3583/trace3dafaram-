@@ -1664,11 +1664,11 @@ if current_market_date and current_market_date != "未知日期":
         # 🎯 【修改處】清理合約月份的 ".0"
         display_contract_month = str(today_opt['合約月份']).replace('.0', '')
 
-        # 🔥 注意：下面的 HTML 標籤已緊貼最左邊（零縮排），並已移除壓力與支撐的背景顏色
+        # 🔥 注意：下面的 HTML 標籤已緊貼最左邊（零縮排），並已移除壓力與支撐的背景顏色 顯示PCR
         st.sidebar.markdown(f"""<div style='background-color: #1e293b; padding: 12px; border-radius: 8px; margin-bottom: 10px; border: 1px solid #334155;'>
 <div style='display: flex; justify-content: space-between; align-items: center; margin-bottom: 8px;'>
-<span style='font-weight: bold; color: white; font-size: 14px;'>🏰 選擇權攻防 ({display_contract_month})</span>
-<span style='color: {pcr_color}; font-weight: bold; font-size: 14px;'>PCR: {pcr}%</span>
+<span style='font-weight: bold; color: white; font-size: 14px;'>🏰 選擇權 ({display_contract_month})</span>
+<span style='color: {pcr_color}; font-weight: bold; font-size: 14px;'>{pcr}%</span>
 </div>
 <div style='border-left: 4px solid #FF4B4B; padding: 8px; border-radius: 4px; margin-bottom: 6px;'>
 <div style='color: #FF4B4B; font-weight: bold; font-size: 13px; display: flex; justify-content: space-between;'>
