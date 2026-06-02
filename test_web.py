@@ -2797,7 +2797,7 @@ if not df_risk_radar.empty:
             def highlight_risk(row):
                 # 💡 【修改點】：全部統一為淺灰字體 (#e0e0e0)，並把格線調亮 (#808495)
                 # 若想調格線，請修改這裡的 1px 或 #808495
-                base_style = 'background-color: #262730; font-weight: normal; color: #e0e0e0; border: 1px solid #808495;'
+                base_style = 'background-color: #262730; font-weight: normal; color: #e0e0e0; border: 2px solid #C7C7E2;'
                 return [base_style] * len(row)
             
             styler = df.style.apply(highlight_risk, axis=1)
