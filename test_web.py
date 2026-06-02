@@ -2711,7 +2711,6 @@ def build_risk_radar():
     if not sell_files:
         return pd.DataFrame(), "找不到三大法人賣超檔案", "", False
 
-    # ⏳ 解析檔名日期功能
     def get_date(filepath):
         match = re.search(r'(\d{8})', os.path.basename(filepath))
         return match.group(1) if match else ""
@@ -2720,10 +2719,7 @@ def build_risk_radar():
     margin_date = get_date(margin_files[0]) if margin_files else ""
     short_date = get_date(short_files[0]) if short_files else ""
     
-    # 判斷日期是否完全同步 (判斷是否為 6點~10點 的過渡期)
     is_sync = (sell_date == margin_date == short_date)
-    
-    # 格式化顯示日期 (YYYY/MM/DD)
     display_date = f"{sell_date[:4]}/{sell_date[4:6]}/{sell_date[6:]}" if len(sell_date) == 8 else sell_date
 
     try:
@@ -2732,11 +2728,11 @@ def build_risk_radar():
         
         id_col = next((c for c in df_sell.columns if '代號' in c), df_sell.columns[1])
         name_col = next((c for c in df_sell.columns if '名稱' in c), df_sell.columns[2])
-        df_sell = df_sell.rename(columns={id_col: '股票代號', name_col: '股票名稱'})
-        df_sell['股票代號'] = df_sell['股票代號'].astype(str).str.strip()
+        # 📝 【修改點 1】：將股票代號、股票名稱精簡為「代號」、「名稱」
+        df_sell = df_sell.rename(columns={id_col: '代號', name_col: '名稱'})
+        df_sell['代號'] = df_sell['代號'].astype(str).str.strip()
         
-        keep_cols = ['股票代號', '股票名稱']
-        # 🗑️ 【修改點 3】：移除了 '10日'
+        keep_cols = ['代號', '名稱']
         for keyword in ['成交', '漲跌價', '漲跌幅', '當日', '2日', '3日', '5日']:
             matched_cols = [c for c in df_sell.columns if keyword in c and '月' not in c and '年' not in c]
             if matched_cols:
@@ -2745,7 +2741,6 @@ def build_risk_radar():
         keep_cols = list(dict.fromkeys(keep_cols))
         df_risk = df_sell[keep_cols].copy()
         
-        # 📝 【修改點 4 & 5】：修改欄位名稱與加上倒立三角形
         rename_mapping = {}
         for col in df_risk.columns:
             if '買賣超佔成交' in col:
@@ -2756,7 +2751,7 @@ def build_risk_radar():
         df_risk = df_risk.rename(columns=rename_mapping)
         
         for col in df_risk.columns:
-            if col not in ['股票代號', '股票名稱']:
+            if col not in ['代號', '名稱']:
                 df_risk[col] = pd.to_numeric(df_risk[col].astype(str).str.replace('%', '', regex=False), errors='coerce')
                 if pd.api.types.is_float_dtype(df_risk[col]):
                     df_risk[col] = df_risk[col].round(2)
@@ -2785,18 +2780,20 @@ def build_risk_radar():
                 short_danger_ids = set(df_short[s_id_col].astype(str).str.replace(r'\D', '', regex=True))
         except: pass
 
-    df_risk['🚨融資套牢'] = df_risk['股票代號'].apply(lambda x: "✔️" if x in margin_danger_ids else "")
-    df_risk['📉借券大增'] = df_risk['股票代號'].apply(lambda x: "✔️" if x in short_danger_ids else "")
+    df_risk['🚨融資套牢'] = df_risk['代號'].apply(lambda x: "✔️" if x in margin_danger_ids else "")
+    df_risk['📉借券大增'] = df_risk['代號'].apply(lambda x: "✔️" if x in short_danger_ids else "")
     
     df_risk['危險指數'] = 1 + (df_risk['🚨融資套牢'] == "✔️").astype(int) + (df_risk['📉借券大增'] == "✔️").astype(int)
     df_risk = df_risk.sort_values(by=['危險指數', '漲跌幅'], ascending=[False, True]).reset_index(drop=True)
     
+    # 📝 【修改點 2】：簡化標籤文字
     def get_risk_tag(score):
-        if score == 3: return "☠️ 極度危險 (三重重榜)"
-        elif score == 2: return "🚨 高度警戒 (雙重重榜)"
-        return "⚠️ 法人倒貨 (初級警戒)"
+        if score == 3: return "☠️ 極度危險"
+        elif score == 2: return "🚨 高度警戒"
+        return "⚠️ 初級警戒"
         
-    df_risk.insert(2, '避險狀態', df_risk['危險指數'].apply(get_risk_tag))
+    # 📝 【修改點 3】：將欄位名稱改為「套牢評估」
+    df_risk.insert(2, '套牢評估', df_risk['危險指數'].apply(get_risk_tag))
     df_risk = df_risk.drop(columns=['危險指數'])
     
     return df_risk, "Success", display_date, is_sync
@@ -2805,51 +2802,53 @@ def build_risk_radar():
 with st.spinner("⏳ 正在掃描全市場避險名單..."):
     df_risk_radar, msg, radar_date, is_radar_sync = build_risk_radar()
 
-# 📅 【修改點 1 & 2】：動態標題與時間標籤渲染
 header_html = "🚨 區塊 4-4：短線避險雷達 (高風險名單) "
 if radar_date:
     if is_radar_sync:
-        # 資料同步：正常顯示指定的藍色 #00D2FF
         header_html += f"<span style='color: #00D2FF; font-size: 0.7em;'>({radar_date})</span>"
     else:
-        # 資料不同步 (6點~10點過渡期)：加上橘色警告標語
         header_html += f"<span style='color: #00D2FF; font-size: 0.7em;'>({radar_date})</span> <span style='color: #ffa500; font-size: 0.5em;'>⏳融券資待更新</span>"
 
 st.markdown(f"<h2>{header_html}</h2>", unsafe_allow_html=True)
-st.write("💡 三大法人賣超，融資套牢或借券增加的籌碼惡化標的。")
+st.write("💡 三大法人賣超，融資套牢或借券增加的籌碼惡化標的。。")
 
 if not df_risk_radar.empty:
-    show_all = st.checkbox("顯示榜內被法人賣超的下跌/持平標的(未出現在融資與借券名單)", value=False)
+    show_all = st.checkbox("顯示榜內被法人賣超的下跌/持平標的但融資借券未上榜", value=False)
     
     if not show_all:
-        df_risk_radar = df_risk_radar[df_risk_radar['避險狀態'].str.contains("☠️|🚨", regex=True)]
+        df_risk_radar = df_risk_radar[df_risk_radar['套牢評估'].str.contains("☠️|🚨", regex=True)]
 
     if df_risk_radar.empty:
-        st.success("🎉 目前沒有同時出現『法人賣超』與『籌碼惡化』的危險重榜名單！")
+        st.success("🎉 目前沒有同時出現法人賣超與籌碼惡化的危險名單！")
     else:
-        # 🎨 表格美化設定
         def style_table(df):
             try:
                 styler = df.style.hide(axis='index')
             except:
                 styler = df.style.hide_index()
             
+            # 🎨 【修改點 4】：特別針對「成交、漲跌價、漲跌幅」三欄染上台股下跌的綠色
             def highlight_risk(row):
-                base_style = 'background-color: #262730; color: #e0e0e0;'
-                return [base_style] * len(row)
+                styles = []
+                for col_name in row.index:
+                    base_style = 'background-color: #262730;'
+                    if col_name in ['成交', '漲跌價', '漲跌幅']:
+                        styles.append(base_style + ' color: #00e676;') # 亮綠色
+                    else:
+                        styles.append(base_style + ' color: #e0e0e0;') # 其他預設淺灰色
+                return styles
             
             styler = styler.apply(highlight_risk, axis=1)
             
             border_css = '1px solid #808495'
             styler = styler.set_table_styles([
-                # 🔍 【修改點 6】：加入 font-size: 13px 來縮小整體字體
                 {'selector': 'table', 'props': [('width', '100%'), ('border-collapse', 'collapse'), ('font-family', 'sans-serif'), ('font-size', '13px')]},
                 {'selector': 'th', 'props': [
                     ('background-color', '#1e1e24'), 
                     ('color', '#ffffff'), 
                     ('font-weight', 'normal'),
                     ('border', border_css),
-                    ('padding', '6px 4px'), # 🔍 縮小表頭留白空間 (原為 10px)
+                    ('padding', '6px 4px'), 
                     ('text-align', 'center'),
                     ('position', 'sticky'),  
                     ('top', '0'),            
@@ -2857,7 +2856,7 @@ if not df_risk_radar.empty:
                 ]},
                 {'selector': 'td', 'props': [
                     ('border', border_css),
-                    ('padding', '4px'), # 🔍 縮小儲存格留白空間 (原為 8px)
+                    ('padding', '4px'), 
                     ('text-align', 'center')
                 ]}
             ])
@@ -2869,9 +2868,9 @@ if not df_risk_radar.empty:
 
         html_table = style_table(df_risk_radar)
         
-        # 捲動容器高度維持，因為字體變小了，同樣的高度可以容納更多檔股票
+        # 📏 【修改點 5】：將 max-height 增加到 600px，確保能顯示約 10 檔
         scrollable_div = f"""
-        <div style="max-height: 450px; overflow-y: auto; border: 1px solid #808495; border-radius: 5px;">
+        <div style="max-height: 600px; overflow-y: auto; border: 1px solid #808495; border-radius: 5px;">
             {html_table}
         </div>
         """
