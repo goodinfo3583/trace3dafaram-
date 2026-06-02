@@ -26,7 +26,15 @@ BLOCK_HISTORY_DIR = os.path.join(DATA_DIR, "BlockHistory")
 for folder in [SCORE_HISTORY_DIR, MARKET_HISTORY_DIR, BLOCK_HISTORY_DIR]:
     if not os.path.exists(folder):
         os.makedirs(folder)
-
+# ==========置頂區塊測試區==================
+# ==========置頂區塊測試區==================
+# ==========置頂區塊測試區==================
+# ==========================================
+# 🚨 區塊 00 測試區：短線避險雷達 (法人賣 + 融資增 + 借券增)
+# ==========================================
+# ==========置頂區塊測試區==================
+# ==========置頂區塊測試區==================
+# ==========置頂區塊測試區==================
 # ==========================================
 # 🧹 清道夫：強制刪除週末錯誤生成的假檔案 (05/28, 05/30, 05/31)
 # ==========================================
@@ -44,99 +52,66 @@ for bad_date in ["20260528", "20260530", "20260531"]:
 # ==========================================
 # 🛑 隱形急救引擎 (請置於程式最頂端，絕對不要刪除！)
 # ==========================================
+# 即使不顯示區塊 0 面板，這段程式碼也必須存在，
+# 否則側邊欄導航會因為讀不到歷史檔案而顯示「查無資料」。
+
 if not os.path.exists(DATA_DIR): os.makedirs(DATA_DIR)
 if not os.path.exists(SCORE_HISTORY_DIR): os.makedirs(SCORE_HISTORY_DIR)
 if not os.path.exists(MARKET_HISTORY_DIR): os.makedirs(MARKET_HISTORY_DIR)
 if not os.path.exists(BLOCK_HISTORY_DIR): os.makedirs(BLOCK_HISTORY_DIR)
 
+# 定義路徑
 backup_df_path = os.path.join(DATA_DIR, "sidebar_twse_df_backup.csv")
 backup_margin_path = os.path.join(DATA_DIR, "sidebar_margin_backup.csv")
 
+# 1. 補法人備援
 if not os.path.exists(backup_df_path):
-    pd.DataFrame({'單位名稱': ['合計'], '買賣差額': ['102770738307']}).to_csv(backup_df_path, index=False, encoding='utf-8-sig')
+    pd.DataFrame({
+        '單位名稱': ['合計'],
+        '買賣差額': ['102770738307']
+    }).to_csv(backup_df_path, index=False, encoding='utf-8-sig')
 
+# 2. 補融資備援
 if not os.path.exists(backup_margin_path):
     pd.DataFrame([{"today_bal": 556359646.0, "prev_bal": 535025764.0}]).to_csv(backup_margin_path, index=False, encoding='utf-8-sig')
+# ==========================================
+# ==========================================
+
+
+#======測試爬蟲=====
+
+#======測試爬蟲=====
+
 
 # ==========================================
-# 🧰 全站共用核心工具箱 & HTML 渲染引擎
+# 🧰 全站共用核心工具箱 (剛剛不小心消失的救命工具)
 # ==========================================
 def extract_date_from_name(filename):
+    """從檔名中萃取出 8 碼日期，供全站各區塊排序使用"""
     match = re.search(r'\d{8}', os.path.basename(filename))
     return match.group(0) if match else "00000000"
 
 def robust_read_csv(file_path):
+    """強硬讀取法：解決各種中文編碼亂碼問題"""
     for encoding in ['cp950', 'utf-8-sig', 'utf-8']:
         try:
             df = pd.read_csv(file_path, encoding=encoding)
             if not df.empty and len(df.columns) > 1 and '撖' in str(df.iloc[0, 1]): 
                 continue
             return df
-        except: continue
+        except:
+            continue
     return pd.read_csv(file_path, encoding='cp950', errors='ignore')
 
-# 🔥 全域通用的 HTML 表格渲染引擎 (取代所有 st.dataframe)
-def render_html_table(df_or_styler, max_height=420):
-    if isinstance(df_or_styler, pd.DataFrame):
-        if df_or_styler.empty:
-            st.write("⚪ 無相符資料")
-            return
-        df = df_or_styler.copy()
-        try: styler = df.style.hide(axis='index')
-        except: styler = df.style.hide_index()
-        
-        # 預設無特定規則的極致黑樣式
-        def default_style(row):
-            return ['background-color: #111622; color: #e0e0e0;'] * len(row)
-        styler = styler.apply(default_style, axis=1)
-        
-        num_cols = df.select_dtypes(include=['number']).columns.tolist()
-        if '索引' in num_cols: num_cols.remove('索引')
-        styler = styler.format({col: "{:.2f}" for col in num_cols})
-    else:
-        styler = df_or_styler
-        try: styler = styler.hide(axis='index')
-        except: styler = styler.hide_index()
-
-    border_css = '1px solid #2D3748'
-    styler = styler.set_table_styles([
-        {'selector': 'table', 'props': [('width', '100%'), ('border-collapse', 'collapse'), ('font-family', 'sans-serif'), ('font-size', '13px')]},
-        {'selector': 'th', 'props': [
-            ('background-color', '#1e293b'), 
-            ('color', '#00D2FF'), 
-            ('font-weight', 'bold'),
-            ('border', border_css),
-            ('padding', '8px 4px'), 
-            ('text-align', 'center'),
-            ('position', 'sticky'),  
-            ('top', '0'),            
-            ('z-index', '1')         
-        ]},
-        {'selector': 'td', 'props': [
-            ('border', border_css),
-            ('padding', '6px 4px'), 
-            ('text-align', 'center'),
-            ('transition', 'all 0.2s ease-in-out') 
-        ]},
-        {'selector': 'tbody tr:hover td', 'props': [
-            ('background-color', 'rgba(0, 210, 255, 0.1) !important'), 
-            ('text-shadow', '0 0 8px rgba(255, 255, 255, 0.3) !important') 
-        ]}
-    ], overwrite=False)
-    
-    html_table = styler.to_html()
-    # 消除 Markdown 縮排錯誤，完美顯示 div
-    scrollable_div = f'<div style="max-height: {max_height}px; overflow-y: auto; border: 1px solid #2D3748; border-radius: 6px;">\n{html_table}\n</div>'
-    st.markdown(scrollable_div, unsafe_allow_html=True)
-
-
 # ==========================================
-# 🗂️ 台股代號與名稱產業類別 萬用字典引擎
+# 🗂️ 台股代號與名稱產業類別 萬用字典引擎 (後台靜默運作版)
 # ==========================================
 @st.cache_data(ttl=3600)
 def get_stock_dictionary():
+    """讀取證交所 ISIN 檔案，在後台安靜地建立雙向對照表"""
     import re
     mapping = {}
+    
     search_patterns = [
         os.path.join(DATA_DIR, "*辨識號碼*.txt"),
         os.path.join("./goodinfo_rankings", "*辨識號碼*.txt"),
@@ -146,7 +121,8 @@ def get_stock_dictionary():
     for pattern in search_patterns:
         dict_files.extend(glob.glob(pattern))
         
-    if not dict_files: return mapping
+    if not dict_files:
+        return mapping
         
     target_file = dict_files[0]
     raw_lines = []
@@ -155,31 +131,47 @@ def get_stock_dictionary():
         try:
             with open(target_file, 'r', encoding=encoding) as f:
                 raw_lines = f.readlines()
-            if len(raw_lines) > 10: break
-        except: continue
+            if len(raw_lines) > 10:
+                break
+        except:
+            continue
             
     for line in raw_lines:
         parts = line.split('\t') if '\t' in line else line.split(',')
         if len(parts) >= 5:
             name_part = parts[0].strip()
             industry = parts[4].strip()
+            
             clean_name = re.sub(r'[\s　]+', ' ', name_part).strip()
             tokens = clean_name.split(' ')
+            
             if len(tokens) >= 2:
                 sid = tokens[0].strip()
                 sname = tokens[1].strip()
+                
                 if sid.isdigit():
+                    # 建立雙向字典 (輸入代號或名稱都能通)
                     mapping[sname] = {"id": sid, "name": sname, "industry": industry}
                     mapping[sid] = {"id": sid, "name": sname, "industry": industry}
+                    
     return mapping
 
+# 在系統啟動時，直接載入這本字典
 STOCK_DICT = get_stock_dictionary()
+# ==========================================
+#以上原始區塊0
+# ==========================================
+# ==========================================
+# 📡 證交所 API 直連：後台資料抓取引擎 (保留給側邊欄使用)
+# ==========================================
+import requests
+import datetime
+import pandas as pd
+import streamlit as st
 
-# ==========================================
-# 📡 證交所 API 直連：後台資料抓取引擎
-# ==========================================
 @st.cache_data(ttl=600)
 def fetch_twse_institutional_data():
+    """自動連線證交所抓取今日三大法人買賣超 (BFI82U)"""
     url = "https://www.twse.com.tw/rwd/zh/fund/BFI82U?response=json"
     headers = {"User-Agent": "Mozilla/5.0"}
     try:
@@ -188,10 +180,12 @@ def fetch_twse_institutional_data():
         if data.get('stat') == 'OK':
             return data.get('title', '三大法人買賣金額統計表'), pd.DataFrame(data['data'], columns=data['fields'])
         return None, None
-    except: return None, None
+    except:
+        return None, None
 
 @st.cache_data(ttl=600)
 def fetch_block_trades():
+    """抓取證交所每日鉅額交易明細 (BFIAUU)"""
     url = "https://www.twse.com.tw/rwd/zh/block/BFIAUU?response=json"
     headers = {"User-Agent": "Mozilla/5.0"}
     try:
@@ -200,28 +194,47 @@ def fetch_block_trades():
         if data.get('stat') == 'OK':
             return pd.DataFrame(data['data'], columns=data['fields'])
         return pd.DataFrame()
-    except: return pd.DataFrame()
+    except:
+        return pd.DataFrame()
+
+
 
 # ==========================================
-# 🌌 網頁格式顏色搭配注入極致黑看盤軟體專屬風格樣式
+# 🌌 網頁格式顏色搭配注入極致黑看盤軟體專屬風格樣式 (全站深色化 + 表格與按鈕優化)
 # ==========================================
 st.markdown(
     """
     <style>
+    /* 1. 變更全站主背景色 */
     .stApp { background-color: #0A0D14 !important; }
+    
+    /* 2. 強制標題與內文變成明亮的灰白 */
     h1, h2, h3, h4, h5, h6, p, label, .stMarkdown, .stText { color: #E2E8F0 !important; }
+    
+    /* 3. 隱藏預設的通知背景 */
     [data-testid="stAlert"] { background-color: transparent !important; border: 1px solid #2D3748 !important; }
+    
+    /* 4. 側邊欄背景色與邊框 */
     [data-testid="stSidebar"] { background-color: #111622 !important; border-right: 1px solid #1E293B; }
+    
+    /* 5. 輸入框等元件 */
     .stTextInput>div>div>input { background-color: #1A202C !important; color: #FFFFFF !important; border: 1px solid #4A5568 !important; }
+    
+    /* 6. 表格深色化修正 */
     div[data-testid="stDataFrame"] { background-color: #111622 !important; border: 1px solid #1E293B !important; border-radius: 6px; }
+
+    /* 7. 超連結優化 */
     [data-testid="stSidebar"] a { color: #00D2FF !important; text-decoration: none !important; font-weight: 500 !important; letter-spacing: 0.5px; transition: all 0.3s ease; }
     [data-testid="stSidebar"] a:hover { color: #FFD700 !important; text-shadow: 0px 0px 8px rgba(255, 215, 0, 0.5); }
+    
+    /* 8. 🔴 全局按鈕與連結按鈕護眼暗黑化 (解決刺眼問題) */
     .stButton > button, .stLinkButton > a {
-        background-color: #1E293B !important; 
-        color: #94A3B8 !important; 
+        background-color: #1E293B !important; /* 深石板灰 */
+        color: #94A3B8 !important; /* 低調灰字 */
         border: 1px solid #334155 !important;
         transition: all 0.2s ease-in-out;
     }
+    /* 滑鼠懸停時才亮起科技藍 */
     .stButton > button:hover, .stLinkButton > a:hover {
         border-color: #00D2FF !important;
         color: #00D2FF !important;
@@ -231,25 +244,70 @@ st.markdown(
     """,
     unsafe_allow_html=True
 )
-
+# ==========================================
+# 🏆 預留置頂空間：頂級選股池容器
+# ==========================================
 top_pool_container = st.container()
 
 # ==========================================
-# 🔍 個股籌碼快搜 "標題" 
+# 🧠 AI 量化評語生成引擎 (土洋對作/換手升級版)
+# ==========================================
+def generate_stock_commentary(row):
+    """
+    根據選股池的綜合數據，自動生成一段人話評語
+    """
+    score = row.get('總分', 0)
+    warns = str(row.get('法人賣出警示', ''))
+    b5_trend = str(row.get('大股東動向', ''))
+    
+    # 判斷是否帶有賣出警示與高分
+    has_warning = "⚠️" in warns
+    high_score = score >= 3
+    
+    # 1. 矛盾訊號判定：土洋對作 / 主力強勢吃籌碼
+    if has_warning and high_score:
+        return f"⚔️ 【土洋對作 / 激烈換手】系統偵測到法人分歧 ({warns})，但該股依然獲得 {score} 分的高評估！這代表『一方的倒貨正被另一方(或大戶)強勢吃下』。籌碼換手後若能維持強勢(如大漲/漲停)，代表承接方實力極強，可沿短均線偏多操作，但需嚴設停損。"
+        
+    # 2. 致命風險判定：真倒貨、無買盤
+    if has_warning and not high_score:
+        return f"🚨 【風險警示】目前法人主力正在進行倒貨調節 ({warns})，且無強大買盤承接，籌碼結構面臨鬆動。建議暫避風頭，嚴控資金水位。"
+    
+    if "大減" in b5_trend:
+        return "⚠️ 【大戶撤退】400張以上大戶出現明顯減碼跡象，主力籌碼渙散，建議先行觀望，等待籌碼沉澱。"
+
+    # 3. 綜合分數常規判定
+    if score >= 6:
+        base_comment = "🔥 【強勢噴發】籌碼面極度優異！內外資法人與大戶同步共振做多，具備強大的波段上攻潛力。"
+        if "大增" in b5_trend:
+            base_comment += "特別是大股東籌碼大幅集中，是不可多得的強勢防守標的，建議積極關注。"
+        return base_comment
+        
+    elif score >= 3:
+        return "📈 【偏多佈局】主力籌碼持續進駐，法人買盤給予一定支撐。具備穩健的波段潛力，可逢低尋找技術面切入點。"
+        
+    elif score >= 1:
+        return "🔄 【中性觀望】籌碼表現較為平淡，雖有零星買盤但缺乏明確的連續性方向。建議多看少做，等待更強的表態訊號。"
+        
+    else:
+        return "❄️ 【弱勢整理】籌碼處於流失或無主力認養狀態，資金效率低。若無特殊題材發酵，短期內建議暫不考量。"
+# ==========================================
+# 🔍 個股籌碼快搜 "標題" (全區塊聯動掃描版 - 終極全景版)
 # ==========================================
 st.write("---")
 st.markdown("<div id='section-search'></div>", unsafe_allow_html=True)
 st.subheader("🔍 個股籌碼快搜 (全方位診斷)")
-
 # ==========================================
-# 📈 繪製 K 線圖與技術分析引擎
+# 📈 繪製 K 線圖與技術分析引擎 (加入 KD、Y軸標籤、手機平移與極簡工具列)
 # ==========================================
 def render_technical_chart(stock_id, timeframe="日線", selected_mas=[], show_rsi=False, show_macd=False, show_kd=False):
     import yfinance as yf
     import plotly.graph_objects as go
     from plotly.subplots import make_subplots
+    import pandas as pd
+    import streamlit as st
 
     try:
+        # 1. 智慧連線：下載歷史資料
         ticker_tw = f"{stock_id}.TW"
         ticker_two = f"{stock_id}.TWO"
         
@@ -265,11 +323,16 @@ def render_technical_chart(stock_id, timeframe="日線", selected_mas=[], show_r
             df.columns = df.columns.get_level_values(0)
         df = df.loc[:, ~df.columns.duplicated()]
 
-        if df.index.tz is not None: df.index = df.index.tz_convert('Asia/Taipei')
-        else: df.index = df.index.tz_localize('UTC').tz_convert('Asia/Taipei')
+        if df.index.tz is not None:
+            df.index = df.index.tz_convert('Asia/Taipei')
+        else:
+            df.index = df.index.tz_localize('UTC').tz_convert('Asia/Taipei')
 
         daily_df = df.copy()
 
+        # ==========================================
+        # 🧠 新增：技術型態雷達引擎 (動態掃描均線、爆量、收斂)
+        # ==========================================
         def generate_technical_signals(df):
             signals = []
             if df.empty or len(df) < 20: return signals
@@ -277,17 +340,21 @@ def render_technical_chart(stock_id, timeframe="日線", selected_mas=[], show_r
             latest_close = df['Close'].iloc[-1]
             latest_vol = df['Volume'].iloc[-1]
             
-            vol_20ma = df['Volume'].rolling(window=20).mean().iloc[-2] 
+            # 1. 🧨 爆近期大量提示 (今日成交量 > 20日均量 2.5倍)
+            vol_20ma = df['Volume'].rolling(window=20).mean().iloc[-2] # 拿昨天的均量來比
             if pd.notna(vol_20ma) and vol_20ma > 0 and latest_vol > (vol_20ma * 2.5):
                 signals.append(f"🧨 爆量出擊：今日成交量達 20 日均量的 {latest_vol/vol_20ma:.1f} 倍！")
 
+            # 2. 🎯 均線回測與關鍵支撐 (差距 1.5% 內視為回測)
             mas = {'5MA': 5, '10MA': 10, '20MA': 20, '60MA': 60, '120MA': 120, '240MA': 240}
             for ma_name, period in mas.items():
                 if len(df) >= period:
                     ma_val = df['Close'].rolling(window=period).mean().iloc[-1]
+                    # 股價在均線上，且距離均線極近 (大於 0 但小於 1.5%)
                     if 0 < (latest_close - ma_val) / ma_val < 0.015:
                         signals.append(f"🎯 回測支撐：股價目前極度貼近 {ma_name} ({ma_val:.2f}) 關鍵支撐線。")
 
+            # 3. 🌀 短中長均線糾結提示 (5, 10, 20MA 極度壓縮在 2% 空間內)
             if len(df) >= 20:
                 ma5 = df['Close'].rolling(5).mean().iloc[-1]
                 ma10 = df['Close'].rolling(10).mean().iloc[-1]
@@ -296,49 +363,73 @@ def render_technical_chart(stock_id, timeframe="日線", selected_mas=[], show_r
                 if pd.notna(ma_max) and (ma_max - ma_min) / ma_min < 0.02:
                     signals.append("🌀 均線糾結：短天期 (5/10/20MA) 成本線高度重合壓縮，醞釀表態！")
 
+            # 4. 📐 三角收斂 / 波動壓縮提示 (近20日高低落差，比前一個20日縮小40%以上)
             if len(df) >= 60:
                 recent_high = df['High'].iloc[-20:].max()
                 recent_low = df['Low'].iloc[-20:].min()
                 prev_high = df['High'].iloc[-40:-20].max()
                 prev_low = df['Low'].iloc[-40:-20].min()
+                
                 recent_volatility = recent_high - recent_low
                 prev_volatility = prev_high - prev_low
                 if prev_volatility > 0 and recent_volatility < (prev_volatility * 0.6):
                     signals.append("📐 型態壓縮：近一個月股價高低波幅急遽收斂，疑似三角收斂末端。")
-
+            # 5. 🚀 股價創波段新高提示 (創 60 日新高)
             if len(df) >= 60:
+                # 找出過去 60 天的最高價
                 highest_60d = df['High'].iloc[-60:].max()
+                # 如果今天的最高價，等於或突破過去 60 天的最高價
                 if df['High'].iloc[-1] >= highest_60d:
                     signals.append("🚀 波段創高：今日股價突破 60 日 (約一季) 以來新高點，上攻動能極強！")
 
+            # 6. 📈 均線多頭排列提示 (5MA > 10MA > 20MA > 60MA 且季線上揚)
             if len(df) >= 60:
                 ma5 = df['Close'].rolling(5).mean().iloc[-1]
                 ma10 = df['Close'].rolling(10).mean().iloc[-1]
                 ma20 = df['Close'].rolling(20).mean().iloc[-1]
                 ma60 = df['Close'].rolling(60).mean().iloc[-1]
-                ma60_prev = df['Close'].rolling(60).mean().iloc[-2]
+                ma60_prev = df['Close'].rolling(60).mean().iloc[-2] # 昨天的 60MA
+                
+                # 嚴格定義：收盤價站上所有均線，且均線照順序排列，外加 60MA 必須是向上的
                 if pd.notna(ma60) and (latest_close > ma5 > ma10 > ma20 > ma60) and (ma60 > ma60_prev):
-                    signals.append("📈 多頭排列：短中長期均線呈現完美多頭發散，趨勢明確翻多！")
+                    signals.append("📈 多頭排列：短中長期均線 (5/10/20/60MA) 呈現完美多頭發散，趨勢明確翻多！")
 
             return signals
 
+        # 執行雷達掃描 (固定用日線資料來掃描最精確，避免切換週線時失真)
         tech_signals = generate_technical_signals(daily_df)
 
+        # ==========================================
+        # 🔥 顯示技術雷達面板
+        # ==========================================
         if tech_signals:
+            # 建立一個暗黑風格的雷達警告框
             signal_html = "<div style='background-color: rgba(0, 210, 255, 0.1); border-left: 4px solid #00D2FF; padding: 10px; border-radius: 5px; margin-bottom: 15px;'>"
             signal_html += "<h5 style='color: #00D2FF; margin-top:0px; margin-bottom: 10px;'>📡 AI 盤中技術型態雷達</h5>"
-            for sig in tech_signals: signal_html += f"<p style='color: #E2E8F0; margin: 5px 0px; font-size: 15px;'>{sig}</p>"
+            for sig in tech_signals:
+                signal_html += f"<p style='color: #E2E8F0; margin: 5px 0px; font-size: 15px;'>{sig}</p>"
             signal_html += "</div>"
             st.markdown(signal_html, unsafe_allow_html=True)
 
+        # ==========================================
+        # 轉換 K 線週期 (這裡有把括號寫完整了！)
+        # ==========================================
         if timeframe == "週線":
-            daily_df = daily_df.resample('W-FRI').agg({'Open': 'first', 'High': 'max', 'Low': 'min', 'Close': 'last', 'Volume': 'sum'}).dropna()
+            daily_df = daily_df.resample('W-FRI').agg({
+                'Open': 'first', 'High': 'max', 'Low': 'min', 'Close': 'last', 'Volume': 'sum'
+            }).dropna()
         elif timeframe == "月線":
-            daily_df = daily_df.resample('ME').agg({'Open': 'first', 'High': 'max', 'Low': 'min', 'Close': 'last', 'Volume': 'sum'}).dropna()
+            daily_df = daily_df.resample('ME').agg({
+                'Open': 'first', 'High': 'max', 'Low': 'min', 'Close': 'last', 'Volume': 'sum'
+            }).dropna()
 
+
+        # 2. 計算均線
         ma_windows = [5, 10, 20, 60, 120, 240]
-        for ma in ma_windows: daily_df[f'{ma}MA'] = daily_df['Close'].rolling(window=ma).mean()
+        for ma in ma_windows:
+            daily_df[f'{ma}MA'] = daily_df['Close'].rolling(window=ma).mean()
 
+        # 3. 內建量化指標計算 (RSI, MACD, KD)
         close_series = daily_df['Close'].squeeze()
         
         if show_rsi:
@@ -358,10 +449,11 @@ def render_technical_chart(stock_id, timeframe="日線", selected_mas=[], show_r
             daily_df['MACD_Hist'] = daily_df['DIF'] - daily_df['MACD_Sign']
             
         if show_kd:
+            # KD (9, 3, 3) 台股標準平滑演算法
             low_9 = daily_df['Low'].rolling(window=9).min()
             high_9 = daily_df['High'].rolling(window=9).max()
             rsv = (close_series - low_9) / (high_9 - low_9).replace(0, 1e-9) * 100
-            daily_df['K'] = rsv.ewm(com=2, adjust=False).mean()
+            daily_df['K'] = rsv.ewm(com=2, adjust=False).mean() # com=2 相當於 1/3 平滑
             daily_df['D'] = daily_df['K'].ewm(com=2, adjust=False).mean()
 
         def get_latest_price(col):
@@ -372,17 +464,23 @@ def render_technical_chart(stock_id, timeframe="日線", selected_mas=[], show_r
                 return f"{float(val):.2f}"
             return "-"
 
+        # 4. 智慧動態調配畫布高度
         rows = 2
         row_heights = [0.5, 0.15]
         if show_rsi: rows += 1; row_heights.append(0.12)
         if show_macd: rows += 1; row_heights.append(0.14)
         if show_kd: rows += 1; row_heights.append(0.14)
 
-        fig = make_subplots(rows=rows, cols=1, shared_xaxes=True, vertical_spacing=0.02, row_heights=row_heights)
+        fig = make_subplots(rows=rows, cols=1, shared_xaxes=True, 
+                            vertical_spacing=0.02, row_heights=row_heights)
                             
+        #繪製K線選擇顏色
         up_color = 'rgb(240, 90, 90)'     
         down_color = 'rgb(80, 200, 120)'  
 
+        # ==========================================
+        # 5. 繪製主 K 線 (乾淨名稱 + 歷史高點標註)
+        # ==========================================
         fig.add_trace(go.Candlestick(
             x=daily_df.index, open=daily_df['Open'].squeeze(), high=daily_df['High'].squeeze(), 
             low=daily_df['Low'].squeeze(), close=daily_df['Close'].squeeze(), 
@@ -392,17 +490,26 @@ def render_technical_chart(stock_id, timeframe="日線", selected_mas=[], show_r
             hovertemplate="開：%{open:.2f}<br>高：%{high:.2f}<br>低：%{low:.2f}<br>收：%{close:.2f}<extra></extra>"
         ), row=1, col=1)
         
+        # 🔥 升級 1：鎖死 Y 軸底線，徹底消滅負數股價 (-50)
         fig.update_yaxes(title_text="股價 (TWD)", row=1, col=1, title_font=dict(size=12, color="#E2E8F0"), rangemode="nonnegative")
 
+        # 🔥 升級 2：自動抓取 5 年內歷史最高價，並繪製黃金天花板標示線
         if not daily_df.empty:
             max_price = daily_df['High'].max()
             max_date = daily_df['High'].idxmax()
+            
+            # 畫一條橫貫全圖的金色微透明虛線
             fig.add_hline(y=max_price, line_dash="dot", line_color="rgba(255, 215, 0, 0.4)", row=1, col=1)
+            
+            # 加上顯眼的價格標籤牌
             fig.add_annotation(
-                x=max_date, y=max_price, text=f"<b>前高: {max_price:.2f}</b>",
+                x=max_date, y=max_price,
+                text=f"<b>前高: {max_price:.2f}</b>",
                 showarrow=True, arrowhead=2, arrowsize=1, arrowwidth=1.5, arrowcolor="#FFD700",
-                ax=0, ay=-40, font=dict(size=13, color="#FFD700"),
-                bgcolor="rgba(17, 22, 34, 0.85)", bordercolor="#FFD700", borderwidth=1, borderpad=4, row=1, col=1
+                ax=0, ay=-40, # 箭頭往上偏移，讓標籤浮在 K 線正上方不擋圖
+                font=dict(size=13, color="#FFD700"),
+                bgcolor="rgba(17, 22, 34, 0.85)", bordercolor="#FFD700", borderwidth=1, borderpad=4,
+                row=1, col=1
             )
 
         ma_config = {
@@ -420,14 +527,20 @@ def render_technical_chart(stock_id, timeframe="日線", selected_mas=[], show_r
                     hovertemplate=f"<b>{ma_name}</b>： %{{y:.2f}}<extra></extra>"
                 ), row=1, col=1)
 
+        # ==========================================
+        # 6. 繪製成交量 (🔥 同步防禦負數成交量)
+        # ==========================================
         vol_colors = [up_color if c >= o else down_color for c, o in zip(daily_df['Close'].squeeze(), daily_df['Open'].squeeze())]
         fig.add_trace(go.Bar(
             x=daily_df.index, y=daily_df['Volume'].squeeze(), 
-            name='成交量', marker_color=vol_colors, showlegend=False, 
+            name='成交量', 
+            marker_color=vol_colors,
+            showlegend=False, 
             hovertemplate="<b>成交量</b>： %{y}<extra></extra>"
         ), row=2, col=1)
         fig.update_yaxes(title_text="成交量", row=2, col=1, title_font=dict(size=12, color="#E2E8F0"), rangemode="nonnegative")
 
+        # 7. 動態追加技術指標畫布
         current_row = 3
         if show_kd:
             fig.add_trace(go.Scatter(x=daily_df.index, y=daily_df['K'].squeeze(), mode='lines', name='K (9)', line=dict(color='#00CCFF', width=1.2), hovertemplate="<b>K</b>: %{y:.2f}<extra></extra>"), row=current_row, col=1)
@@ -452,17 +565,44 @@ def render_technical_chart(stock_id, timeframe="日線", selected_mas=[], show_r
             fig.update_yaxes(title_text="MACD", row=current_row, col=1, title_font=dict(size=11, color="#E2E8F0"))
             current_row += 1
 
+        # ==========================================
+        # 8. 版面美化與防重疊 (終極淨化版)
+        # ==========================================
         fig.update_layout(
-            xaxis_rangeslider_visible=False, height=500 + (rows - 1) * 110, 
-            template='plotly_dark', paper_bgcolor='rgba(0,0,0,0)', plot_bgcolor='rgba(0,0,0,0)',  
-            margin=dict(l=10, r=65, t=30, b=10), hovermode='x unified',
+            # 🔥 升級 1：徹底移除上方標題，不再顯示「股票代號 日線與綜合技術指標」
+            xaxis_rangeslider_visible=False,
+            height=500 + (rows - 1) * 110, 
+            template='plotly_dark',       
+            paper_bgcolor='rgba(0,0,0,0)', 
+            plot_bgcolor='rgba(0,0,0,0)',  
+            # 🔥 升級 2：標題移除後，將上方留白(t)從 90 縮小至 30，讓圖表更緊湊
+            margin=dict(l=10, r=65, t=30, b=10), 
+            hovermode='x unified',
             hoverlabel=dict(bgcolor="#1A202C", font_size=15, font_color="#FFFFFF"),
-            legend=dict(orientation="h", yanchor="bottom", y=1.01, xanchor="left", x=0.01, font=dict(color='#E2E8F0', size=16), itemsizing='constant'),
+            legend=dict(
+                # 🔥 升級 3：移除「顯示：」字眼，只保留乾淨的按鈕
+                orientation="h", 
+                yanchor="bottom", 
+                y=1.01, 
+                xanchor="left", 
+                x=0.01, 
+                font=dict(color='#E2E8F0', size=16),
+                itemsizing='constant'
+            ),
             dragmode='pan' 
         )
         
-        fig.update_xaxes(showspikes=True, spikecolor="rgba(255, 235, 100, 0.5)", spikesnap="cursor", spikemode="across", spikethickness=0.5, spikedash="dash", gridcolor="rgba(255, 255, 255, 0.05)")
-        fig.update_yaxes(showspikes=True, spikecolor="rgba(255, 235, 100, 0.5)", spikesnap="cursor", spikemode="across", spikethickness=0.5, spikedash="dash", side="right", gridcolor="rgba(255, 255, 255, 0.05)")
+        # 🔥 升級 4：十字游標變細 (0.5)、微黃色，並將背景分隔網格線 (gridcolor) 極度透明化 (0.05)
+        fig.update_xaxes(
+            showspikes=True, spikecolor="rgba(255, 235, 100, 0.5)", spikesnap="cursor", 
+            spikemode="across", spikethickness=0.5, spikedash="dash",
+            gridcolor="rgba(255, 255, 255, 0.05)"
+        )
+        fig.update_yaxes(
+            showspikes=True, spikecolor="rgba(255, 235, 100, 0.5)", spikesnap="cursor", 
+            spikemode="across", spikethickness=0.5, spikedash="dash", side="right",
+            gridcolor="rgba(255, 255, 255, 0.05)"
+        )
         
         for r in range(1, rows + 1):
             fig.update_xaxes(hoverformat="%Y-%m-%d", tickformat="%Y-%m-%d", row=r, col=1)
@@ -474,28 +614,46 @@ def render_technical_chart(stock_id, timeframe="日線", selected_mas=[], show_r
             for r in range(1, rows + 1):
                 fig.update_xaxes(range=zoom_range, row=r, col=1)
         
+        # ==========================================
+        # 🔥 升級 5：動態填補 K 線圖破洞 (精準剃除所有週末與國定假日)
+        # ==========================================
         if timeframe == "日線":
+            # 1. 產生從第一天到最後一天的「完整日曆天」
             all_days = pd.date_range(start=daily_df.index.min().normalize(), end=daily_df.index.max().normalize(), freq='D')
+            
+            # 2. 抓出這檔股票「實際有開盤交易的日子」
             actual_days = daily_df.index.normalize()
+            
+            # 3. 兩者相減，自動抓出所有「沒開盤的日子」(包含六日、國定假日、颱風假)
             missing_days = all_days.difference(actual_days).strftime('%Y-%m-%d').tolist()
+
             for r in range(1, rows + 1):
+                # 將原本死板的 bounds，改成精準隱藏 missing_days
                 fig.update_xaxes(rangebreaks=[dict(values=missing_days)], row=r, col=1)
         
         plotly_config = {
-            'scrollZoom': True, 'displaylogo': False,
-            'modeBarButtonsToRemove': ['zoom2d', 'zoomIn2d', 'zoomOut2d', 'autoScale2d', 'select2d', 'lasso2d', 'hoverClosestCartesian', 'hoverCompareCartesian', 'toggleSpikelines']
+            'scrollZoom': True,
+            'displaylogo': False,
+            'modeBarButtonsToRemove': [
+                'zoom2d', 'zoomIn2d', 'zoomOut2d', 'autoScale2d', 
+                'select2d', 'lasso2d', 'hoverClosestCartesian', 
+                'hoverCompareCartesian', 'toggleSpikelines'
+            ]
         }
         
         st.plotly_chart(fig, use_container_width=True, key=f"kline_{stock_id}_{timeframe}_{len(selected_mas)}_{show_rsi}_{show_macd}_{show_kd}", config=plotly_config)
         
     except Exception as e:
         st.error(f"❌ 繪製 K 線圖時發生錯誤: {str(e)}")
+#===================================
+#以上技術線圖
+#===================================       
 
-# ==========================================
-# 搜尋與呈現工具
-# ==========================================
+# 🛠️ 定義強韌的搜尋函式
 def robust_search_engine(df, query):
-    if df is None or df.empty: return pd.DataFrame()
+    if df is None or df.empty:
+        return pd.DataFrame()
+        
     df = df.loc[:, ~df.columns.duplicated()].copy()
     query = str(query).strip()
     mask = pd.Series(False, index=df.index)
@@ -510,11 +668,17 @@ def robust_search_engine(df, query):
         
     return df[mask]
 
+# ==========================================
+# 🎯 建立通用掃描與顯示工具 (浮點數級別終極攔截 0% 假象)
+# ==========================================
 def scan_and_display(title, session_key, query):
+    # 先不管有沒有資料，標題一律用 subheader 頂固，確保左右 columns 完全對齊
     st.subheader(title)
+    
     if session_key not in st.session_state:
         st.write("⚪ 尚未載入資料表")
         return
+        
     df = st.session_state[session_key]
     if df is None or df.empty:
         st.write("⚪ 該榜單無任何資料")
@@ -2750,9 +2914,10 @@ if not df_squeeze_radar.empty:
         
         # 📏 高度控制 (顯示約 10~12 筆)
         scrollable_div = f"""
-<div style="max-height: 420px; overflow-y: auto; border: 1px solid #808495; border-radius: 5px;">
-{html_table}
-</div>"""
+        <div style="max-height: 420px; overflow-y: auto; border: 1px solid #808495; border-radius: 5px;">
+            {html_table}
+        </div>
+        """
         st.markdown(scrollable_div, unsafe_allow_html=True)
 else:
     st.warning(f"軋空雷達載入失敗：{msg}")
@@ -2959,9 +3124,10 @@ if not df_risk_radar.empty:
         
         # 📏 【修改點】：將 max-height 調整為 420px，大約顯示 10~12 筆
         scrollable_div = f"""
-<div style="max-height: 420px; overflow-y: auto; border: 1px solid #808495; border-radius: 5px;">
-{html_table}
-</div>"""
+        <div style="max-height: 420px; overflow-y: auto; border: 1px solid #808495; border-radius: 5px;">
+            {html_table}
+        </div>
+        """
         st.markdown(scrollable_div, unsafe_allow_html=True)
 else:
     st.warning(f"避險雷達載入失敗：{msg}")
