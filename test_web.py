@@ -1379,7 +1379,7 @@ def render_sidebar_market_summary():
 # ------------------------------------------
 def render_options_dashboard(today_str):
     st.markdown("<hr style='margin:15px 0;'>", unsafe_allow_html=True)
-    st.markdown("<h2 style='margin-top: 0; margin-bottom: 5px;'>🏰 選擇權關鍵兵力分布</h2>", unsafe_allow_html=True)
+    st.markdown("<h2 style='margin-top: 0; margin-bottom: 5px;'>🏰 選擇權</h2>", unsafe_allow_html=True)
     
     today_opt, prev_opt = sync_options_with_gs(today_str)
     
@@ -1403,12 +1403,10 @@ def render_options_dashboard(today_str):
     # 取出 39000 到 50000 的範圍，但只顯示壓力與支撐之間的合理區間 (+- 2000點)
     display_strikes = [s for s in range(max_pressure + 2000, max_support - 3000, -1000)]
     
-    html_opt = """
-    <table style="width: 100%; text-align: center; border-collapse: collapse; margin-top: 5px; font-size: 13px;">
-        <tr style="border-bottom: 1px solid #555; background-color: #262730;">
-            <th style="padding: 5px;">點位</th><th style="padding: 5px;">⚔️ Call (口)</th><th style="padding: 5px;">🛡️ Put (口)</th>
-        </tr>
-    """
+    html_opt = """<table style="width: 100%; text-align: center; border-collapse: collapse; margin-top: 5px; font-size: 13px;">
+<tr style="border-bottom: 1px solid #555; background-color: #262730;">
+<th style="padding: 5px;">點位</th><th style="padding: 5px;">⚔️ Call (口)</th><th style="padding: 5px;">🛡️ Put (口)</th>
+</tr>"""
     
     for strike in display_strikes:
         c_key = f"C{strike}"
@@ -1439,12 +1437,12 @@ def render_options_dashboard(today_str):
         p_oi_str = f"{p_oi:,}" if p_oi > 0 else "-"
 
         html_opt += f"""
-        <tr style="border-bottom: 1px solid #333;">
-            <td style="padding: 6px; font-weight: bold;">{strike_label}</td>
-            <td style="padding: 6px; color: #FF4B4B;">{c_oi_str}{c_diff_ui}</td>
-            <td style="padding: 6px; color: #00E272;">{p_oi_str}{p_diff_ui}</td>
-        </tr>
-        """
+<tr style="border-bottom: 1px solid #333;">
+<td style="padding: 6px; font-weight: bold;">{strike_label}</td>
+<td style="padding: 6px; color: #FF4B4B;">{c_oi_str}{c_diff_ui}</td>
+<td style="padding: 6px; color: #00E272;">{p_oi_str}{p_diff_ui}</td>
+</tr>
+"""
         
     html_opt += "</table>"
     st.markdown(html_opt, unsafe_allow_html=True)
