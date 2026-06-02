@@ -1246,7 +1246,7 @@ def render_sidebar_market_summary():
                 elif gs_latest_date == today_str:
                     if gs_margin > 0:
                         need_crawl = False 
-                    elif now.time() < datetime.time(21, 30): # 提早到 21:30 讓融資可以準備抓取
+                    elif now.time() < datetime.time(21, 30): 
                         need_crawl = False 
     except Exception: pass 
 
@@ -1254,8 +1254,8 @@ def render_sidebar_market_summary():
     oi_data = {"外資": 0, "投信": 0, "自營商": 0}
     
     if need_crawl:
-        # 🕵️ 【隱藏蹤跡】：修改 Loading 提示詞，讓它看起來像是一般的系統讀取
-        with st.spinner("🔄 系統資料同步中..."):
+        # 🤫 【隱藏蹤跡 1】：將 Spinner 的文字設為一個空白字元，只會轉圈不講話
+        with st.spinner(" "): 
             twse_title, twse_df = fetch_twse_institutional_data()
             if twse_df is not None and not twse_df.empty:
                 date_match = re.search(r'(\d+)年(\d+)月(\d+)日', str(twse_title))
@@ -1263,16 +1263,15 @@ def render_sidebar_market_summary():
                     date_key = f"{int(date_match.group(1))+1911}{int(date_match.group(2)):02d}{int(date_match.group(3)):02d}"
                     display_date_key = date_key 
                 
-                if force_update or now.time() >= datetime.time(21, 30):
+                # 🔧 【午夜陷阱修復】：如果是強制更新，或超過 21:30，或「正在抓的日期小於今天(代表過夜了)」，就強制抓融資！
+                if force_update or now.time() >= datetime.time(21, 30) or (date_key and date_key < today_str):
                     try: 
-                        # 🔧 【融資修復雙重策略】：策略 A (指定日期)
                         margin_url = f"https://www.twse.com.tw/rwd/zh/margin/MI_MARGN?response=json&date={date_key}&selectType=MS"
                         res_margin = requests.get(margin_url, headers={'User-Agent': 'Mozilla/5.0'}, timeout=5)
                         m_data = []
                         if res_margin.status_code == 200:
                             m_data = res_margin.json().get("data", []) if "data" in res_margin.json() else res_margin.json().get("tables", [{}])[0].get("data", [])
                         
-                        # 🔧 【融資修復雙重策略】：策略 B (如果 A 抓不到，改抓不帶日期的最新版)
                         if not m_data:
                             margin_url_latest = "https://www.twse.com.tw/rwd/zh/margin/MI_MARGN?response=json&selectType=MS"
                             res_margin_latest = requests.get(margin_url_latest, headers={'User-Agent': 'Mozilla/5.0'}, timeout=5)
@@ -1280,7 +1279,8 @@ def render_sidebar_market_summary():
                                 m_data = res_margin_latest.json().get("data", []) if "data" in res_margin_latest.json() else res_margin_latest.json().get("tables", [{}])[0].get("data", [])
 
                         for row in m_data:
-                            if row and len(row) >= 6 and "融資金額" in str(row[0]):
+                            # 加入 "融資(交易單位)" 雙重比對，防止證交所偷改標籤
+                            if row and len(row) >= 6 and ("融資金額" in str(row[0]) or "融資(交易單位)" in str(row[0])):
                                 margin_prev, margin_today = float(str(row[4]).replace(',', '').strip()), float(str(row[5]).replace(',', '').strip())
                                 break
                     except: pass
@@ -1339,9 +1339,10 @@ def render_sidebar_market_summary():
                 "融資增減": round(margin_diff_yi, 1), "融資餘額": round(margin_today_yi, 1)
             }])
             
+            # 🧹 【橡皮擦機制】：確保新資料寫入前，先把舊的半成品刪掉，防止重複
             if not gs_backup.empty and '日期' in gs_backup.columns:
                 gs_backup['日期'] = gs_backup['日期'].astype(str).str.replace('.0', '', regex=False)
-                gs_backup = gs_backup[gs_backup['日期'] != date_key]
+                gs_backup = gs_backup[gs_backup['日期'] != date_key] 
                 
             updated_df = pd.concat([gs_backup, new_row], ignore_index=True)
             for c in STD_COLS:
@@ -1416,10 +1417,10 @@ def render_sidebar_market_summary():
     st.markdown(html, unsafe_allow_html=True)
     return display_date_key 
 
+
 # ==========================================
-# 執行側邊欄渲染 (包含隱藏版狗頭按鈕)
+# 執行側邊欄渲染 (包含極密版狗頭按鈕)
 # ==========================================
-# (保留原本的選擇權 dashboard 函數，只替換執行這段)
 with tab1:
     actual_data_date = render_sidebar_market_summary()
     render_options_dashboard(actual_data_date)
@@ -1427,12 +1428,11 @@ with tab1:
     st.markdown("<br><br><br>", unsafe_allow_html=True) 
     col1, col2 = st.columns([9, 1]) 
     with col2:
-        # 🕵️ 【隱藏蹤跡】：help 設為隱形空白，按鈕極度不顯眼
-        if st.button("🐕", help=" ", key="secret_watchdog"):
+        # 🤫 【隱藏蹤跡 2】：移除 help 參數，滑過按鈕不再出現任何文字提示
+        if st.button("🐕", key="secret_watchdog"):
             st.session_state['force_update'] = True
             st.cache_data.clear()
             st.rerun()
-
 # ==========================================
 # 📌 渲染 分頁 2 內容：總經指標 + 快速導航
 # ==========================================
