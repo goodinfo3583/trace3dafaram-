@@ -2750,10 +2750,9 @@ if not df_squeeze_radar.empty:
         
         # 📏 高度控制 (顯示約 10~12 筆)
         scrollable_div = f"""
-        <div style="max-height: 420px; overflow-y: auto; border: 1px solid #808495; border-radius: 5px;">
-            {html_table}
-        </div>
-        """
+<div style="max-height: 420px; overflow-y: auto; border: 1px solid #808495; border-radius: 5px;">
+{html_table}
+</div>"""
         st.markdown(scrollable_div, unsafe_allow_html=True)
 else:
     st.warning(f"軋空雷達載入失敗：{msg}")
