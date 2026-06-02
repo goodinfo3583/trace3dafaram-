@@ -2785,9 +2785,9 @@ def build_risk_radar():
     df_risk = df_risk.sort_values(by=['危險指數', '漲跌幅'], ascending=[False, True]).reset_index(drop=True)
     
     def get_risk_tag(score):
-        if score == 3: return "☠️ 極度危險"
-        elif score == 2: return "🚨 高度警戒"
-        return "⚠️ 初級警戒"
+        if score == 3: return "☠️ 極危"
+        elif score == 2: return "🚨 高危"
+        return "⚠️ 初危"
         
     df_risk.insert(2, '套牢評估', df_risk['危險指數'].apply(get_risk_tag))
     df_risk = df_risk.drop(columns=['危險指數'])
