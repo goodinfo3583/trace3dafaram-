@@ -520,7 +520,7 @@ def scan_and_display(title, session_key, query):
         st.write("⚪ 該榜單無任何資料")
         return
         
-    res = robust_search_engine(df
+    res = robust_search_engine(df, query)
     
     if not res.empty:
         # 🔥 終極攔截器：直接轉成數學小數點來驗證，消滅所有格式變形的「0」
