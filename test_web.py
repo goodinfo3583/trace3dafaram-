@@ -32,142 +32,6 @@ for folder in [SCORE_HISTORY_DIR, MARKET_HISTORY_DIR, BLOCK_HISTORY_DIR]:
 # ==========================================
 # 🚨 區塊 00 測試區：短線避險雷達 (法人賣 + 融資增 + 借券增)
 # ==========================================
-# ==========================================
-# 🚨 區塊 00 測試區：短線避險雷達 (法人賣 + 融資增 + 借券增)
-# ==========================================
-import streamlit as st
-import pandas as pd
-import os
-import glob
-
-st.markdown("<div id='section-00'></div>", unsafe_allow_html=True)
-st.header("🚨 區塊 00：短線避險雷達 (高風險名單)")
-st.write("💡 偵測『三大法人賣超』並比對『融資增加(散戶接刀)』與『借券賣出增加(空頭狙擊)』的多重重榜名單。")
-
-# 🛠️ 【修正】：直接在區塊內建立專用的讀取函數，避免找不到定義
-def robust_read_csv_local(file_path):
-    for encoding in ['cp950', 'utf-8-sig', 'utf-8']:
-        try:
-            df = pd.read_csv(file_path, encoding=encoding)
-            if not df.empty and len(df.columns) > 1 and '撖' in str(df.iloc[0, 1]): 
-                continue
-            return df
-        except:
-            continue
-    return pd.read_csv(file_path, encoding='cp950', errors='ignore')
-
-def build_risk_radar():
-    # --- 1. 尋找三個關鍵檔案 ---
-    sell_pattern = os.path.join(DATA_DIR, "*三大法人賣超佔成交比*.csv")
-    margin_pattern = os.path.join(DATA_DIR, "*融資增加幅度*.csv")
-    short_pattern = os.path.join(DATA_DIR, "*借券賣出增加幅度*.csv")
-    
-    sell_files = sorted(glob.glob(sell_pattern), reverse=True)
-    margin_files = sorted(glob.glob(margin_pattern), reverse=True)
-    short_files = sorted(glob.glob(short_pattern), reverse=True)
-    
-    if not sell_files:
-        return pd.DataFrame(), "找不到三大法人賣超檔案"
-
-    # --- 2. 處理母表：三大法人賣超佔成交比 ---
-    try:
-        # 使用區塊專用的讀取函數
-        df_sell = robust_read_csv_local(sell_files[0])
-        df_sell.columns = [str(c).replace(" ", "").replace("\n", "").replace("\ufeff", "").strip() for c in df_sell.columns]
-        
-        # 確保代號與名稱存在
-        id_col = next((c for c in df_sell.columns if '代號' in c), df_sell.columns[1])
-        name_col = next((c for c in df_sell.columns if '名稱' in c), df_sell.columns[2])
-        df_sell = df_sell.rename(columns={id_col: '股票代號', name_col: '股票名稱'})
-        df_sell['股票代號'] = df_sell['股票代號'].astype(str).str.strip()
-        
-        # 定義我們要保留的欄位 (捨棄1個月到10年等長線欄位)
-        keep_cols = ['股票代號', '股票名稱']
-        # 動態抓取需要的基礎與短線欄位
-        for keyword in ['成交', '漲跌價', '漲跌幅', '當日', '2日', '3日', '5日', '10日']:
-            matched_cols = [c for c in df_sell.columns if keyword in c and '月' not in c and '年' not in c]
-            if matched_cols:
-                keep_cols.append(matched_cols[0])
-                
-        # 去除重複欄位，保持順序
-        keep_cols = list(dict.fromkeys(keep_cols))
-        df_risk = df_sell[keep_cols].copy()
-        
-        # 標記母表來源
-        df_risk['⚠️法人賣超'] = "✔️"
-        
-    except Exception as e:
-        return pd.DataFrame(), f"讀取賣超母表失敗: {str(e)}"
-
-    # --- 3. 處理交集 1：融資增加 (散戶接刀) ---
-    margin_danger_ids = set()
-    if margin_files:
-        try:
-            df_margin = robust_read_csv_local(margin_files[0])
-            m_id_col = next((c for c in df_margin.columns if '代號' in c), None)
-            if m_id_col:
-                margin_danger_ids = set(df_margin[m_id_col].astype(str).str.replace(r'\D', '', regex=True))
-        except: pass
-        
-    # --- 4. 處理交集 2：借券賣出增加 (空單狙擊) ---
-    short_danger_ids = set()
-    if short_files:
-        try:
-            df_short = robust_read_csv_local(short_files[0])
-            s_id_col = next((c for c in df_short.columns if '代號' in c), None)
-            if s_id_col:
-                short_danger_ids = set(df_short[s_id_col].astype(str).str.replace(r'\D', '', regex=True))
-        except: pass
-
-    # --- 5. 整合重榜標籤與計算危險指數 ---
-    df_risk['🚨融資套牢'] = df_risk['股票代號'].apply(lambda x: "✔️" if x in margin_danger_ids else "")
-    df_risk['📉借券大增'] = df_risk['股票代號'].apply(lambda x: "✔️" if x in short_danger_ids else "")
-    
-    # 計算危險分數 (1分=單純法人賣, 2分=雙重命中, 3分=三重命中)
-    df_risk['危險指數'] = 1 + (df_risk['🚨融資套牢'] == "✔️").astype(int) + (df_risk['📉借券大增'] == "✔️").astype(int)
-    
-    # 依照危險指數降冪排列 (把三重命中的放在最上面)
-    df_risk = df_risk.sort_values(by=['危險指數'], ascending=[False]).reset_index(drop=True)
-    
-    # 將危險指數轉為視覺化標籤
-    def get_risk_tag(score):
-        if score == 3: return "☠️ 極度危險 (三重重榜)"
-        elif score == 2: return "🚨 高度警戒 (雙重重榜)"
-        return "⚠️ 法人調節"
-        
-    df_risk.insert(2, '避險狀態', df_risk['危險指數'].apply(get_risk_tag))
-    df_risk = df_risk.drop(columns=['危險指數']) # 隱藏數字，留視覺標籤
-    
-    return df_risk, "Success"
-
-# 執行與渲染
-with st.spinner("⏳ 正在掃描全市場避險名單..."):
-    df_risk_radar, msg = build_risk_radar()
-
-if not df_risk_radar.empty:
-    # 顯示過濾選項
-    show_all = st.checkbox("顯示所有被法人賣超的標的 (取消勾選則只顯示有重榜的警示名單)", value=False)
-    
-    if not show_all:
-        # 只顯示雙重或三重重榜的危險名單
-        df_risk_radar = df_risk_radar[df_risk_radar['避險狀態'].str.contains("☠️|🚨", regex=True)]
-
-    if df_risk_radar.empty:
-        st.success("🎉 目前沒有同時出現『法人賣超』與『籌碼惡化』的危險重榜名單！")
-    else:
-        # 利用 Style 把極度危險的標紅
-        def highlight_risk(row):
-            if "☠️" in row['避險狀態']:
-                return ['background-color: rgba(255, 75, 75, 0.3); color: #FFF; font-weight: bold;'] * len(row)
-            elif "🚨" in row['避險狀態']:
-                return ['background-color: rgba(255, 165, 0, 0.2);'] * len(row)
-            return [''] * len(row)
-
-        styled_risk_df = df_risk_radar.style.apply(highlight_risk, axis=1)
-        st.dataframe(styled_risk_df, use_container_width=True, hide_index=True)
-else:
-    st.warning(f"避險雷達載入失敗：{msg}")
-
 # ==========置頂區塊測試區==================
 # ==========置頂區塊測試區==================
 # ==========置頂區塊測試區==================
@@ -1596,8 +1460,10 @@ with tab2:
     st.markdown("[🔄 區塊4-1：融資減少動向](#section-4-1)")
     st.markdown("[🔄 區塊4-2：借券賣出減少動向](#section-4-2)")
     st.markdown("[🔄 區塊4-3：融券增加動向](#section-4-3)")
+    st.markdown("[🔄 區塊4-4：短線套牢名單](#section-4-4)")
     st.markdown("[💰 區塊5：大股東動向](#section-5)")
     st.markdown("[💸 區塊6：鉅額交易動向](#section-6)")
+    
 # ==========================================
 # 🏠 核心五大區塊
 # ==========================================
@@ -2835,6 +2701,7 @@ def robust_read_csv_local(file_path):
     return pd.read_csv(file_path, encoding='cp950', errors='ignore')
 
 def build_risk_radar():
+    # 🎯 這裡就是以「法人賣超」作為母表打底
     sell_pattern = os.path.join(DATA_DIR, "*三大法人賣超佔成交比*.csv")
     margin_pattern = os.path.join(DATA_DIR, "*融資增加幅度*.csv")
     short_pattern = os.path.join(DATA_DIR, "*借券賣出增加幅度*.csv")
@@ -2864,16 +2731,14 @@ def build_risk_radar():
         keep_cols = list(dict.fromkeys(keep_cols))
         df_risk = df_sell[keep_cols].copy()
         
-        # 🛠️ 修復小數點過多問題：將字串轉為浮點數，並統一四捨五入到小數點後兩位
         for col in df_risk.columns:
             if col not in ['股票代號', '股票名稱']:
                 df_risk[col] = pd.to_numeric(df_risk[col].astype(str).str.replace('%', '', regex=False), errors='coerce')
                 if pd.api.types.is_float_dtype(df_risk[col]):
                     df_risk[col] = df_risk[col].round(2)
         
-        # 💡 套牢邏輯實作：只保留「漲跌幅 <= 0」的股票 (排除上漲且融資賺錢的名單)
+        # 💡 套牢邏輯：只保留「漲跌幅 <= 0」的股票
         df_risk = df_risk[df_risk['漲跌幅'] <= 0]
-        
         df_risk['⚠️法人賣超'] = "✔️"
         
     except Exception as e:
@@ -2901,7 +2766,7 @@ def build_risk_radar():
     df_risk['📉借券大增'] = df_risk['股票代號'].apply(lambda x: "✔️" if x in short_danger_ids else "")
     
     df_risk['危險指數'] = 1 + (df_risk['🚨融資套牢'] == "✔️").astype(int) + (df_risk['📉借券大增'] == "✔️").astype(int)
-    df_risk = df_risk.sort_values(by=['危險指數', '漲跌幅'], ascending=[False, True]).reset_index(drop=True) # 越危險且跌越多的排前面
+    df_risk = df_risk.sort_values(by=['危險指數', '漲跌幅'], ascending=[False, True]).reset_index(drop=True)
     
     def get_risk_tag(score):
         if score == 3: return "☠️ 極度危險 (三重重榜)"
@@ -2926,25 +2791,25 @@ if not df_risk_radar.empty:
     if df_risk_radar.empty:
         st.success("🎉 目前沒有同時出現『法人賣超』與『籌碼惡化』的危險重榜名單！")
     else:
-        # 🎨 表格美化設定
+        # 🎨 表格美化設定 (已更新為深藍黑底色)
         def style_table(df):
-            # 1. 設定整列的危險背景色
             def highlight_risk(row):
                 if "☠️" in row['避險狀態']:
-                    return ['background-color: rgba(255, 75, 75, 0.3); color: #FFF; font-weight: bold;'] * len(row)
+                    # 深藍黑底色 + 亮紅色粗體字
+                    return ['background-color: #262730; color: #ff4b4b; font-weight: bold;'] * len(row)
                 elif "🚨" in row['避險狀態']:
-                    return ['background-color: rgba(255, 165, 0, 0.2);'] * len(row)
+                    # 深藍黑底色 + 亮橘色粗體字
+                    return ['background-color: #262730; color: #ffa500; font-weight: bold;'] * len(row)
                 return [''] * len(row)
             
             styler = df.style.apply(highlight_risk, axis=1)
             
-            # 2. 修改表頭 (Header) 底色為側邊欄的深色 (#262730)
+            # 確保表頭也是深色調，視覺統一
             styler = styler.set_table_styles([
-                {'selector': 'th', 'props': [('background-color', '#262730'), ('color', 'white'), ('font-weight', 'bold')]}
+                {'selector': 'th', 'props': [('background-color', '#1e1e24'), ('color', '#ffffff'), ('font-weight', 'bold')]}
             ])
             
-            # 3. 確保數值欄位顯示小數點後兩位 (防止 Streamlit 再次跑版)
-            num_cols = [c for c in df.columns if c not in ['股票代號', '股票名稱', '避險狀態', '⚠️法人賣超', '🚨融資套牢', '📉借券大增']]
+            num_cols = [c for c in df.columns if c not in ['股票代號', '股票名稱', '避險狀態', '⚠️法人賣超', '🚨融亡套牢', '📉借券大增']]
             styler = styler.format({col: "{:.2f}" for col in num_cols})
             
             return styler
