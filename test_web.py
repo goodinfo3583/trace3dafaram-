@@ -1507,12 +1507,18 @@ def get_diff_ui(today_val, prev_val):
         return f"<span style='color:{color}; font-size:11px; margin-left:4px;'>({sign}{diff:,})</span>"
     except: return ""
 
+# ==========================================
+# 🗂️ 建立側邊欄分頁 (Tabs)
+# ==========================================
+tab1, tab2 = st.sidebar.tabs(["📊 大盤與期權", "🧭 戰情導航"])
+
 # ------------------------------------------
 # 1. 大盤籌碼導航總覽引擎 (Google Sheets 看門狗極速版)
 # ------------------------------------------
 def render_sidebar_market_summary():
     global conn, SHEET_URL
-    st.sidebar.markdown("<h2 style='margin-top: 0; margin-bottom: 5px;'>📊 大盤資金風向球</h2>", unsafe_allow_html=True)
+    # ⚠️ 注意：這裡的 st.sidebar 已改為 st，這樣呼叫時才能正確放進 Tab 裡
+    st.markdown("<h2 style='margin-top: 0; margin-bottom: 5px;'>📊 大盤資金風向球</h2>", unsafe_allow_html=True)
     now = datetime.datetime.now()
     today_str = now.strftime("%Y%m%d")
     need_crawl = True 
@@ -1632,84 +1638,84 @@ def render_sidebar_market_summary():
         else:
             html_lines.append(f"<tr style='border-top: 1px dashed #334155;'><td style='padding: 8px 0 2px 0; color: white; font-weight: bold;' colspan='2'>📊 融資餘額增減(億)</td><td style='padding: 8px 0 2px 0; text-align: right; color: #94A3B8; font-weight: bold;'>⏳ 晚間 22:00 出爐</td></tr>")
         html_lines.append("</table></div>")
-        st.sidebar.markdown("".join(html_lines), unsafe_allow_html=True)
-    else: st.sidebar.info("🕒 目前查無今日三大法人買賣資料。")
+        st.markdown("".join(html_lines), unsafe_allow_html=True)
+    else: st.info("🕒 目前查無今日三大法人買賣資料。")
     return date_str
 
-current_market_date = render_sidebar_market_summary()
+# ==========================================
+# 📌 渲染 分頁 1 內容：大盤資金 + 選擇權
+# ==========================================
+with tab1:
+    current_market_date = render_sidebar_market_summary()
 
-# ------------------------------------------
-# 🎯 附加：選擇權攻防 (Google Sheet 動態兵力位移版)
-# ------------------------------------------
-# ------------------------------------------
-# 🎯 附加：選擇權攻防 (Google Sheet 動態兵力位移版)
-# ------------------------------------------
-if current_market_date and current_market_date != "未知日期":
-    today_opt, prev_opt = sync_options_with_gs(current_market_date)
+    # ------------------------------------------
+    # 🎯 附加：選擇權攻防 (Google Sheet 動態兵力位移版)
+    # ------------------------------------------
+    if current_market_date and current_market_date != "未知日期":
+        today_opt, prev_opt = sync_options_with_gs(current_market_date)
 
-    if today_opt:
-        pcr = today_opt.get('PCR', 0.0)
-        pcr_color = "#00E272" if pcr >= 110 else "#FF4B4B" if pcr <= 90 else "#FFA500"
-        
-        is_same_month = prev_opt and (str(today_opt.get('合約月份')) == str(prev_opt.get('合約月份')))
-        display_contract_month = str(today_opt['合約月份']).replace('.0', '')
-        
-        now = datetime.datetime.now()
-        is_weekend = now.weekday() >= 5
-        opt_status_badge = "⚡ <span style='color:#00E272;'>雲端極速載入</span>" if (is_weekend or now.time() < datetime.time(18, 0)) else "🌕 <span style='color:#00E272;'>即時更新版</span>"
-
-        max_call_strike = int(today_opt.get('最大壓力點', 0))
-        sec_call_strike = int(today_opt.get('次大壓力點', 0))
-        max_put_strike = int(today_opt.get('最大支撐點', 0))
-        sec_put_strike = int(today_opt.get('次大支撐點', 0))
-
-        # 🔥 自動生成 40000 到 48000 的千點陣列，再也不用手動打
-        custom_strikes = list(range(40000, 49000, 1000))
-        
-        all_strikes = set(custom_strikes + [max_call_strike, sec_call_strike, max_put_strike, sec_put_strike])
-        all_strikes.discard(0) 
-        sorted_strikes = sorted(list(all_strikes), reverse=True)
-
-        table_rows_html = ""
-        for strike in sorted_strikes:
-            label_suffix = ""
-            if strike == max_call_strike: label_suffix = "<br><span style='font-size:10px; color:#FF4B4B;'>(最壓)</span>"
-            elif strike == sec_call_strike: label_suffix = "<br><span style='font-size:10px; color:#FF8A8A;'>(次壓)</span>"
-            elif strike == max_put_strike: label_suffix = "<br><span style='font-size:10px; color:#00E272;'>(最撐)</span>"
-            elif strike == sec_put_strike: label_suffix = "<br><span style='font-size:10px; color:#8AFFB0;'>(次撐)</span>"
-
-            c_oi, p_oi = 0, 0
-            d_c_ui, d_p_ui = "", ""
+        if today_opt:
+            pcr = today_opt.get('PCR', 0.0)
+            pcr_color = "#00E272" if pcr >= 110 else "#FF4B4B" if pcr <= 90 else "#FFA500"
             
-            if strike in custom_strikes:
-                c_oi = today_opt.get(f'C{strike}', 0)
-                p_oi = today_opt.get(f'P{strike}', 0)
-                if is_same_month and prev_opt:
-                    d_c_ui = get_diff_ui(c_oi, prev_opt.get(f'C{strike}'))
-                    d_p_ui = get_diff_ui(p_oi, prev_opt.get(f'P{strike}'))
-            else:
-                if strike == max_call_strike:
-                    c_oi = today_opt.get('最大壓力OI', 0)
-                    if is_same_month: d_c_ui = get_diff_ui(c_oi, prev_opt.get('最大壓力OI'))
-                elif strike == sec_call_strike:
-                    c_oi = today_opt.get('次大壓力OI', 0)
-                    if is_same_month: d_c_ui = get_diff_ui(c_oi, prev_opt.get('次大壓力OI'))
-                elif strike == max_put_strike:
-                    p_oi = today_opt.get('最大支撐OI', 0)
-                    if is_same_month: d_p_ui = get_diff_ui(p_oi, prev_opt.get('最大支撐OI'))
-                elif strike == sec_put_strike:
-                    p_oi = today_opt.get('次大支撐OI', 0)
-                    if is_same_month: d_p_ui = get_diff_ui(p_oi, prev_opt.get('次大支撐OI'))
+            is_same_month = prev_opt and (str(today_opt.get('合約月份')) == str(prev_opt.get('合約月份')))
+            display_contract_month = str(today_opt['合約月份']).replace('.0', '')
+            
+            now = datetime.datetime.now()
+            is_weekend = now.weekday() >= 5
+            opt_status_badge = "⚡ <span style='color:#00E272;'>雲端極速載入</span>" if (is_weekend or now.time() < datetime.time(18, 0)) else "🌕 <span style='color:#00E272;'>即時更新版</span>"
 
-            try: c_oi_int = int(float(c_oi))
-            except: c_oi_int = 0
-            try: p_oi_int = int(float(p_oi))
-            except: p_oi_int = 0
+            max_call_strike = int(today_opt.get('最大壓力點', 0))
+            sec_call_strike = int(today_opt.get('次大壓力點', 0))
+            max_put_strike = int(today_opt.get('最大支撐點', 0))
+            sec_put_strike = int(today_opt.get('次大支撐點', 0))
 
-            c_oi_str = f"{c_oi_int:,}" if c_oi_int > 0 else "-"
-            p_oi_str = f"{p_oi_int:,}" if p_oi_int > 0 else "-"
+            custom_strikes = list(range(40000, 49000, 1000))
+            
+            all_strikes = set(custom_strikes + [max_call_strike, sec_call_strike, max_put_strike, sec_put_strike])
+            all_strikes.discard(0) 
+            sorted_strikes = sorted(list(all_strikes), reverse=True)
 
-            table_rows_html += f"""<tr style='border-bottom: 1px solid #334155;'>
+            table_rows_html = ""
+            for strike in sorted_strikes:
+                label_suffix = ""
+                if strike == max_call_strike: label_suffix = "<br><span style='font-size:10px; color:#FF4B4B;'>(最壓)</span>"
+                elif strike == sec_call_strike: label_suffix = "<br><span style='font-size:10px; color:#FF8A8A;'>(次壓)</span>"
+                elif strike == max_put_strike: label_suffix = "<br><span style='font-size:10px; color:#00E272;'>(最撐)</span>"
+                elif strike == sec_put_strike: label_suffix = "<br><span style='font-size:10px; color:#8AFFB0;'>(次撐)</span>"
+
+                c_oi, p_oi = 0, 0
+                d_c_ui, d_p_ui = "", ""
+                
+                if strike in custom_strikes:
+                    c_oi = today_opt.get(f'C{strike}', 0)
+                    p_oi = today_opt.get(f'P{strike}', 0)
+                    if is_same_month and prev_opt:
+                        d_c_ui = get_diff_ui(c_oi, prev_opt.get(f'C{strike}'))
+                        d_p_ui = get_diff_ui(p_oi, prev_opt.get(f'P{strike}'))
+                else:
+                    if strike == max_call_strike:
+                        c_oi = today_opt.get('最大壓力OI', 0)
+                        if is_same_month: d_c_ui = get_diff_ui(c_oi, prev_opt.get('最大壓力OI'))
+                    elif strike == sec_call_strike:
+                        c_oi = today_opt.get('次大壓力OI', 0)
+                        if is_same_month: d_c_ui = get_diff_ui(c_oi, prev_opt.get('次大壓力OI'))
+                    elif strike == max_put_strike:
+                        p_oi = today_opt.get('最大支撐OI', 0)
+                        if is_same_month: d_p_ui = get_diff_ui(p_oi, prev_opt.get('最大支撐OI'))
+                    elif strike == sec_put_strike:
+                        p_oi = today_opt.get('次大支撐OI', 0)
+                        if is_same_month: d_p_ui = get_diff_ui(p_oi, prev_opt.get('次大支撐OI'))
+
+                try: c_oi_int = int(float(c_oi))
+                except: c_oi_int = 0
+                try: p_oi_int = int(float(p_oi))
+                except: p_oi_int = 0
+
+                c_oi_str = f"{c_oi_int:,}" if c_oi_int > 0 else "-"
+                p_oi_str = f"{p_oi_int:,}" if p_oi_int > 0 else "-"
+
+                table_rows_html += f"""<tr style='border-bottom: 1px solid #334155;'>
 <td style='padding: 6px 0; color: white; font-weight: bold;'>{strike:,}{label_suffix}</td>
 <td style='padding: 6px 0; color: #FF8A8A; font-weight: bold;'>{c_oi_str}</td>
 <td style='padding: 6px 0;'>{d_c_ui}</td>
@@ -1717,7 +1723,7 @@ if current_market_date and current_market_date != "未知日期":
 <td style='padding: 6px 0;'>{d_p_ui}</td>
 </tr>"""
 
-        st.sidebar.markdown(f"""<div style='background-color: #1e293b; padding: 12px; border-radius: 8px; margin-bottom: 10px;'>
+            st.markdown(f"""<div style='background-color: #1e293b; padding: 12px; border-radius: 8px; margin-bottom: 10px;'>
 <div style='font-size: 13px; color: #00D2FF; margin-bottom: 8px;'>📅 {display_contract_month} | {opt_status_badge}</div>
 <div style='display: flex; justify-content: space-between; align-items: center; margin-bottom: 8px;'>
 <span style='font-weight: bold; color: white; font-size: 14px;'>🏰 選擇權關鍵兵力分布</span>
@@ -1734,34 +1740,34 @@ if current_market_date and current_market_date != "未知日期":
 {table_rows_html}
 </table>
 </div>""", unsafe_allow_html=True)
-# ------------------------------------------
-# 2. 大盤總體經濟指標
-# ------------------------------------------
-st.sidebar.markdown("---")
-st.sidebar.subheader("📊 大盤總體經濟指標")
 
-c_btn1, c_btn2 = st.sidebar.columns(2)
-with c_btn1: st.link_button("📈 恐懼貪婪", "https://www.wantgoo.com/global/macroeconomics/fearandgreed", use_container_width=True)
-with c_btn2: st.link_button("⚠️ VIX 指數", "https://www.wantgoo.com/global/vix", use_container_width=True)
 
-# ------------------------------------------
-# 3. 戰情室快速導航
-# ------------------------------------------
-st.sidebar.markdown("---")
-st.sidebar.header("📍 戰情室快速導航")
-st.sidebar.markdown("[🏆 數據分析觀察名單](#section-top-pool)")
-st.sidebar.markdown("[🔍 個股籌碼快搜 (診斷區)](#section-search)")
-st.sidebar.markdown("[👑 區塊1：三大法人持股比追蹤](#section-1)")
-st.sidebar.markdown("[🎯 區塊2-1：外資5日淨買佔成交量](#section-2-1)")
-st.sidebar.markdown("[🎯 區塊2-2：投信5日淨買佔成交量](#section-2-2)")
-st.sidebar.markdown("[🎯 區塊2-3：外資5日淨買佔發行量](#section-2-3)")
-st.sidebar.markdown("[🎯 區塊2-4：投信5日淨買佔發行量](#section-2-4)")
-st.sidebar.markdown("[📅 區塊3：法人連續買超](#section-3)")
-st.sidebar.markdown("[🔄 區塊4-1：融資減少動向](#section-4-1)")
-st.sidebar.markdown("[🔄 區塊4-2：借券賣出減少動向](#section-4-2)")
-st.sidebar.markdown("[🔄 區塊4-3：融券增加動向](#section-4-3)")
-st.sidebar.markdown("[💰 區塊5：大股東動向](#section-5)")
-st.sidebar.markdown("[💸 區塊6：鉅額交易動向](#section-6)")
+# ==========================================
+# 📌 渲染 分頁 2 內容：總經指標 + 快速導航
+# ==========================================
+with tab2:
+    st.subheader("📊 大盤總體經濟指標")
+    
+    # ⚠️ 這裡使用 st.columns 取代 st.sidebar.columns，才能放進分頁
+    c_btn1, c_btn2 = st.columns(2)
+    with c_btn1: st.link_button("📈 恐懼貪婪", "https://www.wantgoo.com/global/macroeconomics/fearandgreed", use_container_width=True)
+    with c_btn2: st.link_button("⚠️ VIX 指數", "https://www.wantgoo.com/global/vix", use_container_width=True)
+
+    st.markdown("---")
+    st.subheader("📍 戰情室快速導航")
+    st.markdown("[🏆 數據分析觀察名單](#section-top-pool)")
+    st.markdown("[🔍 個股籌碼快搜 (診斷區)](#section-search)")
+    st.markdown("[👑 區塊1：三大法人持股比追蹤](#section-1)")
+    st.markdown("[🎯 區塊2-1：外資5日淨買佔成交量](#section-2-1)")
+    st.markdown("[🎯 區塊2-2：投信5日淨買佔成交量](#section-2-2)")
+    st.markdown("[🎯 區塊2-3：外資5日淨買佔發行量](#section-2-3)")
+    st.markdown("[🎯 區塊2-4：投信5日淨買佔發行量](#section-2-4)")
+    st.markdown("[📅 區塊3：法人連續買超](#section-3)")
+    st.markdown("[🔄 區塊4-1：融資減少動向](#section-4-1)")
+    st.markdown("[🔄 區塊4-2：借券賣出減少動向](#section-4-2)")
+    st.markdown("[🔄 區塊4-3：融券增加動向](#section-4-3)")
+    st.markdown("[💰 區塊5：大股東動向](#section-5)")
+    st.markdown("[💸 區塊6：鉅額交易動向](#section-6)")
 # ==========================================
 # 🏠 核心五大區塊
 # ==========================================
