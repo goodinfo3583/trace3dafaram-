@@ -32,15 +32,31 @@ for folder in [SCORE_HISTORY_DIR, MARKET_HISTORY_DIR, BLOCK_HISTORY_DIR]:
 # ==========================================
 # 🚨 區塊 00 測試區：短線避險雷達 (法人賣 + 融資增 + 借券增)
 # ==========================================
+# ==========================================
+# 🚨 區塊 00 測試區：短線避險雷達 (法人賣 + 融資增 + 借券增)
+# ==========================================
+import streamlit as st
+import pandas as pd
+import os
+import glob
+
 st.markdown("<div id='section-00'></div>", unsafe_allow_html=True)
 st.header("🚨 區塊 00：短線避險雷達 (高風險名單)")
 st.write("💡 偵測『三大法人賣超』並比對『融資增加(散戶接刀)』與『借券賣出增加(空頭狙擊)』的多重重榜名單。")
 
+# 🛠️ 【修正】：直接在區塊內建立專用的讀取函數，避免找不到定義
+def robust_read_csv_local(file_path):
+    for encoding in ['cp950', 'utf-8-sig', 'utf-8']:
+        try:
+            df = pd.read_csv(file_path, encoding=encoding)
+            if not df.empty and len(df.columns) > 1 and '撖' in str(df.iloc[0, 1]): 
+                continue
+            return df
+        except:
+            continue
+    return pd.read_csv(file_path, encoding='cp950', errors='ignore')
+
 def build_risk_radar():
-    import os
-    import glob
-    import pandas as pd
-    
     # --- 1. 尋找三個關鍵檔案 ---
     sell_pattern = os.path.join(DATA_DIR, "*三大法人賣超佔成交比*.csv")
     margin_pattern = os.path.join(DATA_DIR, "*融資增加幅度*.csv")
@@ -55,8 +71,8 @@ def build_risk_radar():
 
     # --- 2. 處理母表：三大法人賣超佔成交比 ---
     try:
-        # 讀取並清理欄位名稱
-        df_sell = robust_read_csv(sell_files[0])
+        # 使用區塊專用的讀取函數
+        df_sell = robust_read_csv_local(sell_files[0])
         df_sell.columns = [str(c).replace(" ", "").replace("\n", "").replace("\ufeff", "").strip() for c in df_sell.columns]
         
         # 確保代號與名稱存在
@@ -73,7 +89,7 @@ def build_risk_radar():
             if matched_cols:
                 keep_cols.append(matched_cols[0])
                 
-        # 這裡用 dict.fromkeys 來去重複，保持順序
+        # 去除重複欄位，保持順序
         keep_cols = list(dict.fromkeys(keep_cols))
         df_risk = df_sell[keep_cols].copy()
         
@@ -87,7 +103,7 @@ def build_risk_radar():
     margin_danger_ids = set()
     if margin_files:
         try:
-            df_margin = robust_read_csv(margin_files[0])
+            df_margin = robust_read_csv_local(margin_files[0])
             m_id_col = next((c for c in df_margin.columns if '代號' in c), None)
             if m_id_col:
                 margin_danger_ids = set(df_margin[m_id_col].astype(str).str.replace(r'\D', '', regex=True))
@@ -97,7 +113,7 @@ def build_risk_radar():
     short_danger_ids = set()
     if short_files:
         try:
-            df_short = robust_read_csv(short_files[0])
+            df_short = robust_read_csv_local(short_files[0])
             s_id_col = next((c for c in df_short.columns if '代號' in c), None)
             if s_id_col:
                 short_danger_ids = set(df_short[s_id_col].astype(str).str.replace(r'\D', '', regex=True))
@@ -125,20 +141,30 @@ def build_risk_radar():
     return df_risk, "Success"
 
 # 執行與渲染
-df_risk_radar, msg = build_risk_radar()
+with st.spinner("⏳ 正在掃描全市場避險名單..."):
+    df_risk_radar, msg = build_risk_radar()
 
 if not df_risk_radar.empty:
-    # 為了版面乾淨，我們可以篩選出「至少命中兩項 (危險指數 >= 2)」的標的，或者全部顯示
-    # 這裡預設全部顯示，並利用 Style 把極度危險的標紅
-    def highlight_risk(row):
-        if "☠️" in row['避險狀態']:
-            return ['background-color: rgba(255, 75, 75, 0.3); color: #FFF; font-weight: bold;'] * len(row)
-        elif "🚨" in row['避險狀態']:
-            return ['background-color: rgba(255, 165, 0, 0.2);'] * len(row)
-        return [''] * len(row)
+    # 顯示過濾選項
+    show_all = st.checkbox("顯示所有被法人賣超的標的 (取消勾選則只顯示有重榜的警示名單)", value=False)
+    
+    if not show_all:
+        # 只顯示雙重或三重重榜的危險名單
+        df_risk_radar = df_risk_radar[df_risk_radar['避險狀態'].str.contains("☠️|🚨", regex=True)]
 
-    styled_risk_df = df_risk_radar.style.apply(highlight_risk, axis=1)
-    st.dataframe(styled_risk_df, use_container_width=True, hide_index=True)
+    if df_risk_radar.empty:
+        st.success("🎉 目前沒有同時出現『法人賣超』與『籌碼惡化』的危險重榜名單！")
+    else:
+        # 利用 Style 把極度危險的標紅
+        def highlight_risk(row):
+            if "☠️" in row['避險狀態']:
+                return ['background-color: rgba(255, 75, 75, 0.3); color: #FFF; font-weight: bold;'] * len(row)
+            elif "🚨" in row['避險狀態']:
+                return ['background-color: rgba(255, 165, 0, 0.2);'] * len(row)
+            return [''] * len(row)
+
+        styled_risk_df = df_risk_radar.style.apply(highlight_risk, axis=1)
+        st.dataframe(styled_risk_df, use_container_width=True, hide_index=True)
 else:
     st.warning(f"避險雷達載入失敗：{msg}")
 
