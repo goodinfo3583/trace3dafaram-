@@ -2859,13 +2859,11 @@ if not df_risk_radar.empty:
                     ('border', border_css),
                     ('padding', '4px'), 
                     ('text-align', 'center'),
-                    ('transition', 'all 0.2s ease-in-out') # 🌟 讓變色有平滑過渡動畫
+                    ('transition', 'all 0.2s ease-in-out') 
                 ]},
-                # 💥 【修改點】：滑鼠 Hover 動態光暈效果 (戰情室導航風格)
                 {'selector': 'tbody tr:hover td', 'props': [
-                    ('background-color', 'rgba(11, 17, 41, 0.85) !important'), # 亮黃色帶透明度，透出暗黑底色
-                    #('box-shadow', 'inset 0 0 10px rgba(255, 215, 0, 0.4) !important'), # 儲存格黃色內光暈
-                    ('text-shadow', '0 0 8px rgba(255, 255, 255, 0.5) !important') # 讓原本的字體微微發光
+                    ('background-color', 'rgba(4, 8, 20, 0.85) !important'), 
+                    ('text-shadow', '0 0 8px rgba(255, 255, 255, 0.5) !important') 
                 ]}
             ])
             
@@ -2879,8 +2877,9 @@ if not df_risk_radar.empty:
 
         html_table = style_table(df_risk_radar)
         
+        # 📏 【修改點】：將 max-height 調整為 420px，大約顯示 10~12 筆
         scrollable_div = f"""
-        <div style="max-height: 600px; overflow-y: auto; border: 1px solid #808495; border-radius: 5px;">
+        <div style="max-height: 420px; overflow-y: auto; border: 1px solid #808495; border-radius: 5px;">
             {html_table}
         </div>
         """
