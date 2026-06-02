@@ -1225,12 +1225,9 @@ def render_sidebar_market_summary():
     gs_backup = pd.DataFrame()
     
     STD_COLS = ["日期", "外資", "投信", "自營商", "合計", "外資期貨", "投信期貨", "自營商期貨", "期貨合計", "融資增減", "融資餘額"]
-    
-    # 🔧 【修復點 2】：設定大盤預設的顯示日期
     display_date_key = today_str 
 
     try:
-        # 加入 ttl=0 防止卡在舊的空白快取，並清除欄位多餘空白
         gs_backup = conn.read(spreadsheet=SHEET_URL, worksheet="大盤風向球", ttl=0 if force_update else 600).dropna(how="all")
         gs_backup.columns = gs_backup.columns.astype(str).str.strip()
         
@@ -1249,7 +1246,7 @@ def render_sidebar_market_summary():
                 elif gs_latest_date == today_str:
                     if gs_margin > 0:
                         need_crawl = False 
-                    elif now.time() < datetime.time(22, 0):
+                    elif now.time() < datetime.time(21, 30): # 提早到 21:30 讓融資可以準備抓取
                         need_crawl = False 
     except Exception: pass 
 
@@ -1257,24 +1254,35 @@ def render_sidebar_market_summary():
     oi_data = {"外資": 0, "投信": 0, "自營商": 0}
     
     if need_crawl:
-        with st.spinner("🐕 汪！看門狗出動抓取今日資料..."):
+        # 🕵️ 【隱藏蹤跡】：修改 Loading 提示詞，讓它看起來像是一般的系統讀取
+        with st.spinner("🔄 系統資料同步中..."):
             twse_title, twse_df = fetch_twse_institutional_data()
             if twse_df is not None and not twse_df.empty:
                 date_match = re.search(r'(\d+)年(\d+)月(\d+)日', str(twse_title))
                 if date_match:
                     date_key = f"{int(date_match.group(1))+1911}{int(date_match.group(2)):02d}{int(date_match.group(3)):02d}"
-                    display_date_key = date_key # 🌟 更新為實際爬到的日期
+                    display_date_key = date_key 
                 
-                if force_update or now.time() >= datetime.time(22, 0):
+                if force_update or now.time() >= datetime.time(21, 30):
                     try: 
+                        # 🔧 【融資修復雙重策略】：策略 A (指定日期)
                         margin_url = f"https://www.twse.com.tw/rwd/zh/margin/MI_MARGN?response=json&date={date_key}&selectType=MS"
                         res_margin = requests.get(margin_url, headers={'User-Agent': 'Mozilla/5.0'}, timeout=5)
+                        m_data = []
                         if res_margin.status_code == 200:
                             m_data = res_margin.json().get("data", []) if "data" in res_margin.json() else res_margin.json().get("tables", [{}])[0].get("data", [])
-                            for row in m_data:
-                                if row and len(row) >= 6 and "融資金額" in str(row[0]):
-                                    margin_prev, margin_today = float(str(row[4]).replace(',', '').strip()), float(str(row[5]).replace(',', '').strip())
-                                    break
+                        
+                        # 🔧 【融資修復雙重策略】：策略 B (如果 A 抓不到，改抓不帶日期的最新版)
+                        if not m_data:
+                            margin_url_latest = "https://www.twse.com.tw/rwd/zh/margin/MI_MARGN?response=json&selectType=MS"
+                            res_margin_latest = requests.get(margin_url_latest, headers={'User-Agent': 'Mozilla/5.0'}, timeout=5)
+                            if res_margin_latest.status_code == 200:
+                                m_data = res_margin_latest.json().get("data", []) if "data" in res_margin_latest.json() else res_margin_latest.json().get("tables", [{}])[0].get("data", [])
+
+                        for row in m_data:
+                            if row and len(row) >= 6 and "融資金額" in str(row[0]):
+                                margin_prev, margin_today = float(str(row[4]).replace(',', '').strip()), float(str(row[5]).replace(',', '').strip())
+                                break
                     except: pass
                     
                 try: 
@@ -1348,7 +1356,6 @@ def render_sidebar_market_summary():
         is_weekend_mode = (now.weekday() >= 5)
         if not gs_backup.empty:
             last_row = gs_backup.iloc[-1]
-            # 🌟 取出雲端真實儲存的日期，而不是當前時間
             display_date_key = str(last_row.get('日期', today_str)).replace('.0', '') 
             date_str = f"📅 {display_date_key} | 🌕 雲端同步版"
             
@@ -1407,113 +1414,21 @@ def render_sidebar_market_summary():
         html += "</div>"
         
     st.markdown(html, unsafe_allow_html=True)
-    
-    # 🔧 【修復點 3】：回傳實際有資料的日期，而不是物理時間的「今天」
     return display_date_key 
 
-# ------------------------------------------
-# 2. 選擇權關鍵兵力分布 
-# ------------------------------------------
-def render_options_dashboard(target_date_str):
-    st.markdown("<hr style='margin:15px 0;'>", unsafe_allow_html=True)
-    st.markdown("<h2 style='margin-top: 0; margin-bottom: 5px;'>🏰 選擇權關鍵兵力分布</h2>", unsafe_allow_html=True)
-    
-    # 將大盤傳遞過來的真實日期交給選擇權
-    today_opt, prev_opt = sync_options_with_gs(target_date_str)
-    
-    if not today_opt:
-        st.warning("目前尚無選擇權籌碼資料。")
-        return
-
-    # 確保 PCR 轉型正確
-    try:
-        pcr_val = float(today_opt.get('PCR', 0.0))
-    except:
-        pcr_val = 0.0
-        
-    pcr_color = "#FF4B4B" if pcr_val > 100 else "#00E272"
-    st.markdown(f"**PCR:** <span style='color:{pcr_color}; font-size: 16px;'>{pcr_val}%</span>", unsafe_allow_html=True)
-
-    # 🔧 【核心修復】：強制轉型為 int，破除 TypeError
-    try:
-        max_pressure = int(float(today_opt.get('最大壓力點', 0)))
-        max_support = int(float(today_opt.get('最大支撐點', 0)))
-    except:
-        max_pressure = 0
-        max_support = 0
-    
-    if max_pressure == 0 or max_support == 0:
-        st.info("無法解析最大壓力/支撐點位")
-        return
-
-    # 現在 max_pressure 和 max_support 絕對是乾淨的整數，range() 不會再報錯
-    display_strikes = [s for s in range(max_pressure + 2000, max_support - 3000, -1000)]
-    
-    html_opt = "<table style='width: 100%; text-align: center; border-collapse: collapse; margin-top: 5px; font-size: 13px;'>"
-    html_opt += "<tr style='border-bottom: 1px solid #555; background-color: #262730;'>"
-    html_opt += "<th style='padding: 5px;'>點位</th><th style='padding: 5px;'>⚔️ Call (口)</th><th style='padding: 5px;'>🛡️ Put (口)</th></tr>"
-    
-    for strike in display_strikes:
-        c_key = f"C{strike}"
-        p_key = f"P{strike}"
-        
-        # 🔧 將所有讀出的口數也強制轉 int，避免顯示為 1500.0 的怪異格式
-        try: c_oi = int(float(today_opt.get(c_key, 0)))
-        except: c_oi = 0
-            
-        try: p_oi = int(float(today_opt.get(p_key, 0)))
-        except: p_oi = 0
-        
-        if c_oi == 0 and p_oi == 0:
-            continue
-            
-        c_diff_ui = get_diff_ui(c_oi, prev_opt.get(c_key) if prev_opt else None)
-        p_diff_ui = get_diff_ui(p_oi, prev_opt.get(p_key) if prev_opt else None)
-        
-        strike_label = str(strike)
-        
-        # 次壓/次撐也要安全轉型
-        try: second_pressure = int(float(today_opt.get('次大壓力點', 0)))
-        except: second_pressure = 0
-        try: second_support = int(float(today_opt.get('次大支撐點', 0)))
-        except: second_support = 0
-
-        if strike == max_pressure:
-            strike_label += "<br><span style='color:#FF4B4B; font-size:10px;'>(最壓)</span>"
-        elif strike == second_pressure:
-            strike_label += "<br><span style='color:#ffa500; font-size:10px;'>(次壓)</span>"
-        elif strike == max_support:
-            strike_label += "<br><span style='color:#00E272; font-size:10px;'>(最撐)</span>"
-        elif strike == second_support:
-            strike_label += "<br><span style='color:#00a352; font-size:10px;'>(次撐)</span>"
-
-        c_oi_str = f"{c_oi:,}" if c_oi > 0 else "-"
-        p_oi_str = f"{p_oi:,}" if p_oi > 0 else "-"
-
-        html_opt += f"<tr style='border-bottom: 1px solid #333;'>"
-        html_opt += f"<td style='padding: 6px; font-weight: bold;'>{strike_label}</td>"
-        html_opt += f"<td style='padding: 6px; color: #FF4B4B;'>{c_oi_str}{c_diff_ui}</td>"
-        html_opt += f"<td style='padding: 6px; color: #00E272;'>{p_oi_str}{p_diff_ui}</td>"
-        html_opt += f"</tr>"
-        
-    html_opt += "</table>"
-    st.markdown(html_opt, unsafe_allow_html=True)
-
 # ==========================================
-# 執行側邊欄渲染
+# 執行側邊欄渲染 (包含隱藏版狗頭按鈕)
 # ==========================================
+# (保留原本的選擇權 dashboard 函數，只替換執行這段)
 with tab1:
-    # 現在大盤風向球會回傳它「實際顯示」的日期
     actual_data_date = render_sidebar_market_summary()
-    
-    # 選擇權乖乖跟著大盤的日期去抓資料
     render_options_dashboard(actual_data_date)
     
-    # 🤫 隱藏版看門狗按鈕 (放置在側邊欄最下方右下角)
     st.markdown("<br><br><br>", unsafe_allow_html=True) 
     col1, col2 = st.columns([9, 1]) 
     with col2:
-        if st.button("🐕", help="更新籌碼", key="secret_watchdog"):
+        # 🕵️ 【隱藏蹤跡】：help 設為隱形空白，按鈕極度不顯眼
+        if st.button("🐕", help=" ", key="secret_watchdog"):
             st.session_state['force_update'] = True
             st.cache_data.clear()
             st.rerun()
