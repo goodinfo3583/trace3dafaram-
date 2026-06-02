@@ -2792,28 +2792,23 @@ if not df_risk_radar.empty:
     if df_risk_radar.empty:
         st.success("🎉 目前沒有同時出現『法人賣超』與『籌碼惡化』的危險重榜名單！")
     else:
-        # 🎨 表格美化設定 
+        # 🎨 表格美化設定 (統一字體顏色、調亮格線)
         def style_table(df):
             def highlight_risk(row):
-                # 💥 【修改點 2】：強化格線顏色，從透明改成實心的灰藍色 (#525465)
-                base_style = 'background-color: #262730; font-weight: normal; border: 1px solid #525465;'
-                
-                if "☠️" in row['避險狀態']:
-                    return [base_style + ' color: #ff4b4b;'] * len(row)
-                elif "🚨" in row['避險狀態']:
-                    return [base_style + ' color: #ffa500;'] * len(row)
-                else:
-                    return [base_style + ' color: #e0e0e0;'] * len(row)
+                # 💡 【修改點】：全部統一為淺灰字體 (#e0e0e0)，並把格線調亮 (#808495)
+                # 若想調格線，請修改這裡的 1px 或 #808495
+                base_style = 'background-color: #262730; font-weight: normal; color: #e0e0e0; border: 1px solid #808495;'
+                return [base_style] * len(row)
             
             styler = df.style.apply(highlight_risk, axis=1)
             
-            # 確保表頭也有一致的明顯格線
+            # 確保表頭也有一致的明顯格線與顏色
             styler = styler.set_table_styles([
                 {'selector': 'th', 'props': [
                     ('background-color', '#1e1e24'), 
                     ('color', '#ffffff'), 
                     ('font-weight', 'normal'),
-                    ('border', '1px solid #525465')
+                    ('border', '1px solid #808495') # 💡 這裡控制表頭的格線
                 ]}
             ])
             
