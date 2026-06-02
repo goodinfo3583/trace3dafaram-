@@ -1156,21 +1156,20 @@ def sync_options_with_gs(date_str_yyyymmdd):
     global conn, SHEET_URL
     gs_opt = pd.DataFrame()
     try:
-        # 🔧 【修復點 1】：加入 ttl=0 強制更新快取，並清除欄位名稱的多餘空白
         gs_opt = conn.read(spreadsheet=SHEET_URL, worksheet="選擇權紀錄", ttl=0).dropna(how="all")
         gs_opt.columns = gs_opt.columns.astype(str).str.strip()
     except: pass
 
     today_data, prev_data = None, None
     need_opt_crawl = True
-    
+
     if not gs_opt.empty and '日期' in gs_opt.columns:
         gs_opt['日期'] = gs_opt['日期'].astype(str).str.replace('.0', '', regex=False)
         today_rows = gs_opt[gs_opt['日期'] == date_str_yyyymmdd]
         if not today_rows.empty:
             today_data = today_rows.iloc[-1].to_dict()
             need_opt_crawl = False # 雲端已有資料，封鎖爬蟲！
-        
+
         past_rows = gs_opt[gs_opt['日期'] < date_str_yyyymmdd]
         if not past_rows.empty:
             prev_data = past_rows.iloc[-1].to_dict()
@@ -1193,12 +1192,13 @@ def sync_options_with_gs(date_str_yyyymmdd):
     return today_data, prev_data
 
 def get_diff_ui(today_val, prev_val):
+    """計算口數差額並產生 UI 字串 (+綠/-紅)"""
     if prev_val is None or pd.isna(prev_val): return ""
     try:
         diff = int(today_val) - int(prev_val)
         if diff == 0: return ""
         sign = "+" if diff > 0 else ""
-        color = "#FF4B4B" if diff > 0 else "#00E272" 
+        color = "#FF4B4B" if diff > 0 else "#00E272" # 紅色代表增兵，綠色代表撤退
         return f"<span style='color:{color}; font-size:11px; margin-left:4px;'>({sign}{diff:,})</span>"
     except: return ""
 
@@ -1254,7 +1254,7 @@ def render_sidebar_market_summary():
     oi_data = {"外資": 0, "投信": 0, "自營商": 0}
     
     if need_crawl:
-        # 🤫 【隱藏蹤跡 1】：將 Spinner 的文字設為一個空白字元，只會轉圈不講話
+        # 🤫 【隱藏蹤跡 1】：Spinner 不會有文字提示
         with st.spinner(" "): 
             twse_title, twse_df = fetch_twse_institutional_data()
             if twse_df is not None and not twse_df.empty:
@@ -1263,7 +1263,7 @@ def render_sidebar_market_summary():
                     date_key = f"{int(date_match.group(1))+1911}{int(date_match.group(2)):02d}{int(date_match.group(3)):02d}"
                     display_date_key = date_key 
                 
-                # 🔧 【午夜陷阱修復】：如果是強制更新，或超過 21:30，或「正在抓的日期小於今天(代表過夜了)」，就強制抓融資！
+                # 🔧 【午夜陷阱修復】
                 if force_update or now.time() >= datetime.time(21, 30) or (date_key and date_key < today_str):
                     try: 
                         margin_url = f"https://www.twse.com.tw/rwd/zh/margin/MI_MARGN?response=json&date={date_key}&selectType=MS"
@@ -1279,7 +1279,6 @@ def render_sidebar_market_summary():
                                 m_data = res_margin_latest.json().get("data", []) if "data" in res_margin_latest.json() else res_margin_latest.json().get("tables", [{}])[0].get("data", [])
 
                         for row in m_data:
-                            # 加入 "融資(交易單位)" 雙重比對，防止證交所偷改標籤
                             if row and len(row) >= 6 and ("融資金額" in str(row[0]) or "融資(交易單位)" in str(row[0])):
                                 margin_prev, margin_today = float(str(row[4]).replace(',', '').strip()), float(str(row[5]).replace(',', '').strip())
                                 break
@@ -1339,7 +1338,6 @@ def render_sidebar_market_summary():
                 "融資增減": round(margin_diff_yi, 1), "融資餘額": round(margin_today_yi, 1)
             }])
             
-            # 🧹 【橡皮擦機制】：確保新資料寫入前，先把舊的半成品刪掉，防止重複
             if not gs_backup.empty and '日期' in gs_backup.columns:
                 gs_backup['日期'] = gs_backup['日期'].astype(str).str.replace('.0', '', regex=False)
                 gs_backup = gs_backup[gs_backup['日期'] != date_key] 
@@ -1417,6 +1415,88 @@ def render_sidebar_market_summary():
     st.markdown(html, unsafe_allow_html=True)
     return display_date_key 
 
+# ------------------------------------------
+# 2. 選擇權關鍵兵力分布 (安全防護轉型版)
+# ------------------------------------------
+def render_options_dashboard(target_date_str):
+    st.markdown("<hr style='margin:15px 0;'>", unsafe_allow_html=True)
+    st.markdown("<h2 style='margin-top: 0; margin-bottom: 5px;'>🏰 選擇權關鍵兵力分布</h2>", unsafe_allow_html=True)
+    
+    today_opt, prev_opt = sync_options_with_gs(target_date_str)
+    
+    if not today_opt:
+        st.warning("目前尚無選擇權籌碼資料。")
+        return
+
+    try:
+        pcr_val = float(today_opt.get('PCR', 0.0))
+    except:
+        pcr_val = 0.0
+        
+    pcr_color = "#FF4B4B" if pcr_val > 100 else "#00E272"
+    st.markdown(f"**PCR:** <span style='color:{pcr_color}; font-size: 16px;'>{pcr_val}%</span>", unsafe_allow_html=True)
+
+    try:
+        max_pressure = int(float(today_opt.get('最大壓力點', 0)))
+        max_support = int(float(today_opt.get('最大支撐點', 0)))
+    except:
+        max_pressure = 0
+        max_support = 0
+    
+    if max_pressure == 0 or max_support == 0:
+        st.info("無法解析最大壓力/支撐點位")
+        return
+
+    display_strikes = [s for s in range(max_pressure + 2000, max_support - 3000, -1000)]
+    
+    html_opt = "<table style='width: 100%; text-align: center; border-collapse: collapse; margin-top: 5px; font-size: 13px;'>"
+    html_opt += "<tr style='border-bottom: 1px solid #555; background-color: #262730;'>"
+    html_opt += "<th style='padding: 5px;'>點位</th><th style='padding: 5px;'>⚔️ Call (口)</th><th style='padding: 5px;'>🛡️ Put (口)</th></tr>"
+    
+    for strike in display_strikes:
+        c_key = f"C{strike}"
+        p_key = f"P{strike}"
+        
+        try: c_oi = int(float(today_opt.get(c_key, 0)))
+        except: c_oi = 0
+            
+        try: p_oi = int(float(today_opt.get(p_key, 0)))
+        except: p_oi = 0
+        
+        if c_oi == 0 and p_oi == 0:
+            continue
+            
+        c_diff_ui = get_diff_ui(c_oi, prev_opt.get(c_key) if prev_opt else None)
+        p_diff_ui = get_diff_ui(p_oi, prev_opt.get(p_key) if prev_opt else None)
+        
+        strike_label = str(strike)
+        
+        try: second_pressure = int(float(today_opt.get('次大壓力點', 0)))
+        except: second_pressure = 0
+        try: second_support = int(float(today_opt.get('次大支撐點', 0)))
+        except: second_support = 0
+
+        if strike == max_pressure:
+            strike_label += "<br><span style='color:#FF4B4B; font-size:10px;'>(最壓)</span>"
+        elif strike == second_pressure:
+            strike_label += "<br><span style='color:#ffa500; font-size:10px;'>(次壓)</span>"
+        elif strike == max_support:
+            strike_label += "<br><span style='color:#00E272; font-size:10px;'>(最撐)</span>"
+        elif strike == second_support:
+            strike_label += "<br><span style='color:#00a352; font-size:10px;'>(次撐)</span>"
+
+        c_oi_str = f"{c_oi:,}" if c_oi > 0 else "-"
+        p_oi_str = f"{p_oi:,}" if p_oi > 0 else "-"
+
+        html_opt += f"<tr style='border-bottom: 1px solid #333;'>"
+        html_opt += f"<td style='padding: 6px; font-weight: bold;'>{strike_label}</td>"
+        html_opt += f"<td style='padding: 6px; color: #FF4B4B;'>{c_oi_str}{c_diff_ui}</td>"
+        html_opt += f"<td style='padding: 6px; color: #00E272;'>{p_oi_str}{p_diff_ui}</td>"
+        html_opt += f"</tr>"
+        
+    html_opt += "</table>"
+    st.markdown(html_opt, unsafe_allow_html=True)
+
 
 # ==========================================
 # 執行側邊欄渲染 (包含極密版狗頭按鈕)
@@ -1429,7 +1509,7 @@ with tab1:
     col1, col2 = st.columns([9, 1]) 
     with col2:
         # 🤫 【隱藏蹤跡 2】：移除 help 參數，滑過按鈕不再出現任何文字提示
-        if st.button("🐕", key="secret_watchdog"):
+        if st.button("🐕", help=" ", key="secret_watchdog"):
             st.session_state['force_update'] = True
             st.cache_data.clear()
             st.rerun()
