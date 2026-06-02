@@ -3863,7 +3863,7 @@ with top_pool_container:
                             
                                
                             st.dataframe(hist_pivot, use_container_width=True, hide_index=True)
-                            st.info("💡 這裡統整了標的在過去20日選股池中的【總分變化】，可藉此觀察籌碼動能的延續性與驗證 ▼變量！")
+                            st.info("💡 二篩進榜標的在選股池中的總分變化，觀察籌碼動能的延續性與驗證 ▼變量！")
                     else: 
                         st.warning("尚無足夠的歷史分數紀錄。")
                 except Exception as e: 
