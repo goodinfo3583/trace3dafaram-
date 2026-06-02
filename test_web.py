@@ -2752,12 +2752,26 @@ def build_squeeze_radar():
         # 如果有些欄位檔案裡沒有，就只拿存在的
         keep_cols = [c for c in keep_cols if c in df_buy.columns]
         df_squeeze = df_buy[keep_cols].copy()
-        
+#===
+        #rename_mapping = {}
+        #for col in df_risk.columns:
+            #if '買賣超佔成交' in col:
+                #new_name = col.replace('買賣超佔成交', '賣佔成交')
+                #if '當日' in new_name:
+                    #new_name = new_name.replace('當日', '▼當日')
+                #rename_mapping[col] = new_name
+        #df_risk = df_risk.rename(columns=rename_mapping)
+#===    
         # 📝 更改欄位名稱 (買賣超佔成交 -> 買佔成交)
-        rename_mapping = {}
+        
+        rename_mapping = {}      
         for col in df_squeeze.columns:
             if '買賣超佔成交' in col:
+                
                 rename_mapping[col] = col.replace('買賣超佔成交', '買佔成交')
+                if '當日' in new_name:
+                    new_name = new_name.replace('當日', '▼當日')
+                rename_mapping[col] = new_name                
         df_squeeze = df_squeeze.rename(columns=rename_mapping)
         
         # 數值轉型
