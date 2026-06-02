@@ -1687,25 +1687,22 @@ if current_market_date and current_market_date != "未知日期":
                     p_oi = today_opt.get('次大支撐OI', 0)
                     if is_same_month: d_p_ui = get_diff_ui(p_oi, prev_opt.get('次大支撐OI'))
 
-            # 🔥 強制轉換為整數，去除 .0 的小數點尾巴
             try: c_oi_int = int(float(c_oi))
             except: c_oi_int = 0
             try: p_oi_int = int(float(p_oi))
             except: p_oi_int = 0
 
-            # 使用轉換後的整數進行格式化
             c_oi_str = f"{c_oi_int:,}" if c_oi_int > 0 else "-"
             p_oi_str = f"{p_oi_int:,}" if p_oi_int > 0 else "-"
 
-            table_rows_html += f"""
-            <tr style='border-bottom: 1px solid #334155;'>
-                <td style='padding: 6px 0; color: white; font-weight: bold;'>{strike:,}{label_suffix}</td>
-                <td style='padding: 6px 0; color: #FF8A8A; font-weight: bold;'>{c_oi_str}</td>
-                <td style='padding: 6px 0;'>{d_c_ui}</td>
-                <td style='padding: 6px 0; color: #8AFFB0; font-weight: bold;'>{p_oi_str}</td>
-                <td style='padding: 6px 0;'>{d_p_ui}</td>
-            </tr>
-            """
+            # 🔥 注意：下面的 HTML 標籤已緊貼最左邊，消除縮排，避免被當成程式碼區塊顯示
+            table_rows_html += f"""<tr style='border-bottom: 1px solid #334155;'>
+<td style='padding: 6px 0; color: white; font-weight: bold;'>{strike:,}{label_suffix}</td>
+<td style='padding: 6px 0; color: #FF8A8A; font-weight: bold;'>{c_oi_str}</td>
+<td style='padding: 6px 0;'>{d_c_ui}</td>
+<td style='padding: 6px 0; color: #8AFFB0; font-weight: bold;'>{p_oi_str}</td>
+<td style='padding: 6px 0;'>{d_p_ui}</td>
+</tr>"""
 
         st.sidebar.markdown(f"""<div style='background-color: #1e293b; padding: 12px; border-radius: 8px; margin-bottom: 10px;'>
 <div style='font-size: 13px; color: #00D2FF; margin-bottom: 8px;'>📅 {display_contract_month} | {opt_status_badge}</div>
