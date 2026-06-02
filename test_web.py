@@ -3840,15 +3840,28 @@ with top_pool_container:
                             df_h['代號'] = df_h[id_col].astype(str).str.replace(r'\.0$', '', regex=True).str.replace(r'\D', '', regex=True)
                             df_h = df_h[['代號', '總分', '日期']]
                             
+                            # 1. 產生樞紐分析表
                             hist_pivot = df_h.pivot_table(index='代號', columns='日期', values='總分', aggfunc='first').reset_index()
+                            
+                            # 2. 強制把日期欄位由「新到舊」排序 (越新在左，越舊在右)
+                            date_columns = [col for col in hist_pivot.columns if col not in ['代號', '名稱']]
+                            sorted_date_columns = sorted(date_columns, reverse=True) # 🔥 關鍵修改：reverse=True
+                            
+                            # 重組欄位順序：代號 -> 排序好的日期群
+                            hist_pivot = hist_pivot[['代號'] + sorted_date_columns]
+                            
+                            # 3. 插入名稱欄位
                             name_mapping = dict(zip(res_df['代號'].astype(str).str.replace(r'\.0$', '', regex=True).str.replace(r'\D', '', regex=True), res_df['名稱']))
                             hist_pivot.insert(1, '名稱', hist_pivot['代號'].map(name_mapping).fillna('-'))
-                            latest_day = hist_pivot.columns[-1]
+                            
+                            # 4. 過濾掉沒有名稱的資料，並以最新一天的分數進行降冪排序
+                            latest_day = sorted_date_columns[0] # 🔥 最新日期現在是陣列的第一個 [0]
                             hist_pivot = hist_pivot[hist_pivot['名稱'] != '-']
                             
                             if not hist_pivot.empty and latest_day in hist_pivot.columns:
                                 hist_pivot = hist_pivot.sort_values(by=latest_day, ascending=False).reset_index(drop=True)
-                                
+                            
+                               
                             st.dataframe(hist_pivot, use_container_width=True, hide_index=True)
                             st.info("💡 這裡統整了標的在過去20日選股池中的【總分變化】，可藉此觀察籌碼動能的延續性與驗證 ▼變量！")
                     else: 
