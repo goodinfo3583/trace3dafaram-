@@ -2959,10 +2959,9 @@ if not df_risk_radar.empty:
         
         # 📏 【修改點】：將 max-height 調整為 420px，大約顯示 10~12 筆
         scrollable_div = f"""
-        <div style="max-height: 420px; overflow-y: auto; border: 1px solid #808495; border-radius: 5px;">
-            {html_table}
-        </div>
-        """
+<div style="max-height: 420px; overflow-y: auto; border: 1px solid #808495; border-radius: 5px;">
+{html_table}
+</div>"""
         st.markdown(scrollable_div, unsafe_allow_html=True)
 else:
     st.warning(f"避險雷達載入失敗：{msg}")
