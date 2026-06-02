@@ -1259,7 +1259,7 @@ def render_sidebar_market_summary():
                 if date_match:
                     date_key = f"{int(date_match.group(1))+1911}{int(date_match.group(2)):02d}{int(date_match.group(3)):02d}"
                 
-                # 🔧 【修復點 2】：融資 API 加上強制日期綁定 (date={date_key})
+                # 融資 API 加上強制日期綁定
                 if force_update or now.time() >= datetime.time(22, 0):
                     try: 
                         margin_url = f"https://www.twse.com.tw/rwd/zh/margin/MI_MARGN?response=json&date={date_key}&selectType=MS"
@@ -1317,7 +1317,6 @@ def render_sidebar_market_summary():
             margin_today_yi = margin_today / 100000
         date_str = f"📅 {date_key} | 🔄 看門狗即時更新"
         
-        # 🔧 【修復點 3】：GS 防止欄位跑掉 + 強制覆蓋最新日期
         try:
             new_row = pd.DataFrame([{
                 "日期": date_key, "外資": round(net_buy_foreign, 1), "投信": round(net_buy_trust, 1),
@@ -1328,13 +1327,11 @@ def render_sidebar_market_summary():
             }])
             
             if not gs_backup.empty and '日期' in gs_backup.columns:
-                # 剔除所有與今天相同的舊資料 (確保只留一筆最新的在最底層)
                 gs_backup['日期'] = gs_backup['日期'].astype(str).str.replace('.0', '', regex=False)
                 gs_backup = gs_backup[gs_backup['日期'] != date_key]
                 
             updated_df = pd.concat([gs_backup, new_row], ignore_index=True)
             
-            # 鎖死欄位，沒有的補0，避免往右邊亂加欄位
             for c in STD_COLS:
                 if c not in updated_df.columns:
                     updated_df[c] = 0
@@ -1347,10 +1344,29 @@ def render_sidebar_market_summary():
         is_weekend_mode = (now.weekday() >= 5)
         if not gs_backup.empty:
             last_row = gs_backup.iloc[-1]
-            date_str = f"📅 {str(last_row['日期']).replace('.0', '')} | 🌕 雲端同步版"
-            net_buy_foreign, net_buy_trust, net_buy_dealer, net_buy_total = map(lambda x: float(last_row[x]) if pd.notna(last_row[x]) else 0.0, ["外資", "投信", "自營商", "合計"])
-            oi_data["外資"], oi_data["投信"], oi_data["自營商"], total_oi = map(lambda x: int(last_row[x]) if pd.notna(last_row[x]) else 0, ["外資期貨", "投信期貨", "自營商期貨", "期貨合計"])
-            margin_diff_yi, margin_today_yi = float(last_row.get("融資增減", 0.0)), float(last_row.get("融資餘額", 0.0))
+            date_str = f"📅 {str(last_row.get('日期', '未知')).replace('.0', '')} | 🌕 雲端同步版"
+            
+            # 🔧 【修復點】：使用 .get() 並加上安全轉換，即使遇到 GS 完全沒這些欄位也不會報錯
+            def safe_float(col):
+                try: return float(last_row.get(col, 0.0))
+                except: return 0.0
+                
+            def safe_int(col):
+                try: return int(float(last_row.get(col, 0)))
+                except: return 0
+                
+            net_buy_foreign = safe_float("外資")
+            net_buy_trust = safe_float("投信")
+            net_buy_dealer = safe_float("自營商")
+            net_buy_total = safe_float("合計")
+            
+            oi_data["外資"] = safe_int("外資期貨")
+            oi_data["投信"] = safe_int("投信期貨")
+            oi_data["自營商"] = safe_int("自營商期貨")
+            total_oi = safe_int("期貨合計")
+            
+            margin_diff_yi = safe_float("融資增減")
+            margin_today_yi = safe_float("融資餘額")
 
     def get_color(val, is_float=True):
         if val > 0: return "#ff4b4b", f"+{val:,.1f}" if is_float else f"+{val:,}"
@@ -1369,7 +1385,6 @@ def render_sidebar_market_summary():
     
     m_c, m_s = get_color(margin_diff_yi)
 
-    # 🔧 【修復點 1】：取消 HTML 多行字串縮排，避免 Streamlit 判斷為程式碼區塊
     html = f"<div style='font-size: 13px; color: #ccc;'>{date_str}</div>"
     html += "<table style='width: 100%; text-align: center; border-collapse: collapse; margin-top: 5px; font-size: 14px;'>"
     html += "<tr style='border-bottom: 1px solid #555; background-color: #262730;'>"
@@ -1415,7 +1430,6 @@ def render_options_dashboard(today_str):
 
     display_strikes = [s for s in range(max_pressure + 2000, max_support - 3000, -1000)]
     
-    # 🔧 【修復點 1】：取消 HTML 多行字串縮排
     html_opt = "<table style='width: 100%; text-align: center; border-collapse: collapse; margin-top: 5px; font-size: 13px;'>"
     html_opt += "<tr style='border-bottom: 1px solid #555; background-color: #262730;'>"
     html_opt += "<th style='padding: 5px;'>點位</th><th style='padding: 5px;'>⚔️ Call (口)</th><th style='padding: 5px;'>🛡️ Put (口)</th></tr>"
@@ -1465,9 +1479,8 @@ with tab1:
     
     # 🤫 隱藏版看門狗按鈕 (放置在側邊欄最下方右下角)
     st.markdown("<br><br><br>", unsafe_allow_html=True) 
-    col1, col2 = st.columns([9, 1]) # 極致邊緣的比例 9:1
+    col1, col2 = st.columns([9, 1]) 
     with col2:
-        # 沒有文字只有狗頭，不知情的人按了會啟動核彈級強制更新
         if st.button("🐕", help="更新籌碼", key="secret_watchdog"):
             st.session_state['force_update'] = True
             st.cache_data.clear()
