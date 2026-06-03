@@ -1202,11 +1202,6 @@ def get_diff_ui(today_val, prev_val):
         return f"<span style='color:{color}; font-size:11px; margin-left:4px;'>({sign}{diff:,})</span>"
     except: return ""
 
-# ==========================================
-# 🗂️ 建立側邊欄分頁 (Tabs)
-# ==========================================
-tab1, tab2 = st.sidebar.tabs(["📊 大盤與期權", "🧭 戰情導航"])
-
 # ------------------------------------------
 # 1. 大盤籌碼導航總覽引擎 (Google Sheets 看門狗極速版)
 # ------------------------------------------
@@ -1254,7 +1249,6 @@ def render_sidebar_market_summary():
     oi_data = {"外資": 0, "投信": 0, "自營商": 0}
     
     if need_crawl:
-        # 🤫 【隱藏蹤跡 1】：Spinner 不會有文字提示
         with st.spinner(" "): 
             twse_title, twse_df = fetch_twse_institutional_data()
             if twse_df is not None and not twse_df.empty:
@@ -1263,25 +1257,37 @@ def render_sidebar_market_summary():
                     date_key = f"{int(date_match.group(1))+1911}{int(date_match.group(2)):02d}{int(date_match.group(3)):02d}"
                     display_date_key = date_key 
                 
-                # 🔧 【午夜陷阱修復】
+                # 🔧 【融資修復：動態欄位追蹤技術】
                 if force_update or now.time() >= datetime.time(21, 30) or (date_key and date_key < today_str):
                     try: 
                         margin_url = f"https://www.twse.com.tw/rwd/zh/margin/MI_MARGN?response=json&date={date_key}&selectType=MS"
-                        res_margin = requests.get(margin_url, headers={'User-Agent': 'Mozilla/5.0'}, timeout=5)
-                        m_data = []
-                        if res_margin.status_code == 200:
-                            m_data = res_margin.json().get("data", []) if "data" in res_margin.json() else res_margin.json().get("tables", [{}])[0].get("data", [])
+                        res_margin = requests.get(margin_url, headers={'User-Agent': 'Mozilla/5.0'}, timeout=10)
                         
-                        if not m_data:
-                            margin_url_latest = "https://www.twse.com.tw/rwd/zh/margin/MI_MARGN?response=json&selectType=MS"
-                            res_margin_latest = requests.get(margin_url_latest, headers={'User-Agent': 'Mozilla/5.0'}, timeout=5)
-                            if res_margin_latest.status_code == 200:
-                                m_data = res_margin_latest.json().get("data", []) if "data" in res_margin_latest.json() else res_margin_latest.json().get("tables", [{}])[0].get("data", [])
-
-                        for row in m_data:
-                            if row and len(row) >= 6 and ("融資金額" in str(row[0]) or "融資(交易單位)" in str(row[0])):
-                                margin_prev, margin_today = float(str(row[4]).replace(',', '').strip()), float(str(row[5]).replace(',', '').strip())
-                                break
+                        if res_margin.status_code == 200:
+                            json_data = res_margin.json()
+                            # 掃描 JSON 裡面的所有表格
+                            for tb in json_data.get("tables", []):
+                                fields = [str(f).replace(' ', '') for f in tb.get("fields", [])]
+                                data_rows = tb.get("data", [])
+                                
+                                # 自動掃描表頭，找出餘額在哪一格 (破除證交所改格式的地雷)
+                                prev_idx, today_idx = -1, -1
+                                for i, f in enumerate(fields):
+                                    if "前日餘額" in f: prev_idx = i
+                                    if "今日餘額" in f: today_idx = i
+                                
+                                # 只有當這兩個欄位都存在時，才開始抓資料
+                                if prev_idx != -1 and today_idx != -1:
+                                    for row in data_rows:
+                                        # 鎖定「融資金額(仟元)」這一列，過濾掉融券跟張數
+                                        if row and len(row) > max(prev_idx, today_idx) and "融資金額" in str(row[0]):
+                                            margin_prev = float(str(row[prev_idx]).replace(',', '').strip())
+                                            margin_today = float(str(row[today_idx]).replace(',', '').strip())
+                                            break
+                                            
+                                # 成功抓到就收工
+                                if margin_today is not None and margin_prev is not None:
+                                    break
                     except: pass
                     
                 try: 
@@ -1324,9 +1330,12 @@ def render_sidebar_market_summary():
             elif unit_name == '合計': net_buy_total = net_val
             
         total_oi = oi_data["外資"] + oi_data["投信"] + oi_data["自營商"]
-        if margin_today and margin_prev:
+        
+        # 進行融資相減並換算成「億」
+        if margin_today is not None and margin_prev is not None:
             margin_diff_yi = (margin_today - margin_prev) / 100000
             margin_today_yi = margin_today / 100000
+            
         date_str = f"📅 {date_key} | 🔄 看門狗即時更新"
         
         try:
@@ -1415,88 +1424,6 @@ def render_sidebar_market_summary():
     st.markdown(html, unsafe_allow_html=True)
     return display_date_key 
 
-# ------------------------------------------
-# 2. 選擇權關鍵兵力分布 (安全防護轉型版)
-# ------------------------------------------
-def render_options_dashboard(target_date_str):
-    st.markdown("<hr style='margin:15px 0;'>", unsafe_allow_html=True)
-    st.markdown("<h2 style='margin-top: 0; margin-bottom: 5px;'>🏰 選擇權關鍵兵力分布</h2>", unsafe_allow_html=True)
-    
-    today_opt, prev_opt = sync_options_with_gs(target_date_str)
-    
-    if not today_opt:
-        st.warning("目前尚無選擇權籌碼資料。")
-        return
-
-    try:
-        pcr_val = float(today_opt.get('PCR', 0.0))
-    except:
-        pcr_val = 0.0
-        
-    pcr_color = "#FF4B4B" if pcr_val > 100 else "#00E272"
-    st.markdown(f"**PCR:** <span style='color:{pcr_color}; font-size: 16px;'>{pcr_val}%</span>", unsafe_allow_html=True)
-
-    try:
-        max_pressure = int(float(today_opt.get('最大壓力點', 0)))
-        max_support = int(float(today_opt.get('最大支撐點', 0)))
-    except:
-        max_pressure = 0
-        max_support = 0
-    
-    if max_pressure == 0 or max_support == 0:
-        st.info("無法解析最大壓力/支撐點位")
-        return
-
-    display_strikes = [s for s in range(max_pressure + 2000, max_support - 3000, -1000)]
-    
-    html_opt = "<table style='width: 100%; text-align: center; border-collapse: collapse; margin-top: 5px; font-size: 13px;'>"
-    html_opt += "<tr style='border-bottom: 1px solid #555; background-color: #262730;'>"
-    html_opt += "<th style='padding: 5px;'>點位</th><th style='padding: 5px;'>⚔️ Call (口)</th><th style='padding: 5px;'>🛡️ Put (口)</th></tr>"
-    
-    for strike in display_strikes:
-        c_key = f"C{strike}"
-        p_key = f"P{strike}"
-        
-        try: c_oi = int(float(today_opt.get(c_key, 0)))
-        except: c_oi = 0
-            
-        try: p_oi = int(float(today_opt.get(p_key, 0)))
-        except: p_oi = 0
-        
-        if c_oi == 0 and p_oi == 0:
-            continue
-            
-        c_diff_ui = get_diff_ui(c_oi, prev_opt.get(c_key) if prev_opt else None)
-        p_diff_ui = get_diff_ui(p_oi, prev_opt.get(p_key) if prev_opt else None)
-        
-        strike_label = str(strike)
-        
-        try: second_pressure = int(float(today_opt.get('次大壓力點', 0)))
-        except: second_pressure = 0
-        try: second_support = int(float(today_opt.get('次大支撐點', 0)))
-        except: second_support = 0
-
-        if strike == max_pressure:
-            strike_label += "<br><span style='color:#FF4B4B; font-size:10px;'>(最壓)</span>"
-        elif strike == second_pressure:
-            strike_label += "<br><span style='color:#ffa500; font-size:10px;'>(次壓)</span>"
-        elif strike == max_support:
-            strike_label += "<br><span style='color:#00E272; font-size:10px;'>(最撐)</span>"
-        elif strike == second_support:
-            strike_label += "<br><span style='color:#00a352; font-size:10px;'>(次撐)</span>"
-
-        c_oi_str = f"{c_oi:,}" if c_oi > 0 else "-"
-        p_oi_str = f"{p_oi:,}" if p_oi > 0 else "-"
-
-        html_opt += f"<tr style='border-bottom: 1px solid #333;'>"
-        html_opt += f"<td style='padding: 6px; font-weight: bold;'>{strike_label}</td>"
-        html_opt += f"<td style='padding: 6px; color: #FF4B4B;'>{c_oi_str}{c_diff_ui}</td>"
-        html_opt += f"<td style='padding: 6px; color: #00E272;'>{p_oi_str}{p_diff_ui}</td>"
-        html_opt += f"</tr>"
-        
-    html_opt += "</table>"
-    st.markdown(html_opt, unsafe_allow_html=True)
-
 
 # ==========================================
 # 執行側邊欄渲染 (包含極密版狗頭按鈕)
@@ -1508,7 +1435,6 @@ with tab1:
     st.markdown("<br><br><br>", unsafe_allow_html=True) 
     col1, col2 = st.columns([9, 1]) 
     with col2:
-        # 🤫 【隱藏蹤跡 2】：移除 help 參數，滑過按鈕不再出現任何文字提示
         if st.button("🐕", help=" ", key="secret_watchdog"):
             st.session_state['force_update'] = True
             st.cache_data.clear()
