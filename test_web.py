@@ -1028,20 +1028,19 @@ import glob
 import pandas as pd
 import streamlit as st
 import datetime
+import yfinance as yf
 
 DATA_DIR = "./Goodinfo_Rankings"
 
 # ------------------------------------------
 # 🗂️ 核心引擎：智能讀取最新 CSV 檔案
 # ------------------------------------------
-@st.cache_data(ttl=60) # 60秒掃描一次資料夾，不消耗任何網路資源
+@st.cache_data(ttl=60) 
 def get_latest_csv(keyword):
     """找出資料夾中符合關鍵字的最新檔案，並回傳 (DataFrame, 日期字串)"""
     if not os.path.exists(DATA_DIR): return None, "未知"
-    files = glob.glob(os.path.join(DATA_DIR, f"*{keyword}.csv"))
+    files = glob.glob(os.path.join(DATA_DIR, f"*{keyword}*csv"))
     if not files: return None, "未知"
-    
-    # 依照檔名的日期排序，取最新的一個 (檔名前8碼是 YYYYMMDD)
     files.sort(reverse=True)
     latest_file = files[0]
     date_str = os.path.basename(latest_file)[:8]
@@ -1052,8 +1051,7 @@ def get_latest_csv(keyword):
 def get_prev_csv(keyword, current_date):
     """找出指定日期『前一天』的檔案，用來計算變化差額"""
     if not os.path.exists(DATA_DIR): return None
-    files = glob.glob(os.path.join(DATA_DIR, f"*{keyword}.csv"))
-    # 過濾出日期小於今日的檔案
+    files = glob.glob(os.path.join(DATA_DIR, f"*{keyword}*csv"))
     past_files = [f for f in files if os.path.basename(f)[:8] < current_date]
     if not past_files: return None
     past_files.sort(reverse=True)
@@ -1061,7 +1059,6 @@ def get_prev_csv(keyword, current_date):
     except: return None
 
 def get_diff_ui(today_val, prev_val):
-    """計算口數差額並產生 UI 字串 (+紅/-綠)"""
     if prev_val is None or pd.isna(prev_val): return ""
     try:
         diff = int(today_val) - int(prev_val)
@@ -1071,13 +1068,10 @@ def get_diff_ui(today_val, prev_val):
         return f"<span style='color:{color}; font-size:11px; margin-left:4px;'>({sign}{diff:,})</span>"
     except: return ""
 
-# ==========================================
-# 🗂️ 建立側邊欄分頁 (Tabs)
-# ==========================================
 tab1, tab2 = st.sidebar.tabs(["📊 大盤與期權", "🧭 戰情導航"])
 
 # ------------------------------------------
-# 1. 大盤籌碼導航總覽 (讀取版)
+# 1. 大盤籌碼導航總覽 (讀取版 + 期貨欄位精準修復)
 # ------------------------------------------
 def render_sidebar_market_summary():
     st.markdown("<h2 style='margin-top: 0; margin-bottom: 5px;'>📊 大盤資金風向球</h2>", unsafe_allow_html=True)
@@ -1086,10 +1080,9 @@ def render_sidebar_market_summary():
     df_fut, _ = get_latest_csv("三大法人期貨多空")
     
     if df_spot is None or df_fut is None:
-        st.warning("尚無大盤數據，請先執行爬蟲程式。")
+        st.warning("尚無大盤數據，請確認資料夾中已有今日 CSV。")
         return "未知"
 
-    # --- 解析現貨 (轉為億) ---
     net_foreign, net_trust, net_dealer, net_total = 0.0, 0.0, 0.0, 0.0
     for _, row in df_spot.iterrows():
         name = str(row.get('單位名稱', ''))
@@ -1101,20 +1094,24 @@ def render_sidebar_market_summary():
         elif '自營商' in name: net_dealer += val
         elif '合計' in name: net_total = val
 
-    # --- 解析期貨 (TX未平倉口數) ---
+    # 🔥 修復：精準鎖定「臺股期貨」與第一筆「未平倉_多空淨額(口數)」
     oi_foreign, oi_trust, oi_dealer = 0, 0, 0
-    col_oi = next((c for c in df_fut.columns if '多空淨額' in c and '口數' in c), None)
-    if col_oi:
-        for _, row in df_fut.iterrows():
-            row_str = str(row.values)
-            try: val = int(str(row[col_oi]).replace(',', ''))
-            except: val = 0
-            if '外資' in row_str: oi_foreign = val
-            elif '投信' in row_str: oi_trust = val
-            elif '自營商' in row_str: oi_dealer = val
+    if df_fut is not None:
+        target_oi_col = next((c for c in df_fut.columns if '未平倉' in c and '多空淨額' in c), None)
+        if target_oi_col:
+            for _, row in df_fut.iterrows():
+                row_vals = " ".join([str(x) for x in row.values])
+                if '臺股期貨' in row_vals:
+                    identity = str(row.values[2]) 
+                    try: val = int(str(row[target_oi_col]).replace(',', ''))
+                    except: val = 0
+                    if '外資' in identity: oi_foreign = val
+                    elif '投信' in identity: oi_trust = val
+                    elif '自營商' in identity: oi_dealer = val
+                    
     total_oi = oi_foreign + oi_trust + oi_dealer
 
-    # --- 💡 融資快速抓取防護 (因爬蟲清單未含融資，保留極輕量API維持UI完整) ---
+    # 融資輕量抓取
     margin_diff_yi, margin_today_yi = 0.0, 0.0
     try:
         import requests
@@ -1128,7 +1125,6 @@ def render_sidebar_market_summary():
                 break
     except: pass
 
-    # --- 畫 UI ---
     def get_color(val, is_float=True):
         if val > 0: return "#ff4b4b", f"+{val:,.1f}" if is_float else f"+{val:,}"
         elif val < 0: return "#00e676", f"{val:,.1f}" if is_float else f"{val:,}"
@@ -1164,7 +1160,7 @@ def render_sidebar_market_summary():
     return date_spot 
 
 # ------------------------------------------
-# 2. 選擇權關鍵兵力分布 (讀取版)
+# 2. 選擇權關鍵兵力分布 (預留 Call/Put 欄位讀取防護)
 # ------------------------------------------
 def render_options_dashboard(target_date_str):
     st.markdown("<hr style='margin:15px 0;'>", unsafe_allow_html=True)
@@ -1175,10 +1171,9 @@ def render_options_dashboard(target_date_str):
     df_prev = get_prev_csv("臺指選擇權行情簡表", target_date_str)
     
     if df_opt is None:
-        st.warning("尚無選擇權籌碼資料。")
+        st.warning("尚無選擇權資料。")
         return
 
-    # --- 1. 解析 PCR ---
     pcr_val = 0.0
     if df_pcr is not None:
         pcr_col = next((c for c in df_pcr.columns if '買賣權未平倉量比率' in c), None)
@@ -1188,36 +1183,32 @@ def render_options_dashboard(target_date_str):
     pcr_color = "#FF4B4B" if pcr_val > 100 else "#00E272"
     st.markdown(f"**PCR:** <span style='color:{pcr_color}; font-size: 16px;'>{pcr_val}%</span>", unsafe_allow_html=True)
 
-    # --- 2. 解析選擇權點位與口數 ---
     col_strike = next((c for c in df_opt.columns if '履約價' in c), None)
-    col_c_oi = next((c for c in df_opt.columns if '買權' in c and '未平倉' in c), None)
-    col_p_oi = next((c for c in df_opt.columns if '賣權' in c and '未平倉' in c), None)
+    col_c_oi = next((c for c in df_opt.columns if '買權' in c and ('未平倉' in c or '未沖銷' in c)), None)
+    col_p_oi = next((c for c in df_opt.columns if '賣權' in c and ('未平倉' in c or '未沖銷' in c)), None)
     col_month = next((c for c in df_opt.columns if '到期' in c or '月份' in c), None)
     
+    # 🛡️ 防呆：如果今天的 CSV 還沒長出買權/賣權，就先提示等待爬蟲更新
     if not all([col_strike, col_c_oi, col_p_oi]):
-        st.info("無法解析選擇權欄位。")
+        st.info("🔄 選擇權格式升級中... 請確認爬蟲腳本已改為 'Report' 並於今日重新執行。")
         return
 
-    # 過濾近月合約
     if col_month:
         front_month = df_opt[col_month].dropna().unique()[0]
         df_opt = df_opt[df_opt[col_month] == front_month]
-        if df_prev is not None:
-            df_prev = df_prev[df_prev[col_month] == front_month]
+        if df_prev is not None: df_prev = df_prev[df_prev[col_month] == front_month]
 
     df_opt[col_strike] = pd.to_numeric(df_opt[col_strike], errors='coerce')
     df_opt[col_c_oi] = pd.to_numeric(df_opt[col_c_oi].astype(str).str.replace(',', ''), errors='coerce').fillna(0)
     df_opt[col_p_oi] = pd.to_numeric(df_opt[col_p_oi].astype(str).str.replace(',', ''), errors='coerce').fillna(0)
     
-    # 計算最大壓力與支撐 (Top 2)
     top_calls = df_opt.nlargest(2, col_c_oi).reset_index(drop=True)
     top_puts = df_opt.nlargest(2, col_p_oi).reset_index(drop=True)
     max_pressure = int(top_calls.loc[0, col_strike]) if len(top_calls) > 0 else 0
     max_support = int(top_puts.loc[0, col_strike]) if len(top_puts) > 0 else 0
     
-    # 建立昨日口數對照字典 (用於計算差額)
     prev_oi_dict = {}
-    if df_prev is not None:
+    if df_prev is not None and col_c_oi in df_prev.columns:
         df_prev[col_strike] = pd.to_numeric(df_prev[col_strike], errors='coerce')
         df_prev[col_c_oi] = pd.to_numeric(df_prev[col_c_oi].astype(str).str.replace(',', ''), errors='coerce').fillna(0)
         df_prev[col_p_oi] = pd.to_numeric(df_prev[col_p_oi].astype(str).str.replace(',', ''), errors='coerce').fillna(0)
@@ -1259,9 +1250,6 @@ def render_options_dashboard(target_date_str):
     st.markdown(html_opt, unsafe_allow_html=True)
 
 
-# ==========================================
-# 執行側邊欄渲染
-# ==========================================
 with tab1:
     actual_data_date = render_sidebar_market_summary()
     render_options_dashboard(actual_data_date)
@@ -1269,35 +1257,23 @@ with tab1:
     st.markdown("<br><br><br>", unsafe_allow_html=True) 
     col1, col2 = st.columns([8, 2]) 
     with col2:
-        # 按鈕現在只做一件事：清除快取，重新掃描資料夾
         if st.button("🔄", help="重新讀取本地資料夾", use_container_width=True):
             st.cache_data.clear()
             st.rerun()
 
-# ==========================================
-# 📌 渲染 分頁 2 內容：總經指標 + 快速導航
-# ==========================================
 with tab2:
     st.subheader("📊 大盤總體經濟指標")
     c_btn1, c_btn2 = st.columns(2)
     with c_btn1: st.link_button("📈 恐懼貪婪", "https://www.wantgoo.com/global/macroeconomics/fearandgreed", use_container_width=True)
     with c_btn2: st.link_button("⚠️ VIX 指數", "https://www.wantgoo.com/global/vix", use_container_width=True)
-
     st.markdown("---")
     st.subheader("📍 戰情室快速導航")
     st.markdown("[🏆 數據分析觀察名單](#section-top-pool)")
     st.markdown("[🔍 個股籌碼快搜 (診斷區)](#section-search)")
     st.markdown("[👑 區塊1：三大法人持股比追蹤](#section-1)")
     st.markdown("[🎯 區塊2-1：外資5日淨買佔成交量](#section-2-1)")
-    st.markdown("[🎯 區塊2-2：投信5日淨買佔成交量](#section-2-2)")
-    st.markdown("[🎯 區塊2-3：外資5日淨買佔發行量](#section-2-3)")
-    st.markdown("[🎯 區塊2-4：投信5日淨買佔發行量](#section-2-4)")
     st.markdown("[📅 區塊3：法人連續買超](#section-3)")
-    st.markdown("[🔄 區塊4-1：融資減少動向](#section-4-1)")
-    st.markdown("[🔄 區塊4-2：借券賣出減少動向](#section-4-2)")
-    st.markdown("[🔄 區塊4-3：融券增加動向](#section-4-3)")
-    st.markdown("[🔄 區塊4-4：可能軋空名單](#section-4-4)")
-    st.markdown("[🔄 區塊4-5：短線套牢名單](#section-4-5)")
+    st.markdown("[🔄 區塊4系列：融資券與借券動向](#section-4-1)")
     st.markdown("[💰 區塊5：大股東動向](#section-5)")
     st.markdown("[💸 區塊6：鉅額交易動向](#section-6)")
     
