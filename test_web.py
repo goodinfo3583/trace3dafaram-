@@ -1064,12 +1064,13 @@ def get_diff_ui(today_val, prev_val):
 tab1, tab2 = st.sidebar.tabs(["📊 大盤與期權", "🧭 戰情導航"])
 
 # ------------------------------------------
-# 1. 大盤籌碼導航總覽 (含融資餘額 UI 強化)
+# 1. 大盤籌碼導航總覽 (含融資餘額本地讀取版)
 # ------------------------------------------
 def render_sidebar_market_summary():
     st.markdown("<h2 style='margin-top: 0; margin-bottom: 5px;'>📊 大盤資金風向球</h2>", unsafe_allow_html=True)
     df_spot, date_spot = get_latest_csv("三大法人買賣超金額")
     df_fut, _ = get_latest_csv("三大法人期貨多空")
+    df_margin, _ = get_latest_csv("融資") # 📥 從本地讀取融資 CSV
     
     if df_spot is None or df_fut is None:
         st.warning("尚無大盤數據，請確認資料夾中已有今日 CSV。")
@@ -1102,18 +1103,18 @@ def render_sidebar_market_summary():
                     
     total_oi = oi_foreign + oi_trust + oi_dealer
 
+    # 🚀 解析本地融資資料
     margin_diff_yi, margin_today_yi = 0.0, 0.0
-    try:
-        import requests
-        m_url = f"https://www.twse.com.tw/rwd/zh/margin/MI_MARGN?response=json&date={date_spot}&selectType=MS"
-        m_res = requests.get(m_url, timeout=3).json()
-        m_data = m_res.get("data", []) if "data" in m_res else m_res.get("tables", [{}])[0].get("data", [])
-        for row in m_data:
-            if "融資金額" in str(row[0]) or "融資(交易單位)" in str(row[0]):
-                margin_diff_yi = (float(str(row[5]).replace(',','')) - float(str(row[4]).replace(',',''))) / 100000
-                margin_today_yi = float(str(row[5]).replace(',','')) / 100000
-                break
-    except: pass
+    if df_margin is not None:
+        for _, row in df_margin.iterrows():
+            row_str = " ".join([str(x) for x in row.values])
+            if '融資' in row_str and ('金額' in row_str or '交易單位' in row_str):
+                try:
+                    # 抓取最後兩欄 (前日餘額與今日餘額)
+                    margin_diff_yi = (float(str(row.values[-1]).replace(',','')) - float(str(row.values[-2]).replace(',',''))) / 100000
+                    margin_today_yi = float(str(row.values[-1]).replace(',','')) / 100000
+                    break
+                except: pass
 
     def get_color(val, is_float=True):
         if val > 0: return "#ff4b4b", f"+{val:,.1f}" if is_float else f"+{val:,}"
@@ -1151,7 +1152,7 @@ def render_sidebar_market_summary():
     return date_spot 
 
 # ------------------------------------------
-# 2. 選擇權關鍵兵力分布 (長表格 Report 終極相容版)
+# 2. 選擇權關鍵兵力分布 (36000 智慧底線版)
 # ------------------------------------------
 def render_options_dashboard(target_date_str):
     st.markdown("<hr style='margin:15px 0;'>", unsafe_allow_html=True)
@@ -1173,7 +1174,6 @@ def render_options_dashboard(target_date_str):
     pcr_color = "#FF4B4B" if pcr_val > 100 else "#00E272"
     st.markdown(f"**PCR:** <span style='color:{pcr_color}; font-size: 16px;'>{pcr_val}%</span>", unsafe_allow_html=True)
 
-    # 針對 Report 長表格特徵提取
     col_strike = next((c for c in df_opt.columns if '履約價' in c), None)
     col_type = next((c for c in df_opt.columns if '買賣權' in c), None)
     col_oi = next((c for c in df_opt.columns if '未沖銷' in c or '未平倉' in c), None)
@@ -1183,27 +1183,29 @@ def render_options_dashboard(target_date_str):
         st.info("🔄 選擇權格式讀取失敗，請確認是否為 Report 長表格格式。")
         return
 
-    # 過濾近月
     valid_months = [m for m in df_opt[col_month].dropna().unique() if str(m).startswith('20')]
     if not valid_months: return
     front_month = sorted(valid_months)[0]
     df_opt = df_opt[df_opt[col_month] == front_month].copy()
 
-    # 清洗與轉換
     df_opt[col_strike] = pd.to_numeric(df_opt[col_strike], errors='coerce')
     df_opt[col_oi] = pd.to_numeric(df_opt[col_oi].astype(str).str.replace(',', ''), errors='coerce').fillna(0)
 
-    # 分離 Call / Put
     df_call = df_opt[df_opt[col_type].str.contains('Call|買權', case=False, na=False)].copy()
     df_put = df_opt[df_opt[col_type].str.contains('Put|賣權', case=False, na=False)].copy()
     
-    # 尋找最大壓力與支撐
     top_calls = df_call.nlargest(2, col_oi).reset_index(drop=True)
     top_puts = df_put.nlargest(2, col_oi).reset_index(drop=True)
     max_pressure = int(top_calls.loc[0, col_strike]) if not top_calls.empty else 0
     max_support = int(top_puts.loc[0, col_strike]) if not top_puts.empty else 0
 
-    display_strikes = [s for s in range(max_pressure + 2000, max_support - 3000, -1000)]
+    # 🚀 智慧底線防呆：依照要求，若行情的壓撐區間在 36000 以上，顯示到底線 36000 即止
+    start_strike = int(max_pressure) + 2000
+    end_strike = int(max_support) - 3000
+    if start_strike >= 36000 and end_strike < 36000:
+        end_strike = 36000
+        
+    display_strikes = list(range(start_strike, end_strike - 1, -1000))
     
     html_opt = "<table style='width: 100%; text-align: center; border-collapse: collapse; margin-top: 5px; font-size: 13px;'>"
     html_opt += "<tr style='border-bottom: 1px solid #555; background-color: #262730;'>"
