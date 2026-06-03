@@ -1151,6 +1151,9 @@ def fetch_taifex_options_raw(query_date):
         except Exception: time.sleep(1)
     return None
 #=========================以上選擇權抓取點位
+# ------------------------------------------
+# 🎯 選擇權爬蟲與雲端記憶引擎 (Google Sheet 聯動)
+# ------------------------------------------
 def sync_options_with_gs(date_str_yyyymmdd):
     """選擇權看門狗：比對 GS，有資料秒回傳，沒資料才爬蟲"""
     global conn, SHEET_URL
@@ -1198,9 +1201,14 @@ def get_diff_ui(today_val, prev_val):
         diff = int(today_val) - int(prev_val)
         if diff == 0: return ""
         sign = "+" if diff > 0 else ""
-        color = "#FF4B4B" if diff > 0 else "#00E272" # 紅色代表增兵，綠色代表撤退
+        color = "#FF4B4B" if diff > 0 else "#00E272" 
         return f"<span style='color:{color}; font-size:11px; margin-left:4px;'>({sign}{diff:,})</span>"
     except: return ""
+
+# ==========================================
+# 🗂️ 建立側邊欄分頁 (Tabs) 🌟 這裡把你遺失的 tab1 補回來了！
+# ==========================================
+tab1, tab2 = st.sidebar.tabs(["📊 大盤與期權", "🧭 戰情導航"])
 
 # ------------------------------------------
 # 1. 大盤籌碼導航總覽引擎 (Google Sheets 看門狗極速版)
@@ -1265,27 +1273,22 @@ def render_sidebar_market_summary():
                         
                         if res_margin.status_code == 200:
                             json_data = res_margin.json()
-                            # 掃描 JSON 裡面的所有表格
                             for tb in json_data.get("tables", []):
                                 fields = [str(f).replace(' ', '') for f in tb.get("fields", [])]
                                 data_rows = tb.get("data", [])
                                 
-                                # 自動掃描表頭，找出餘額在哪一格 (破除證交所改格式的地雷)
                                 prev_idx, today_idx = -1, -1
                                 for i, f in enumerate(fields):
                                     if "前日餘額" in f: prev_idx = i
                                     if "今日餘額" in f: today_idx = i
                                 
-                                # 只有當這兩個欄位都存在時，才開始抓資料
                                 if prev_idx != -1 and today_idx != -1:
                                     for row in data_rows:
-                                        # 鎖定「融資金額(仟元)」這一列，過濾掉融券跟張數
                                         if row and len(row) > max(prev_idx, today_idx) and "融資金額" in str(row[0]):
                                             margin_prev = float(str(row[prev_idx]).replace(',', '').strip())
                                             margin_today = float(str(row[today_idx]).replace(',', '').strip())
                                             break
                                             
-                                # 成功抓到就收工
                                 if margin_today is not None and margin_prev is not None:
                                     break
                     except: pass
@@ -1331,7 +1334,6 @@ def render_sidebar_market_summary():
             
         total_oi = oi_data["外資"] + oi_data["投信"] + oi_data["自營商"]
         
-        # 進行融資相減並換算成「億」
         if margin_today is not None and margin_prev is not None:
             margin_diff_yi = (margin_today - margin_prev) / 100000
             margin_today_yi = margin_today / 100000
@@ -1424,6 +1426,87 @@ def render_sidebar_market_summary():
     st.markdown(html, unsafe_allow_html=True)
     return display_date_key 
 
+# ------------------------------------------
+# 2. 選擇權關鍵兵力分布 (安全防護轉型版)
+# ------------------------------------------
+def render_options_dashboard(target_date_str):
+    st.markdown("<hr style='margin:15px 0;'>", unsafe_allow_html=True)
+    st.markdown("<h2 style='margin-top: 0; margin-bottom: 5px;'>🏰 選擇權關鍵兵力分布</h2>", unsafe_allow_html=True)
+    
+    today_opt, prev_opt = sync_options_with_gs(target_date_str)
+    
+    if not today_opt:
+        st.warning("目前尚無選擇權籌碼資料。")
+        return
+
+    try:
+        pcr_val = float(today_opt.get('PCR', 0.0))
+    except:
+        pcr_val = 0.0
+        
+    pcr_color = "#FF4B4B" if pcr_val > 100 else "#00E272"
+    st.markdown(f"**PCR:** <span style='color:{pcr_color}; font-size: 16px;'>{pcr_val}%</span>", unsafe_allow_html=True)
+
+    try:
+        max_pressure = int(float(today_opt.get('最大壓力點', 0)))
+        max_support = int(float(today_opt.get('最大支撐點', 0)))
+    except:
+        max_pressure = 0
+        max_support = 0
+    
+    if max_pressure == 0 or max_support == 0:
+        st.info("無法解析最大壓力/支撐點位")
+        return
+
+    display_strikes = [s for s in range(max_pressure + 2000, max_support - 3000, -1000)]
+    
+    html_opt = "<table style='width: 100%; text-align: center; border-collapse: collapse; margin-top: 5px; font-size: 13px;'>"
+    html_opt += "<tr style='border-bottom: 1px solid #555; background-color: #262730;'>"
+    html_opt += "<th style='padding: 5px;'>點位</th><th style='padding: 5px;'>⚔️ Call (口)</th><th style='padding: 5px;'>🛡️ Put (口)</th></tr>"
+    
+    for strike in display_strikes:
+        c_key = f"C{strike}"
+        p_key = f"P{strike}"
+        
+        try: c_oi = int(float(today_opt.get(c_key, 0)))
+        except: c_oi = 0
+            
+        try: p_oi = int(float(today_opt.get(p_key, 0)))
+        except: p_oi = 0
+        
+        if c_oi == 0 and p_oi == 0:
+            continue
+            
+        c_diff_ui = get_diff_ui(c_oi, prev_opt.get(c_key) if prev_opt else None)
+        p_diff_ui = get_diff_ui(p_oi, prev_opt.get(p_key) if prev_opt else None)
+        
+        strike_label = str(strike)
+        
+        try: second_pressure = int(float(today_opt.get('次大壓力點', 0)))
+        except: second_pressure = 0
+        try: second_support = int(float(today_opt.get('次大支撐點', 0)))
+        except: second_support = 0
+
+        if strike == max_pressure:
+            strike_label += "<br><span style='color:#FF4B4B; font-size:10px;'>(最壓)</span>"
+        elif strike == second_pressure:
+            strike_label += "<br><span style='color:#ffa500; font-size:10px;'>(次壓)</span>"
+        elif strike == max_support:
+            strike_label += "<br><span style='color:#00E272; font-size:10px;'>(最撐)</span>"
+        elif strike == second_support:
+            strike_label += "<br><span style='color:#00a352; font-size:10px;'>(次撐)</span>"
+
+        c_oi_str = f"{c_oi:,}" if c_oi > 0 else "-"
+        p_oi_str = f"{p_oi:,}" if p_oi > 0 else "-"
+
+        html_opt += f"<tr style='border-bottom: 1px solid #333;'>"
+        html_opt += f"<td style='padding: 6px; font-weight: bold;'>{strike_label}</td>"
+        html_opt += f"<td style='padding: 6px; color: #FF4B4B;'>{c_oi_str}{c_diff_ui}</td>"
+        html_opt += f"<td style='padding: 6px; color: #00E272;'>{p_oi_str}{p_diff_ui}</td>"
+        html_opt += f"</tr>"
+        
+    html_opt += "</table>"
+    st.markdown(html_opt, unsafe_allow_html=True)
 
 # ==========================================
 # 執行側邊欄渲染 (包含極密版狗頭按鈕)
