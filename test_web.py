@@ -1064,7 +1064,7 @@ def get_diff_ui(today_val, prev_val):
 tab1, tab2 = st.sidebar.tabs(["📊 大盤與期權", "🧭 戰情導航"])
 
 # ------------------------------------------
-# 1. 大盤籌碼導航總覽 (融資智能標籤鎖定版)
+# 1. 大盤籌碼導航總覽 (含融資餘額本地讀取版)
 # ------------------------------------------
 def render_sidebar_market_summary():
     st.markdown("<h2 style='margin-top: 0; margin-bottom: 5px;'>📊 大盤資金風向球</h2>", unsafe_allow_html=True)
@@ -1103,32 +1103,16 @@ def render_sidebar_market_summary():
                     
     total_oi = oi_foreign + oi_trust + oi_dealer
 
-    # 🚀 融資餘額：智能欄位定位 (不寫死)
+    # 🚀 解析本地融資資料
     margin_diff_yi, margin_today_yi = 0.0, 0.0
     if df_margin is not None:
-        # 尋找關鍵欄位的位置
-        col_margin_today = next((c for c in df_margin.columns if '今日餘額' in str(c)), None)
-        col_margin_prev = next((c for c in df_margin.columns if '前日餘額' in str(c)), None)
-        
         for _, row in df_margin.iterrows():
             row_str = " ".join([str(x) for x in row.values])
             if '融資' in row_str and ('金額' in row_str or '交易單位' in row_str):
                 try:
-                    if col_margin_today and col_margin_prev:
-                        today_val = float(str(row[col_margin_today]).replace(',',''))
-                        prev_val = float(str(row[col_margin_prev]).replace(',',''))
-                    else:
-                        # 備案：如果找不到完美表頭名稱，就嘗試抓含有「買進」、「賣出」數字序列後的那幾欄
-                        # 這是證交所表格的常見規律：買進, 賣出, 現金償還, 前日餘額, 今日餘額
-                        numbers = [float(str(x).replace(',','')) for x in row.values if str(x).replace(',','').replace('.','').isdigit()]
-                        if len(numbers) >= 2:
-                            today_val = numbers[-1]
-                            prev_val = numbers[-2]
-                        else:
-                            continue
-                            
-                    margin_diff_yi = (today_val - prev_val) / 100000
-                    margin_today_yi = today_val / 100000
+                    # 抓取最後兩欄 (前日餘額與今日餘額)
+                    margin_diff_yi = (float(str(row.values[-1]).replace(',','')) - float(str(row.values[-2]).replace(',',''))) / 100000
+                    margin_today_yi = float(str(row.values[-1]).replace(',','')) / 100000
                     break
                 except: pass
 
@@ -1215,6 +1199,7 @@ def render_options_dashboard(target_date_str):
     max_pressure = int(top_calls.loc[0, col_strike]) if not top_calls.empty else 0
     max_support = int(top_puts.loc[0, col_strike]) if not top_puts.empty else 0
 
+    # 🚀 智慧底線防呆：依照要求，若行情的壓撐區間在 36000 以上，顯示到底線 36000 即止
     start_strike = int(max_pressure) + 2000
     end_strike = int(max_support) - 3000
     if start_strike >= 36000 and end_strike < 36000:
@@ -1269,7 +1254,6 @@ with tab2:
     st.markdown("[🔄 區塊4系列：融資券與軋空雷達](#section-4-1)")
     st.markdown("[💰 區塊5：大股東動向](#section-5)")
     st.markdown("[💸 區塊6：鉅額交易動向](#section-6)")
-
 
 # ==========================================
 # 🏠 核心五大區塊
@@ -3087,7 +3071,7 @@ else:
     else:
         st.error("無法合併資料。")
 # ==========================================
-# 💸 區塊 6：盤後鉅額交易總表 (HTML 滾動發光版 + 歷史矩陣)
+# 💸 區塊 6：盤後鉅額交易總表 (發光懸浮 + 靠左緊湊排版)
 # ==========================================
 def clean_number_for_display(val):
     try:
@@ -3098,15 +3082,13 @@ def clean_number_for_display(val):
 
 @st.cache_data(ttl=60)
 def build_historical_block_matrix():
-    """搜尋資料夾中所有的鉅額交易紀錄，抓取最近 10 天組成歷史矩陣"""
+    """搜尋資料夾中所有的鉅額交易紀錄，自動組成歷史矩陣 (防呆保護版)"""
     if not os.path.exists(DATA_DIR): return None
     files = glob.glob(os.path.join(DATA_DIR, "*鉅額交易*csv"))
     if not files: return None
     
-    # 按照日期排序，取最新 10 天
     files.sort(reverse=True)
     target_files = files[:10]
-    
     master_df = None
     date_cols = []
     
@@ -3118,7 +3100,6 @@ def build_historical_block_matrix():
             date_cols.append(col_name)
             
             df = pd.read_csv(f)
-            # 智能提取必要欄位
             c_code = next((c for c in df.columns if '代號' in c), None)
             c_name = next((c for c in df.columns if '名稱' in c), None)
             c_price = next((c for c in df.columns if '單價' in c or '成交價' in c), None)
@@ -3128,7 +3109,6 @@ def build_historical_block_matrix():
             df['代號'] = df[c_code].astype(str).str.replace(r'\.0$', '', regex=True).str.replace(r'\D', '', regex=True)
             df = df[(df['代號'] != '0') & (df['代號'] != '') & (df['代號'] != 'nan')]
             
-            # 整理當天的成交價 (多筆則用 / 連接)
             day_df = df.groupby(['代號', c_name]).agg({
                 c_price: lambda x: ' / '.join(sorted(set([clean_number_for_display(i) for i in x.dropna()])))
             }).reset_index()
@@ -3138,12 +3118,11 @@ def build_historical_block_matrix():
             else: master_df = pd.merge(master_df, day_df, on=['代號', '股票名稱'], how='outer')
         except: pass
         
-    if master_df is not None:
+    if master_df is not None and not master_df.empty:
         master_df = master_df.fillna('-')
-        # 去除重複無變化的天數 (連續假期防呆)
         master_df = master_df.loc[:, ~master_df.columns.duplicated()]
-        master_df = master_df.sort_values(by=date_cols[0], ascending=False)
-        
+        if date_cols and date_cols[0] in master_df.columns:
+            master_df = master_df.sort_values(by=date_cols[0], ascending=False)
     return master_df
 
 st.write("---")
@@ -3158,7 +3137,7 @@ st.write("💡 鉅額交易常為大戶私下換手籌碼，成交價可視為�
 
 tab_today, tab_hist = st.tabs(["🆕 今日最新鉅額交易", "📅 歷史防守價追蹤表"])
 
-# ==================== Tab 1: 今日鉅額交易 (4-4 懸浮發光樣式) ====================
+# ==================== Tab 1: 今日鉅額交易 (完美還原 4-4 發光樣式) ====================
 with tab_today:
     if df_block is not None and not df_block.empty:
         col_code = next((c for c in df_block.columns if '代號' in c), None)
@@ -3214,40 +3193,38 @@ with tab_today:
             grouped_block['__rank'] = grouped_block.apply(sort_logic, axis=1)
             grouped_block = grouped_block.sort_values(by=['__rank', '代號'], ascending=[True, True])
             
-            # 準備純淨版 Dataframe 給 Styler
             dynamic_price_col = f"▼{block_date[-4:]} 成交價"
             display_df = grouped_block[['代號', '股票名稱', '成交價', '▼收盤價', '成交張數', '總額(億)']].copy()
             display_df = display_df.rename(columns={'成交價': dynamic_price_col})
 
-            # 🌟 HTML / CSS 華麗表格渲染 (移植區塊 4-4)
+            # 🌟 HTML / CSS 華麗表格渲染 (移植 4-4 光暈版)
             def style_block_table(df):
                 styler = df.style.hide(axis='index') if hasattr(df.style, 'hide') else df.style.hide_index()
                 def highlight_row(row):
                     styles = []
                     target_col = [c for c in row.index if '成交價' in c][0]
                     for col in row.index:
-                        base = 'background-color: #262730; color: #e0e0e0;'
-                        # 價格判斷與上色
+                        # ⚠️ 關鍵防護：這裡絕不寫死 background-color，保留給底下的 Hover 特效發揮
                         if col == target_col:
                             try:
                                 prices = [float(p) for p in str(row[target_col]).split(' / ')]
                                 avg_p = sum(prices) / len(prices)
                                 c_p = float(str(row['▼收盤價']).replace(',',''))
                                 color = '#FF4B4B' if c_p > avg_p else '#FFA500' if c_p == avg_p else '#00E272'
-                                styles.append(f"background-color: #262730; color: {color}; font-weight: bold; text-align: left;")
-                            except: styles.append(f"background-color: #262730; color: #e0e0e0; text-align: left;")
+                                styles.append(f"color: {color}; font-weight: bold;") # 不鎖背景色
+                            except: styles.append(f"color: #e0e0e0;")
                         else:
-                            styles.append(base)
+                            styles.append('color: #e0e0e0;')
                     return styles
                 
                 styler = styler.apply(highlight_row, axis=1)
                 border_css = '1px solid #808495'
                 
-                # 控制欄位寬度與表頭樣式
+                # 控制欄位寬度與表頭樣式 (col2 就是成交價那一欄)
                 styler = styler.set_table_styles([
-                    {'selector': 'table', 'props': [('width', '100%'), ('border-collapse', 'collapse'), ('font-family', 'sans-serif'), ('font-size', '13px'), ('table-layout', 'fixed')]},
-                    # 縮小成交價的欄位寬度
-                    {'selector': f'th.col2', 'props': [('width', '110px')]}, 
+                    {'selector': 'table', 'props': [('width', '100%'), ('border-collapse', 'collapse'), ('font-family', 'sans-serif'), ('font-size', '13px')]},
+                    {'selector': 'th.col2', 'props': [('width', '90px'), ('text-align', 'left !important')]}, # 表頭靠左且縮小
+                    {'selector': 'td.col2', 'props': [('text-align', 'left !important')]},                    # 內容也靠左
                     {'selector': 'th', 'props': [
                         ('background-color', '#1e1e24'), ('color', '#ffffff'), ('font-weight', 'normal'),
                         ('border', border_css), ('padding', '6px 4px'), ('text-align', 'center'),
@@ -3256,7 +3233,7 @@ with tab_today:
                     {'selector': 'td', 'props': [
                         ('border', border_css), ('padding', '6px'), ('text-align', 'center'), ('transition', 'all 0.2s ease-in-out')
                     ]},
-                    # 🌟 滑鼠 Hover 動態光暈效果
+                    # 🌟 滑鼠 Hover 動態光暈效果 (完美還原)
                     {'selector': 'tbody tr:hover td', 'props': [
                         ('background-color', 'rgba(4, 8, 20, 0.85) !important'), 
                         ('text-shadow', '0 0 8px rgba(255, 255, 255, 0.5) !important')
@@ -3264,10 +3241,10 @@ with tab_today:
                 ])
                 return styler.to_html()
 
-            # 📏 高度控制 (顯示約 10 筆，其餘滾動)
+            # 📏 高度控制 (顯示約 10 筆，高度設為 350px 呈現滾動軸)
             html_table = style_block_table(display_df)
             scrollable_div = f"""
-            <div style="max-height: 400px; overflow-y: auto; border: 1px solid #808495; border-radius: 5px;">
+            <div style="max-height: 350px; overflow-y: auto; border: 1px solid #808495; border-radius: 5px;">
             {html_table}
             </div>
             """
@@ -3284,6 +3261,7 @@ with tab_hist:
         st.dataframe(hist_matrix, use_container_width=True, hide_index=True)
     else:
         st.info("📂 資料夾內尚無足夠的歷史交易紀錄 (將隨著每日爬蟲自動累積)。")
+        
 # ==========================================以上網頁核心區塊
 # ==========================================
 # 🏆 頂級選股池核心引擎 (動態日期捕捉 + 暗盤連動)
