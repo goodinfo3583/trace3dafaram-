@@ -1058,24 +1058,26 @@ def get_diff_ui(today_val, prev_val):
         if diff == 0: return ""
         sign = "+" if diff > 0 else ""
         color = "#FF4B4B" if diff > 0 else "#00E272" 
-        return f"<span style='color:{color}; font-size:11px; margin-left:4px;'>({sign}{diff:,})</span>"
+        return f"<br><span style='color:{color}; font-size:11px;'>({sign}{diff:,})</span>"
     except: return ""
 
 tab1, tab2 = st.sidebar.tabs(["📊 大盤與期權", "🧭 戰情導航"])
 
 # ------------------------------------------
-# 1. 大盤籌碼導航總覽 (含融資餘額本地讀取版)
+# 1. 大盤籌碼導航總覽 (終極精準融資 + 期貨變化量)
 # ------------------------------------------
 def render_sidebar_market_summary():
     st.markdown("<h2 style='margin-top: 0; margin-bottom: 5px;'>📊 大盤資金風向球</h2>", unsafe_allow_html=True)
     df_spot, date_spot = get_latest_csv("三大法人買賣超金額")
     df_fut, _ = get_latest_csv("三大法人期貨多空")
-    df_margin, _ = get_latest_csv("融資") # 📥 從本地讀取融資 CSV
+    df_fut_prev = get_prev_csv("三大法人期貨多空", date_spot)
+    df_margin, _ = get_latest_csv("融資融券餘額") # 💡 檔名對應
     
     if df_spot is None or df_fut is None:
         st.warning("尚無大盤數據，請確認資料夾中已有今日 CSV。")
         return "未知"
 
+    # --- 1. 現貨 ---
     net_foreign, net_trust, net_dealer, net_total = 0.0, 0.0, 0.0, 0.0
     for _, row in df_spot.iterrows():
         name = str(row.get('單位名稱', ''))
@@ -1087,6 +1089,7 @@ def render_sidebar_market_summary():
         elif '自營商' in name: net_dealer += val
         elif '合計' in name: net_total = val
 
+    # --- 2. 期貨 (今日) ---
     oi_foreign, oi_trust, oi_dealer = 0, 0, 0
     if df_fut is not None:
         target_oi_col = next((c for c in df_fut.columns if '未平倉' in c and '多空淨額' in c), None)
@@ -1094,28 +1097,49 @@ def render_sidebar_market_summary():
             for _, row in df_fut.iterrows():
                 row_vals = " ".join([str(x) for x in row.values])
                 if '臺股期貨' in row_vals:
-                    identity = str(row.values[2]) 
+                    iden = str(row.values[2]) 
                     try: val = int(str(row[target_oi_col]).replace(',', ''))
                     except: val = 0
-                    if '外資' in identity: oi_foreign = val
-                    elif '投信' in identity: oi_trust = val
-                    elif '自營商' in identity: oi_dealer = val
-                    
+                    if '外資' in iden: oi_foreign = val
+                    elif '投信' in iden: oi_trust = val
+                    elif '自營商' in iden: oi_dealer = val
     total_oi = oi_foreign + oi_trust + oi_dealer
 
-    # 🚀 解析本地融資資料
+    # --- 3. 期貨 (前日，用來算變化量) ---
+    oi_f_prev, oi_t_prev, oi_d_prev = None, None, None
+    if df_fut_prev is not None:
+        t_col_prev = next((c for c in df_fut_prev.columns if '未平倉' in c and '多空淨額' in c), None)
+        if t_col_prev:
+            for _, row in df_fut_prev.iterrows():
+                r_vals = " ".join([str(x) for x in row.values])
+                if '臺股期貨' in r_vals:
+                    iden = str(row.values[2]) 
+                    try: val = int(str(row[t_col_prev]).replace(',', ''))
+                    except: val = 0
+                    if '外資' in iden: oi_f_prev = val
+                    elif '投信' in iden: oi_t_prev = val
+                    elif '自營商' in iden: oi_d_prev = val
+
+    # --- 4. 🚀 融資餘額 (絕對鎖定仟元與單位轉換) ---
     margin_diff_yi, margin_today_yi = 0.0, 0.0
     if df_margin is not None:
         for _, row in df_margin.iterrows():
-            row_str = " ".join([str(x) for x in row.values])
-            if '融資' in row_str and ('金額' in row_str or '交易單位' in row_str):
+            row_list = [str(x).replace(',', '').strip() for x in row.values]
+            row_str = "".join(row_list)
+            # 🎯 絕對鎖定「金額(仟元)」這一列
+            if '融資金額' in row_str:
                 try:
-                    # 抓取最後兩欄 (前日餘額與今日餘額)
-                    margin_diff_yi = (float(str(row.values[-1]).replace(',','')) - float(str(row.values[-2]).replace(',',''))) / 100000
-                    margin_today_yi = float(str(row.values[-1]).replace(',','')) / 100000
+                    # 證交所標準欄位：最後兩格必定是 [前日餘額, 今日餘額]
+                    margin_prev = float(row_list[-2]) 
+                    margin_today = float(row_list[-1])
+                    
+                    # 將仟元轉換為億元 (除以 100,000)
+                    margin_diff_yi = (margin_today - margin_prev) / 100000
+                    margin_today_yi = margin_today / 100000
                     break
                 except: pass
 
+    # --- UI 渲染 ---
     def get_color(val, is_float=True):
         if val > 0: return "#ff4b4b", f"+{val:,.1f}" if is_float else f"+{val:,}"
         elif val < 0: return "#00e676", f"{val:,.1f}" if is_float else f"{val:,}"
@@ -1135,31 +1159,34 @@ def render_sidebar_market_summary():
     html += "<table style='width: 100%; text-align: center; border-collapse: collapse; margin-top: 5px; font-size: 14px;'>"
     html += "<tr style='border-bottom: 1px solid #555; background-color: #262730;'>"
     html += "<th style='padding: 5px;'>法人</th><th style='padding: 5px;'>現貨(億)</th><th style='padding: 5px;'>TX未平倉</th></tr>"
-    html += f"<tr><td style='padding: 4px;'>🌐 外資</td><td style='color: {f_c};'>{f_s}</td><td style='color: {fo_c};'>{fo_s}</td></tr>"
-    html += f"<tr><td style='padding: 4px;'>🏦 投信</td><td style='color: {t_c};'>{t_s}</td><td style='color: {to_oc};'>{to_os}</td></tr>"
-    html += f"<tr><td style='padding: 4px;'>🏢 自營商</td><td style='color: {d_c};'>{d_s}</td><td style='color: {do_c};'>{do_os}</td></tr>"
-    html += f"<tr style='border-top: 1px solid #555; font-weight: bold;'><td style='padding: 4px;'>🔥 合計</td><td style='color: {to_c};'>{to_s}</td><td style='color: {too_c};'>{too_os}</td></tr>"
+    html += f"<tr><td style='padding: 4px;'>🌐 外資</td><td style='color: {f_c}; vertical-align: middle;'>{f_s}</td><td style='color: {fo_c}; vertical-align: middle; padding-bottom: 6px;'>{fo_s}{get_diff_ui(oi_foreign, oi_f_prev)}</td></tr>"
+    html += f"<tr><td style='padding: 4px;'>🏦 投信</td><td style='color: {t_c}; vertical-align: middle;'>{t_s}</td><td style='color: {to_oc}; vertical-align: middle; padding-bottom: 6px;'>{to_os}{get_diff_ui(oi_trust, oi_t_prev)}</td></tr>"
+    html += f"<tr><td style='padding: 4px;'>🏢 自營商</td><td style='color: {d_c}; vertical-align: middle;'>{d_s}</td><td style='color: {do_c}; vertical-align: middle; padding-bottom: 6px;'>{do_os}{get_diff_ui(oi_dealer, oi_d_prev)}</td></tr>"
+    
+    tot_prev = (oi_f_prev + oi_t_prev + oi_d_prev) if oi_f_prev is not None else None
+    html += f"<tr style='border-top: 1px solid #555; font-weight: bold;'><td style='padding: 4px;'>🔥 合計</td><td style='color: {to_c}; vertical-align: middle;'>{to_s}</td><td style='color: {too_c}; vertical-align: middle; padding-bottom: 6px;'>{too_os}{get_diff_ui(total_oi, tot_prev)}</td></tr>"
     html += "</table>"
     
     if margin_today_yi != 0.0:
         html += "<div style='margin-top: 8px; padding: 6px; background-color: #1e1e24; border: 1px solid #555; border-radius: 5px; font-size: 13px;'>"
-        html += f"<div style='font-weight: bold;'>📉 融資餘額動向</div>"
+        html += f"<div style='font-weight: bold;'>📉 大盤融資餘額</div>"
         html += f"<div style='color: #aaa; margin-top: 4px;'>今日增減(億) <span style='color: {m_c}; font-weight: bold; float: right;'>{m_s}</span></div>"
-        html += f"<div style='color: #aaa; margin-top: 2px;'>總額(億) <span style='float: right; color: #fff;'>{margin_today_yi:,.1f}</span></div>"
+        html += f"<div style='color: #aaa; margin-top: 2px;'>餘額總計(億) <span style='float: right; color: #fff;'>{margin_today_yi:,.1f}</span></div>"
         html += "</div>"
         
     st.markdown(html, unsafe_allow_html=True)
     return date_spot 
 
 # ------------------------------------------
-# 2. 選擇權關鍵兵力分布 (36000 智慧底線版)
+# 2. 選擇權關鍵兵力分布 (36000 智慧底線 + 變化量追蹤版)
 # ------------------------------------------
 def render_options_dashboard(target_date_str):
     st.markdown("<hr style='margin:15px 0;'>", unsafe_allow_html=True)
     st.markdown("<h2 style='margin-top: 0; margin-bottom: 5px;'>🏰 選擇權兵力分布</h2>", unsafe_allow_html=True)
     
-    df_opt, _ = get_latest_csv("臺指選擇權行情簡表")
+    df_opt, date_opt = get_latest_csv("臺指選擇權行情簡表")
     df_pcr, _ = get_latest_csv("臺指選擇權PC比")
+    df_opt_prev = get_prev_csv("臺指選擇權行情簡表", date_opt)
     
     if df_opt is None:
         st.warning("尚無選擇權資料。")
@@ -1180,7 +1207,7 @@ def render_options_dashboard(target_date_str):
     col_month = next((c for c in df_opt.columns if '到期' in c or '月份' in c), None)
     
     if not all([col_strike, col_type, col_oi, col_month]):
-        st.info("🔄 選擇權格式讀取失敗，請確認是否為 Report 長表格格式。")
+        st.info("🔄 選擇權格式讀取失敗，請確認是否為 Report 格式。")
         return
 
     valid_months = [m for m in df_opt[col_month].dropna().unique() if str(m).startswith('20')]
@@ -1199,11 +1226,30 @@ def render_options_dashboard(target_date_str):
     max_pressure = int(top_calls.loc[0, col_strike]) if not top_calls.empty else 0
     max_support = int(top_puts.loc[0, col_strike]) if not top_puts.empty else 0
 
-    # 🚀 智慧底線防呆：依照要求，若行情的壓撐區間在 36000 以上，顯示到底線 36000 即止
+    # 🚀 解析昨日資料供比對
+    prev_oi_dict = {}
+    if df_opt_prev is not None and col_strike in df_opt_prev.columns:
+        valid_months_p = [m for m in df_opt_prev[col_month].dropna().unique() if str(m).startswith('20')]
+        if valid_months_p:
+            f_month_p = sorted(valid_months_p)[0]
+            df_opt_prev = df_opt_prev[df_opt_prev[col_month] == f_month_p]
+            df_opt_prev[col_strike] = pd.to_numeric(df_opt_prev[col_strike], errors='coerce')
+            df_opt_prev[col_oi] = pd.to_numeric(df_opt_prev[col_oi].astype(str).str.replace(',', ''), errors='coerce').fillna(0)
+            
+            for _, row in df_opt_prev.iterrows():
+                strike_val = row[col_strike]
+                if pd.isna(strike_val): continue
+                strike_val = int(strike_val)
+                type_val = str(row[col_type])
+                oi_val = int(row[col_oi])
+                
+                if strike_val not in prev_oi_dict: prev_oi_dict[strike_val] = {'c': 0, 'p': 0}
+                if 'Call' in type_val or '買權' in type_val: prev_oi_dict[strike_val]['c'] += oi_val
+                if 'Put' in type_val or '賣權' in type_val: prev_oi_dict[strike_val]['p'] += oi_val
+
     start_strike = int(max_pressure) + 2000
     end_strike = int(max_support) - 3000
-    if start_strike >= 36000 and end_strike < 36000:
-        end_strike = 36000
+    if start_strike >= 36000 and end_strike < 36000: end_strike = 36000
         
     display_strikes = list(range(start_strike, end_strike - 1, -1000))
     
@@ -1220,10 +1266,13 @@ def render_options_dashboard(target_date_str):
         if strike == max_pressure: strike_label += "<br><span style='color:#FF4B4B; font-size:10px;'>(最壓)</span>"
         elif strike == max_support: strike_label += "<br><span style='color:#00E272; font-size:10px;'>(最撐)</span>"
 
+        prev_c = prev_oi_dict.get(strike, {}).get('c', None)
+        prev_p = prev_oi_dict.get(strike, {}).get('p', None)
+
         html_opt += f"<tr style='border-bottom: 1px solid #333;'>"
-        html_opt += f"<td style='padding: 6px; font-weight: bold;'>{strike_label}</td>"
-        html_opt += f"<td style='padding: 6px; color: #FF4B4B;'>{int(c_val):,}</td>"
-        html_opt += f"<td style='padding: 6px; color: #00E272;'>{int(p_val):,}</td>"
+        html_opt += f"<td style='padding: 6px; font-weight: bold; vertical-align: middle;'>{strike_label}</td>"
+        html_opt += f"<td style='padding: 6px; color: #FF4B4B; vertical-align: middle;'>{int(c_val):,}{get_diff_ui(c_val, prev_c)}</td>"
+        html_opt += f"<td style='padding: 6px; color: #00E272; vertical-align: middle;'>{int(p_val):,}{get_diff_ui(p_val, prev_p)}</td>"
         html_opt += f"</tr>"
         
     html_opt += "</table>"
@@ -1254,7 +1303,6 @@ with tab2:
     st.markdown("[🔄 區塊4系列：融資券與軋空雷達](#section-4-1)")
     st.markdown("[💰 區塊5：大股東動向](#section-5)")
     st.markdown("[💸 區塊6：鉅額交易動向](#section-6)")
-
 # ==========================================
 # 🏠 核心五大區塊
 # ==========================================
@@ -3071,7 +3119,7 @@ else:
     else:
         st.error("無法合併資料。")
 # ==========================================
-# 💸 區塊 6：盤後鉅額交易總表 (發光懸浮 + 靠左緊湊排版)
+# 💸 區塊 6：盤後鉅額交易總表 (發光懸浮 + 歷史矩陣強效相容版)
 # ==========================================
 def clean_number_for_display(val):
     try:
@@ -3082,10 +3130,10 @@ def clean_number_for_display(val):
 
 @st.cache_data(ttl=60)
 def build_historical_block_matrix():
-    """搜尋資料夾中所有的鉅額交易紀錄，自動組成歷史矩陣 (防呆保護版)"""
-    if not os.path.exists(DATA_DIR): return None
-    files = glob.glob(os.path.join(DATA_DIR, "*鉅額交易*csv"))
-    if not files: return None
+    """搜尋資料夾中所有的鉅額交易紀錄，自動組成歷史矩陣 (最強寬容版)"""
+    if not os.path.exists(DATA_DIR): return None, []
+    files = glob.glob(os.path.join(DATA_DIR, "*鉅額*.csv"))
+    if not files: return None, []
     
     files.sort(reverse=True)
     target_files = files[:10]
@@ -3094,15 +3142,16 @@ def build_historical_block_matrix():
     
     for f in target_files:
         try:
-            d_str = os.path.basename(f)[:8]
+            d_str = os.path.basename(f).replace('-', '').replace('_', '')[:8]
             short_date = d_str[-4:]
             col_name = f"▼{short_date}"
-            date_cols.append(col_name)
+            if col_name not in date_cols: date_cols.append(col_name)
             
             df = pd.read_csv(f)
-            c_code = next((c for c in df.columns if '代號' in c), None)
-            c_name = next((c for c in df.columns if '名稱' in c), None)
-            c_price = next((c for c in df.columns if '單價' in c or '成交價' in c), None)
+            # 🎯 極致寬容的欄位鎖定：只要包含關鍵字就能抓！
+            c_code = next((c for c in df.columns if '代號' in c or '證券代號' in c), None)
+            c_name = next((c for c in df.columns if '名稱' in c or '證券名稱' in c), None)
+            c_price = next((c for c in df.columns if '價' in c), None) # 只要有「價」就抓
             
             if not all([c_code, c_name, c_price]): continue
             
@@ -3121,9 +3170,13 @@ def build_historical_block_matrix():
     if master_df is not None and not master_df.empty:
         master_df = master_df.fillna('-')
         master_df = master_df.loc[:, ~master_df.columns.duplicated()]
-        if date_cols and date_cols[0] in master_df.columns:
-            master_df = master_df.sort_values(by=date_cols[0], ascending=False)
-    return master_df
+        valid_date_cols = [c for c in date_cols if c in master_df.columns]
+        valid_date_cols.sort(reverse=True)
+        master_df = master_df[['代號', '股票名稱'] + valid_date_cols]
+        if valid_date_cols:
+            master_df = master_df.sort_values(by=valid_date_cols[0], ascending=False)
+            
+    return master_df, [os.path.basename(f) for f in target_files]
 
 st.write("---")
 st.markdown("<div id='section-6'></div>", unsafe_allow_html=True)
@@ -3137,7 +3190,7 @@ st.write("💡 鉅額交易常為大戶私下換手籌碼，成交價可視為�
 
 tab_today, tab_hist = st.tabs(["🆕 今日最新鉅額交易", "📅 歷史防守價追蹤表"])
 
-# ==================== Tab 1: 今日鉅額交易 (完美還原 4-4 發光樣式) ====================
+# ==================== Tab 1: 今日鉅額交易 ====================
 with tab_today:
     if df_block is not None and not df_block.empty:
         col_code = next((c for c in df_block.columns if '代號' in c), None)
@@ -3163,7 +3216,6 @@ with tab_today:
             grouped_block['成交張數'] = (grouped_block['成交股數'] / 1000).astype(int).apply(lambda x: f"{x:,}")
             grouped_block['總額(億)'] = (grouped_block['成交金額'] / 100000000).apply(lambda x: f"{x:.2f}".rstrip('0').rstrip('.'))
 
-            # YF 抓取收盤價
             unique_ids = grouped_block['代號'].unique()
             close_price_dict = {}
             if len(unique_ids) > 0:
@@ -3197,21 +3249,19 @@ with tab_today:
             display_df = grouped_block[['代號', '股票名稱', '成交價', '▼收盤價', '成交張數', '總額(億)']].copy()
             display_df = display_df.rename(columns={'成交價': dynamic_price_col})
 
-            # 🌟 HTML / CSS 華麗表格渲染 (移植 4-4 光暈版)
             def style_block_table(df):
                 styler = df.style.hide(axis='index') if hasattr(df.style, 'hide') else df.style.hide_index()
                 def highlight_row(row):
                     styles = []
                     target_col = [c for c in row.index if '成交價' in c][0]
                     for col in row.index:
-                        # ⚠️ 關鍵防護：這裡絕不寫死 background-color，保留給底下的 Hover 特效發揮
                         if col == target_col:
                             try:
                                 prices = [float(p) for p in str(row[target_col]).split(' / ')]
                                 avg_p = sum(prices) / len(prices)
                                 c_p = float(str(row['▼收盤價']).replace(',',''))
                                 color = '#FF4B4B' if c_p > avg_p else '#FFA500' if c_p == avg_p else '#00E272'
-                                styles.append(f"color: {color}; font-weight: bold;") # 不鎖背景色
+                                styles.append(f"color: {color}; font-weight: bold;")
                             except: styles.append(f"color: #e0e0e0;")
                         else:
                             styles.append('color: #e0e0e0;')
@@ -3220,11 +3270,10 @@ with tab_today:
                 styler = styler.apply(highlight_row, axis=1)
                 border_css = '1px solid #808495'
                 
-                # 控制欄位寬度與表頭樣式 (col2 就是成交價那一欄)
                 styler = styler.set_table_styles([
                     {'selector': 'table', 'props': [('width', '100%'), ('border-collapse', 'collapse'), ('font-family', 'sans-serif'), ('font-size', '13px')]},
-                    {'selector': 'th.col2', 'props': [('width', '90px'), ('text-align', 'left !important')]}, # 表頭靠左且縮小
-                    {'selector': 'td.col2', 'props': [('text-align', 'left !important')]},                    # 內容也靠左
+                    {'selector': 'th.col2', 'props': [('width', '90px'), ('text-align', 'left !important')]},
+                    {'selector': 'td.col2', 'props': [('text-align', 'left !important')]},
                     {'selector': 'th', 'props': [
                         ('background-color', '#1e1e24'), ('color', '#ffffff'), ('font-weight', 'normal'),
                         ('border', border_css), ('padding', '6px 4px'), ('text-align', 'center'),
@@ -3233,7 +3282,6 @@ with tab_today:
                     {'selector': 'td', 'props': [
                         ('border', border_css), ('padding', '6px'), ('text-align', 'center'), ('transition', 'all 0.2s ease-in-out')
                     ]},
-                    # 🌟 滑鼠 Hover 動態光暈效果 (完美還原)
                     {'selector': 'tbody tr:hover td', 'props': [
                         ('background-color', 'rgba(4, 8, 20, 0.85) !important'), 
                         ('text-shadow', '0 0 8px rgba(255, 255, 255, 0.5) !important')
@@ -3241,7 +3289,6 @@ with tab_today:
                 ])
                 return styler.to_html()
 
-            # 📏 高度控制 (顯示約 10 筆，高度設為 350px 呈現滾動軸)
             html_table = style_block_table(display_df)
             scrollable_div = f"""
             <div style="max-height: 350px; overflow-y: auto; border: 1px solid #808495; border-radius: 5px;">
@@ -3256,11 +3303,16 @@ with tab_today:
 
 # ==================== Tab 2: 歷史防守價追蹤表 ====================
 with tab_hist:
-    hist_matrix = build_historical_block_matrix()
+    hist_matrix, detected_files = build_historical_block_matrix()
+    
+    # 💡 新增：檔案偵測雷達 (協助你確認程式抓到了哪些檔案)
+    if detected_files:
+        st.caption(f"📡 已自動讀取 {len(detected_files)} 天的歷史檔案，組合中...")
+        
     if hist_matrix is not None and not hist_matrix.empty:
         st.dataframe(hist_matrix, use_container_width=True, hide_index=True)
     else:
-        st.info("📂 資料夾內尚無足夠的歷史交易紀錄 (將隨著每日爬蟲自動累積)。")
+        st.info("📂 資料夾內尚無足夠的歷史交易紀錄，請確認檔名包含「鉅額」字樣。")
         
 # ==========================================以上網頁核心區塊
 # ==========================================
