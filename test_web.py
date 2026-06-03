@@ -1169,9 +1169,17 @@ def sync_options_with_gs(date_str_yyyymmdd):
     if not gs_opt.empty and '日期' in gs_opt.columns:
         gs_opt['日期'] = gs_opt['日期'].astype(str).str.replace('.0', '', regex=False)
         today_rows = gs_opt[gs_opt['日期'] == date_str_yyyymmdd]
+        
         if not today_rows.empty:
             today_data = today_rows.iloc[-1].to_dict()
-            need_opt_crawl = False 
+            # 🛡️ 【空殼防護罩】：檢查讀出來的 PCR 是否大於 0，避免讀到之前存壞的空殼資料
+            try:
+                if float(today_data.get('PCR', 0.0)) > 0:
+                    need_opt_crawl = False 
+                else:
+                    need_opt_crawl = True # 若是空殼，強制重新爬蟲！
+            except:
+                need_opt_crawl = True
 
         past_rows = gs_opt[gs_opt['日期'] < date_str_yyyymmdd]
         if not past_rows.empty:
@@ -1180,7 +1188,9 @@ def sync_options_with_gs(date_str_yyyymmdd):
     if need_opt_crawl:
         date_str_slash = f"{date_str_yyyymmdd[:4]}/{date_str_yyyymmdd[4:6]}/{date_str_yyyymmdd[6:8]}"
         crawled_data = fetch_taifex_options_raw(date_str_slash)
-        if crawled_data:
+        
+        # 🛡️ 【防護罩 2】：確認抓下來的資料是真的有 PCR 數值，才准寫入 GS，拒絕寫入空值！
+        if crawled_data and float(crawled_data.get('PCR', 0.0)) > 0:
             crawled_data['日期'] = date_str_yyyymmdd
             today_data = crawled_data
             try:
@@ -1224,11 +1234,9 @@ def render_sidebar_market_summary():
     
     force_update = st.session_state.pop('force_update', False)
     
-    # 定義雙表單標準欄位
     STD_COLS_INST = ["日期", "外資", "投信", "自營商", "合計", "外資期貨", "投信期貨", "自營商期貨", "期貨合計"]
     STD_COLS_MARGIN = ["日期", "融資增減", "融資餘額"]
     
-    # 1. 讀取雙表單
     gs_inst, gs_margin = pd.DataFrame(), pd.DataFrame()
     try:
         gs_inst = conn.read(spreadsheet=SHEET_URL, worksheet="大盤風向球", ttl=0).dropna(how="all")
@@ -1242,33 +1250,27 @@ def render_sidebar_market_summary():
         if '日期' in gs_margin.columns: gs_margin['日期'] = gs_margin['日期'].astype(str).str.replace('.0', '', regex=False)
     except: pass
     
-    # 2. 判斷雙軌爬蟲需求
     need_inst_crawl = force_update
     need_margin_crawl = force_update
     
     if not force_update and now.weekday() < 5:
-        # 法人提早到 15:00 就可以抓了
         if now.time() >= datetime.time(15, 0):
             if gs_inst.empty or today_str not in gs_inst['日期'].values:
                 need_inst_crawl = True
-        # 融資要等到 21:30
         if now.time() >= datetime.time(21, 30):
             if gs_margin.empty or today_str not in gs_margin['日期'].values:
                 need_margin_crawl = True
                 
-    # 避免半夜跨日漏抓昨天的融資 (00:00 ~ 08:00 間)
     if not force_update and now.time() < datetime.time(8, 0):
          if not gs_inst.empty:
              last_inst_date = gs_inst['日期'].iloc[-1]
              if gs_margin.empty or last_inst_date not in gs_margin['日期'].values:
                  need_margin_crawl = True
     
-    # 3. 執行爬蟲
     display_date_key = today_str
     
     if need_inst_crawl or need_margin_crawl:
         with st.spinner(" "): 
-            # (A) 先抓法人現貨，確立真正的「交易日」
             twse_title, twse_df = fetch_twse_institutional_data()
             date_key = None
             if twse_df is not None and not twse_df.empty:
@@ -1278,8 +1280,8 @@ def render_sidebar_market_summary():
                     display_date_key = date_key
             
             if date_key:
-                # 處理法人與期貨 (寫入「大盤風向球」)
-                if gs_inst.empty or date_key not in gs_inst['日期'].values:
+                # --- A. 法人現貨與期貨爬蟲 ---
+                if gs_inst.empty or date_key not in gs_inst['日期'].values or force_update:
                     oi_data = {"外資": 0, "投信": 0, "自營商": 0}
                     try:
                         res_oi = requests.post("https://www.taifex.com.tw/cht/3/futContractsDate", data={'queryDate': f"{int(date_key[:4])}/{date_key[4:6]}/{date_key[6:8]}"}, headers={'User-Agent': 'Mozilla/5.0'}, timeout=5)
@@ -1289,8 +1291,13 @@ def render_sidebar_market_summary():
                             for row in BeautifulSoup(res_oi.text, 'html.parser').find_all('tr'):
                                 texts = [td.get_text(strip=True) for td in row.find_all('td')]
                                 if not texts: continue
-                                if "臺股期貨" in texts: is_tx_block = True
-                                elif any(x in texts for x in ["小型臺指期貨", "電子期貨", "金融期貨", "臺灣50期貨"]): is_tx_block = False
+                                
+                                # 🔧 【模糊比對防護】：對付期交所隱藏空白鍵或文字改動
+                                if any("臺股期貨" in t for t in texts): 
+                                    is_tx_block = True
+                                elif any(x in t for t in texts for x in ["小型臺指期貨", "電子期貨", "金融期貨", "臺灣50期貨"]): 
+                                    is_tx_block = False
+                                    
                                 if is_tx_block:
                                     identity = None
                                     if any("外資" in t for t in texts): identity = "外資"
@@ -1322,31 +1329,30 @@ def render_sidebar_market_summary():
                     try: conn.update(spreadsheet=SHEET_URL, worksheet="大盤風向球", data=gs_inst)
                     except: pass
                 
-                # (B) 處理融資爬蟲 (寫入「大盤融資」)
-                if gs_margin.empty or date_key not in gs_margin['日期'].values:
+                # --- B. 融資餘額爬蟲 ---
+                if gs_margin.empty or date_key not in gs_margin['日期'].values or force_update:
                     if force_update or now.time() >= datetime.time(21, 30) or date_key < today_str:
                         margin_prev, margin_today = None, None
                         try:
-                            # 🔧 【動態欄位追蹤技術】：精準掃描前日餘額與今日餘額
                             margin_url = f"https://www.twse.com.tw/rwd/zh/margin/MI_MARGN?response=json&date={date_key}&selectType=MS"
                             res_margin = requests.get(margin_url, headers={'User-Agent': 'Mozilla/5.0'}, timeout=10)
                             if res_margin.status_code == 200:
                                 json_data = res_margin.json()
+                                # 🔧 【無差別掃描防護】：不再檢查 title，只要有這兩個欄位就抓！
                                 for tb in json_data.get("tables", []):
-                                    if "信用交易統計" in tb.get("title", ""):
-                                        fields = tb.get("fields", [])
-                                        prev_idx = next((i for i, f in enumerate(fields) if "前日餘額" in f), -1)
-                                        today_idx = next((i for i, f in enumerate(fields) if "今日餘額" in f), -1)
-                                        if prev_idx != -1 and today_idx != -1:
-                                            for row in tb.get("data", []):
-                                                # 鎖定「融資金額」那一橫列，直接過濾掉交易單位的雜訊
-                                                if "融資金額" in str(row[0]):
-                                                    margin_prev = float(str(row[prev_idx]).replace(',', '').strip())
-                                                    margin_today = float(str(row[today_idx]).replace(',', '').strip())
-                                                    break
+                                    fields = tb.get("fields", [])
+                                    prev_idx = next((i for i, f in enumerate(fields) if "前日餘額" in f), -1)
+                                    today_idx = next((i for i, f in enumerate(fields) if "今日餘額" in f), -1)
+                                    
+                                    if prev_idx != -1 and today_idx != -1:
+                                        for row in tb.get("data", []):
+                                            if "融資金額" in str(row[0]):
+                                                margin_prev = float(str(row[prev_idx]).replace(',', '').strip())
+                                                margin_today = float(str(row[today_idx]).replace(',', '').strip())
+                                                break
+                                    if margin_today is not None: break # 抓到就跳出
                         except: pass
                         
-                        # 成功抓取後，獨立寫入大盤融資表單
                         if margin_today is not None and margin_prev is not None:
                             margin_diff_yi = round((margin_today - margin_prev) / 100000, 1)
                             margin_today_yi = round(margin_today / 100000, 1)
@@ -1361,7 +1367,6 @@ def render_sidebar_market_summary():
                             except: pass
         st.cache_data.clear()
         
-    # 4. 準備渲染畫面 (從最新的雙軌資料組合)
     render_inst = {}
     render_margin = {}
     
@@ -1420,7 +1425,6 @@ def render_sidebar_market_summary():
     html += f"<tr style='border-top: 1px solid #555; font-weight: bold;'><td style='padding: 4px;'>🔥 合計</td><td style='color: {to_c};'>{to_s}</td><td style='color: {too_c};'>{too_os}</td></tr>"
     html += "</table>"
     
-    # 只要這天有融資資料，或者我們強迫它顯示
     if m_total > 0 or m_s != "0.0":
         html += "<div style='margin-top: 5px; padding: 5px; background-color: #262730; border-radius: 5px; font-size: 13px;'>"
         html += f"<div>📊 融資餘額增減(億) <span style='color: {m_c}; font-weight: bold; float: right;'>{m_s}</span></div>"
@@ -1431,7 +1435,7 @@ def render_sidebar_market_summary():
     return display_date_key 
 
 # ------------------------------------------
-# 2. 選擇權關鍵兵力分布 (安全防護轉型版)
+# 2. 選擇權關鍵兵力分布 
 # ------------------------------------------
 def render_options_dashboard(target_date_str):
     st.markdown("<hr style='margin:15px 0;'>", unsafe_allow_html=True)
@@ -1443,10 +1447,8 @@ def render_options_dashboard(target_date_str):
         st.warning("目前尚無選擇權籌碼資料。")
         return
 
-    try:
-        pcr_val = float(today_opt.get('PCR', 0.0))
-    except:
-        pcr_val = 0.0
+    try: pcr_val = float(today_opt.get('PCR', 0.0))
+    except: pcr_val = 0.0
         
     pcr_color = "#FF4B4B" if pcr_val > 100 else "#00E272"
     st.markdown(f"**PCR:** <span style='color:{pcr_color}; font-size: 16px;'>{pcr_val}%</span>", unsafe_allow_html=True)
@@ -1511,6 +1513,7 @@ def render_options_dashboard(target_date_str):
         
     html_opt += "</table>"
     st.markdown(html_opt, unsafe_allow_html=True)
+
 
 # ==========================================
 # 執行側邊欄渲染 (包含極密版狗頭按鈕)
