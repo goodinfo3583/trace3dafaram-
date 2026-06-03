@@ -1048,7 +1048,6 @@ def get_latest_csv(keyword):
     try: return pd.read_csv(latest_file), date_str
     except: return None, "未知"
 
-<<<<<<< HEAD
 @st.cache_data(ttl=60)
 def get_prev_csv(keyword, current_date):
     """找出指定日期『前一天』的檔案，用來計算變化差額"""
@@ -1063,144 +1062,6 @@ def get_prev_csv(keyword, current_date):
 
 def get_diff_ui(today_val, prev_val):
     """計算口數差額並產生 UI 字串 (+紅/-綠)"""
-=======
-            # 2. 未平倉量 爬取
-            response = requests.post(url_oi, data=payload_oi, headers=headers, timeout=15)
-            response.encoding = 'utf-8' 
-            dfs = pd.read_html(StringIO(response.text))
-            target_df = next((df for df in dfs if '履約價' in df.to_string() and ('未沖銷' in df.to_string() or '未平倉' in df.to_string())), None)
-            if target_df is None: return None
-            
-            if isinstance(target_df.columns, pd.MultiIndex): target_df.columns = ['_'.join(map(str, col)).strip() for col in target_df.columns]
-            else: target_df.columns = target_df.columns.astype(str)
-            
-            col_month = next((c for c in target_df.columns if '到期' in c or '月份' in c), None)
-            col_strike = next((c for c in target_df.columns if '履約價' in c), None)
-            col_type = next((c for c in target_df.columns if '買賣權' in c), None)
-            col_oi = next((c for c in target_df.columns if '未沖銷' in c or '未平倉' in c), None)
-            
-            if not all([col_month, col_strike, col_type, col_oi]):
-                for idx in range(min(5, len(target_df))):
-                    row_str = str(target_df.iloc[idx].tolist())
-                    if '履約價' in row_str and ('未沖銷' in row_str or '未平倉' in row_str):
-                        target_df.columns = target_df.iloc[idx].astype(str)
-                        target_df = target_df.iloc[idx+1:].reset_index(drop=True)
-                        col_month, col_strike, col_type, col_oi = next((c for c in target_df.columns if '到期' in c or '月份' in c), None), next((c for c in target_df.columns if '履約價' in c), None), next((c for c in target_df.columns if '買賣權' in c), None), next((c for c in target_df.columns if '未沖銷' in c or '未平倉' in c), None)
-                        break
-                        
-            df = target_df.dropna(subset=[col_strike, col_type, col_oi]).copy()
-            df[col_oi] = pd.to_numeric(df[col_oi].astype(str).str.replace(',', '').str.replace('-', '0'), errors='coerce').fillna(0)
-            df[col_strike] = pd.to_numeric(df[col_strike].astype(str).str.replace(',', ''), errors='coerce')
-            df[col_month] = df[col_month].astype(str).str.strip()
-            
-            valid_months = [m for m in df[col_month].unique() if m.startswith('20')]
-            if not valid_months: return None
-            standard_months = [m for m in valid_months if len(m) == 6 and m.isdigit()]
-            contract_month = sorted(standard_months)[0] if standard_months else sorted(valid_months)[0]
-            df_near = df[df[col_month] == contract_month]
-
-            # 🔥 抓取千點自訂點位 (從 39000 一路抓到 50000 備用)
-            target_strikes = list(range(39000, 51000, 1000))
-            custom_strikes_data = {}
-            for strike in target_strikes:
-                c_oi, p_oi = 0, 0
-                c_df = df_near[(df_near[col_strike] == strike) & (df_near[col_type].str.contains('Call|買權', case=False, na=False))]
-                p_df = df_near[(df_near[col_strike] == strike) & (df_near[col_type].str.contains('Put|賣權', case=False, na=False))]
-                if not c_df.empty: c_oi = int(c_df[col_oi].iloc[0])
-                if not p_df.empty: p_oi = int(p_df[col_oi].iloc[0])
-                custom_strikes_data[strike] = {'call': c_oi, 'put': p_oi}
-            
-            # 過濾並抓最大壓力/支撐
-            col_vol = next((c for c in target_df.columns if '成交量' in c), None)
-            if col_vol:
-                df_near[col_vol] = pd.to_numeric(df_near[col_vol].astype(str).str.replace(',', '').str.replace('-', '0'), errors='coerce').fillna(0)
-                total_vol = df_near[col_vol].sum()
-                est_idx = (df_near[col_strike] * df_near[col_vol]).sum() / total_vol if total_vol > 0 else df_near[col_strike].median()
-            else: est_idx = df_near[col_strike].median()
-            
-            df_near_filtered = df_near[(df_near[col_strike] >= est_idx * 0.88) & (df_near[col_strike] <= est_idx * 1.12)]
-            if df_near_filtered.empty: df_near_filtered = df_near
-            df_call = df_near_filtered[df_near_filtered[col_type].str.contains('Call|買權', case=False, na=False)]
-            df_put = df_near_filtered[df_near_filtered[col_type].str.contains('Put|賣權', case=False, na=False)]
-            top_calls = df_call.nlargest(2, col_oi).reset_index(drop=True)
-            top_puts = df_put.nlargest(2, col_oi).reset_index(drop=True)
-            
-            result_dict = {
-                '合約月份': contract_month, 'PCR': pcr_value,
-                '最大壓力點': int(top_calls.loc[0, col_strike]) if len(top_calls) >= 1 else 0,
-                '最大壓力OI': int(top_calls.loc[0, col_oi]) if len(top_calls) >= 1 else 0,
-                '次大壓力點': int(top_calls.loc[1, col_strike]) if len(top_calls) >= 2 else 0,
-                '次大壓力OI': int(top_calls.loc[1, col_oi]) if len(top_calls) >= 2 else 0,
-                '最大支撐點': int(top_puts.loc[0, col_strike]) if len(top_puts) >= 1 else 0,
-                '最大支撐OI': int(top_puts.loc[0, col_oi]) if len(top_puts) >= 1 else 0,
-                '次大支撐點': int(top_puts.loc[1, col_strike]) if len(top_puts) >= 2 else 0,
-                '次大支撐OI': int(top_puts.loc[1, col_oi]) if len(top_puts) >= 2 else 0
-            }
-            
-            # 🔥 將所有千點口數併入回傳字典
-            for strike in target_strikes:
-                result_dict[f'C{strike}'] = custom_strikes_data[strike]['call']
-                result_dict[f'P{strike}'] = custom_strikes_data[strike]['put']
-                
-            return result_dict
-        except Exception: time.sleep(1)
-    return None
-#=========================以上選擇權抓取點位
-# ------------------------------------------
-# 🎯 選擇權爬蟲與雲端記憶引擎 (Google Sheet 聯動)
-# ------------------------------------------
-def sync_options_with_gs(date_str_yyyymmdd):
-    """選擇權看門狗：比對 GS，有資料秒回傳，沒資料才爬蟲"""
-    global conn, SHEET_URL
-    gs_opt = pd.DataFrame()
-    try:
-        gs_opt = conn.read(spreadsheet=SHEET_URL, worksheet="選擇權紀錄", ttl=0).dropna(how="all")
-        gs_opt.columns = gs_opt.columns.astype(str).str.strip()
-    except: pass
-
-    today_data, prev_data = None, None
-    need_opt_crawl = True
-
-    if not gs_opt.empty and '日期' in gs_opt.columns:
-        gs_opt['日期'] = gs_opt['日期'].astype(str).str.replace('.0', '', regex=False)
-        today_rows = gs_opt[gs_opt['日期'] == date_str_yyyymmdd]
-        
-        if not today_rows.empty:
-            today_data = today_rows.iloc[-1].to_dict()
-            # 🛡️ 【空殼防護罩】：檢查讀出來的 PCR 是否大於 0，避免讀到之前存壞的空殼資料
-            try:
-                if float(today_data.get('PCR', 0.0)) > 0:
-                    need_opt_crawl = False 
-                else:
-                    need_opt_crawl = True # 若是空殼，強制重新爬蟲！
-            except:
-                need_opt_crawl = True
-
-        past_rows = gs_opt[gs_opt['日期'] < date_str_yyyymmdd]
-        if not past_rows.empty:
-            prev_data = past_rows.iloc[-1].to_dict()
-
-    if need_opt_crawl:
-        date_str_slash = f"{date_str_yyyymmdd[:4]}/{date_str_yyyymmdd[4:6]}/{date_str_yyyymmdd[6:8]}"
-        crawled_data = fetch_taifex_options_raw(date_str_slash)
-        
-        # 🛡️ 【防護罩 2】：確認抓下來的資料是真的有 PCR 數值，才准寫入 GS，拒絕寫入空值！
-        if crawled_data and float(crawled_data.get('PCR', 0.0)) > 0:
-            crawled_data['日期'] = date_str_yyyymmdd
-            today_data = crawled_data
-            try:
-                df_to_append = pd.DataFrame([today_data])
-                if not gs_opt.empty:
-                    gs_opt = gs_opt[gs_opt['日期'] != date_str_yyyymmdd]
-                    updated_df = pd.concat([gs_opt, df_to_append], ignore_index=True)
-                else: updated_df = df_to_append
-                conn.update(spreadsheet=SHEET_URL, worksheet="選擇權紀錄", data=updated_df)
-            except: pass
-
-    return today_data, prev_data
-
-def get_diff_ui(today_val, prev_val):
->>>>>>> 6d9a552009e6fcb93874cb378939a959756420aa
     if prev_val is None or pd.isna(prev_val): return ""
     try:
         diff = int(today_val) - int(prev_val)
@@ -1216,11 +1077,7 @@ def get_diff_ui(today_val, prev_val):
 tab1, tab2 = st.sidebar.tabs(["📊 大盤與期權", "🧭 戰情導航"])
 
 # ------------------------------------------
-<<<<<<< HEAD
 # 1. 大盤籌碼導航總覽 (讀取版)
-=======
-# 1. 大盤籌碼導航總覽引擎 (雙軌制：法人與融資分離版)
->>>>>>> 6d9a552009e6fcb93874cb378939a959756420aa
 # ------------------------------------------
 def render_sidebar_market_summary():
     st.markdown("<h2 style='margin-top: 0; margin-bottom: 5px;'>📊 大盤資金風向球</h2>", unsafe_allow_html=True)
@@ -1228,7 +1085,6 @@ def render_sidebar_market_summary():
     df_spot, date_spot = get_latest_csv("三大法人買賣超金額")
     df_fut, _ = get_latest_csv("三大法人期貨多空")
     
-<<<<<<< HEAD
     if df_spot is None or df_fut is None:
         st.warning("尚無大盤數據，請先執行爬蟲程式。")
         return "未知"
@@ -1271,172 +1127,6 @@ def render_sidebar_market_summary():
                 margin_today_yi = float(str(row[5]).replace(',','')) / 100000
                 break
     except: pass
-=======
-    force_update = st.session_state.pop('force_update', False)
-    
-    STD_COLS_INST = ["日期", "外資", "投信", "自營商", "合計", "外資期貨", "投信期貨", "自營商期貨", "期貨合計"]
-    STD_COLS_MARGIN = ["日期", "融資增減", "融資餘額"]
-    
-    gs_inst, gs_margin = pd.DataFrame(), pd.DataFrame()
-    try:
-        gs_inst = conn.read(spreadsheet=SHEET_URL, worksheet="大盤風向球", ttl=0).dropna(how="all")
-        gs_inst.columns = gs_inst.columns.astype(str).str.strip()
-        if '日期' in gs_inst.columns: gs_inst['日期'] = gs_inst['日期'].astype(str).str.replace('.0', '', regex=False)
-    except: pass
-    
-    try:
-        gs_margin = conn.read(spreadsheet=SHEET_URL, worksheet="大盤融資", ttl=0).dropna(how="all")
-        gs_margin.columns = gs_margin.columns.astype(str).str.strip()
-        if '日期' in gs_margin.columns: gs_margin['日期'] = gs_margin['日期'].astype(str).str.replace('.0', '', regex=False)
-    except: pass
-    
-    need_inst_crawl = force_update
-    need_margin_crawl = force_update
-    
-    if not force_update and now.weekday() < 5:
-        if now.time() >= datetime.time(15, 0):
-            if gs_inst.empty or today_str not in gs_inst['日期'].values:
-                need_inst_crawl = True
-        if now.time() >= datetime.time(21, 30):
-            if gs_margin.empty or today_str not in gs_margin['日期'].values:
-                need_margin_crawl = True
-                
-    if not force_update and now.time() < datetime.time(8, 0):
-         if not gs_inst.empty:
-             last_inst_date = gs_inst['日期'].iloc[-1]
-             if gs_margin.empty or last_inst_date not in gs_margin['日期'].values:
-                 need_margin_crawl = True
-    
-    display_date_key = today_str
-    
-    if need_inst_crawl or need_margin_crawl:
-        with st.spinner(" "): 
-            twse_title, twse_df = fetch_twse_institutional_data()
-            date_key = None
-            if twse_df is not None and not twse_df.empty:
-                date_match = re.search(r'(\d+)年(\d+)月(\d+)日', str(twse_title))
-                if date_match:
-                    date_key = f"{int(date_match.group(1))+1911}{int(date_match.group(2)):02d}{int(date_match.group(3)):02d}"
-                    display_date_key = date_key
-            
-            if date_key:
-                # --- A. 法人現貨與期貨爬蟲 ---
-                if gs_inst.empty or date_key not in gs_inst['日期'].values or force_update:
-                    oi_data = {"外資": 0, "投信": 0, "自營商": 0}
-                    try:
-                        res_oi = requests.post("https://www.taifex.com.tw/cht/3/futContractsDate", data={'queryDate': f"{int(date_key[:4])}/{date_key[4:6]}/{date_key[6:8]}"}, headers={'User-Agent': 'Mozilla/5.0'}, timeout=5)
-                        if res_oi.status_code == 200:
-                            from bs4 import BeautifulSoup
-                            is_tx_block = False 
-                            for row in BeautifulSoup(res_oi.text, 'html.parser').find_all('tr'):
-                                texts = [td.get_text(strip=True) for td in row.find_all('td')]
-                                if not texts: continue
-                                
-                                # 🔧 【模糊比對防護】：對付期交所隱藏空白鍵或文字改動
-                                if any("臺股期貨" in t for t in texts): 
-                                    is_tx_block = True
-                                elif any(x in t for t in texts for x in ["小型臺指期貨", "電子期貨", "金融期貨", "臺灣50期貨"]): 
-                                    is_tx_block = False
-                                    
-                                if is_tx_block:
-                                    identity = None
-                                    if any("外資" in t for t in texts): identity = "外資"
-                                    elif any("投信" in t for t in texts): identity = "投信"
-                                    elif any("自營商" in t for t in texts): identity = "自營商"
-                                    if identity and len(texts) >= 8:
-                                        try: oi_data[identity] = int(texts[-2].replace(',', ''))
-                                        except: pass
-                    except: pass
-                    
-                    net_buy_foreign, net_buy_trust, net_buy_dealer, net_buy_total = 0.0, 0.0, 0.0, 0.0
-                    for _, row in twse_df.iterrows():
-                        unit_name = str(row['單位名稱']).strip()
-                        try: net_val = float(str(row['買賣差額']).replace(',', '')) / 100000000
-                        except: net_val = 0.0
-                        if unit_name in ['外資及陸資(不含外資自營商)', '外資自營商']: net_buy_foreign += net_val
-                        elif unit_name == '投信': net_buy_trust += net_val
-                        elif unit_name in ['自營商(自行買賣)', '自營商(避險)']: net_buy_dealer += net_val
-                        elif unit_name == '合計': net_buy_total = net_val
-                        
-                    new_inst = pd.DataFrame([{
-                        "日期": date_key, "外資": round(net_buy_foreign, 1), "投信": round(net_buy_trust, 1),
-                        "自營商": round(net_buy_dealer, 1), "合計": round(net_buy_total, 1),
-                        "外資期貨": oi_data["外資"], "投信期貨": oi_data["投信"],
-                        "自營商期貨": oi_data["自營商"], "期貨合計": sum(oi_data.values())
-                    }])
-                    if not gs_inst.empty: gs_inst = gs_inst[gs_inst['日期'] != date_key]
-                    gs_inst = pd.concat([gs_inst, new_inst], ignore_index=True)[STD_COLS_INST].fillna(0)
-                    try: conn.update(spreadsheet=SHEET_URL, worksheet="大盤風向球", data=gs_inst)
-                    except: pass
-                
-                # --- B. 融資餘額爬蟲 ---
-                if gs_margin.empty or date_key not in gs_margin['日期'].values or force_update:
-                    if force_update or now.time() >= datetime.time(21, 30) or date_key < today_str:
-                        margin_prev, margin_today = None, None
-                        try:
-                            margin_url = f"https://www.twse.com.tw/rwd/zh/margin/MI_MARGN?response=json&date={date_key}&selectType=MS"
-                            res_margin = requests.get(margin_url, headers={'User-Agent': 'Mozilla/5.0'}, timeout=10)
-                            if res_margin.status_code == 200:
-                                json_data = res_margin.json()
-                                # 🔧 【無差別掃描防護】：不再檢查 title，只要有這兩個欄位就抓！
-                                for tb in json_data.get("tables", []):
-                                    fields = tb.get("fields", [])
-                                    prev_idx = next((i for i, f in enumerate(fields) if "前日餘額" in f), -1)
-                                    today_idx = next((i for i, f in enumerate(fields) if "今日餘額" in f), -1)
-                                    
-                                    if prev_idx != -1 and today_idx != -1:
-                                        for row in tb.get("data", []):
-                                            if "融資金額" in str(row[0]):
-                                                margin_prev = float(str(row[prev_idx]).replace(',', '').strip())
-                                                margin_today = float(str(row[today_idx]).replace(',', '').strip())
-                                                break
-                                    if margin_today is not None: break # 抓到就跳出
-                        except: pass
-                        
-                        if margin_today is not None and margin_prev is not None:
-                            margin_diff_yi = round((margin_today - margin_prev) / 100000, 1)
-                            margin_today_yi = round(margin_today / 100000, 1)
-                            new_margin = pd.DataFrame([{
-                                "日期": date_key, 
-                                "融資增減": margin_diff_yi, 
-                                "融資餘額": margin_today_yi
-                            }])
-                            if not gs_margin.empty: gs_margin = gs_margin[gs_margin['日期'] != date_key]
-                            gs_margin = pd.concat([gs_margin, new_margin], ignore_index=True)[STD_COLS_MARGIN].fillna(0)
-                            try: conn.update(spreadsheet=SHEET_URL, worksheet="大盤融資", data=gs_margin)
-                            except: pass
-        st.cache_data.clear()
-        
-    render_inst = {}
-    render_margin = {}
-    
-    if not gs_inst.empty:
-        last_inst = gs_inst.iloc[-1]
-        display_date_key = str(last_inst.get('日期', display_date_key))
-        render_inst = {
-            "net_buy_foreign": float(last_inst.get("外資", 0.0)),
-            "net_buy_trust": float(last_inst.get("投信", 0.0)),
-            "net_buy_dealer": float(last_inst.get("自營商", 0.0)),
-            "net_buy_total": float(last_inst.get("合計", 0.0)),
-            "oi_foreign": int(float(last_inst.get("外資期貨", 0))),
-            "oi_trust": int(float(last_inst.get("投信期貨", 0))),
-            "oi_dealer": int(float(last_inst.get("自營商期貨", 0))),
-            "oi_total": int(float(last_inst.get("期貨合計", 0)))
-        }
-        
-    if not gs_margin.empty:
-        match_margin = gs_margin[gs_margin['日期'] == display_date_key]
-        if not match_margin.empty:
-            last_margin = match_margin.iloc[-1]
-            render_margin = {
-                "diff": float(last_margin.get("融資增減", 0.0)),
-                "total": float(last_margin.get("融資餘額", 0.0))
-            }
-            
-    date_str = f"📅 {display_date_key} | 🌕 雲端同步版"
-    if need_inst_crawl or need_margin_crawl:
-        date_str = f"📅 {display_date_key} | 🔄 最新同步"
->>>>>>> 6d9a552009e6fcb93874cb378939a959756420aa
 
     # --- 畫 UI ---
     def get_color(val, is_float=True):
@@ -1444,7 +1134,6 @@ def render_sidebar_market_summary():
         elif val < 0: return "#00e676", f"{val:,.1f}" if is_float else f"{val:,}"
         return "#e0e0e0", "0.0" if is_float else "0"
 
-<<<<<<< HEAD
     f_c, f_s = get_color(net_foreign)
     t_c, t_s = get_color(net_trust)
     d_c, d_s = get_color(net_dealer)
@@ -1454,20 +1143,6 @@ def render_sidebar_market_summary():
     do_c, do_os = get_color(oi_dealer, False)
     too_c, too_os = get_color(total_oi, False)
     m_c, m_s = get_color(margin_diff_yi)
-=======
-    f_c, f_s = get_color(render_inst.get('net_buy_foreign', 0.0))
-    t_c, t_s = get_color(render_inst.get('net_buy_trust', 0.0))
-    d_c, d_s = get_color(render_inst.get('net_buy_dealer', 0.0))
-    to_c, to_s = get_color(render_inst.get('net_buy_total', 0.0))
-    
-    fo_c, fo_s = get_color(render_inst.get('oi_foreign', 0), False)
-    to_oc, to_os = get_color(render_inst.get('oi_trust', 0), False)
-    do_c, do_os = get_color(render_inst.get('oi_dealer', 0), False)
-    too_c, too_os = get_color(render_inst.get('oi_total', 0), False)
-    
-    m_c, m_s = get_color(render_margin.get('diff', 0.0))
-    m_total = render_margin.get('total', 0.0)
->>>>>>> 6d9a552009e6fcb93874cb378939a959756420aa
 
     html = f"<div style='font-size: 13px; color: #00E272;'>📅 {date_spot} | ⚡ 本地極速版</div>"
     html += "<table style='width: 100%; text-align: center; border-collapse: collapse; margin-top: 5px; font-size: 14px;'>"
@@ -1479,25 +1154,17 @@ def render_sidebar_market_summary():
     html += f"<tr style='border-top: 1px solid #555; font-weight: bold;'><td style='padding: 4px;'>🔥 合計</td><td style='color: {to_c};'>{to_s}</td><td style='color: {too_c};'>{too_os}</td></tr>"
     html += "</table>"
     
-<<<<<<< HEAD
     if margin_today_yi != 0.0:
-=======
-    if m_total > 0 or m_s != "0.0":
->>>>>>> 6d9a552009e6fcb93874cb378939a959756420aa
         html += "<div style='margin-top: 5px; padding: 5px; background-color: #262730; border-radius: 5px; font-size: 13px;'>"
         html += f"<div>📊 融資餘額增減(億) <span style='color: {m_c}; font-weight: bold; float: right;'>{m_s}</span></div>"
-        html += f"<div style='color: #aaa; margin-top: 3px;'>└ 今日融資總餘額 <span style='float: right;'>{m_total:,.1f}</span></div>"
+        html += f"<div style='color: #aaa; margin-top: 3px;'>└ 今日融資總餘額 <span style='float: right;'>{margin_today_yi:,.1f}</span></div>"
         html += "</div>"
         
     st.markdown(html, unsafe_allow_html=True)
     return date_spot 
 
 # ------------------------------------------
-<<<<<<< HEAD
 # 2. 選擇權關鍵兵力分布 (讀取版)
-=======
-# 2. 選擇權關鍵兵力分布 
->>>>>>> 6d9a552009e6fcb93874cb378939a959756420aa
 # ------------------------------------------
 def render_options_dashboard(target_date_str):
     st.markdown("<hr style='margin:15px 0;'>", unsafe_allow_html=True)
@@ -1511,7 +1178,6 @@ def render_options_dashboard(target_date_str):
         st.warning("尚無選擇權籌碼資料。")
         return
 
-<<<<<<< HEAD
     # --- 1. 解析 PCR ---
     pcr_val = 0.0
     if df_pcr is not None:
@@ -1519,11 +1185,6 @@ def render_options_dashboard(target_date_str):
         if pcr_col:
             try: pcr_val = float(str(df_pcr[pcr_col].dropna().iloc[-1]).replace('%', ''))
             except: pass
-=======
-    try: pcr_val = float(today_opt.get('PCR', 0.0))
-    except: pcr_val = 0.0
-        
->>>>>>> 6d9a552009e6fcb93874cb378939a959756420aa
     pcr_color = "#FF4B4B" if pcr_val > 100 else "#00E272"
     st.markdown(f"**PCR:** <span style='color:{pcr_color}; font-size: 16px;'>{pcr_val}%</span>", unsafe_allow_html=True)
 
@@ -1608,13 +1269,8 @@ with tab1:
     st.markdown("<br><br><br>", unsafe_allow_html=True) 
     col1, col2 = st.columns([8, 2]) 
     with col2:
-<<<<<<< HEAD
         # 按鈕現在只做一件事：清除快取，重新掃描資料夾
         if st.button("🔄", help="重新讀取本地資料夾", use_container_width=True):
-=======
-        if st.button("🐕", help=" ", key="secret_watchdog"):
-            st.session_state['force_update'] = True
->>>>>>> 6d9a552009e6fcb93874cb378939a959756420aa
             st.cache_data.clear()
             st.rerun()
 
