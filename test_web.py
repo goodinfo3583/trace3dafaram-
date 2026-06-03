@@ -3093,8 +3093,12 @@ else:
     else:
         st.error("無法合併資料。")
 # ==========================================
-# 💸 區塊 6：盤後鉅額交易總表 (HTML 本地讀取渲染版)
+# 💸 區塊 6：盤後鉅額交易總表 (HTML 本地讀取 + 智能欄位鎖定版)
 # ==========================================
+import pandas as pd
+import yfinance as yf
+import streamlit as st
+
 def clean_number_for_display(val):
     try:
         if pd.isna(val) or str(val).strip() == '-': return '-'
@@ -3106,6 +3110,7 @@ def clean_number_for_display(val):
 st.write("---")
 st.markdown("<div id='section-6'></div>", unsafe_allow_html=True)
 
+# 使用前面寫好的 get_latest_csv 函數來讀檔
 df_block, block_date = get_latest_csv("鉅額交易")
 
 if df_block is not None and not df_block.empty:
@@ -3114,91 +3119,100 @@ if df_block is not None and not df_block.empty:
     st.markdown(f"### 💸 區塊 6：鉅額交易動向 <span style='font-size: 0.6em; color: #00D2FF;'>({formatted_date} {status_icon})</span>", unsafe_allow_html=True)
     st.write("💡 鉅額交易常為大戶私下換手籌碼，成交價可視為「支撐/壓力」防守線；短線跌破建議嚴設停損。")
 
-    # 1. 整理 CSV 欄位
-    df_block['代號'] = df_block['證券代號'].astype(str).str.replace(r'\.0$', '', regex=True).str.replace(r'\D', '', regex=True)
-    df_block['股票名稱'] = df_block['證券名稱']
-    df_block['成交價'] = pd.to_numeric(df_block['成交單價'].astype(str).replace(',', '', regex=True), errors='coerce')
-    df_block['成交股數'] = pd.to_numeric(df_block['成交股數'].astype(str).replace(',', '', regex=True), errors='coerce')
-    df_block['成交金額'] = pd.to_numeric(df_block['成交金額'].astype(str).replace(',', '', regex=True), errors='coerce')
+    # 🛡️ 1. 智能欄位鎖定 (不寫死名稱，防範證交所暗算)
+    col_code = next((c for c in df_block.columns if '代號' in c), None)
+    col_name = next((c for c in df_block.columns if '名稱' in c), None)
+    col_price = next((c for c in df_block.columns if '單價' in c or '成交價' in c), None)
+    col_vol = next((c for c in df_block.columns if '股數' in c or '張數' in c or '成交量' in c), None)
+    col_amt = next((c for c in df_block.columns if '金額' in c or '總額' in c), None)
 
-    # 過濾垃圾行
-    df_block = df_block[(df_block['代號'] != '0') & (df_block['代號'] != '') & (df_block['代號'] != 'nan')]
+    if not all([col_code, col_name, col_price, col_vol, col_amt]):
+        st.error(f"⚠️ 無法解析 CSV 欄位，目前擁有的欄位為：{df_block.columns.tolist()}")
+    else:
+        # 2. 整理 CSV 欄位
+        df_block['代號'] = df_block[col_code].astype(str).str.replace(r'\.0$', '', regex=True).str.replace(r'\D', '', regex=True)
+        df_block['股票名稱'] = df_block[col_name]
+        df_block['成交價'] = pd.to_numeric(df_block[col_price].astype(str).replace(',', '', regex=True), errors='coerce')
+        df_block['成交股數'] = pd.to_numeric(df_block[col_vol].astype(str).replace(',', '', regex=True), errors='coerce')
+        df_block['成交金額'] = pd.to_numeric(df_block[col_amt].astype(str).replace(',', '', regex=True), errors='coerce')
 
-    # 2. 依照代號與名稱合併同日多筆交易 (將價格用 / 串聯，張數金額加總)
-    grouped_block = df_block.groupby(['代號', '股票名稱']).agg({
-        '成交價': lambda x: ' / '.join(sorted(set([clean_number_for_display(i) for i in x]))),
-        '成交股數': 'sum',
-        '成交金額': 'sum'
-    }).reset_index()
+        # 過濾垃圾行 (大盤總計等)
+        df_block = df_block[(df_block['代號'] != '0') & (df_block['代號'] != '') & (df_block['代號'] != 'nan')]
 
-    grouped_block['成交張數'] = (grouped_block['成交股數'] / 1000).astype(int).apply(lambda x: f"{x:,}")
-    grouped_block['成交總額(億)'] = (grouped_block['成交金額'] / 100000000).apply(lambda x: f"{x:.2f}".rstrip('0').rstrip('.'))
+        # 3. 依照代號與名稱合併同日多筆交易 (將價格用 / 串聯，張數金額加總)
+        grouped_block = df_block.groupby(['代號', '股票名稱']).agg({
+            '成交價': lambda x: ' / '.join(sorted(set([clean_number_for_display(i) for i in x.dropna()]))),
+            '成交股數': 'sum',
+            '成交金額': 'sum'
+        }).reset_index()
 
-    # 3. 呼叫 Yahoo Finance 抓取收盤價比對
-    unique_ids = grouped_block['代號'].unique()
-    close_price_dict = {}
-    if len(unique_ids) > 0:
-        yf_tickers = " ".join([f"{sid}.TW" for sid in unique_ids])
-        try:
-            df_yf = yf.download(yf_tickers, period="5d", progress=False)
-            if not df_yf.empty and 'Close' in df_yf:
-                close_data = df_yf['Close']
-                if len(unique_ids) == 1:
-                    price = close_data.dropna().iloc[-1]
-                    close_price_dict[unique_ids[0]] = str(int(round(price)))
-                else:
-                    for sid in unique_ids:
-                        tkr = f"{sid}.TW"
-                        if tkr in close_data.columns:
-                            valid_prices = close_data[tkr].dropna()
-                            if not valid_prices.empty: close_price_dict[sid] = str(int(round(valid_prices.iloc[-1])))
-        except: pass
+        grouped_block['成交張數'] = (grouped_block['成交股數'] / 1000).astype(int).apply(lambda x: f"{x:,}")
+        grouped_block['成交總額(億)'] = (grouped_block['成交金額'] / 100000000).apply(lambda x: f"{x:.2f}".rstrip('0').rstrip('.'))
 
-    grouped_block['▼收盤價'] = grouped_block['代號'].map(close_price_dict).fillna('-')
+        # 4. 呼叫 Yahoo Finance 抓取收盤價比對
+        unique_ids = grouped_block['代號'].unique()
+        close_price_dict = {}
+        if len(unique_ids) > 0:
+            yf_tickers = " ".join([f"{sid}.TW" for sid in unique_ids])
+            try:
+                df_yf = yf.download(yf_tickers, period="5d", progress=False)
+                if not df_yf.empty and 'Close' in df_yf:
+                    close_data = df_yf['Close']
+                    if len(unique_ids) == 1:
+                        price = close_data.dropna().iloc[-1]
+                        close_price_dict[unique_ids[0]] = str(int(round(price)))
+                    else:
+                        for sid in unique_ids:
+                            tkr = f"{sid}.TW"
+                            if tkr in close_data.columns:
+                                valid_prices = close_data[tkr].dropna()
+                                if not valid_prices.empty: close_price_dict[sid] = str(int(round(valid_prices.iloc[-1])))
+            except: pass
 
-    # 4. 排序：顏色燈號 (收盤價跌破區塊價者優先顯示)
-    def sort_logic(row):
-        try:
-            prices = [float(p) for p in str(row['成交價']).split(' / ')]
-            avg_block_p = sum(prices) / len(prices)
-            close_p = float(str(row['▼收盤價']).replace(',', ''))
-            return 1 if close_p > avg_block_p else 2 if close_p == avg_block_p else 3
-        except: return 4
-    
-    grouped_block['__rank'] = grouped_block.apply(sort_logic, axis=1)
-    grouped_block = grouped_block.sort_values(by=['__rank', '代號'], ascending=[True, True])
+        grouped_block['▼收盤價'] = grouped_block['代號'].map(close_price_dict).fillna('-')
 
-    # 5. HTML 表格渲染
-    html = "<table style='width: 100%; text-align: center; border-collapse: collapse; margin-top: 10px; font-size: 14px;'>"
-    html += "<tr style='background-color: #262730; border-bottom: 1px solid #555;'>"
-    html += "<th style='padding: 8px;'>代號</th><th style='padding: 8px;'>股票名稱</th>"
-    html += f"<th style='padding: 8px;'>▼{block_date[-4:]} 成交價</th><th style='padding: 8px;'>▼收盤價</th>"
-    html += "<th style='padding: 8px;'>成交張數</th><th style='padding: 8px;'>總額(億)</th></tr>"
-
-    for _, row in grouped_block.iterrows():
-        c_code, c_name = row['代號'], row['股票名稱']
-        c_block_p, c_close_p = row['成交價'], row['▼收盤價']
-        c_vol, c_amt = row['成交張數'], row['成交總額(億)']
+        # 5. 排序：顏色燈號 (收盤價跌破區塊價者優先顯示)
+        def sort_logic(row):
+            try:
+                prices = [float(p) for p in str(row['成交價']).split(' / ')]
+                avg_block_p = sum(prices) / len(prices)
+                close_p = float(str(row['▼收盤價']).replace(',', ''))
+                return 1 if close_p > avg_block_p else 2 if close_p == avg_block_p else 3
+            except: return 4
         
-        # 顏色判定
-        color = '#E0E0E0'
-        try:
-            # 若有多個價位，取平均來當比對基準
-            prices = [float(p) for p in str(c_block_p).split(' / ')]
-            avg_block = sum(prices) / len(prices)
-            close_val = float(str(c_close_p).replace(',', ''))
-            color = '#FF4B4B' if close_val > avg_block else '#FFA500' if close_val == avg_block else '#00E272'
-        except: pass
-        
-        html += f"<tr style='border-bottom: 1px solid #333; background-color: transparent;'>"
-        html += f"<td style='padding: 8px;'>{c_code}</td><td style='padding: 8px;'>{c_name}</td>"
-        html += f"<td style='padding: 8px; font-weight: bold; color: {color};'>{c_block_p}</td>"
-        html += f"<td style='padding: 8px; color: #E0E0E0;'>{c_close_p}</td>"
-        html += f"<td style='padding: 8px; color: #E0E0E0;'>{c_vol}</td><td style='padding: 8px; color: #E0E0E0;'>{c_amt}</td>"
-        html += "</tr>"
-        
-    html += "</table>"
-    st.markdown(html, unsafe_allow_html=True)
+        grouped_block['__rank'] = grouped_block.apply(sort_logic, axis=1)
+        grouped_block = grouped_block.sort_values(by=['__rank', '代號'], ascending=[True, True])
+
+        # 6. HTML 表格渲染
+        html = "<table style='width: 100%; text-align: center; border-collapse: collapse; margin-top: 10px; font-size: 14px;'>"
+        html += "<tr style='background-color: #262730; border-bottom: 1px solid #555;'>"
+        html += "<th style='padding: 8px;'>代號</th><th style='padding: 8px;'>股票名稱</th>"
+        html += f"<th style='padding: 8px;'>▼{block_date[-4:]} 成交價</th><th style='padding: 8px;'>▼收盤價</th>"
+        html += "<th style='padding: 8px;'>成交張數</th><th style='padding: 8px;'>總額(億)</th></tr>"
+
+        for _, row in grouped_block.iterrows():
+            c_code, c_name = row['代號'], row['股票名稱']
+            c_block_p, c_close_p = row['成交價'], row['▼收盤價']
+            c_vol, c_amt = row['成交張數'], row['成交總額(億)']
+            
+            # 顏色判定
+            color = '#E0E0E0'
+            try:
+                prices = [float(p) for p in str(c_block_p).split(' / ')]
+                avg_block = sum(prices) / len(prices)
+                close_val = float(str(c_close_p).replace(',', ''))
+                color = '#FF4B4B' if close_val > avg_block else '#FFA500' if close_val == avg_block else '#00E272'
+            except: pass
+            
+            html += f"<tr style='border-bottom: 1px solid #333; background-color: transparent;'>"
+            html += f"<td style='padding: 8px;'>{c_code}</td><td style='padding: 8px;'>{c_name}</td>"
+            html += f"<td style='padding: 8px; font-weight: bold; color: {color};'>{c_block_p}</td>"
+            html += f"<td style='padding: 8px; color: #E0E0E0;'>{c_close_p}</td>"
+            html += f"<td style='padding: 8px; color: #E0E0E0;'>{c_vol}</td><td style='padding: 8px; color: #E0E0E0;'>{c_amt}</td>"
+            html += "</tr>"
+            
+        html += "</table>"
+        st.markdown(html, unsafe_allow_html=True)
 
 else:
     st.markdown("### 💸 區塊 6：鉅額交易動向")
