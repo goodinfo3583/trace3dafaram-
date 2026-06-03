@@ -1064,7 +1064,7 @@ def get_diff_ui(today_val, prev_val):
 tab1, tab2 = st.sidebar.tabs(["📊 大盤與期權", "🧭 戰情導航"])
 
 # ------------------------------------------
-# 1. 大盤籌碼導航總覽 (含融資餘額本地讀取版)
+# 1. 大盤籌碼導航總覽 (融資智能標籤鎖定版)
 # ------------------------------------------
 def render_sidebar_market_summary():
     st.markdown("<h2 style='margin-top: 0; margin-bottom: 5px;'>📊 大盤資金風向球</h2>", unsafe_allow_html=True)
@@ -1103,16 +1103,32 @@ def render_sidebar_market_summary():
                     
     total_oi = oi_foreign + oi_trust + oi_dealer
 
-    # 🚀 解析本地融資資料
+    # 🚀 融資餘額：智能欄位定位 (不寫死)
     margin_diff_yi, margin_today_yi = 0.0, 0.0
     if df_margin is not None:
+        # 尋找關鍵欄位的位置
+        col_margin_today = next((c for c in df_margin.columns if '今日餘額' in str(c)), None)
+        col_margin_prev = next((c for c in df_margin.columns if '前日餘額' in str(c)), None)
+        
         for _, row in df_margin.iterrows():
             row_str = " ".join([str(x) for x in row.values])
             if '融資' in row_str and ('金額' in row_str or '交易單位' in row_str):
                 try:
-                    # 抓取最後兩欄 (前日餘額與今日餘額)
-                    margin_diff_yi = (float(str(row.values[-1]).replace(',','')) - float(str(row.values[-2]).replace(',',''))) / 100000
-                    margin_today_yi = float(str(row.values[-1]).replace(',','')) / 100000
+                    if col_margin_today and col_margin_prev:
+                        today_val = float(str(row[col_margin_today]).replace(',',''))
+                        prev_val = float(str(row[col_margin_prev]).replace(',',''))
+                    else:
+                        # 備案：如果找不到完美表頭名稱，就嘗試抓含有「買進」、「賣出」數字序列後的那幾欄
+                        # 這是證交所表格的常見規律：買進, 賣出, 現金償還, 前日餘額, 今日餘額
+                        numbers = [float(str(x).replace(',','')) for x in row.values if str(x).replace(',','').replace('.','').isdigit()]
+                        if len(numbers) >= 2:
+                            today_val = numbers[-1]
+                            prev_val = numbers[-2]
+                        else:
+                            continue
+                            
+                    margin_diff_yi = (today_val - prev_val) / 100000
+                    margin_today_yi = today_val / 100000
                     break
                 except: pass
 
@@ -1199,7 +1215,6 @@ def render_options_dashboard(target_date_str):
     max_pressure = int(top_calls.loc[0, col_strike]) if not top_calls.empty else 0
     max_support = int(top_puts.loc[0, col_strike]) if not top_puts.empty else 0
 
-    # 🚀 智慧底線防呆：依照要求，若行情的壓撐區間在 36000 以上，顯示到底線 36000 即止
     start_strike = int(max_pressure) + 2000
     end_strike = int(max_support) - 3000
     if start_strike >= 36000 and end_strike < 36000:
@@ -1254,6 +1269,8 @@ with tab2:
     st.markdown("[🔄 區塊4系列：融資券與軋空雷達](#section-4-1)")
     st.markdown("[💰 區塊5：大股東動向](#section-5)")
     st.markdown("[💸 區塊6：鉅額交易動向](#section-6)")
+
+
 # ==========================================
 # 🏠 核心五大區塊
 # ==========================================
