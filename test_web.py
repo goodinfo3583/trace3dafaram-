@@ -1489,10 +1489,17 @@ if sorted_dates:
         df_day = df_day_raw.groupby(['股票代號', '股票名稱']).agg(agg_dict).reset_index()
         df_day = df_day.rename(columns={'上榜區塊': f"{date_label}_區塊"})
             
+        # 🛠️ 核心修復：只保留「最新日期 (i==0)」的排名欄位
+        # 歷史日期的排名直接刪除，避免 Pandas Merge 時發生 _x _y 欄位名稱衝突
+        if i != 0:
+            rank_cols = [c for c in df_day.columns if '排名' in c]
+            df_day = df_day.drop(columns=rank_cols, errors='ignore')
+            
         if final_df is None: 
             final_df = df_day
         else: 
             final_df = pd.merge(final_df, df_day, on=['股票代號', '股票名稱'], how='outer')
+        #=
             
     if final_df is not None and not final_df.empty:
         date_cols = sorted([c for c in final_df.columns if '持股%' in c], reverse=True)
