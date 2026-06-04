@@ -1293,6 +1293,10 @@ with tab2:
 # ==========================================
 
 # ==========================================
+# 🏠 核心五大區塊
+# ==========================================
+
+# ==========================================
 # 🏠 區塊1：中長線 三大法人 持股比例 追蹤 (量化動態升級+多頁簽排行優化版)
 # ==========================================
 st.write("---")
@@ -1315,6 +1319,7 @@ def parse_special_txt(file_path, date_label):
     target_col = f"{date_label}持股%"
     target_amt_col = f"{date_label}金額"
     current_section = None
+    rank_counter = 1 # 👈 新增：用來追蹤該區塊內的真實排名
     
     try:
         with open(file_path, 'r', encoding='utf-8-sig', errors='ignore') as f:
@@ -1332,6 +1337,7 @@ def parse_special_txt(file_path, date_label):
                     elif "20日" in line_str: current_section = "20日"
                     elif "5日" in line_str: current_section = "5日"
                     elif "60日" in line_str: current_section = "60日"
+                    rank_counter = 1 # 👈 切換區塊時，排名計數器歸零重置
                     continue
                 
                 # 抓取資料
@@ -1363,8 +1369,10 @@ def parse_special_txt(file_path, date_label):
                         '股票名稱': stock_name,
                         target_col: holding_pct,
                         target_amt_col: inst_amount,
-                        '上榜區塊': current_section
+                        '上榜區塊': current_section,
+                        f'{current_section}排名': rank_counter # 👈 紀錄這檔股票在這個天期榜單的真實排名
                     })
+                    rank_counter += 1
     except Exception:
         pass
     return pd.DataFrame(parsed_data)
@@ -1414,6 +1422,12 @@ if sorted_dates:
         if target_amt_col in df_day_raw.columns:
             agg_dict[target_amt_col] = 'max'
             
+        # 👈 新增：把四個天期的獨立排名也納入聚合 (取最小值，也就是最佳名次)
+        for w in ['5日', '20日', '60日', '120日']:
+            rank_col = f'{w}排名'
+            if rank_col in df_day_raw.columns:
+                agg_dict[rank_col] = 'min'
+            
         df_day = df_day_raw.groupby(['股票代號', '股票名稱']).agg(agg_dict).reset_index()
         df_day = df_day.rename(columns={'上榜區塊': f"{date_label}_區塊"})
             
@@ -1448,7 +1462,7 @@ if sorted_dates:
             
         final_df['今日上榜'] = final_df[latest_sect_col].apply(generate_tags)
         final_df['上榜數量'] = final_df['今日上榜'].apply(lambda x: str(x).count('日'))
-        final_df['原始上榜區塊'] = final_df[latest_sect_col] # 👈 保留未格式化字串，用於分頁標籤精確交叉過濾
+        final_df['原始上榜區塊'] = final_df[latest_sect_col] 
             
         # 🧠 量化動態判定邏輯核心
         def evaluate_trend(row):
@@ -1510,7 +1524,7 @@ if sorted_dates:
                 
         final_df['最新動態'] = final_df.apply(evaluate_trend, axis=1)
         
-        # 💡 【架構修正】：在數值被強制格式化成字串（未進榜）前，先抽取指定的核心統計欄位
+        # 💡 在數值被強制格式化成字串（未進榜）前，先抽取指定的核心統計欄位
         final_df['法人持股'] = final_df[date_cols[0]]
         if len(date_cols) >= 2:
             final_df['△'] = final_df[date_cols[0]] - final_df[date_cols[1]]
@@ -1523,7 +1537,7 @@ if sorted_dates:
         else:
             final_df['法人金額'] = 0.0
 
-        # 將數據池按照上榜天期共振數與持股量大小進行基準排序
+        # 將全能池數據按照上榜天期共振數與持股量大小進行基準排序
         if date_cols:
             final_df = final_df.sort_values(by=['上榜數量', date_cols[0]], ascending=[False, False])
             
@@ -1567,7 +1581,6 @@ if sorted_dates:
         filtered_df['△'] = filtered_df['△'].apply(lambda x: f"+{x:.2f}" if x > 0 else (f"{x:.2f}" if x < 0 else "0.00"))
         filtered_df['法人金額'] = filtered_df['法人金額'].apply(lambda x: f"{x:.2f} 億" if x != 0 else "0.00")
 
-        # 🌟 直接將 4 個天期分頁與全能池合併進區塊一的主體渲染中
         tab5, tab20, tab60, tab120, tab_all = st.tabs([
             "🔴 5日排行 Top 50", 
             "🟡 20日排行 Top 50", 
@@ -1576,48 +1589,53 @@ if sorted_dates:
             "📊 歷史軌跡全能池"
         ])
         
-        # 統一新格式的自訂顯示欄位
         display_cols = ['股票代號', '股票名稱', '法人持股', '△', '法人金額', '最新動態', '今日上榜']
 
+        # 👈 修改核心：強制按照文字檔中萃取出來的各區塊真實名次重新排序！
         with tab5:
-            df_5 = filtered_df[filtered_df['原始上榜區塊'].str.contains('5日', na=False)].head(50)
+            df_5 = filtered_df[filtered_df['原始上榜區塊'].str.contains('5日', na=False)].copy()
+            if '5日排名' in df_5.columns:
+                df_5 = df_5.sort_values(by='5日排名', ascending=True)
             if not df_5.empty:
-                st.dataframe(df_5[display_cols].style.apply(highlight_row, axis=1), use_container_width=True, hide_index=True)
+                st.dataframe(df_5[display_cols].head(50).style.apply(highlight_row, axis=1), use_container_width=True, hide_index=True)
             else:
                 st.info("💡 今日 5日 排名暫無符合篩選條件之數據。")
 
         with tab20:
-            df_20 = filtered_df[filtered_df['原始上榜區塊'].str.contains('20日', na=False)].head(50)
+            df_20 = filtered_df[filtered_df['原始上榜區塊'].str.contains('20日', na=False)].copy()
+            if '20日排名' in df_20.columns:
+                df_20 = df_20.sort_values(by='20日排名', ascending=True)
             if not df_20.empty:
-                st.dataframe(df_20[display_cols].style.apply(highlight_row, axis=1), use_container_width=True, hide_index=True)
+                st.dataframe(df_20[display_cols].head(50).style.apply(highlight_row, axis=1), use_container_width=True, hide_index=True)
             else:
                 st.info("💡 今日 20日 排名暫無符合篩選條件之數據。")
 
         with tab60:
-            df_60 = filtered_df[filtered_df['原始上榜區塊'].str.contains('60日', na=False)].head(50)
+            df_60 = filtered_df[filtered_df['原始上榜區塊'].str.contains('60日', na=False)].copy()
+            if '60日排名' in df_60.columns:
+                df_60 = df_60.sort_values(by='60日排名', ascending=True)
             if not df_60.empty:
-                st.dataframe(df_60[display_cols].style.apply(highlight_row, axis=1), use_container_width=True, hide_index=True)
+                st.dataframe(df_60[display_cols].head(50).style.apply(highlight_row, axis=1), use_container_width=True, hide_index=True)
             else:
                 st.info("💡 今日 60日 排名暫無符合篩選條件之數據。")
 
         with tab120:
-            df_120 = filtered_df[filtered_df['原始上榜區塊'].str.contains('120日', na=False)].head(50)
+            df_120 = filtered_df[filtered_df['原始上榜區塊'].str.contains('120日', na=False)].copy()
+            if '120日排名' in df_120.columns:
+                df_120 = df_120.sort_values(by='120日排名', ascending=True)
             if not df_120.empty:
-                st.dataframe(df_120[display_cols].style.apply(highlight_row, axis=1), use_container_width=True, hide_index=True)
+                st.dataframe(df_120[display_cols].head(50).style.apply(highlight_row, axis=1), use_container_width=True, hide_index=True)
             else:
                 st.info("💡 今日 120日 排名暫無符合篩選條件之數據。")
                 
         with tab_all:
-            # 原本的多日橫向對比大表移動至此分頁，方便做深度的多日洗盤追蹤
             all_display_cols = ['股票代號', '股票名稱', '今日上榜', '最新動態'] + date_cols
             st.dataframe(filtered_df[all_display_cols].style.apply(highlight_row, axis=1), use_container_width=True)
 
-        # 2. 下方統一樣式提示
         st.write("")
-        st.info("💡 欄位說明：【△】代表最新數據對比前一交易日之持股比例淨增減。各天期分頁依據各天期排名篩選前 50 強。")
+        st.info("💡 欄位說明：各天期分頁依據三大法人持股變化排序呈現前 50 強。")
         st.success(f"已成功串聯歷史的持股數據 (今日上榜共振數量排序優先)")
         
-        # 將資料存入 session 供後續區塊共用
         st.session_state['my_final_df'] = final_df
 
 # ==========================================
