@@ -1352,13 +1352,19 @@ with tab2:
 # ==========================================
 
 # ==========================================
+# 🏠 核心五大區塊
+# ==========================================
+
+# ==========================================
 # 🏠 區塊1：中長線 三大法人 持股比例 追蹤 (量化動態升級+多頁簽排行優化版)
 # ==========================================
 st.write("---")
 st.markdown("<div id='section-1'></div>", unsafe_allow_html=True)
-st.header("👑 區塊1：三大法人短中長線持股比追蹤")
 
-# 🌟 新增功能：將網址轉為專屬按鈕連結置頂於區塊一
+# 🌟 新增功能：使用佔位符，讓帶有日期的標題可以置頂顯示
+header_placeholder = st.empty()
+
+# 網址轉為專屬按鈕連結置頂於區塊一
 st.link_button("📊 DDong 台股法人籌碼數據儀表板", "https://goodinfo3583.github.io/DDong_tw-institutional-stocker/")
 st.write("")
 
@@ -1368,7 +1374,63 @@ import glob
 import pandas as pd
 from collections import defaultdict
 
+# ------------------------------------------
+# 🎨 專屬科技黑原生表格產生器 (HTML/CSS)
+# ------------------------------------------
+def render_tech_table(df):
+    html = """
+    <style>
+    .tech-table {
+        width: 100%;
+        border-collapse: collapse;
+        margin-top: 5px;
+        font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+        background-color: #0E1117; /* 極致暗黑底色 */
+        color: #E2E8F0;
+        font-size: 15px;
+    }
+    .tech-table th {
+        background-color: #1A202C; /* 表頭微亮區隔 */
+        color: #00D2FF; /* 科技藍文字 */
+        padding: 12px 10px;
+        text-align: left;
+        border-bottom: 2px solid #00D2FF;
+        font-weight: 600;
+        white-space: nowrap;
+    }
+    .tech-table td {
+        padding: 10px 10px;
+        border-bottom: 1px solid #1E232F;
+    }
+    .tech-table tr {
+        transition: all 0.25s ease;
+    }
+    /* 🔥 滑鼠懸停效果：整欄透明反白 + 科技光暈 */
+    .tech-table tr:hover {
+        background-color: rgba(255, 255, 255, 0.08); 
+        box-shadow: 0 0 15px rgba(0, 210, 255, 0.15) inset; 
+    }
+    </style>
+    <table class="tech-table">
+    """
+    # 建立表頭
+    html += "<thead><tr>"
+    for col in df.columns:
+        html += f"<th>{col}</th>"
+    html += "</tr></thead><tbody>"
+    
+    # 建立資料列
+    for _, row in df.iterrows():
+        html += "<tr>"
+        for col in df.columns:
+            html += f"<td>{row[col]}</td>"
+        html += "</tr>"
+    html += "</tbody></table>"
+    return html
+
+# ------------------------------------------
 # 1. 解析引擎 (同時抓取持股%、專屬天期ΔChange與排名)
+# ------------------------------------------
 def parse_special_txt(file_path, date_label):
     parsed_data = []
     target_col = f"{date_label}持股%"
@@ -1379,13 +1441,10 @@ def parse_special_txt(file_path, date_label):
         with open(file_path, 'r', encoding='utf-8-sig', errors='ignore') as f:
             for line in f:
                 line_str = line.strip()
-                
-                # 🛑 【絕對斷路器】：遇到分隔線清空狀態
                 if line_str.startswith("---") or line_str.startswith("==="):
                     current_section = None
                     continue
                 
-                # 💡 【區塊開關】：切換時重置排名
                 if "三大法人持股變化排名" in line_str or ("排名" in line_str and "日)" in line_str):
                     if "120日" in line_str: current_section = "120日"
                     elif "20日" in line_str: current_section = "20日"
@@ -1394,12 +1453,10 @@ def parse_special_txt(file_path, date_label):
                     rank_counter = 1 
                     continue
                 
-                # 抓取資料
                 parts = line_str.split('\t')
                 if current_section and len(parts) >= 4 and parts[0].isdigit():
                     try: 
-                        holding_pct = float(parts[-2]) # 倒數第二欄是持股%
-                        # 💡 抓取天期專屬的 ΔChange (例如: 5日ΔChange)
+                        holding_pct = float(parts[-2])
                         delta_str = parts[-1].replace('+', '').replace('%', '').replace(',', '').strip()
                         period_delta_val = float(delta_str)
                     except ValueError: 
@@ -1414,7 +1471,7 @@ def parse_special_txt(file_path, date_label):
                         '股票代號': stock_id,
                         '股票名稱': stock_name,
                         target_col: holding_pct,
-                        f'{current_section}ΔChange': period_delta_val, # 賦予專屬欄位名稱
+                        f'{current_section}ΔChange': period_delta_val,
                         '上榜區塊': current_section,
                         f'{current_section}排名': rank_counter 
                     })
@@ -1423,7 +1480,6 @@ def parse_special_txt(file_path, date_label):
         pass
     return pd.DataFrame(parsed_data)
 
-# 聚合相同標的的不同榜單標籤
 def agg_sections_func(x):
     valid_x = set([s for s in x if pd.notna(s) and s != ""])
     order = ['5日', '20日', '60日', '120日']
@@ -1446,7 +1502,13 @@ sorted_dates = sorted(date_files.keys(), reverse=True)
 if sorted_dates:
     latest_d = sorted_dates[0]
     fmt_date = f"{latest_d[:4]}/{latest_d[4:6]}/{latest_d[6:]}"
-    st.markdown(f"<span style='color:#00D2FF; font-size:14px; font-weight:500;'>最新數據基準日：{fmt_date}</span>", unsafe_allow_html=True)
+    
+    # 🌟 標題與日期完美合併置頂渲染
+    header_placeholder.markdown(
+        f"<h2 style='margin-bottom: 0px;'>👑 區塊1：三大法人短中長線持股比追蹤 "
+        f"<span style='color:#00D2FF; font-size:16px; font-weight:500; margin-left:12px;'>最新數據基準日：{fmt_date}</span></h2>", 
+        unsafe_allow_html=True
+    )
     
     final_df = None
     
@@ -1462,7 +1524,6 @@ if sorted_dates:
         df_day_raw = pd.concat(day_dfs, ignore_index=True)
         target_col = f"{date_label}持股%"
         
-        # 建立動態聚合字典
         agg_dict = {target_col: 'max', '上榜區塊': agg_sections_func}
             
         for w in ['5日', '20日', '60日', '120日']:
@@ -1474,7 +1535,6 @@ if sorted_dates:
         df_day = df_day_raw.groupby(['股票代號', '股票名稱']).agg(agg_dict).reset_index()
         df_day = df_day.rename(columns={'上榜區塊': f"{date_label}_區塊"})
             
-        # 🛠️ 修復：如果是歷史資料，就把排名與ΔChange欄位刪除，只保留最新一天的資料，避免合併名稱衝突
         if i != 0:
             cols_to_drop = [c for c in df_day.columns if '排名' in c or 'ΔChange' in c]
             df_day = df_day.drop(columns=cols_to_drop, errors='ignore')
@@ -1486,11 +1546,9 @@ if sorted_dates:
             
     if final_df is not None and not final_df.empty:
         date_cols = sorted([c for c in final_df.columns if '持股%' in c], reverse=True)
-        
         for c in date_cols:
             final_df[c] = pd.to_numeric(final_df[c], errors='coerce').fillna(0)
             
-        # 今日上榜標籤化
         def generate_tags(sections):
             if pd.isna(sections) or not sections: return ""
             sec_list = str(sections).split(',')
@@ -1509,7 +1567,6 @@ if sorted_dates:
         final_df['上榜數量'] = final_df['今日上榜'].apply(lambda x: str(x).count('日'))
         final_df['原始上榜區塊'] = final_df[latest_sect_col] 
             
-        # 🧠 量化動態判定邏輯核心
         def evaluate_trend(row):
             if len(date_cols) < 2: return "⚪ 資料不足"
             dynamics = []
@@ -1556,17 +1613,12 @@ if sorted_dates:
             return " | ".join(dynamics)
                 
         final_df['最新動態'] = final_df.apply(evaluate_trend, axis=1)
-        
-        # 💡 強制抽取欄位
         final_df['法人持股'] = final_df[date_cols[0]]
         
-        # 💡 單日變化 △ (今天減去昨天)
-        if len(date_cols) >= 2:
-            final_df['△'] = final_df[date_cols[0]] - final_df[date_cols[1]]
-        else:
-            final_df['△'] = 0.0
+        if len(date_cols) >= 2: final_df['△'] = final_df[date_cols[0]] - final_df[date_cols[1]]
+        else: final_df['△'] = 0.0
 
-        final_df['法人金額'] = 0.0 # 預設保留0.00
+        final_df['法人金額'] = 0.0 
 
         if date_cols:
             final_df = final_df.sort_values(by=['上榜數量', date_cols[0]], ascending=[False, False])
@@ -1595,6 +1647,7 @@ if sorted_dates:
             
         filtered_df = final_df[mask].copy()
         
+        # 📊 歷史軌跡全能池專用的高亮保留
         def highlight_row(row):
             cnt = color_ref.get(row['股票代號'], 0)
             if cnt == 4: bg = 'background-color: rgba(240, 90, 90, 0.25)'     
@@ -1604,7 +1657,6 @@ if sorted_dates:
             else: bg = 'background-color: #111622; color: #E2E8F0'                                                                                                                                                                         
             return [bg] * len(row)
 
-        # 數字格式化美化
         filtered_df['法人持股'] = filtered_df['法人持股'].apply(lambda x: f"{x:.2f}%")
         filtered_df['△'] = filtered_df['△'].apply(lambda x: f"+{x:.2f}" if x > 0 else (f"{x:.2f}" if x < 0 else "0.00"))
         
@@ -1619,38 +1671,40 @@ if sorted_dates:
             "🔴 5日排行 Top 50", "🟡 20日排行 Top 50", "🟢 60日排行 Top 50", "🔵 120日排行 Top 50", "📊 歷史軌跡全能池"
         ])
 
+        # 🔥 四大天期改用原生科技黑表格渲染，並拔除底色
         with tab5:
-            display_cols = ['股票代號', '股票名稱', '法人持股', '△', '5日ΔChange', '法人金額', '最新動態', '今日上榜']
+            display_cols = ['5日排名', '股票代號', '股票名稱', '法人持股', '△', '5日ΔChange', '法人金額', '最新動態', '今日上榜']
             df_5 = filtered_df[filtered_df['原始上榜區塊'].str.contains('5日', na=False)].copy()
             if '5日排名' in df_5.columns: df_5 = df_5.sort_values(by='5日排名', ascending=True)
             real_cols = [c for c in display_cols if c in df_5.columns]
-            if not df_5.empty: st.dataframe(df_5[real_cols].head(50).style.apply(highlight_row, axis=1), use_container_width=True, hide_index=True)
+            if not df_5.empty: st.markdown(render_tech_table(df_5[real_cols].head(50)), unsafe_allow_html=True)
             else: st.info("💡 今日 5日 排名暫無符合篩選條件之數據。")
 
         with tab20:
-            display_cols = ['股票代號', '股票名稱', '法人持股', '△', '20日ΔChange', '法人金額', '最新動態', '今日上榜']
+            display_cols = ['20日排名', '股票代號', '股票名稱', '法人持股', '△', '20日ΔChange', '法人金額', '最新動態', '今日上榜']
             df_20 = filtered_df[filtered_df['原始上榜區塊'].str.contains('20日', na=False)].copy()
             if '20日排名' in df_20.columns: df_20 = df_20.sort_values(by='20日排名', ascending=True)
             real_cols = [c for c in display_cols if c in df_20.columns]
-            if not df_20.empty: st.dataframe(df_20[real_cols].head(50).style.apply(highlight_row, axis=1), use_container_width=True, hide_index=True)
+            if not df_20.empty: st.markdown(render_tech_table(df_20[real_cols].head(50)), unsafe_allow_html=True)
             else: st.info("💡 今日 20日 排名暫無符合篩選條件之數據。")
 
         with tab60:
-            display_cols = ['股票代號', '股票名稱', '法人持股', '△', '60日ΔChange', '法人金額', '最新動態', '今日上榜']
+            display_cols = ['60日排名', '股票代號', '股票名稱', '法人持股', '△', '60日ΔChange', '法人金額', '最新動態', '今日上榜']
             df_60 = filtered_df[filtered_df['原始上榜區塊'].str.contains('60日', na=False)].copy()
             if '60日排名' in df_60.columns: df_60 = df_60.sort_values(by='60日排名', ascending=True)
             real_cols = [c for c in display_cols if c in df_60.columns]
-            if not df_60.empty: st.dataframe(df_60[real_cols].head(50).style.apply(highlight_row, axis=1), use_container_width=True, hide_index=True)
+            if not df_60.empty: st.markdown(render_tech_table(df_60[real_cols].head(50)), unsafe_allow_html=True)
             else: st.info("💡 今日 60日 排名暫無符合篩選條件之數據。")
 
         with tab120:
-            display_cols = ['股票代號', '股票名稱', '法人持股', '△', '120日ΔChange', '法人金額', '最新動態', '今日上榜']
+            display_cols = ['120日排名', '股票代號', '股票名稱', '法人持股', '△', '120日ΔChange', '法人金額', '最新動態', '今日上榜']
             df_120 = filtered_df[filtered_df['原始上榜區塊'].str.contains('120日', na=False)].copy()
             if '120日排名' in df_120.columns: df_120 = df_120.sort_values(by='120日排名', ascending=True)
             real_cols = [c for c in display_cols if c in df_120.columns]
-            if not df_120.empty: st.dataframe(df_120[real_cols].head(50).style.apply(highlight_row, axis=1), use_container_width=True, hide_index=True)
+            if not df_120.empty: st.markdown(render_tech_table(df_120[real_cols].head(50)), unsafe_allow_html=True)
             else: st.info("💡 今日 120日 排名暫無符合篩選條件之數據。")
                 
+        # 📊 全能池保留原本的顏色與 st.dataframe 格式
         with tab_all:
             all_display_cols = ['股票代號', '股票名稱', '今日上榜', '最新動態'] + date_cols
             st.dataframe(filtered_df[all_display_cols].style.apply(highlight_row, axis=1), use_container_width=True)
@@ -1659,6 +1713,9 @@ if sorted_dates:
         st.info("💡 欄位說明：【△】為最新單日法人持股增減變化；【◯日ΔChange】為該天期之法人持股累積變化。(法人金額暫時保留為0.00)")
         
         st.session_state['my_final_df'] = final_df
+else:
+    # 🌟 若尚無資料，依然顯示標題
+    header_placeholder.markdown("<h2 style='margin-bottom: 0px;'>👑 區塊1：三大法人短中長線持股比追蹤</h2>", unsafe_allow_html=True)
         
 # ==========================================
 # 🎯 區塊2-1：外資 5 日買超 佔成交量比 追蹤 (穩定精確版)
