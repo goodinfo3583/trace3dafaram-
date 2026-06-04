@@ -1297,7 +1297,11 @@ with tab2:
 # ==========================================
 
 # ==========================================
-# 🏠 區塊1：中長線 三大法人 持股比例 追蹤 (修正極端值漏洞與色彩回歸版)
+# 🏠 核心五大區塊
+# ==========================================
+
+# ==========================================
+# 🏠 區塊1：中長線 三大法人 持股比例 追蹤 (防爆破與安全相減版)
 # ==========================================
 st.write("---")
 st.markdown("<div id='section-1'></div>", unsafe_allow_html=True)
@@ -1336,16 +1340,16 @@ def fetch_github_json_all():
             else: json_dfs[d] = pd.DataFrame()
         except Exception: json_dfs[d] = pd.DataFrame()
         
-    # 🌟 新增：抓取「全市場最新狀態」以獲取最準確的單日 △，避免因榜單落榜造成的相減錯誤
+    # 🌟 安全修正：將下載下來的 df 放在獨立變數，並嚴格檢查欄位防爆破
     latest_all_df = pd.DataFrame()
     try:
         url_all = f"https://raw.githubusercontent.com/{account}/{repo}/{branch}/docs/data/stock_three_inst_latest.json"
         res_all = requests.get(url_all, timeout=5)
         if res_all.status_code == 200:
-            latest_all_df = pd.DataFrame(res_all.json())
-            # 假設該 JSON 內有 code 與對應的單日 change，若無則回傳空表
-            if not latest_all_df.empty and 'code' in latest_all_df.columns and 'change' in latest_all_df.columns:
-                latest_all_df = latest_all_df[['code', 'change']].rename(columns={'code': '股票代號', 'change': '精準單日△'})
+            temp_df = pd.DataFrame(res_all.json())
+            # 只有當 JSON 裡面確實有 code 和 change 欄位時，才轉換為最新單日△表
+            if not temp_df.empty and 'code' in temp_df.columns and 'change' in temp_df.columns:
+                latest_all_df = temp_df[['code', 'change']].rename(columns={'code': '股票代號', 'change': '精準單日△'})
     except Exception:
         pass
         
@@ -1490,20 +1494,28 @@ if sorted_dates:
         final_df['最新動態'] = final_df.apply(evaluate_trend, axis=1)
         final_df['法人持股'] = final_df[date_cols[0]]
         
-        # 💡 核心變更：不再用今天的榜單減去昨天的榜單，而是嘗試關聯來自 GitHub 的精準單日變化
-        if not latest_all_df.empty:
+        # 💡 核心防爆與安全演算法：
+        # 1. 嘗試關聯 GitHub 的最新精準變化 (如果有的話)
+        if not latest_all_df.empty and '股票代號' in latest_all_df.columns:
             final_df = pd.merge(final_df, latest_all_df, on='股票代號', how='left')
             final_df['△'] = final_df['精準單日△'].fillna(0.0)
         else:
-            # 如果抓不到雲端資料，寧可顯示 0.0，也不要用減法造成台化 +38.22 這種錯誤
-            final_df['△'] = 0.0
+            # 2. 如果 JSON 沒抓到，改用【安全歷史相減法】
+            if len(date_cols) >= 2:
+                # 只有昨天在榜單上(大於0.001)才允許相減，否則算0，徹底避免台化暴增 38% 的靈異事件
+                final_df['△'] = final_df.apply(
+                    lambda row: row[date_cols[0]] - row[date_cols[1]] if row[date_cols[1]] > 0.001 else 0.0, 
+                    axis=1
+                )
+            else:
+                final_df['△'] = 0.0
             
         final_df['法人金額'] = 0.0 
 
         color_ref = final_df.set_index('股票代號')['上榜數量'].to_dict()
         for col in date_cols: final_df[col] = final_df[col].apply(lambda x: "未進榜" if pd.isna(x) or abs(x) < 0.0001 else f"{x:.2f}")
 
-        # 保留釘選機制，但不再影響顏色判斷
+        # 保留釘選機制，但不影響色彩判定
         final_df['今日有上榜_排序'] = final_df['今日上榜'] != ""
         if date_cols:
             final_df = final_df.sort_values(by=['今日有上榜_排序', '上榜數量', date_cols[0]], ascending=[False, False, False])
@@ -1533,18 +1545,13 @@ def format_delta(x):
 def process_json_tab(df, target_day):
     if df.empty: return df
     
-    # 從歷史大表中取得最新動態與今日上榜標籤
+    # 從算好的歷史大表 final_df 中，把算好的 △、動態與今日上榜直接複製過來 (不重複戳 JSON)
     if not final_df.empty:
-        merge_cols = ['股票代號', '最新動態', '今日上榜']
+        merge_cols = ['股票代號', '最新動態', '今日上榜', '△']
         available_cols = [c for c in merge_cols if c in final_df.columns]
         df = pd.merge(df, final_df[available_cols], on='股票代號', how='left')
         
-    # 如果全市場資料有成功抓取，直接掛載精準單日△
-    if not latest_all_df.empty:
-        df = pd.merge(df, latest_all_df, on='股票代號', how='left')
-        df['△'] = df['精準單日△'].fillna(0.0)
-    else:
-        df['△'] = 0.0
+    if '△' not in df.columns: df['△'] = 0.0
         
     is_bond = df['股票代號'].str.endswith('B')
     is_etf = (df['股票代號'].str.len() >= 5) & (~is_bond)
@@ -1598,7 +1605,7 @@ with tab_all:
         filtered_df['法人持股'] = filtered_df['法人持股'].apply(lambda x: f"{x:.2f}%")
         filtered_df['△'] = filtered_df['△'].apply(format_delta)
         
-        # 🎨 色彩回歸：徹底修正判斷邏輯，依照 color_ref 給予共振底色
+        # 🎨 色彩回歸：徹底還原紅黃綠藍的共振底色
         def highlight_row(row):
             cnt = color_ref.get(row['股票代號'], 0)
             if cnt == 4: bg = 'background-color: rgba(240, 90, 90, 0.25)'     
