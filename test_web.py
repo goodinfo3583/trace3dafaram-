@@ -1582,7 +1582,52 @@ if sorted_dates:
         st.session_state['my_final_df'] = final_df
 
         
+# ==========================================
+籌碼排行榜與數據儀表板
+# ==========================================
+st.header("🏆 區塊 1：台股籌碼核心排行榜")
 
+# 1. 新增專屬按鈕連結 (會自動套用你寫好的護眼暗黑化樣式)
+st.link_button("📊 DDong 台股法人籌碼數據儀表板", "https://goodinfo3583.github.io/DDong_tw-institutional-stocker/")
+
+st.write("---")
+
+# 2. 建立四個分頁
+tab5, tab20, tab60, tab120 = st.tabs(["5日 Top 50", "20日 Top 50", "60日 Top 50", "120日 Top 50"])
+
+# 💡 這裡定義你想顯示的欄位，包含你指定的「法人持股」、「△」，
+# 以及籌碼分析不能漏掉的「法人金額」與你的燃料公式(越負越好)也可依需求納入觀察。
+display_cols = ['股票代號', '股票名稱', '法人持股', '△', '法人金額', '總分'] 
+
+# ==========================================
+# 3. 顯示各分頁前 50 名資料
+# ==========================================
+# (註：因為檔案中未顯示你實際讀取 5, 20 等天期資料的 DataFrame 變數，以下用 df_5, df_20 等作為範例，請替換成你實際的變數名稱)
+
+with tab5:
+    # 確保資料已針對特定欄位排序後，取出前 50 名
+    if 'df_5' in locals():
+        st.dataframe(df_5[display_cols].head(50), use_container_width=True, hide_index=True)
+    else:
+        st.info("💡 請在此替換為 5 日的 DataFrame 變數")
+
+with tab20:
+    if 'df_20' in locals():
+        st.dataframe(df_20[display_cols].head(50), use_container_width=True, hide_index=True)
+    else:
+        st.info("💡 請在此替換為 20 日的 DataFrame 變數")
+
+with tab60:
+    if 'df_60' in locals():
+        st.dataframe(df_60[display_cols].head(50), use_container_width=True, hide_index=True)
+    else:
+        st.info("💡 請在此替換為 60 日的 DataFrame 變數")
+
+with tab120:
+    if 'df_120' in locals():
+        st.dataframe(df_120[display_cols].head(50), use_container_width=True, hide_index=True)
+    else:
+        st.info("💡 請在此替換為 120 日的 DataFrame 變數")
 
 # ==========================================
 # 🎯 區塊2-1：外資 5 日買超 佔成交量比 追蹤 (穩定精確版)
