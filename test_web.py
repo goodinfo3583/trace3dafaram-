@@ -22,17 +22,12 @@ SCORE_HISTORY_DIR = os.path.join(DATA_DIR, "ScoreHistory")
 MARKET_HISTORY_DIR = os.path.join(DATA_DIR, "MarketHistory")
 BLOCK_HISTORY_DIR = os.path.join(DATA_DIR, "BlockHistory")
 
-# 👉 步驟 2：變數都認識了，再一次性幫它們建立資料夾
-for folder in [SCORE_HISTORY_DIR, MARKET_HISTORY_DIR, BLOCK_HISTORY_DIR]:
-    if not os.path.exists(folder):
-        os.makedirs(folder)
-
+# 👉 步驟 2：
 # ==========================================
 # 🛑 隱形急救引擎 (請置於程式最頂端，絕對不要刪除！)
 # ==========================================
 # 即使不顯示區塊 0 面板，這段程式碼也必須存在，
 # 否則側邊欄導航會因為讀不到歷史檔案而顯示「查無資料」。
-
 if not os.path.exists(DATA_DIR): os.makedirs(DATA_DIR)
 if not os.path.exists(SCORE_HISTORY_DIR): os.makedirs(SCORE_HISTORY_DIR)
 if not os.path.exists(MARKET_HISTORY_DIR): os.makedirs(MARKET_HISTORY_DIR)
