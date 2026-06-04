@@ -1351,7 +1351,11 @@ with tab2:
 # 🏠 核心五大區塊
 # ==========================================
 # ==========================================
-# 🏠 區塊1：中長線 三大法人 持股比例 追蹤 (全自動 JSON 串接 + 捲動視窗版)
+# 🏠 核心五大區塊
+# ==========================================
+
+# ==========================================
+# 🏠 區塊1：中長線 三大法人 持股比例 追蹤 (全自動 JSON 抓取 + 自動歷史封存版)
 # ==========================================
 st.write("---")
 st.markdown("<div id='section-1'></div>", unsafe_allow_html=True)
@@ -1365,12 +1369,14 @@ import os
 import glob
 import pandas as pd
 import requests
+import datetime
+import pytz
 from collections import defaultdict
 
 # ------------------------------------------
 # 🌐 全自動 GitHub JSON 抓取引擎 (抓取完整 200 名單)
 # ------------------------------------------
-@st.cache_data(ttl=3600)  # 快取1小時避免過度頻繁請求
+@st.cache_data(ttl=3600)
 def fetch_github_json_all():
     days_list = [5, 20, 60, 120]
     json_dfs = {}
@@ -1382,137 +1388,106 @@ def fetch_github_json_all():
             res = requests.get(url, timeout=5)
             if res.status_code == 200:
                 df = pd.DataFrame(res.json())
-                df = df.rename(columns={
-                    'code': '股票代號', 'name': '股票名稱',
-                    'three_inst_ratio': '法人持股', 'change': f'{d}日ΔChange'
-                })
-                # 建立 1~200 名的真實排名
+                df = df.rename(columns={'code': '股票代號', 'name': '股票名稱', 'three_inst_ratio': '法人持股', 'change': f'{d}日ΔChange'})
                 df[f'{d}日排名'] = df.index + 1
                 json_dfs[d] = df
-            else:
-                json_dfs[d] = pd.DataFrame()
-        except Exception:
-            json_dfs[d] = pd.DataFrame()
+            else: json_dfs[d] = pd.DataFrame()
+        except Exception: json_dfs[d] = pd.DataFrame()
     return json_dfs
 
 # ------------------------------------------
-# 🎨 專屬科技黑原生表格產生器 (加入 10行限制與捲動條)
+# 💾 【自動化歷史封存引擎】(Auto-Archive) 
+# 自動將每日 JSON 存為 CSV，取代手動貼 TXT
+# ------------------------------------------
+def auto_archive_today_data(json_dfs):
+    tw_tz = pytz.timezone('Asia/Taipei')
+    today_str = datetime.datetime.now(tw_tz).strftime("%Y%m%d")
+    archive_file = os.path.join(DATA_DIR, f"{today_str}_auto_history.csv")
+    
+    # 如果今天還沒備份過，且確實有抓到資料，就自動建立歷史檔案
+    if not os.path.exists(archive_file) and any(not df.empty for df in json_dfs.values()):
+        records = []
+        for days, df in json_dfs.items():
+            if not df.empty:
+                for _, row in df.iterrows():
+                    records.append({
+                        '股票代號': row.get('股票代號', ''),
+                        '股票名稱': row.get('股票名稱', ''),
+                        f'{today_str}持股%': row.get('法人持股', 0.0),
+                        '上榜區塊': f"{days}日"
+                    })
+        if records:
+            save_df = pd.DataFrame(records)
+            save_df.to_csv(archive_file, index=False, encoding='utf-8-sig')
+            
+# 🚀 啟動抓取與自動封存 (背景執行)
+json_dfs = fetch_github_json_all()
+auto_archive_today_data(json_dfs)
+
+# ------------------------------------------
+# 🎨 專屬科技黑原生表格產生器
 # ------------------------------------------
 def render_tech_table(df):
     html = """
     <style>
-    /* 🔥 外框與捲動條設定：高度設為約 10 行的大小 */
-    .table-container {
-        max-height: 480px; 
-        overflow-y: auto;
-        border: 1px solid #1E232F;
-        border-radius: 8px;
-        background-color: #0E1117;
-    }
-    /* 自訂捲動條樣式 (針對 Webkit 瀏覽器) */
-    .table-container::-webkit-scrollbar {
-        width: 8px;
-    }
-    .table-container::-webkit-scrollbar-track {
-        background: #0E1117; 
-        border-radius: 8px;
-    }
-    .table-container::-webkit-scrollbar-thumb {
-        background: #3A404D; 
-        border-radius: 8px;
-    }
-    .table-container::-webkit-scrollbar-thumb:hover {
-        background: #00D2FF; 
-    }
-    .tech-table {
-        width: 100%;
-        border-collapse: collapse;
-        font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
-        color: #E2E8F0;
-        font-size: 15px;
-    }
-    .tech-table thead th {
-        position: sticky; /* 讓表頭固定在頂部 */
-        top: 0;
-        background-color: #1A202C;
-        color: #00D2FF;
-        padding: 12px 10px;
-        text-align: left;
-        border-bottom: 2px solid #00D2FF;
-        font-weight: 600;
-        white-space: nowrap;
-        z-index: 2; /* 確保表頭蓋過資料列 */
-    }
-    .tech-table td {
-        padding: 10px 10px;
-        border-bottom: 1px solid #1E232F;
-    }
-    .tech-table tbody tr {
-        transition: all 0.25s ease;
-    }
-    /* 滑鼠懸停效果：整欄透明反白 + 科技光暈 */
-    .tech-table tbody tr:hover {
-        background-color: rgba(255, 255, 255, 0.08); 
-        box-shadow: 0 0 15px rgba(0, 210, 255, 0.15) inset; 
-    }
+    .table-container { max-height: 480px; overflow-y: auto; border: 1px solid #1E232F; border-radius: 8px; background-color: #0E1117; }
+    .table-container::-webkit-scrollbar { width: 8px; }
+    .table-container::-webkit-scrollbar-track { background: #0E1117; border-radius: 8px; }
+    .table-container::-webkit-scrollbar-thumb { background: #3A404D; border-radius: 8px; }
+    .table-container::-webkit-scrollbar-thumb:hover { background: #00D2FF; }
+    .tech-table { width: 100%; border-collapse: collapse; font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; color: #E2E8F0; font-size: 15px; }
+    .tech-table thead th { position: sticky; top: 0; background-color: #1A202C; color: #00D2FF; padding: 12px 10px; text-align: left; border-bottom: 2px solid #00D2FF; font-weight: 600; white-space: nowrap; z-index: 2; }
+    .tech-table td { padding: 10px 10px; border-bottom: 1px solid #1E232F; }
+    .tech-table tbody tr { transition: all 0.25s ease; }
+    .tech-table tbody tr:hover { background-color: rgba(255, 255, 255, 0.08); box-shadow: 0 0 15px rgba(0, 210, 255, 0.15) inset; }
     </style>
-    <div class="table-container">
-    <table class="tech-table">
+    <div class="table-container"><table class="tech-table"><thead><tr>
     """
-    # 建立表頭
-    html += "<thead><tr>"
-    for col in df.columns:
-        html += f"<th>{col}</th>"
+    for col in df.columns: html += f"<th>{col}</th>"
     html += "</tr></thead><tbody>"
-    
-    # 建立資料列
     for _, row in df.iterrows():
         html += "<tr>"
         for col in df.columns:
             val = row[col]
-            # 💡 核心修復：如果遇到排名欄位，強制轉為整數消除 .0
             if '排名' in str(col) and pd.notna(val):
                 try: val_str = str(int(float(val)))
                 except ValueError: val_str = str(val)
-            else:
-                val_str = str(val) if pd.notna(val) else ""
+            else: val_str = str(val) if pd.notna(val) else ""
             html += f"<td>{val_str}</td>"
         html += "</tr>"
     html += "</tbody></table></div>"
     return html
 
 # ------------------------------------------
-# 歷史資料解析引擎 (保留以供歷史對比、洗盤計算)
+# 歷史資料解析引擎 (相容舊版 TXT 與新版 CSV)
 # ------------------------------------------
-def parse_special_txt(file_path, date_label):
-    parsed_data = []
-    target_col = f"{date_label}持股%"
-    current_section = None
-    rank_counter = 1 
-    try:
-        with open(file_path, 'r', encoding='utf-8-sig', errors='ignore') as f:
-            for line in f:
-                line_str = line.strip()
-                if line_str.startswith("---") or line_str.startswith("==="):
-                    current_section = None; continue
-                if "三大法人持股變化排名" in line_str or ("排名" in line_str and "日)" in line_str):
-                    if "120日" in line_str: current_section = "120日"
-                    elif "20日" in line_str: current_section = "20日"
-                    elif "5日" in line_str: current_section = "5日"
-                    elif "60日" in line_str: current_section = "60日"
-                    rank_counter = 1; continue
-                parts = line_str.split('\t')
-                if current_section and len(parts) >= 4 and parts[0].isdigit():
-                    try: holding_pct = float(parts[-2])
-                    except ValueError: continue
-                    stock_str = parts[1].strip()  
-                    m = re.match(r'^(\d+)(.*)', stock_str)
-                    stock_id = m.group(1) if m else stock_str
-                    stock_name = m.group(2).strip() if m else stock_str
-                    parsed_data.append({'股票代號': stock_id, '股票名稱': stock_name, target_col: holding_pct, '上榜區塊': current_section})
-                    rank_counter += 1
-    except Exception: pass
-    return pd.DataFrame(parsed_data)
+def parse_history_file(file_path, date_label):
+    if file_path.endswith('.csv'):
+        try: return pd.read_csv(file_path, encoding='utf-8-sig')
+        except Exception: return pd.DataFrame()
+    else:
+        parsed_data, target_col, current_section = [], f"{date_label}持股%", None
+        try:
+            with open(file_path, 'r', encoding='utf-8-sig', errors='ignore') as f:
+                for line in f:
+                    line_str = line.strip()
+                    if line_str.startswith("---") or line_str.startswith("==="):
+                        current_section = None; continue
+                    if "三大法人持股變化排名" in line_str or ("排名" in line_str and "日)" in line_str):
+                        if "120日" in line_str: current_section = "120日"
+                        elif "20日" in line_str: current_section = "20日"
+                        elif "5日" in line_str: current_section = "5日"
+                        elif "60日" in line_str: current_section = "60日"
+                        continue
+                    parts = line_str.split('\t')
+                    if current_section and len(parts) >= 4 and parts[0].isdigit():
+                        try: holding_pct = float(parts[-2])
+                        except ValueError: continue
+                        stock_str = parts[1].strip()  
+                        m = re.match(r'^(\d+)(.*)', stock_str)
+                        parsed_data.append({'股票代號': m.group(1) if m else stock_str, '股票名稱': m.group(2).strip() if m else stock_str, target_col: holding_pct, '上榜區塊': current_section})
+        except Exception: pass
+        return pd.DataFrame(parsed_data)
 
 def agg_sections_func(x):
     valid_x = set([s for s in x if pd.notna(s) and s != ""])
@@ -1521,10 +1496,10 @@ def agg_sections_func(x):
 # ==========================================
 # 🔄 歷史資料合併與邏輯運算 (支援全能池)
 # ==========================================
-txt_pattern = os.path.join(DATA_DIR, "*持股排名變化*.txt")
-all_txt_files = glob.glob(txt_pattern)
+# 同時抓取舊的 txt 與自動產生的 csv
+all_history_files = glob.glob(os.path.join(DATA_DIR, "*持股排名變化*.txt")) + glob.glob(os.path.join(DATA_DIR, "*_auto_history.csv"))
 date_files = defaultdict(list)
-for f in all_txt_files:
+for f in all_history_files:
     date_label = os.path.basename(f)[:8]
     if date_label.isdigit(): date_files[date_label].append(f)
 
@@ -1542,7 +1517,7 @@ if sorted_dates:
     
     final_df = None
     for i, date_label in enumerate(sorted_dates[:30]):
-        day_dfs = [parse_special_txt(f, date_label) for f in date_files[date_label]]
+        day_dfs = [parse_history_file(f, date_label) for f in date_files[date_label]]
         day_dfs = [df for df in day_dfs if not df.empty]
         if not day_dfs: continue
             
@@ -1601,11 +1576,17 @@ if sorted_dates:
         color_ref = final_df.set_index('股票代號')['上榜數量'].to_dict()
         for col in date_cols: final_df[col] = final_df[col].apply(lambda x: "未進榜" if pd.isna(x) or abs(x) < 0.0001 else f"{x:.2f}")
 
+        # 🔥 核心優化：建立「釘選權重」，確保今日有上榜的永遠在最上面
+        final_df['今日有上榜_排序'] = final_df['今日上榜'] != ""
+        if date_cols:
+            # 排序邏輯：1.今日是否上榜(True優先) 2.共振數量多寡 3.持股比例多寡
+            final_df = final_df.sort_values(by=['今日有上榜_排序', '上榜數量', date_cols[0]], ascending=[False, False, False])
+
 else:
     header_placeholder.markdown("<h2 style='margin-bottom: 0px;'>👑 區塊1：三大法人短中長線持股比追蹤</h2>", unsafe_allow_html=True)
 
 # ==========================================
-# 🔧 UI 數據渲染 (JSON 驅動前四大榜單，全能池保留 TXT)
+# 🔧 UI 數據渲染
 # ==========================================
 c1, c2 = st.columns(2)
 show_etf = c1.checkbox("顯示 ETF", value=True, key="blk1_etf_sync")
@@ -1615,20 +1596,13 @@ tab5, tab20, tab60, tab120, tab_all = st.tabs([
     "🔴 5日排行 Top 200", "🟡 20日排行 Top 200", "🟢 60日排行 Top 200", "🔵 120日排行 Top 200", "📊 歷史軌跡全能池"
 ])
 
-# 🚀 啟動即時 JSON 抓取
-json_dfs = fetch_github_json_all()
-
-# 負責過濾與格式化 JSON DataFrame 的通用函數
 def process_json_tab(df, target_day):
     if df.empty: return df
-    
-    # 如果有歷史資料 (final_df)，把 △、動態與今日上榜關聯進來
     if not final_df.empty:
         merge_cols = ['股票代號', '△', '最新動態', '今日上榜']
         available_cols = [c for c in merge_cols if c in final_df.columns]
         df = pd.merge(df, final_df[available_cols], on='股票代號', how='left')
         
-    # ETF / 債券過濾機制
     is_bond = df['股票代號'].str.endswith('B')
     is_etf = (df['股票代號'].str.len() >= 5) & (~is_bond)
     is_stock = df['股票代號'].str.len() == 4
@@ -1637,7 +1611,6 @@ def process_json_tab(df, target_day):
     if show_bond: mask |= is_bond
     df = df[mask].copy()
 
-    # 數值美化
     df['法人持股'] = df['法人持股'].apply(lambda x: f"{x:.2f}%" if pd.notna(x) else "0.00%")
     if f'{target_day}日ΔChange' in df.columns:
         df[f'{target_day}日ΔChange'] = df[f'{target_day}日ΔChange'].apply(lambda x: f"+{float(x):.2f}" if float(x) > 0 else (f"{float(x):.2f}" if float(x) < 0 else "0.00"))
@@ -1647,7 +1620,6 @@ def process_json_tab(df, target_day):
     df['法人金額'] = "0.00"
     if '最新動態' in df.columns: df['最新動態'] = df['最新動態'].fillna("⚪ 尚無昨日比對紀錄")
     if '今日上榜' in df.columns: df['今日上榜'] = df['今日上榜'].fillna("")
-        
     return df
 
 with tab5:
@@ -1655,8 +1627,8 @@ with tab5:
     display_cols = ['5日排名', '股票代號', '股票名稱', '法人持股', '△', '5日ΔChange', '法人金額', '最新動態', '今日上榜']
     if not df_5.empty: 
         real_cols = [c for c in display_cols if c in df_5.columns]
-        st.markdown(render_tech_table(df_5[real_cols]), unsafe_allow_html=True) # 不再限制 head(50)，透過外框捲動
-    else: st.info("💡 正在從 Github 獲取 5日 排名數據或無符合條件標的...")
+        st.markdown(render_tech_table(df_5[real_cols]), unsafe_allow_html=True)
+    else: st.info("💡 正在從 Github 獲取數據...")
 
 with tab20:
     df_20 = process_json_tab(json_dfs.get(20, pd.DataFrame()), 20)
@@ -1664,7 +1636,7 @@ with tab20:
     if not df_20.empty: 
         real_cols = [c for c in display_cols if c in df_20.columns]
         st.markdown(render_tech_table(df_20[real_cols]), unsafe_allow_html=True)
-    else: st.info("💡 正在從 Github 獲取 20日 排名數據或無符合條件標的...")
+    else: st.info("💡 正在從 Github 獲取數據...")
 
 with tab60:
     df_60 = process_json_tab(json_dfs.get(60, pd.DataFrame()), 60)
@@ -1672,7 +1644,7 @@ with tab60:
     if not df_60.empty: 
         real_cols = [c for c in display_cols if c in df_60.columns]
         st.markdown(render_tech_table(df_60[real_cols]), unsafe_allow_html=True)
-    else: st.info("💡 正在從 Github 獲取 60日 排名數據或無符合條件標的...")
+    else: st.info("💡 正在從 Github 獲取數據...")
 
 with tab120:
     df_120 = process_json_tab(json_dfs.get(120, pd.DataFrame()), 120)
@@ -1680,9 +1652,8 @@ with tab120:
     if not df_120.empty: 
         real_cols = [c for c in display_cols if c in df_120.columns]
         st.markdown(render_tech_table(df_120[real_cols]), unsafe_allow_html=True)
-    else: st.info("💡 正在從 Github 獲取 120日 排名數據或無符合條件標的...")
+    else: st.info("💡 正在從 Github 獲取數據...")
         
-# 📊 全能池保留原本的顏色與 st.dataframe 格式
 with tab_all:
     if final_df is not None and not final_df.empty:
         is_bond = final_df['股票代號'].str.endswith('B')
@@ -1698,7 +1669,9 @@ with tab_all:
         
         def highlight_row(row):
             cnt = color_ref.get(row['股票代號'], 0)
-            if cnt == 4: bg = 'background-color: rgba(240, 90, 90, 0.25)'     
+            # 被洗掉的標的(今日未上榜)，給予最底層的深灰色暗示，今天有上榜的才給亮底色
+            if row.get('今日有上榜_排序', False) == False: bg = 'background-color: #0E1117; color: #64748B' 
+            elif cnt == 4: bg = 'background-color: rgba(240, 90, 90, 0.25)'     
             elif cnt == 3: bg = 'background-color: rgba(255, 165, 0, 0.25)'    
             elif cnt == 2: bg = 'background-color: rgba(80, 200, 120, 0.25)'    
             elif cnt == 1: bg = 'background-color: rgba(0, 127, 255, 0.25)'    
@@ -1709,7 +1682,7 @@ with tab_all:
         st.dataframe(filtered_df[all_display_cols].style.apply(highlight_row, axis=1), use_container_width=True)
 
 st.write("")
-st.info("💡 欄位說明：【△】為最新單日法人持股增減變化；【◯日ΔChange】為該天期之法人持股累積變化。前四榜單已直連 Github 自動獲取 200 名額。")
+st.info("💡 欄位說明：【△】為單日法人持股增減；【◯日ΔChange】為該天期累積變化。已直連 Github 自動獲取 200 名額並每日自動封存建檔。")
 st.session_state['my_final_df'] = final_df
         
 # ==========================================
