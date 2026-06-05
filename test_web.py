@@ -3322,40 +3322,36 @@ with top_pool_container:
     import json
     import pandas as pd
 
-# 1. 自動掃描最新資料日期 (🔥 終極升級：四大區塊獨立日期追蹤引擎)
+# 1. 自動掃描最新資料日期 (🔥 升級：強行與區塊 5 日期同步)
     all_files = glob.glob(os.path.join(DATA_DIR, "*"))
-    anchor_date_str = "00000000" # 供存檔用的全局最大日期
     
     # 建立各區塊專屬的日期追蹤器
-    d_b1_inst = "00000000"  # 區塊1：法人持股排名
-    d_b23_chip = "00000000" # 區塊2&3：買賣佔比、連買
-    d_b4_margin = "00000000"# 區塊4：融資券、借券
-    d_b5_share = "00000000" # 區塊5：大股東、神秘金字塔
+    d_b1_inst = "00000000"
+    d_b5_share = "00000000"
     
     for f in all_files:
         filename = os.path.basename(f)
-        # 尋找檔名中 8 位數的日期 (例如 20260604)
         match = re.search(r'(202\d{5})', filename)
         if match:
             file_date = match.group(1)
-            
-            # 紀錄全局最大日期 (存檔用)
-            if file_date > anchor_date_str:
-                anchor_date_str = file_date
-                
-            # 分類掃描各區塊的最新日期
+            # 偵測區塊 1
             if "持股排名變化" in filename:
                 if file_date > d_b1_inst: d_b1_inst = file_date
-                
-            elif "佔成交比" in filename or "連買" in filename or "買賣超" in filename:
-                if file_date > d_b23_chip: d_b23_chip = file_date
-                
-            elif "融資" in filename or "融券" in filename or "借券" in filename or "資券" in filename:
-                if file_date > d_b4_margin: d_b4_margin = file_date
-                
-            # 🔥 加入 "神秘金字塔" 作為區塊 5 的關鍵字辨識！
-            elif "大股東" in filename or "集保" in filename or "持股分級" in filename or "神秘金字塔" in filename:
+            # 偵測區塊 5 (包含神秘金字塔)
+            elif "大股東" in filename or "集保" in filename or "神秘金字塔" in filename:
                 if file_date > d_b5_share: d_b5_share = file_date
+
+    # 🔥 關鍵修改：讓觀察名單的標題日期，強制與區塊 5 (大股東) 同步，確保分析基準一致
+    pool_date_display = f"{d_b5_share[4:6]}/{d_b5_share[6:]}" if d_b5_share != "00000000" else "未知"
+    b1_display = f"{d_b1_inst[4:6]}/{d_b1_inst[6:]}" if d_b1_inst != "00000000" else "未知"
+
+    st.markdown(
+        f"## 🏆 數據分析觀察名單 <br>"
+        f"<span style='font-size:14px; color:#FFD700; font-weight:500; background-color:rgba(255, 215, 0, 0.1); padding:5px 10px; border-radius:5px;'>"
+        f"📍打底數據(區塊1): {b1_display} ｜ 📍加分分析數據(區塊5): {pool_date_display}"
+        f"</span>", 
+        unsafe_allow_html=True
+    )
 
     # 日期格式化小工具 (只顯示 月/日)
     def fmt_d(d_str):
