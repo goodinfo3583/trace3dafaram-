@@ -3318,7 +3318,7 @@ with top_pool_container:
     import json
     import pandas as pd
 
-    # 1. 自動掃描最新資料日期 (🔥 終極升級：四大區塊獨立日期追蹤引擎)
+# 1. 自動掃描最新資料日期 (🔥 終極升級：四大區塊獨立日期追蹤引擎)
     all_files = glob.glob(os.path.join(DATA_DIR, "*"))
     anchor_date_str = "00000000" # 供存檔用的全局最大日期
     
@@ -3326,7 +3326,7 @@ with top_pool_container:
     d_b1_inst = "00000000"  # 區塊1：法人持股排名
     d_b23_chip = "00000000" # 區塊2&3：買賣佔比、連買
     d_b4_margin = "00000000"# 區塊4：融資券、借券
-    d_b5_share = "00000000" # 區塊5：大股東、集保
+    d_b5_share = "00000000" # 區塊5：大股東、神秘金字塔
     
     for f in all_files:
         filename = os.path.basename(f)
@@ -3349,7 +3349,8 @@ with top_pool_container:
             elif "融資" in filename or "融券" in filename or "借券" in filename or "資券" in filename:
                 if file_date > d_b4_margin: d_b4_margin = file_date
                 
-            elif "大股東" in filename or "集保" in filename or "持股分級" in filename:
+            # 🔥 加入 "神秘金字塔" 作為區塊 5 的關鍵字辨識！
+            elif "大股東" in filename or "集保" in filename or "持股分級" in filename or "神秘金字塔" in filename:
                 if file_date > d_b5_share: d_b5_share = file_date
 
     # 日期格式化小工具 (只顯示 月/日)
