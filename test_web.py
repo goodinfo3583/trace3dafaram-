@@ -2960,7 +2960,7 @@ if not df_risk_radar.empty:
 else:
     st.warning(f"避險雷達載入失敗：{msg}")
 # ==========================================
-# 💰 區塊 5：大股東動向 (日期去重與去西元修復版)
+# 💰 區塊 5：大股東動向 (八碼完整日期顯示版)
 # ==========================================
 import re
 import os
@@ -2990,11 +2990,13 @@ else:
             df = pd.read_csv(file, encoding='utf-8-sig')
             df.columns = [str(c).strip() for c in df.columns]
             
-            # 【核心修復 1】：即時偵測並刪除欄位名稱開頭的 "2026"
+            # 【核心修復 1】：取消去西元截斷，全面保留 8 碼 (例如 20260530)
             standardized_cols = []
             for c in df.columns:
-                if re.match(r'^2026\d{4}$', c):  # 如果是 2026XXXX 格式
-                    standardized_cols.append(c[-4:])  # 只取後方 4 碼 XXXX
+                if re.match(r'^202\d{5}$', c):  # 如果是完整的 8 碼格式
+                    standardized_cols.append(c)
+                elif re.match(r'^\d{4}$', c):   # 防呆機制：如果是舊的 4 碼檔案，幫它補回年份
+                    standardized_cols.append(f"2026{c}")
                 else:
                     standardized_cols.append(c)
             df.columns = standardized_cols
@@ -3010,8 +3012,8 @@ else:
             if '股票代號' not in df.columns:
                 continue
                 
-            # 抓取已被標準化為 4 碼的日期欄位
-            date_cols = [c for c in df.columns if re.match(r'^\d{4}$', c)]
+            # 抓取已被標準化為 8 碼的日期欄位
+            date_cols = [c for c in df.columns if re.match(r'^202\d{5}$', c)]
             all_date_cols.update(date_cols)
             
             # 決定保留的欄位
@@ -3038,15 +3040,17 @@ else:
     if master_df is not None:
         master_df = master_df.reset_index()
         
-        # 2. 排序日期欄位 (皆已轉為4碼，可直接降冪排序，越新越前面)
+        # 2. 排序日期欄位 (已轉為8碼，可直接降冪排序，越新越前面)
         sorted_dates = sorted(list(all_date_cols), reverse=True)
         
-        # 🔥 【修改點 1】：在這裡抓出最新日期，並印出帶有樣式的標題
+        # 🔥 抓出最新日期，並印出帶有樣式的標題
         latest_date = sorted_dates[0] if sorted_dates else "無資料"
+        # 標題美化：將 20260530 變成 2026/05/30
+        fmt_latest_date = f"{latest_date[:4]}/{latest_date[4:6]}/{latest_date[6:]}" if len(latest_date) == 8 else latest_date
         
         st.write("---")
         st.markdown("<div id='section-5'></div>", unsafe_allow_html=True)
-        st.markdown(f"## 💰 區塊 5：大股東動向 <span style='font-size: 0.5em; color: #00D2FF;'>({latest_date})</span>", unsafe_allow_html=True)
+        st.markdown(f"## 💰 區塊 5：大股東動向 <span style='font-size: 0.5em; color: #00D2FF;'>({fmt_latest_date})</span>", unsafe_allow_html=True)
         st.write("💡 400張以上大股東週更新資訊。")
         
         # 3. 計算週動態
@@ -3097,7 +3101,7 @@ else:
             
         final_df = final_df.fillna("無資料")
         
-        # 🔥 【修改點 2】：表格輸出前，把最新日期的欄位名稱加上 ▼
+        # 🔥 表格輸出前，把最新日期的欄位名稱加上 ▼ (維持 8 碼)
         if sorted_dates:
             latest_col = sorted_dates[0]
             final_df = final_df.rename(columns={latest_col: f"▼{latest_col}"})
