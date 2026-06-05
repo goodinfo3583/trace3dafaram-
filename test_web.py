@@ -3318,24 +3318,53 @@ with top_pool_container:
     import json
     import pandas as pd
 
-    # 1. 自動掃描最新資料日期 (🔥 升級：從所有檔案抓取最大日期，保護舊資料不被覆蓋)
+    # 1. 自動掃描最新資料日期 (🔥 終極升級：四大區塊獨立日期追蹤引擎)
     all_files = glob.glob(os.path.join(DATA_DIR, "*"))
-    anchor_date_str = "00000000"
+    anchor_date_str = "00000000" # 供存檔用的全局最大日期
+    
+    # 建立各區塊專屬的日期追蹤器
+    d_b1_inst = "00000000"  # 區塊1：法人持股排名
+    d_b23_chip = "00000000" # 區塊2&3：買賣佔比、連買
+    d_b4_margin = "00000000"# 區塊4：融資券、借券
+    d_b5_share = "00000000" # 區塊5：大股東、集保
     
     for f in all_files:
-        # 尋找檔名中 8 位數的日期 (例如 20260601)
-        match = re.search(r'(202\d{5})', os.path.basename(f))
+        filename = os.path.basename(f)
+        # 尋找檔名中 8 位數的日期 (例如 20260604)
+        match = re.search(r'(202\d{5})', filename)
         if match:
             file_date = match.group(1)
+            
+            # 紀錄全局最大日期 (存檔用)
             if file_date > anchor_date_str:
                 anchor_date_str = file_date
+                
+            # 分類掃描各區塊的最新日期
+            if "持股排名變化" in filename:
+                if file_date > d_b1_inst: d_b1_inst = file_date
+                
+            elif "佔成交比" in filename or "連買" in filename or "買賣超" in filename:
+                if file_date > d_b23_chip: d_b23_chip = file_date
+                
+            elif "融資" in filename or "融券" in filename or "借券" in filename or "資券" in filename:
+                if file_date > d_b4_margin: d_b4_margin = file_date
+                
+            elif "大股東" in filename or "集保" in filename or "持股分級" in filename:
+                if file_date > d_b5_share: d_b5_share = file_date
 
-    if anchor_date_str != "00000000":
-        latest_date_str = f"{anchor_date_str[:4]}/{anchor_date_str[4:6]}/{anchor_date_str[6:]}"
-    else:
-        latest_date_str = "未知日期"
+    # 日期格式化小工具 (只顯示 月/日)
+    def fmt_d(d_str):
+        return f"{d_str[4:6]}/{d_str[6:]}" if d_str != "00000000" else "--/--"
 
-    st.markdown(f"## 🏆 數據分析觀察名單 <span style='font-size:18px; color:#00D2FF; font-weight:500;'>(最新數據: {latest_date_str})</span>", unsafe_allow_html=True)
+    # 🔥 在標題上將「四大區塊的日期」完全分開顯示！
+    st.markdown(
+        f"## 🏆 數據分析觀察名單 <br>"
+        f"<span style='font-size:14px; color:#00D2FF; font-weight:500; display:inline-block; margin-top:5px; background-color:rgba(0, 210, 255, 0.1); padding:5px 10px; border-radius:5px;'>"
+        f"📊 資料基準日 ➔ 📍區塊1(法人): {fmt_d(d_b1_inst)} ｜ 📍區塊2&3(佔比/連買): {fmt_d(d_b23_chip)} ｜ 📍區塊4(資券): {fmt_d(d_b4_margin)} ｜ 📍區塊5(大股東): {fmt_d(d_b5_share)}"
+        f"</span>", 
+        unsafe_allow_html=True
+    )
+    
     st.info("💡 **權重評分**：法人持股上榜搭配其他數據分析積分,請參考短動態。(評分數據僅供參考)")
 
     if 'my_final_df' not in st.session_state or st.session_state['my_final_df'].empty:
@@ -3460,7 +3489,7 @@ with top_pool_container:
                 s_iw, r_b3_iw = get_b3_score(df_b3, sid, '投信週'); score += s_iw; 
                 if s_iw > 0: details.append(f"投信週連: +{s_iw}")
                 
-                # 🔥 區塊四核心升級 (幅+1, 量+0.5)
+                # 區塊四核心升級 (幅+1, 量+0.5)
                 r_b4_mar = ""
                 b4_list_count = 0
                 if sid in s_b4_mar_pct: r_b4_mar += "✔️(幅)"; score += 1.0; details.append("資減(幅): +1.0"); b4_list_count += 1
@@ -3596,7 +3625,7 @@ with top_pool_container:
                             old_df = old_df.dropna(how="all")
                             if '紀錄日期' in old_df.columns:
                                 old_df['紀錄日期'] = old_df['紀錄日期'].astype(str).str.replace(r'\.0$', '', regex=True).str.zfill(8)
-                                # 🔥 關鍵防護：只刪除「相同日期」的舊資料，絕對不刪除前一天的紀錄！
+                                # 🔥 關鍵防護：只刪除「相同總最新日期」的舊資料，絕對不刪除前一天的紀錄！
                                 old_df = old_df[old_df['紀錄日期'] != anchor_date_str]
                             final_save_df = pd.concat([old_df, save_df], ignore_index=True)
                         except:
@@ -3604,7 +3633,7 @@ with top_pool_container:
 
                         conn.update(spreadsheet=SHEET_URL, worksheet="選股歷史", data=final_save_df)
                 except Exception as e: 
-                    st.error(f"寫入 Google Sheets 發生錯誤: {e}")
+                    pass # 隱藏報錯，保持版面乾淨
 
             # 🌟 Streamlit 頁籤渲染
             tab1, tab2 = st.tabs(["🔥 今日最新排行", "📈 歷史分數追蹤表"])
@@ -3631,35 +3660,28 @@ with top_pool_container:
                             df_h['代號'] = df_h[id_col].astype(str).str.replace(r'\.0$', '', regex=True).str.replace(r'\D', '', regex=True)
                             df_h = df_h[['代號', '總分', '日期']]
                             
-                            # 1. 產生樞紐分析表
                             hist_pivot = df_h.pivot_table(index='代號', columns='日期', values='總分', aggfunc='first').reset_index()
                             
-                            # 2. 強制把日期欄位由「新到舊」排序 (越新在左，越舊在右)
                             date_columns = [col for col in hist_pivot.columns if col not in ['代號', '名稱']]
-                            sorted_date_columns = sorted(date_columns, reverse=True) # 🔥 關鍵修改：reverse=True
+                            sorted_date_columns = sorted(date_columns, reverse=True)
                             
-                            # 重組欄位順序：代號 -> 排序好的日期群
                             hist_pivot = hist_pivot[['代號'] + sorted_date_columns]
                             
-                            # 3. 插入名稱欄位
                             name_mapping = dict(zip(res_df['代號'].astype(str).str.replace(r'\.0$', '', regex=True).str.replace(r'\D', '', regex=True), res_df['名稱']))
                             hist_pivot.insert(1, '名稱', hist_pivot['代號'].map(name_mapping).fillna('-'))
                             
-                            # 4. 過濾掉沒有名稱的資料，並以最新一天的分數進行降冪排序
-                            latest_day = sorted_date_columns[0] # 🔥 最新日期現在是陣列的第一個 [0]
+                            latest_day = sorted_date_columns[0]
                             hist_pivot = hist_pivot[hist_pivot['名稱'] != '-']
                             
                             if not hist_pivot.empty and latest_day in hist_pivot.columns:
                                 hist_pivot = hist_pivot.sort_values(by=latest_day, ascending=False).reset_index(drop=True)
                             
-                               
                             st.dataframe(hist_pivot, use_container_width=True, hide_index=True)
                             st.info("💡 二篩進榜標的在選股池中的總分變化，觀察籌碼動能的延續性與驗證 ▼變量！")
                     else: 
                         st.warning("尚無足夠的歷史分數紀錄。")
                 except Exception as e: 
-                    st.error(f"歷史分數讀取發生錯誤: {e}")
-
+                    pass
 
 # ==========================================
 # ==========================================
