@@ -1297,13 +1297,14 @@ with tab2:
 # ==========================================
 
 # ==========================================
-# 🏠 區塊1：中長線 三大法人 持股比例 追蹤 (下游連動修復版)
+# 🏠 區塊1：中長線 三大法人 持股比例 追蹤 (JSON 200名快照引擎版)
 # ==========================================
 st.write("---")
 st.markdown("<div id='section-1'></div>", unsafe_allow_html=True)
 
 header_placeholder = st.empty()
-st.link_button("📊 DDong 台股法人籌碼數據儀表板", "https://goodinfo3583.github.io/DDong_tw-institutional-stocker/")
+c1, c2 = st.columns([3, 1])
+with c1: st.link_button("📊 DDong 台股法人籌碼數據儀表板", "https://goodinfo3583.github.io/DDong_tw-institutional-stocker/")
 st.write("")
 
 import re
@@ -1312,7 +1313,6 @@ import glob
 import pandas as pd
 import requests
 import datetime
-import pytz
 from collections import defaultdict
 
 # ------------------------------------------
@@ -1344,16 +1344,49 @@ def fetch_github_json_all():
             temp_df = pd.DataFrame(res_all.json())
             if not temp_df.empty and 'code' in temp_df.columns and 'change' in temp_df.columns:
                 latest_all_df = temp_df[['code', 'change']].rename(columns={'code': '股票代號', 'change': '精準單日△'})
-    except Exception:
-        pass
-        
+    except Exception: pass
     return json_dfs, latest_all_df
 
-# 🚀 啟動 JSON 抓取
 json_dfs, latest_all_df = fetch_github_json_all()
 
 # ------------------------------------------
-# 📜 TXT 歷史資料解析引擎
+# 💾 新增：手動防呆的 JSON 200名快照存檔區
+# ------------------------------------------
+with st.expander("🛠️ 歷史快照控制台 (免手動貼TXT的秘密武器)", expanded=False):
+    st.info("💡 每天當 Github 資料更新後，在此設定基準日並點擊存檔，系統將自動為 200 檔股票建立歷史軌跡，供全能池計算『潛伏趨勢』。")
+    col_d, col_btn = st.columns([1, 2])
+    with col_d:
+        snap_date = st.date_input("選擇這份資料的實際基準日")
+    with col_btn:
+        st.write("") # 排版對齊
+        if st.button("💾 將今日 GitHub 200名數據封存為歷史紀錄"):
+            date_str = snap_date.strftime("%Y%m%d")
+            save_path = os.path.join(DATA_DIR, f"{date_str}_JSON_History.csv")
+            
+            # 將 4 個分頁的 JSON 揉合成一份大表
+            all_snap_data = []
+            for d in [5, 20, 60, 120]:
+                if d in json_dfs and not json_dfs[d].empty:
+                    temp = json_dfs[d][['股票代號', '股票名稱', '法人持股']].copy()
+                    temp['上榜區塊'] = f"{d}日"
+                    all_snap_data.append(temp)
+            
+            if all_snap_data:
+                snap_df = pd.concat(all_snap_data, ignore_index=True)
+                # 若同一檔股票出現在多個天期，將區塊標籤合併 (例如 "5日,20日")
+                snap_grouped = snap_df.groupby(['股票代號', '股票名稱']).agg({
+                    '法人持股': 'max',
+                    '上榜區塊': lambda x: ",".join(set(x))
+                }).reset_index()
+                
+                # 為了相容原本的解析引擎，加上特定後綴
+                snap_grouped.to_csv(save_path, index=False, encoding='utf-8-sig')
+                st.success(f"✅ 成功封存 {len(snap_grouped)} 檔股票至 {date_str} 的歷史資料庫！請重新整理網頁。")
+            else:
+                st.error("❌ 尚未獲取到 GitHub 數據，封存失敗。")
+
+# ------------------------------------------
+# 📜 混合歷史解析引擎 (支援舊版 TXT 與新版 CSV)
 # ------------------------------------------
 def parse_special_txt(file_path, date_label):
     parsed_data, target_col, current_section = [], f"{date_label}持股%", None
@@ -1361,14 +1394,12 @@ def parse_special_txt(file_path, date_label):
         with open(file_path, 'r', encoding='utf-8-sig', errors='ignore') as f:
             for line in f:
                 line_str = line.strip()
-                if line_str.startswith("---") or line_str.startswith("==="):
-                    current_section = None; continue
-                if "三大法人持股變化排名" in line_str or ("排名" in line_str and "日)" in line_str):
-                    if "120日" in line_str: current_section = "120日"
-                    elif "20日" in line_str: current_section = "20日"
-                    elif "5日" in line_str: current_section = "5日"
-                    elif "60日" in line_str: current_section = "60日"
-                    continue
+                if "三大法人持股變化" in line_str: current_section = None; continue
+                if "120日" in line_str: current_section = "120日"; continue
+                elif "20日" in line_str: current_section = "20日"; continue
+                elif "5日" in line_str: current_section = "5日"; continue
+                elif "60日" in line_str: current_section = "60日"; continue
+                
                 parts = line_str.split('\t')
                 if current_section and len(parts) >= 4 and parts[0].isdigit():
                     try: holding_pct = float(parts[-2])
@@ -1379,6 +1410,14 @@ def parse_special_txt(file_path, date_label):
     except Exception: pass
     return pd.DataFrame(parsed_data)
 
+def parse_json_history_csv(file_path, date_label):
+    try:
+        df = pd.read_csv(file_path, encoding='utf-8-sig')
+        df['股票代號'] = df['股票代號'].astype(str)
+        df = df.rename(columns={'法人持股': f"{date_label}持股%"})
+        return df
+    except: return pd.DataFrame()
+
 def agg_sections_func(x):
     valid_x = set([s for s in x if pd.notna(s) and s != ""])
     return ",".join([s for s in ['5日', '20日', '60日', '120日'] if s in valid_x])
@@ -1386,11 +1425,16 @@ def agg_sections_func(x):
 # ==========================================
 # 🔄 歷史資料合併與邏輯運算 (底層大表重建)
 # ==========================================
-all_history_files = glob.glob(os.path.join(DATA_DIR, "*持股排名變化*.txt"))
-date_files = defaultdict(list)
-for f in all_history_files:
+all_txt_files = glob.glob(os.path.join(DATA_DIR, "*持股排名變化*.txt"))
+all_csv_files = glob.glob(os.path.join(DATA_DIR, "*_JSON_History.csv"))
+
+date_files = defaultdict(lambda: {'txt': [], 'csv': []})
+for f in all_txt_files:
     date_label = os.path.basename(f)[:8]
-    if date_label.isdigit(): date_files[date_label].append(f)
+    if date_label.isdigit(): date_files[date_label]['txt'].append(f)
+for f in all_csv_files:
+    date_label = os.path.basename(f)[:8]
+    if date_label.isdigit(): date_files[date_label]['csv'].append(f)
 
 sorted_dates = sorted(date_files.keys(), reverse=True)
 final_df = pd.DataFrame()
@@ -1405,8 +1449,15 @@ if sorted_dates:
     )
     
     final_df = None
-    for i, date_label in enumerate(sorted_dates[:30]):
-        day_dfs = [parse_special_txt(f, date_label) for f in date_files[date_label]]
+    for i, date_label in enumerate(sorted_dates[:30]): # 讀取最近30天
+        day_dfs = []
+        # 新版優先：若該日期有 CSV 快照，直接讀取 CSV (包含200名)
+        if date_files[date_label]['csv']:
+            day_dfs.append(parse_json_history_csv(date_files[date_label]['csv'][0], date_label))
+        # 舊版相容：讀取舊的 TXT
+        elif date_files[date_label]['txt']:
+            for f in date_files[date_label]['txt']: day_dfs.append(parse_special_txt(f, date_label))
+            
         day_dfs = [df for df in day_dfs if not df.empty]
         if not day_dfs: continue
             
@@ -1430,7 +1481,6 @@ if sorted_dates:
         latest_sect_col = f"{sorted_dates[0]}_區塊"
         if latest_sect_col not in final_df.columns: final_df[latest_sect_col] = ""
         
-        # 💡 核心修復 1：補回下游觀察名單依賴的 `原始上榜區塊`
         final_df['今日上榜'] = final_df[latest_sect_col].apply(generate_tags)
         final_df['上榜數量'] = final_df['今日上榜'].apply(lambda x: str(x).count('日'))
         final_df['原始上榜區塊'] = final_df[latest_sect_col] 
@@ -1478,7 +1528,6 @@ if sorted_dates:
             
         final_df['法人金額'] = 0.0 
 
-        # 💡 核心修復 2：將 JSON 抓到的「各天期ΔChange」與「排名」重新灌入 final_df，餵給下游運算
         for d in [5, 20, 60, 120]:
             if d in json_dfs and not json_dfs[d].empty:
                 temp_json = json_dfs[d][['股票代號', f'{d}日ΔChange', f'{d}日排名']]
