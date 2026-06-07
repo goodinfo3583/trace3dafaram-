@@ -837,10 +837,9 @@ if search_query:
         else:
             st.warning("⚠️ 技術 K 線圖目前僅支援代號查詢。請在上方輸入框加入股票代號。")
 
-    # ==========================================
+
     # ==========================================
     # 👑 區塊 1：短中長線三大法人持股變化 (搜尋結果專屬顯示)
-    # ==========================================
     # ==========================================
     st.write("---")
     st.subheader("👑 區塊 1：短中長線三大法人持股變化")
@@ -864,8 +863,12 @@ if search_query:
                 # 只要全部都是未進榜，就連圖表都不畫了，乾淨俐落！
                 st.write("未進榜")
             else:
-                # 有真實數據，印出乾淨的表格
-                st.dataframe(res_b1, use_container_width=True, hide_index=True)
+                # 🔥 終極淨化器：過濾掉系統運算用的「內部隱藏欄位」
+                hide_keywords = ['_區塊', '排序', '上榜數量', '原始上榜', '精準單日']
+                clean_cols = [c for c in res_b1.columns if not any(k in c for k in hide_keywords)]
+                
+                # 有真實數據，印出乾淨的表格 (只餵給它乾淨的欄位)
+                st.dataframe(res_b1[clean_cols], use_container_width=True, hide_index=True)
                 
                 # 📊 繪製持股波段軌跡圖
                 row = res_b1.iloc[0]
