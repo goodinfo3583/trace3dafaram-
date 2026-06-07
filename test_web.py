@@ -1439,7 +1439,12 @@ def parse_json_history_csv(file_path, date_label):
     except: return pd.DataFrame()
 
 def agg_sections_func(x):
-    valid_x = set([s for s in x if pd.notna(s) and s != ""])
+    valid_x = set()
+    for val in x:
+        if pd.notna(val) and str(val).strip() != "":
+            # 🔥 關鍵修復：針對 CSV 已經合併過的格式 (例如 "5日,20日") 進行拆解，確保每一顆勳章都能獨立辨識
+            for p in str(val).split(','):
+                valid_x.add(p.strip())
     return ",".join([s for s in ['5日', '20日', '60日', '120日'] if s in valid_x])
 
 # ==========================================
