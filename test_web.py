@@ -1382,7 +1382,7 @@ with st.expander("🛠️ 站長專屬歷史快照控制台 (密碼防護)", exp
                     }).reset_index()
                     
                     # 轉成 CSV 格式的字串，準備供下載
-                    csv_data = snap_grouped.to_csv(index=False, encoding='utf-8-sig')
+                    csv_data = snap_grouped.to_csv(index=False).encode('utf-8-sig')
                     
                     # 依然在伺服器暫存一份，讓當下的畫面可以立刻重算
                     snap_grouped.to_csv(save_path, index=False, encoding='utf-8-sig')
