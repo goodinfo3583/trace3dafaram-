@@ -1587,7 +1587,7 @@ with tab_all:
         st.dataframe(filtered_df[all_display_cols].style.apply(highlight_row, axis=1), use_container_width=True)
 
 st.write("")
-st.info("💡 欄位說明："△"為精準單日法人持股增減；【◯日ΔChange】為天期累積變化。")
+st.info("💡 欄位說明：「△」為單日法人持股增減；「◯日ΔChange」為天期累積變化。")
 st.session_state['my_final_df'] = final_df
 # ==========================================
 # 🎯 區塊2-1：外資 5 日買超 佔成交量比 追蹤 (穩定精確版)
@@ -3365,12 +3365,12 @@ with top_pool_container:
     st.markdown(
         f"## 🏆 數據分析觀察名單 <br>"
         f"<span style='font-size:16px; color:#00D2FF; font-weight:500; display:inline-block; margin-top:5px; background-color:rgba(0, 210, 255, 0.1); padding:5px 10px; border-radius:5px;'>"
-        f"資料基準日 ➔ 📍區塊1(法人): {fmt_d(d_b1_inst)} ｜ 📍區塊2&3(佔比/連買): {fmt_d(d_b23_chip)} ｜ 📍區塊4(資券): {fmt_d(d_b4_margin)} ｜ 📍區塊5(大股東): {fmt_d(d_b5_share)}"
+        f"資料基準日：📍區塊1(法人): {fmt_d(d_b1_inst)} ｜ 📍區塊2&3(佔比/連買): {fmt_d(d_b23_chip)} ｜ 📍區塊4(資券): {fmt_d(d_b4_margin)} ｜ 📍區塊5(大股東): {fmt_d(d_b5_share)}"
         f"</span>", 
         unsafe_allow_html=True
     )
     
-    st.info("💡 **評分方式**：法人持股上榜搭配其他數據分析積分,請參考短動態。(評分數據僅供參考)")
+    st.info("💡 **評分方式**：區塊一之法人持股上榜搭配其他數據分析積分。(請搜尋參考今日短動態追蹤法人行為,評分數據僅供參考)")
 
     if 'my_final_df' not in st.session_state or st.session_state['my_final_df'].empty:
         st.warning("⚠️ 尚未載入區塊 1 資料，無法進行選股池評比。")
