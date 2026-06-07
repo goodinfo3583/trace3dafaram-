@@ -1351,7 +1351,7 @@ json_dfs, latest_all_df = fetch_github_json_all()
 # ------------------------------------------
 # 💾 站長專屬：JSON 200名快照存檔區 (含密碼防護與下載功能)
 # ------------------------------------------
-with st.expander("🛠️ 站長專屬歷史快照控制台 (密碼防護)", expanded=False):
+with st.expander("🛠點我沒反應", expanded=False):
     st.info("💡 站長專用：將今日 GitHub 最新資料封存為歷史 CSV。")
     
     # 1. 密碼防護機制
