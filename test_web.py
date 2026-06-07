@@ -3419,8 +3419,16 @@ with top_pool_container:
     def fmt_d(d_str):
         return f"{d_str[4:6]}/{d_str[6:]}" if d_str != "00000000" else "--/--"
 
-    pool_date_display = fmt_d(d_b5_share)
-    b1_display = fmt_d(d_b1_inst)
+    # 🔥 恢復四大區塊獨立日期顯示，掌握所有籌碼的開牌進度！
+    st.markdown(
+        f"## 🏆 數據分析觀察名單 <br>"
+        f"<span style='font-size:14px; color:#00D2FF; font-weight:500; display:inline-block; margin-top:5px; background-color:rgba(0, 210, 255, 0.1); padding:5px 10px; border-radius:5px;'>"
+        f"📊 資料基準日 ➔ 📍區塊1(法人): {fmt_d(d_b1_inst)} ｜ 📍區塊2&3(佔比/連買): {fmt_d(d_b23_chip)} ｜ 📍區塊4(資券): {fmt_d(d_b4_margin)} ｜ 📍區塊5(大股東): {fmt_d(d_b5_share)}"
+        f"</span>", 
+        unsafe_allow_html=True
+    )
+    
+    st.info("💡 **權重評分**：法人持股上榜搭配其他數據分析積分,請參考短動態。(評分數據僅供參考)")
 
     # 🔥 在標題上將「打底區塊」與「加分區塊」分開顯示
     st.markdown(
