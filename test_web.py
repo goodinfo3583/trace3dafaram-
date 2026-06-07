@@ -1346,38 +1346,62 @@ def fetch_github_json_all():
 json_dfs, latest_all_df = fetch_github_json_all()
 
 # ------------------------------------------
-# 💾 手動防呆的 JSON 200名快照存檔區
+# 💾 站長專屬：JSON 200名快照存檔區 (含密碼防護與下載功能)
 # ------------------------------------------
-with st.expander("🛠️ 歷史快照控制台 (免手動貼TXT的秘密武器)", expanded=False):
-    st.info("💡 每天當 Github 資料更新後，在此設定基準日並點擊存檔，系統將自動為 200 檔股票建立歷史軌跡，供全能池計算『潛伏趨勢』。")
-    col_d, col_btn = st.columns([1, 2])
-    with col_d:
-        snap_date = st.date_input("選擇這份資料的實際基準日")
-    with col_btn:
-        st.write("") 
-        if st.button("💾 將今日 GitHub 200名數據封存為歷史紀錄"):
-            date_str = snap_date.strftime("%Y%m%d")
-            save_path = os.path.join(DATA_DIR, f"{date_str}_JSON_History.csv")
-            
-            all_snap_data = []
-            for d in [5, 20, 60, 120]:
-                if d in json_dfs and not json_dfs[d].empty:
-                    temp = json_dfs[d][['股票代號', '股票名稱', '法人持股']].copy()
-                    temp['上榜區塊'] = f"{d}日"
-                    all_snap_data.append(temp)
-            
-            if all_snap_data:
-                snap_df = pd.concat(all_snap_data, ignore_index=True)
-                snap_grouped = snap_df.groupby(['股票代號', '股票名稱']).agg({
-                    '法人持股': 'max',
-                    '上榜區塊': lambda x: ",".join(set(x))
-                }).reset_index()
+with st.expander("🛠️ 站長專屬歷史快照控制台 (密碼防護)", expanded=False):
+    st.info("💡 站長專用：將今日 GitHub 最新資料封存為歷史 CSV。")
+    
+    # 1. 密碼防護機制
+    admin_pw = st.text_input("請輸入站長密碼以解鎖功能", type="password", key="admin_pw_input")
+    
+    # 請將 "DDong888" 換成你自己想要的密碼
+    if admin_pw == "DDong888": 
+        st.success("🔓 驗證成功！請執行快照封存。")
+        
+        col_d, col_btn = st.columns([1, 2])
+        with col_d:
+            snap_date = st.date_input("選擇這份資料的實際基準日")
+        with col_btn:
+            st.write("") 
+            if st.button("💾 將今日 GitHub 200名數據封存為 CSV"):
+                date_str = snap_date.strftime("%Y%m%d")
+                save_path = os.path.join(DATA_DIR, f"{date_str}_JSON_History.csv")
                 
-                snap_grouped.to_csv(save_path, index=False, encoding='utf-8-sig')
-                st.success(f"✅ 成功封存 {len(snap_grouped)} 檔股票至 {date_str} 的歷史資料庫！請重新整理網頁。")
-            else:
-                st.error("❌ 尚未獲取到 GitHub 數據，封存失敗。")
-
+                all_snap_data = []
+                for d in [5, 20, 60, 120]:
+                    if d in json_dfs and not json_dfs[d].empty:
+                        temp = json_dfs[d][['股票代號', '股票名稱', '法人持股']].copy()
+                        temp['上榜區塊'] = f"{d}日"
+                        all_snap_data.append(temp)
+                
+                if all_snap_data:
+                    snap_df = pd.concat(all_snap_data, ignore_index=True)
+                    snap_grouped = snap_df.groupby(['股票代號', '股票名稱']).agg({
+                        '法人持股': 'max',
+                        '上榜區塊': lambda x: ",".join(set(x))
+                    }).reset_index()
+                    
+                    # 轉成 CSV 格式的字串，準備供下載
+                    csv_data = snap_grouped.to_csv(index=False, encoding='utf-8-sig')
+                    
+                    # 依然在伺服器暫存一份，讓當下的畫面可以立刻重算
+                    snap_grouped.to_csv(save_path, index=False, encoding='utf-8-sig')
+                    
+                    st.success(f"✅ 成功生成 {len(snap_grouped)} 檔股票的歷史快照！")
+                    
+                    # 2. 顯示下載按鈕，讓站長可以直接下載到本機
+                    st.download_button(
+                        label="📥 點我下載快照 CSV 檔案",
+                        data=csv_data,
+                        file_name=f"{date_str}_JSON_History.csv",
+                        mime="text/csv",
+                        type="primary"
+                    )
+                    st.warning("⚠️ 提醒：請務必點擊上方下載按鈕，將檔案放入本機的 Goodinfo_Rankings 資料夾並 Push 到 GitHub，否則雲端重啟後資料會遺失！")
+                else:
+                    st.error("❌ 尚未獲取到 GitHub 數據，封存失敗。")
+    elif admin_pw != "":
+        st.error("❌ 密碼錯誤，無法使用此功能。")
 # ------------------------------------------
 # 📜 混合歷史解析引擎 (💡 修復版：完美讀取舊 TXT 與新 CSV)
 # ------------------------------------------
