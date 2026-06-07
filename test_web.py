@@ -3393,12 +3393,14 @@ with top_pool_container:
     import json
     import pandas as pd
 
-# 1. 自動掃描最新資料日期 (🔥 終極升級：四大區塊獨立日期追蹤引擎)
+    # 1. 自動掃描最新資料日期 (🔥 終極升級：四大區塊獨立日期追蹤引擎)
     all_files = glob.glob(os.path.join(DATA_DIR, "*"))
     anchor_date_str = "00000000" # 供存檔用的全局最大日期
     
-    # 建立各區塊專屬的日期追蹤器
+    # 🔥 完整建立各區塊專屬的日期追蹤器
     d_b1_inst = "00000000"  # 區塊1：法人持股排名
+    d_b23_chip = "00000000" # 區塊2&3：買賣佔比、連買
+    d_b4_margin = "00000000"# 區塊4：融資券、借券
     d_b5_share = "00000000" # 區塊5：大股東、神秘金字塔
     
     for f in all_files:
@@ -3412,11 +3414,16 @@ with top_pool_container:
             if file_date > anchor_date_str:
                 anchor_date_str = file_date
                 
-            # 🔥 修復點：讓雷達也能認出 JSON_History 新版快照檔案！
+            # 🔥 完整分類掃描各區塊的最新日期
             if "持股排名變化" in filename or "JSON_History" in filename:
                 if file_date > d_b1_inst: d_b1_inst = file_date
                 
-            # 偵測區塊 5 (包含神秘金字塔)
+            elif "佔成交比" in filename or "連買" in filename or "買賣超" in filename:
+                if file_date > d_b23_chip: d_b23_chip = file_date
+                
+            elif "融資" in filename or "融券" in filename or "借券" in filename or "資券" in filename:
+                if file_date > d_b4_margin: d_b4_margin = file_date
+                
             elif "大股東" in filename or "集保" in filename or "神秘金字塔" in filename:
                 if file_date > d_b5_share: d_b5_share = file_date
 
@@ -3433,18 +3440,9 @@ with top_pool_container:
         unsafe_allow_html=True
     )
     
-    st.info("💡 **權重評分**：法人持股上榜搭配其他數據分析積分,請參考短動態。(評分數據僅供參考)")
-
-    # 🔥 在標題上將「打底區塊」與「加分區塊」分開顯示
-    st.markdown(
-        f"## 🏆 數據分析觀察名單 <br>"
-        f"<span style='font-size:14px; color:#FFD700; font-weight:500; background-color:rgba(255, 215, 0, 0.1); padding:5px 10px; border-radius:5px;'>"
-        f"📍打底數據(區塊1): {b1_display} ｜ 📍加分分析數據(區塊5): {pool_date_display}"
-        f"</span>", 
-        unsafe_allow_html=True
-    )
-    
     st.info("💡 **評分方式**：區塊一之法人持股上榜搭配其他數據分析積分。(請搜尋參考今日短動態追蹤法人行為,評分數據僅供參考)")
+
+    # (接下來保留原本的 if 'my_final_df' not in st.session_state... 以下都不用動)
 
     if 'my_final_df' not in st.session_state or st.session_state['my_final_df'].empty:
         st.warning("⚠️ 尚未載入區塊 1 資料，無法進行選股池評比。")
