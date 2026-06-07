@@ -1400,7 +1400,7 @@ if sorted_dates:
     fmt_date = f"{latest_d[:4]}/{latest_d[4:6]}/{latest_d[6:]}"
     header_placeholder.markdown(
         f"<h2 style='margin-bottom: 0px;'>👑 區塊1：三大法人短中長線持股比追蹤 "
-        f"<span style='color:#00D2FF; font-size:16px; font-weight:500; margin-left:12px;'>歷史基準日：{fmt_date}</span></h2>", 
+        f"<span style='color:#00D2FF; font-size:16px; font-weight:500; margin-left:12px;'>資料基準日：{fmt_date}</span></h2>", 
         unsafe_allow_html=True
     )
     
