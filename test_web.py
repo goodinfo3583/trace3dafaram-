@@ -1293,7 +1293,7 @@ with tab2:
 # ==========================================
 
 # ==========================================
-# 🏠 區塊1：中長線 三大法人 持股比例 追蹤 (JSON 200名快照引擎版)
+# 🏠 區塊1：中長線 三大法人 持股比例 追蹤 (JSON 200名快照引擎版 + TXT修復)
 # ==========================================
 st.write("---")
 st.markdown("<div id='section-1'></div>", unsafe_allow_html=True)
@@ -1346,7 +1346,7 @@ def fetch_github_json_all():
 json_dfs, latest_all_df = fetch_github_json_all()
 
 # ------------------------------------------
-# 💾 新增：手動防呆的 JSON 200名快照存檔區
+# 💾 手動防呆的 JSON 200名快照存檔區
 # ------------------------------------------
 with st.expander("🛠️ 歷史快照控制台 (免手動貼TXT的秘密武器)", expanded=False):
     st.info("💡 每天當 Github 資料更新後，在此設定基準日並點擊存檔，系統將自動為 200 檔股票建立歷史軌跡，供全能池計算『潛伏趨勢』。")
@@ -1354,12 +1354,11 @@ with st.expander("🛠️ 歷史快照控制台 (免手動貼TXT的秘密武器)
     with col_d:
         snap_date = st.date_input("選擇這份資料的實際基準日")
     with col_btn:
-        st.write("") # 排版對齊
+        st.write("") 
         if st.button("💾 將今日 GitHub 200名數據封存為歷史紀錄"):
             date_str = snap_date.strftime("%Y%m%d")
             save_path = os.path.join(DATA_DIR, f"{date_str}_JSON_History.csv")
             
-            # 將 4 個分頁的 JSON 揉合成一份大表
             all_snap_data = []
             for d in [5, 20, 60, 120]:
                 if d in json_dfs and not json_dfs[d].empty:
@@ -1369,20 +1368,18 @@ with st.expander("🛠️ 歷史快照控制台 (免手動貼TXT的秘密武器)
             
             if all_snap_data:
                 snap_df = pd.concat(all_snap_data, ignore_index=True)
-                # 若同一檔股票出現在多個天期，將區塊標籤合併 (例如 "5日,20日")
                 snap_grouped = snap_df.groupby(['股票代號', '股票名稱']).agg({
                     '法人持股': 'max',
                     '上榜區塊': lambda x: ",".join(set(x))
                 }).reset_index()
                 
-                # 為了相容原本的解析引擎，加上特定後綴
                 snap_grouped.to_csv(save_path, index=False, encoding='utf-8-sig')
                 st.success(f"✅ 成功封存 {len(snap_grouped)} 檔股票至 {date_str} 的歷史資料庫！請重新整理網頁。")
             else:
                 st.error("❌ 尚未獲取到 GitHub 數據，封存失敗。")
 
 # ------------------------------------------
-# 📜 混合歷史解析引擎 (支援舊版 TXT 與新版 CSV)
+# 📜 混合歷史解析引擎 (💡 修復版：完美讀取舊 TXT 與新 CSV)
 # ------------------------------------------
 def parse_special_txt(file_path, date_label):
     parsed_data, target_col, current_section = [], f"{date_label}持股%", None
@@ -1390,12 +1387,15 @@ def parse_special_txt(file_path, date_label):
         with open(file_path, 'r', encoding='utf-8-sig', errors='ignore') as f:
             for line in f:
                 line_str = line.strip()
-                if "三大法人持股變化" in line_str: current_section = None; continue
-                if "120日" in line_str: current_section = "120日"; continue
-                elif "20日" in line_str: current_section = "20日"; continue
-                elif "5日" in line_str: current_section = "5日"; continue
-                elif "60日" in line_str: current_section = "60日"; continue
-                
+                if line_str.startswith("---") or line_str.startswith("==="):
+                    current_section = None; continue
+                # 🔥 這裡修復了上一版的 Bug，重新找回精準的標籤定位
+                if "三大法人持股變化排名" in line_str or ("排名" in line_str and "日)" in line_str):
+                    if "120日" in line_str: current_section = "120日"
+                    elif "20日" in line_str: current_section = "20日"
+                    elif "5日" in line_str: current_section = "5日"
+                    elif "60日" in line_str: current_section = "60日"
+                    continue
                 parts = line_str.split('\t')
                 if current_section and len(parts) >= 4 and parts[0].isdigit():
                     try: holding_pct = float(parts[-2])
@@ -1445,12 +1445,10 @@ if sorted_dates:
     )
     
     final_df = None
-    for i, date_label in enumerate(sorted_dates[:30]): # 讀取最近30天
+    for i, date_label in enumerate(sorted_dates[:30]): 
         day_dfs = []
-        # 新版優先：若該日期有 CSV 快照，直接讀取 CSV (包含200名)
         if date_files[date_label]['csv']:
             day_dfs.append(parse_json_history_csv(date_files[date_label]['csv'][0], date_label))
-        # 舊版相容：讀取舊的 TXT
         elif date_files[date_label]['txt']:
             for f in date_files[date_label]['txt']: day_dfs.append(parse_special_txt(f, date_label))
             
@@ -1509,7 +1507,6 @@ if sorted_dates:
         final_df['最新動態'] = final_df.apply(evaluate_trend, axis=1)
         final_df['法人持股'] = final_df[date_cols[0]]
         
-        # 關聯 GitHub 的最新精準變化，若無則採用安全相減
         if not latest_all_df.empty and '股票代號' in latest_all_df.columns:
             final_df = pd.merge(final_df, latest_all_df, on='股票代號', how='left')
             final_df['△'] = final_df['精準單日△'].fillna(0.0)
@@ -3373,8 +3370,6 @@ with top_pool_container:
     
     # 建立各區塊專屬的日期追蹤器
     d_b1_inst = "00000000"  # 區塊1：法人持股排名
-    d_b23_chip = "00000000" # 區塊2&3：買賣佔比、連買
-    d_b4_margin = "00000000"# 區塊4：融資券、借券
     d_b5_share = "00000000" # 區塊5：大股東、神秘金字塔
     
     for f in all_files:
@@ -3388,29 +3383,26 @@ with top_pool_container:
             if file_date > anchor_date_str:
                 anchor_date_str = file_date
                 
-            # 分類掃描各區塊的最新日期
-            if "持股排名變化" in filename:
+            # 🔥 修復點：讓雷達也能認出 JSON_History 新版快照檔案！
+            if "持股排名變化" in filename or "JSON_History" in filename:
                 if file_date > d_b1_inst: d_b1_inst = file_date
                 
-            elif "佔成交比" in filename or "連買" in filename or "買賣超" in filename:
-                if file_date > d_b23_chip: d_b23_chip = file_date
-                
-            elif "融資" in filename or "融券" in filename or "借券" in filename or "資券" in filename:
-                if file_date > d_b4_margin: d_b4_margin = file_date
-                
-            # 🔥 加入 "神秘金字塔" 作為區塊 5 的關鍵字辨識！
-            elif "大股東" in filename or "集保" in filename or "持股分級" in filename or "神秘金字塔" in filename:
+            # 偵測區塊 5 (包含神秘金字塔)
+            elif "大股東" in filename or "集保" in filename or "神秘金字塔" in filename:
                 if file_date > d_b5_share: d_b5_share = file_date
 
     # 日期格式化小工具 (只顯示 月/日)
     def fmt_d(d_str):
         return f"{d_str[4:6]}/{d_str[6:]}" if d_str != "00000000" else "--/--"
 
-    # 🔥 在標題上將「四大區塊的日期」完全分開顯示！
+    pool_date_display = fmt_d(d_b5_share)
+    b1_display = fmt_d(d_b1_inst)
+
+    # 🔥 在標題上將「打底區塊」與「加分區塊」分開顯示
     st.markdown(
         f"## 🏆 數據分析觀察名單 <br>"
-        f"<span style='font-size:16px; color:#00D2FF; font-weight:500; display:inline-block; margin-top:5px; background-color:rgba(0, 210, 255, 0.1); padding:5px 10px; border-radius:5px;'>"
-        f"資料基準日：📍區塊1(法人): {fmt_d(d_b1_inst)} ｜ 📍區塊2&3(佔比/連買): {fmt_d(d_b23_chip)} ｜ 📍區塊4(資券): {fmt_d(d_b4_margin)} ｜ 📍區塊5(大股東): {fmt_d(d_b5_share)}"
+        f"<span style='font-size:14px; color:#FFD700; font-weight:500; background-color:rgba(255, 215, 0, 0.1); padding:5px 10px; border-radius:5px;'>"
+        f"📍打底數據(區塊1): {b1_display} ｜ 📍加分分析數據(區塊5): {pool_date_display}"
         f"</span>", 
         unsafe_allow_html=True
     )
