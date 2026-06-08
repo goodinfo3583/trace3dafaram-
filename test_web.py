@@ -3028,7 +3028,7 @@ if not df_risk_radar.empty:
 else:
     st.warning(f"避險雷達載入失敗：{msg}")
 # ==========================================
-# 💰 區塊 5：大股東動向 (八碼完整日期顯示版)
+# 💰 區塊 5：大股東動向 (八碼完整日期顯示版 + 6週增減動能)
 # ==========================================
 import re
 import os
@@ -3087,9 +3087,10 @@ else:
             # 決定保留的欄位
             cols_to_keep = ['股票代號', '股票名稱'] + date_cols
             
-            # 只有在讀取最新檔案 (idx == 0) 時，才把「上週持有%」抓進來
-            if idx == 0 and '上週持有%' in df.columns:
-                cols_to_keep.append('上週持有%')
+            # 🔥 只有在讀取最新檔案 (idx == 0) 時，才把「上週持有%」與「總增減」抓進來
+            if idx == 0:
+                if '上週持有%' in df.columns: cols_to_keep.append('上週持有%')
+                if '總增減' in df.columns: cols_to_keep.append('總增減')
             
             cols_to_keep = [c for c in cols_to_keep if c in df.columns]
             temp_df = df[cols_to_keep].copy()
@@ -3143,8 +3144,10 @@ else:
         else:
             master_df['週動態'] = "無資料"
 
-        # 4. 整理最終欄位順序：代號、名稱、週動態、上週持有%、所有日期(新到舊)
+        # 4. 🔥 整理最終欄位順序：代號、名稱、週動態、總增減(改名用)、上週持有%(改名用)、所有日期(新到舊)
         final_cols = ['股票代號', '股票名稱', '週動態']
+        if '總增減' in master_df.columns:
+            final_cols.append('總增減')
         if '上週持有%' in master_df.columns:
             final_cols.append('上週持有%')
         final_cols.extend(sorted_dates)
@@ -3166,13 +3169,28 @@ else:
             final_df[col] = final_df[col].apply(clean_decimals)
         if '上週持有%' in final_df.columns:
             final_df['上週持有%'] = final_df['上週持有%'].apply(clean_decimals)
+        if '總增減' in final_df.columns:
+            final_df['總增減'] = final_df['總增減'].apply(clean_decimals)
             
         final_df = final_df.fillna("無資料")
         
-        # 🔥 表格輸出前，把最新日期的欄位名稱加上 ▼ (維持 8 碼)
+        # 7. 🔥 終極改名引擎：套用客製化名稱
+        rename_dict = {}
         if sorted_dates:
             latest_col = sorted_dates[0]
-            final_df = final_df.rename(columns={latest_col: f"▼{latest_col}"})
+            # 抓取最新日期的後 4 碼 (例如從 20260605 抽出 0605)
+            short_date = latest_col[-4:] if len(latest_col) == 8 else latest_col 
+            
+            # 最新日期加 ▼
+            rename_dict[latest_col] = f"▼{latest_col}"
+            
+            # 動態改名
+            if '上週持有%' in final_df.columns:
+                rename_dict['上週持有%'] = f"{short_date}持有%"
+            if '總增減' in final_df.columns:
+                rename_dict['總增減'] = "▼6周增減"
+                
+        final_df = final_df.rename(columns=rename_dict)
         
         st.dataframe(final_df, use_container_width=True, hide_index=True)
         
