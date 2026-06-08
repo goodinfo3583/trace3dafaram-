@@ -3028,7 +3028,7 @@ if not df_risk_radar.empty:
 else:
     st.warning(f"避險雷達載入失敗：{msg}")
 # ==========================================
-# 💰 區塊 5：大股東動向 (八碼完整日期顯示版 + 6週增減動能)
+# 💰 區塊 5：大股東動向 (數值排序修復 + 基準日顯示版)
 # ==========================================
 import re
 import os
@@ -3058,18 +3058,18 @@ else:
             df = pd.read_csv(file, encoding='utf-8-sig')
             df.columns = [str(c).strip() for c in df.columns]
             
-            # 【核心修復 1】：取消去西元截斷，全面保留 8 碼 (例如 20260530)
+            # 取消去西元截斷，全面保留 8 碼 (例如 20260530)
             standardized_cols = []
             for c in df.columns:
-                if re.match(r'^202\d{5}$', c):  # 如果是完整的 8 碼格式
+                if re.match(r'^202\d{5}$', c):  
                     standardized_cols.append(c)
-                elif re.match(r'^\d{4}$', c):   # 防呆機制：如果是舊的 4 碼檔案，幫它補回年份
+                elif re.match(r'^\d{4}$', c):   
                     standardized_cols.append(f"2026{c}")
                 else:
                     standardized_cols.append(c)
             df.columns = standardized_cols
             
-            # 【核心修復 2】：刪除單檔內部可能重複的相同日期欄位
+            # 刪除單檔內部可能重複的相同日期欄位
             df = df.loc[:, ~df.columns.duplicated()]
             
             # 分離代號與名稱
@@ -3087,7 +3087,7 @@ else:
             # 決定保留的欄位
             cols_to_keep = ['股票代號', '股票名稱'] + date_cols
             
-            # 🔥 只有在讀取最新檔案 (idx == 0) 時，才把「上週持有%」與「總增減」抓進來
+            # 只有在讀取最新檔案 (idx == 0) 時，才把「上週持有%」與「總增減」抓進來
             if idx == 0:
                 if '上週持有%' in df.columns: cols_to_keep.append('上週持有%')
                 if '總增減' in df.columns: cols_to_keep.append('總增減')
@@ -3101,7 +3101,6 @@ else:
             if master_df is None:
                 master_df = temp_df
             else:
-                # 智慧拼接歷史資料
                 master_df = master_df.combine_first(temp_df)
         except Exception:
             continue
@@ -3109,17 +3108,17 @@ else:
     if master_df is not None:
         master_df = master_df.reset_index()
         
-        # 2. 排序日期欄位 (已轉為8碼，可直接降冪排序，越新越前面)
+        # 2. 排序日期欄位
         sorted_dates = sorted(list(all_date_cols), reverse=True)
         
-        # 🔥 抓出最新日期，並印出帶有樣式的標題
+        # 抓出最新日期，並印出帶有樣式的標題
         latest_date = sorted_dates[0] if sorted_dates else "無資料"
-        # 標題美化：將 20260530 變成 2026/05/30
         fmt_latest_date = f"{latest_date[:4]}/{latest_date[4:6]}/{latest_date[6:]}" if len(latest_date) == 8 else latest_date
         
         st.write("---")
         st.markdown("<div id='section-5'></div>", unsafe_allow_html=True)
-        st.markdown(f"## 💰 區塊 5：大股東動向 <span style='font-size: 0.5em; color: #00D2FF;'>({fmt_latest_date})</span>", unsafe_allow_html=True)
+        # 🔥 修改點 1：加上「基準日」
+        st.markdown(f"## 💰 區塊 5：大股東動向 <span style='font-size: 0.5em; color: #00D2FF;'>(基準日 {fmt_latest_date})</span>", unsafe_allow_html=True)
         st.write("💡 400張以上大股東週更新資訊。")
         
         # 3. 計算週動態
@@ -3144,7 +3143,7 @@ else:
         else:
             master_df['週動態'] = "無資料"
 
-        # 4. 🔥 整理最終欄位順序：代號、名稱、週動態、總增減(改名用)、上週持有%(改名用)、所有日期(新到舊)
+        # 4. 整理最終欄位順序
         final_cols = ['股票代號', '股票名稱', '週動態']
         if '總增減' in master_df.columns:
             final_cols.append('總增減')
@@ -3154,37 +3153,27 @@ else:
         
         final_df = master_df[[c for c in final_cols if c in master_df.columns]].copy()
         
-        # 5. 排序表單：以最新日期做為置頂降冪排序依據
+        # 5. 排序表單
         if sorted_dates:
             final_df = final_df.sort_values(by=sorted_dates[0], ascending=False)
         
-        # 6. 清理小數點與空值 (安全去除 .0 尾數)
-        def clean_decimals(val):
-            if pd.isna(val): return "無資料"
-            s = str(val).strip()
-            if s.endswith('.0'): return s[:-2]
-            return s
+        # 6. 🔥 修改點 2：強制將數據轉回數值 (Float)，消滅文字字典排序問題！
+        cols_to_numeric = sorted_dates.copy()
+        if '上週持有%' in final_df.columns: cols_to_numeric.append('上週持有%')
+        if '總增減' in final_df.columns: cols_to_numeric.append('總增減')
             
-        for col in sorted_dates:
-            final_df[col] = final_df[col].apply(clean_decimals)
-        if '上週持有%' in final_df.columns:
-            final_df['上週持有%'] = final_df['上週持有%'].apply(clean_decimals)
-        if '總增減' in final_df.columns:
-            final_df['總增減'] = final_df['總增減'].apply(clean_decimals)
-            
-        final_df = final_df.fillna("無資料")
+        for col in cols_to_numeric:
+            # 遇到空值會轉成原生 NaN，在 Streamlit 畫面上會呈現優雅的空白
+            final_df[col] = pd.to_numeric(final_df[col], errors='coerce')
         
-        # 7. 🔥 終極改名引擎：套用客製化名稱
+        # 7. 終極改名引擎：套用客製化名稱
         rename_dict = {}
         if sorted_dates:
             latest_col = sorted_dates[0]
-            # 抓取最新日期的後 4 碼 (例如從 20260605 抽出 0605)
             short_date = latest_col[-4:] if len(latest_col) == 8 else latest_col 
             
-            # 最新日期加 ▼
             rename_dict[latest_col] = f"▼{latest_col}"
             
-            # 動態改名
             if '上週持有%' in final_df.columns:
                 rename_dict['上週持有%'] = f"{short_date}持有%"
             if '總增減' in final_df.columns:
