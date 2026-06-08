@@ -3192,7 +3192,7 @@ def clean_number_for_display(val):
 
 @st.cache_data(ttl=60)
 def build_historical_block_matrix():
-    """搜尋資料夾中所有的鉅額交易紀錄，自動組成歷史矩陣 (最強寬容版)"""
+    """搜尋資料夾中所有的鉅額交易紀錄，自動組成歷史矩陣 (最強寬容版 + 智慧箭頭標示)"""
     if not os.path.exists(DATA_DIR): return None, []
     files = glob.glob(os.path.join(DATA_DIR, "*鉅額*.csv"))
     if not files: return None, []
@@ -3206,7 +3206,7 @@ def build_historical_block_matrix():
         try:
             d_str = os.path.basename(f).replace('-', '').replace('_', '')[:8]
             short_date = d_str[-4:]
-            col_name = f"▼{short_date}"
+            col_name = short_date  # 🔥 修改點 1：先使用乾淨的純日期作為欄位名稱
             if col_name not in date_cols: date_cols.append(col_name)
             
             df = pd.read_csv(f)
@@ -3232,7 +3232,15 @@ def build_historical_block_matrix():
         master_df = master_df.fillna('-')
         master_df = master_df.loc[:, ~master_df.columns.duplicated()]
         valid_date_cols = [c for c in date_cols if c in master_df.columns]
-        valid_date_cols.sort(reverse=True)
+        valid_date_cols.sort(reverse=True) # 排序日期，例如 ['0606', '0605', '0604']
+        
+        # 🔥 修改點 2：只為「最新」的那一天加上 ▼ 標記，其餘保持純數字
+        if valid_date_cols:
+            latest_col = valid_date_cols[0]
+            new_latest_col = f"▼{latest_col}"
+            master_df = master_df.rename(columns={latest_col: new_latest_col})
+            valid_date_cols[0] = new_latest_col # 更新列表中的名稱
+            
         master_df = master_df[['代號', '股票名稱'] + valid_date_cols]
         if valid_date_cols:
             master_df = master_df.sort_values(by=valid_date_cols[0], ascending=False)
