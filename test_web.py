@@ -1268,13 +1268,7 @@ def render_options_dashboard(target_date_str):
 with tab1:
     actual_data_date = render_sidebar_market_summary()
     render_options_dashboard(actual_data_date)
-    st.markdown("<br><br><br>", unsafe_allow_html=True) 
-    col1, col2 = st.columns([8, 2]) 
-    with col2:
-        if st.button("🔄", help="重新讀取本地資料夾", use_container_width=True):
-            st.cache_data.clear()
-            st.rerun()
-
+    
 with tab2:
     st.subheader("📊 大盤總體經濟指標")
     c_btn1, c_btn2 = st.columns(2)
