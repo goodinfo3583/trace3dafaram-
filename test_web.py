@@ -3028,165 +3028,242 @@ if not df_risk_radar.empty:
 else:
     st.warning(f"避險雷達載入失敗：{msg}")
 # ==========================================
-# 💰 區塊 5：大股東動向 (數值排序修復 + 基準日顯示版)
+# 💰 區塊 5：大股東動向 (雙分頁大戶系統 + 智慧分段矩陣拼接 + 基準日升級版)
 # ==========================================
 import re
 import os
 import glob
 import pandas as pd
+import streamlit as st
 
-csv_pattern_b5 = os.path.join(DATA_DIR, "*神秘金字塔 - 股權類股排行(5日之400張以上股東排行)*.csv")
-all_files_b5 = glob.glob(csv_pattern_b5)
-
-if not all_files_b5:
-    # 找不到檔案時，維持顯示基本標題
-    st.write("---")
-    st.markdown("<div id='section-5'></div>", unsafe_allow_html=True)
-    st.markdown("## 💰 區塊 5：大股東動向", unsafe_allow_html=True)
-    st.write("💡 400張以上大股東週更新資訊。")
-    st.warning("⚠️ 找不到相關 CSV 檔案。")
-else:
-    # 依照檔名排序，確保最新的檔案在最前面
-    all_files_b5 = sorted(all_files_b5, key=os.path.basename, reverse=True)
-    
-    master_df = None
-    all_date_cols = set()
-
-    # 1. 遍歷所有檔案並合併
-    for idx, file in enumerate(all_files_b5):
-        try:
-            df = pd.read_csv(file, encoding='utf-8-sig')
-            df.columns = [str(c).strip() for c in df.columns]
-            
-            # 取消去西元截斷，全面保留 8 碼 (例如 20260530)
-            standardized_cols = []
-            for c in df.columns:
-                if re.match(r'^202\d{5}$', c):  
-                    standardized_cols.append(c)
-                elif re.match(r'^\d{4}$', c):   
-                    standardized_cols.append(f"2026{c}")
-                else:
-                    standardized_cols.append(c)
-            df.columns = standardized_cols
-            
-            # 刪除單檔內部可能重複的相同日期欄位
-            df = df.loc[:, ~df.columns.duplicated()]
-            
-            # 分離代號與名稱
-            if '股票代號/名稱' in df.columns:
-                df['股票代號'] = df['股票代號/名稱'].astype(str).str.extract(r'(\d+)')
-                df['股票名稱'] = df['股票代號/名稱'].astype(str).str.replace(r'^\d+', '', regex=True)
-            
-            if '股票代號' not in df.columns:
-                continue
-                
-            # 抓取已被標準化為 8 碼的日期欄位
-            date_cols = [c for c in df.columns if re.match(r'^202\d{5}$', c)]
-            all_date_cols.update(date_cols)
-            
-            # 決定保留的欄位
-            cols_to_keep = ['股票代號', '股票名稱'] + date_cols
-            
-            # 只有在讀取最新檔案 (idx == 0) 時，才把「上週持有%」與「總增減」抓進來
-            if idx == 0:
-                if '上週持有%' in df.columns: cols_to_keep.append('上週持有%')
-                if '總增減' in df.columns: cols_to_keep.append('總增減')
-            
-            cols_to_keep = [c for c in cols_to_keep if c in df.columns]
-            temp_df = df[cols_to_keep].copy()
-            
-            # 設定索引進行智慧拼接
-            temp_df = temp_df.set_index(['股票代號', '股票名稱'])
-            
-            if master_df is None:
-                master_df = temp_df
-            else:
-                master_df = master_df.combine_first(temp_df)
-        except Exception:
-            continue
-
-    if master_df is not None:
-        master_df = master_df.reset_index()
-        
-        # 2. 排序日期欄位
-        sorted_dates = sorted(list(all_date_cols), reverse=True)
-        
-        # 抓出最新日期，並印出帶有樣式的標題
-        latest_date = sorted_dates[0] if sorted_dates else "無資料"
-        fmt_latest_date = f"{latest_date[:4]}/{latest_date[4:6]}/{latest_date[6:]}" if len(latest_date) == 8 else latest_date
-        
-        st.write("---")
-        st.markdown("<div id='section-5'></div>", unsafe_allow_html=True)
-        # 🔥 修改點 1：加上「基準日」
-        st.markdown(f"## 💰 區塊 5：大股東動向 <span style='font-size: 0.5em; color: #00D2FF;'>(基準日 {fmt_latest_date})</span>", unsafe_allow_html=True)
-        st.write("💡 400張以上大股東週更新資訊。")
-        
-        # 3. 計算週動態
-        if len(sorted_dates) >= 2:
-            newest, prev = sorted_dates[0], sorted_dates[1]
-            master_df[newest] = pd.to_numeric(master_df[newest], errors='coerce')
-            master_df[prev] = pd.to_numeric(master_df[prev], errors='coerce')
-            
-            def get_trend(row):
-                v1, v2 = row.get(newest), row.get(prev)
-                if pd.isna(v1) or pd.isna(v2): return "無資料"
-                diff = v1 - v2
-                if diff >= 1.5: return "🔥 大增"
-                if diff >= 0.5: return "📈 增"
-                if diff > 0: return "↗️ 微增"
-                if diff == 0: return "🔄 持平"
-                if diff > -0.5: return "↘️ 微減"
-                if diff > -1.5: return "📉 減"
-                return "🚨 大減"
-            
-            master_df['週動態'] = master_df.apply(get_trend, axis=1)
+# ------------------------------------------
+# 0. 預先掃描最新檔案日期以供標題基準日顯示
+# ------------------------------------------
+global_latest_date = "20260605"  # 預設防護值
+all_b5_raw_files = glob.glob(os.path.join(DATA_DIR, "*神秘金字塔*")) + glob.glob(os.path.join(DATA_DIR, "*大股東800張*"))
+for f in all_b5_raw_files:
+    match = re.search(r'(\d{8})', os.path.basename(f))
+    if match and match.group(1) > global_latest_date and match.group(1).startswith("202"):
+        # 如果拿到的是檔案上傳日(如20260608)，轉換為對應的交易所除權息/集保基準日(20260605)
+        if match.group(1) == "20260608":
+            global_latest_date = "20260605"
         else:
-            master_df['週動態'] = "無資料"
+            global_latest_date = match.group(1)
 
-        # 4. 整理最終欄位順序
-        final_cols = ['股票代號', '股票名稱', '週動態']
-        if '總增減' in master_df.columns:
-            final_cols.append('總增減')
-        if '上週持有%' in master_df.columns:
-            final_cols.append('上週持有%')
-        final_cols.extend(sorted_dates)
-        
-        final_df = master_df[[c for c in final_cols if c in master_df.columns]].copy()
-        
-        # 5. 排序表單
-        if sorted_dates:
-            final_df = final_df.sort_values(by=sorted_dates[0], ascending=False)
-        
-        # 6. 🔥 修改點 2：強制將數據轉回數值 (Float)，消滅文字字典排序問題！
-        cols_to_numeric = sorted_dates.copy()
-        if '上週持有%' in final_df.columns: cols_to_numeric.append('上週持有%')
-        if '總增減' in final_df.columns: cols_to_numeric.append('總增減')
-            
-        for col in cols_to_numeric:
-            # 遇到空值會轉成原生 NaN，在 Streamlit 畫面上會呈現優雅的空白
-            final_df[col] = pd.to_numeric(final_df[col], errors='coerce')
-        
-        # 7. 終極改名引擎：套用客製化名稱
-        rename_dict = {}
-        if sorted_dates:
-            latest_col = sorted_dates[0]
-            short_date = latest_col[-4:] if len(latest_col) == 8 else latest_col 
-            
-            rename_dict[latest_col] = f"▼{latest_col}"
-            
-            if '上週持有%' in final_df.columns:
-                rename_dict['上週持有%'] = f"{short_date}持有%"
-            if '總增減' in final_df.columns:
-                rename_dict['總增減'] = "▼6周增減"
-                
-        final_df = final_df.rename(columns=rename_dict)
-        
-        st.dataframe(final_df, use_container_width=True, hide_index=True)
-        
-        # 將最終結果同步存入記憶體，供搜尋區塊聯動掃描
-        st.session_state['df_blk5'] = final_df
+fmt_global_date = f"{global_latest_date[:4]}/{global_latest_date[4:6]}/{global_latest_date[6:]}"
+
+st.write("---")
+st.markdown("<div id='section-5'></div>", unsafe_allow_html=True)
+st.markdown(f"## 💰 區塊 5：大股東動向 <span style='font-size: 0.5em; color: #00D2FF;'>(基準日 {fmt_global_date})</span>", unsafe_allow_html=True)
+st.write("💡 千張與四百張長線千金大戶股權動態週更新軌跡。")
+
+# 建立全新雙分頁
+tab_1000, tab_400 = st.tabs(["👑 1000張大戶系統", "💰 400張大戶系統"])
+
+# ==========================================
+# 👑 TAB 1: 1000張大戶系統 (智慧多檔垂直拼接 + 橫向矩陣融合)
+# ==========================================
+with tab_1000:
+    csv_pattern_b5_1000 = os.path.join(DATA_DIR, "*大股東800張數週增加*.csv")
+    all_files_b5_1000 = glob.glob(csv_pattern_b5_1000)
+    
+    if not all_files_b5_1000:
+        st.info("⚪ 暫無 1000張大戶相關資料，請確認資料夾中含有「大股東800張數週增加」之 CSV 檔案。")
     else:
-        st.error("無法合併資料。")
+        # 1. 依照日期分組 (防止未來有多個日期的分段檔案混在一起)
+        file_groups_1000 = {}
+        for f in all_files_b5_1000:
+            fn = os.path.basename(f)
+            date_match = re.search(r'(\d{8})', fn)
+            f_prefix = date_match.group(1) if date_match else "UNKNOWN"
+            if f_prefix not in file_groups_1000:
+                file_groups_1000[f_prefix] = []
+            file_groups_1000[f_prefix].append(f)
+            
+        merged_dates_dfs_1000 = []
+        all_1000_date_cols = []
+        
+        # 2. 處理每個日期的分段檔案拼接
+        for prefix, files in sorted(file_groups_1000.items(), reverse=True):
+            group_chunks = []
+            detected_date_col = None
+            
+            for file in files:
+                try:
+                    df_chunk = pd.read_csv(file, encoding='utf-8-sig')
+                    df_chunk.columns = [str(c).strip() for c in df_chunk.columns]
+                    
+                    c_code = next((c for c in df_chunk.columns if '代號' in c), None)
+                    c_name = next((c for c in df_chunk.columns if '名稱' in c), None)
+                    c_target = next((c for c in df_chunk.columns if '持股 超過 1千張' in c or '1千張' in c), None)
+                    c_date = next((c for c in df_chunk.columns if '更新 日期' in c or '更新日期' in c), None)
+                    
+                    if not all([c_code, c_name, c_target]):
+                        continue
+                        
+                    df_chunk['股票代號'] = df_chunk[c_code].astype(str).str.extract(r'(\d+)')
+                    df_chunk['股票名稱'] = df_chunk[c_name].astype(str).str.strip()
+                    df_chunk['持股值'] = pd.to_numeric(df_chunk[c_target].astype(str).str.replace(',', ''), errors='coerce')
+                    
+                    # 讀取內部開盤更新日期 (例: 06/05 -> 20260605)
+                    if detected_date_col is None and c_date and not df_chunk[c_date].dropna().empty:
+                        raw_date = str(df_chunk[c_date].dropna().iloc[0]).replace('/', '').strip()
+                        if len(raw_date) == 4: detected_date_col = f"2026{raw_date}"
+                        elif len(raw_date) == 8: detected_date_col = raw_date
+                        
+                    df_chunk = df_chunk.dropna(subset=['股票代號'])
+                    group_chunks.append(df_chunk[['股票代號', '股票名稱', '持股值']])
+                except:
+                    continue
+                    
+            if group_chunks:
+                # 垂直拼接同日期的所有名次區段
+                combined_date_df = pd.concat(group_chunks, ignore_index=True)
+                if detected_date_col is None:
+                    detected_date_col = "20260605" if prefix == "20260608" else prefix
+                    
+                combined_date_df = combined_date_df.rename(columns={'持股值': detected_date_col})
+                # 聚合去重
+                combined_date_df = combined_date_df.groupby(['股票代號', '股票名稱'])[detected_date_col].max().reset_index()
+                merged_dates_dfs_1000.append(combined_date_df)
+                all_1000_date_cols.append(detected_date_col)
+                
+        # 3. 橫向多歷史日期合併 (Outer Join)
+        if merged_dates_dfs_1000:
+            master_1000 = merged_dates_dfs_1000[0]
+            for subsequent_df in merged_dates_dfs_1000[1:]:
+                master_1000 = pd.merge(master_1000, subsequent_df, on=['股票代號', '股票名稱'], how='outer')
+                
+            sorted_1000_dates = sorted(all_1000_date_cols, reverse=True)
+            
+            # 🔥 【核心修正】：強制保持為純數值 Float 型態，徹底修復 12 擠在 1、2 中間的文字排序 Bug
+            for d_col in sorted_1000_dates:
+                master_1000[d_col] = pd.to_numeric(master_1000[d_col], errors='coerce')
+                
+            # 僅為最新一欄加上導航箭頭 ▼
+            latest_1000_col = sorted_1000_dates[0]
+            master_1000 = master_1000.rename(columns={latest_1000_col: f"▼{latest_1000_col}"})
+            sorted_1000_dates[0] = f"▼{latest_1000_col}"
+            
+            # 預設按照最新千張持股比例降冪排序
+            master_1000 = master_1000.sort_values(by=sorted_1000_dates[0], ascending=False)
+            
+            final_1000_cols = ['股票代號', '股票名稱'] + sorted_1000_dates
+            st.dataframe(master_1000[final_1000_cols], use_container_width=True, hide_index=True)
+            
+            # 將千張大戶矩陣獨立存入緩存，保留給後續雷達功能擴充
+            st.session_state['df_blk5_1000'] = master_1000[final_1000_cols]
+
+# ==========================================
+# 💰 TAB 2: 400張大戶系統 (原始神秘金字塔追蹤)
+# ==========================================
+with tab_400:
+    csv_pattern_b5 = os.path.join(DATA_DIR, "*神秘金字塔 - 股權類股排行(5日之400張以上股東排行)*.csv")
+    all_files_b5 = glob.glob(csv_pattern_b5)
+    
+    if not all_files_b5:
+        st.info("⚪ 暫無 400張大戶相關資料。")
+    else:
+        all_files_b5 = sorted(all_files_b5, key=os.path.basename, reverse=True)
+        master_df = None
+        all_date_cols = set()
+    
+        for idx, file in enumerate(all_files_b5):
+            try:
+                df = pd.read_csv(file, encoding='utf-8-sig')
+                df.columns = [str(c).strip() for c in df.columns]
+                
+                standardized_cols = []
+                for c in df.columns:
+                    if re.match(r'^202\d{5}$', c):  
+                        standardized_cols.append(c)
+                    elif re.match(r'^\d{4}$', c):   
+                        standardized_cols.append(f"2026{c}")
+                    else:
+                        standardized_cols.append(c)
+                df.columns = standardized_cols
+                df = df.loc[:, ~df.columns.duplicated()]
+                
+                if '股票代號/名稱' in df.columns:
+                    df['股票代號'] = df['股票代號/名稱'].astype(str).str.extract(r'(\d+)')
+                    df['股票名稱'] = df['股票代號/名稱'].astype(str).str.replace(r'^\d+', '', regex=True)
+                
+                if '股票代號' not in df.columns:
+                    continue
+                    
+                date_cols = [c for c in df.columns if re.match(r'^202\d{5}$', c)]
+                all_date_cols.update(date_cols)
+                cols_to_keep = ['股票代號', '股票名稱'] + date_cols
+                
+                if idx == 0:
+                    if '上週持有%' in df.columns: cols_to_keep.append('上週持有%')
+                    if '總增減' in df.columns: cols_to_keep.append('總增減')
+                
+                cols_to_keep = [c for c in cols_to_keep if c in df.columns]
+                temp_df = df[cols_to_keep].copy()
+                temp_df = temp_df.set_index(['股票代號', '股票名稱'])
+                
+                if master_df is None:
+                    master_df = temp_df
+                else:
+                    master_df = master_df.combine_first(temp_df)
+            except:
+                continue
+    
+        if master_df is not None:
+            master_df = master_df.reset_index()
+            sorted_dates = sorted(list(all_date_cols), reverse=True)
+            
+            if sorted_dates:
+                newest, prev = sorted_dates[0], sorted_dates[1] if len(sorted_dates) >= 2 else (sorted_dates[0], sorted_dates[0])
+                master_df[newest] = pd.to_numeric(master_df[newest], errors='coerce')
+                if len(sorted_dates) >= 2: master_df[prev] = pd.to_numeric(master_df[prev], errors='coerce')
+                
+                def get_trend(row):
+                    v1, v2 = row.get(newest), row.get(prev)
+                    if pd.isna(v1) or pd.isna(v2): return "無資料"
+                    diff = v1 - v2
+                    if diff >= 1.5: return "🔥 大增"
+                    if diff >= 0.5: return "📈 增"
+                    if diff > 0: return "↗️ 微增"
+                    if diff == 0: return "🔄 持平"
+                    if diff > -0.5: return "↘️ 微減"
+                    if diff > -1.5: return "📉 減"
+                    return "🚨 大減"
+                master_df['週動態'] = master_df.apply(get_trend, axis=1) if len(sorted_dates) >= 2 else "持平"
+            else:
+                master_df['週動態'] = "無資料"
+    
+            final_cols = ['股票代號', '股票名稱', '週動態']
+            if '總增減' in master_df.columns: final_cols.append('總增減')
+            if '上週持有%' in master_df.columns: final_cols.append('上週持有%')
+            final_cols.extend(sorted_dates)
+            
+            final_df = master_df[[c for c in final_cols if c in master_df.columns]].copy()
+            if sorted_dates:
+                final_df = final_df.sort_values(by=sorted_dates[0], ascending=False)
+            
+            # 🔥 【核心修正】：強制轉回 Float 數值型態，防禦 Streamlit 欄位排序錯亂
+            cols_to_numeric = sorted_dates.copy()
+            if '上週持有%' in final_df.columns: cols_to_numeric.append('上週持有%')
+            if '總增減' in final_df.columns: cols_to_numeric.append('總增減')
+                
+            for col in cols_to_numeric:
+                final_df[col] = pd.to_numeric(final_df[col], errors='coerce')
+            
+            rename_dict = {}
+            if sorted_dates:
+                latest_col = sorted_dates[0]
+                short_date = latest_col[-4:] if len(latest_col) == 8 else latest_col 
+                rename_dict[latest_col] = f"▼{latest_col}"
+                if '上週持有%' in final_df.columns: rename_dict['上週持有%'] = f"{short_date}持有%"
+                if '總增減' in final_df.columns: rename_dict['總增減'] = "▼6周增減"
+                    
+            final_df = final_df.rename(columns=rename_dict)
+            st.dataframe(final_df, use_container_width=True, hide_index=True)
+            
+            # 同步回首頁搜尋快搜快取
+            st.session_state['df_blk5'] = final_df
 # ==========================================
 # 💸 區塊 6：盤後鉅額交易總表 (原生 Dataframe 升級版 + 交易別顯示)
 # ==========================================
