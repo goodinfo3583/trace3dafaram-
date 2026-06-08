@@ -3181,7 +3181,7 @@ else:
     else:
         st.error("無法合併資料。")
 # ==========================================
-# 💸 區塊 6：盤後鉅額交易總表 (發光懸浮 + 歷史矩陣強效相容版)
+# 💸 區塊 6：盤後鉅額交易總表 (原生 Dataframe 升級版 + 交易別顯示)
 # ==========================================
 def clean_number_for_display(val):
     try:
@@ -3210,10 +3210,9 @@ def build_historical_block_matrix():
             if col_name not in date_cols: date_cols.append(col_name)
             
             df = pd.read_csv(f)
-            # 🎯 極致寬容的欄位鎖定：只要包含關鍵字就能抓！
             c_code = next((c for c in df.columns if '代號' in c or '證券代號' in c), None)
             c_name = next((c for c in df.columns if '名稱' in c or '證券名稱' in c), None)
-            c_price = next((c for c in df.columns if '價' in c), None) # 只要有「價」就抓
+            c_price = next((c for c in df.columns if '價' in c), None) 
             
             if not all([c_code, c_name, c_price]): continue
             
@@ -3260,6 +3259,8 @@ with tab_today:
         col_price = next((c for c in df_block.columns if '單價' in c or '成交價' in c), None)
         col_vol = next((c for c in df_block.columns if '股數' in c or '張數' in c or '成交量' in c), None)
         col_amt = next((c for c in df_block.columns if '金額' in c or '總額' in c), None)
+        # 🔥 新增：動態抓取交易別 (證交所通常寫「交易別」或「類別」)
+        col_type = next((c for c in df_block.columns if '交易別' in c or '類別' in c), None)
 
         if all([col_code, col_name, col_price, col_vol, col_amt]):
             df_block['代號'] = df_block[col_code].astype(str).str.replace(r'\.0$', '', regex=True).str.replace(r'\D', '', regex=True)
@@ -3267,9 +3268,14 @@ with tab_today:
             df_block['成交價'] = pd.to_numeric(df_block[col_price].astype(str).replace(',', '', regex=True), errors='coerce')
             df_block['成交股數'] = pd.to_numeric(df_block[col_vol].astype(str).replace(',', '', regex=True), errors='coerce')
             df_block['成交金額'] = pd.to_numeric(df_block[col_amt].astype(str).replace(',', '', regex=True), errors='coerce')
+            # 🔥 處理交易別，若找不到該欄位則預設填入 '-'
+            df_block['交易別'] = df_block[col_type].fillna('-') if col_type else '-'
+            
             df_block = df_block[(df_block['代號'] != '0') & (df_block['代號'] != '') & (df_block['代號'] != 'nan')]
 
             grouped_block = df_block.groupby(['代號', '股票名稱']).agg({
+                # 🔥 將同檔股票的不同交易別合併顯示 (例如: 逐筆交易、配對交易)
+                '交易別': lambda x: '、'.join(sorted(set([str(i) for i in x.dropna() if str(i).strip() != '-']))),
                 '成交價': lambda x: ' / '.join(sorted(set([clean_number_for_display(i) for i in x.dropna()]))),
                 '成交股數': 'sum',
                 '成交金額': 'sum'
@@ -3308,60 +3314,36 @@ with tab_today:
             grouped_block = grouped_block.sort_values(by=['__rank', '代號'], ascending=[True, True])
             
             dynamic_price_col = f"▼{block_date[-4:]} 成交價"
-            display_df = grouped_block[['代號', '股票名稱', '成交價', '▼收盤價', '成交張數', '總額(億)']].copy()
+            # 🔥 將交易別加入最終顯示清單
+            display_df = grouped_block[['代號', '股票名稱', '交易別', '成交價', '▼收盤價', '成交張數', '總額(億)']].copy()
             display_df = display_df.rename(columns={'成交價': dynamic_price_col})
 
-            def style_block_table(df):
-                styler = df.style.hide(axis='index') if hasattr(df.style, 'hide') else df.style.hide_index()
-                def highlight_row(row):
-                    styles = []
-                    target_col = [c for c in row.index if '成交價' in c][0]
-                    for col in row.index:
-                        if col == target_col:
-                            try:
-                                prices = [float(p) for p in str(row[target_col]).split(' / ')]
-                                avg_p = sum(prices) / len(prices)
-                                c_p = float(str(row['▼收盤價']).replace(',',''))
-                                color = '#FF4B4B' if c_p > avg_p else '#FFA500' if c_p == avg_p else '#00E272'
-                                styles.append(f"color: {color}; font-weight: bold;")
-                            except: styles.append(f"color: #e0e0e0;")
-                        else:
-                            styles.append('color: #e0e0e0;')
-                    return styles
-                
-                styler = styler.apply(highlight_row, axis=1)
-                border_css = '1px solid #808495'
-                
-                styler = styler.set_table_styles([
-                    {'selector': 'table', 'props': [('width', '100%'), ('border-collapse', 'collapse'), ('font-family', 'sans-serif'), ('font-size', '13px')]},
-                    {'selector': 'th.col2', 'props': [('width', '90px'), ('text-align', 'left !important')]},
-                    {'selector': 'td.col2', 'props': [('text-align', 'left !important')]},
-                    {'selector': 'th', 'props': [
-                        ('background-color', '#1e1e24'), ('color', '#ffffff'), ('font-weight', 'normal'),
-                        ('border', border_css), ('padding', '6px 4px'), ('text-align', 'center'),
-                        ('position', 'sticky'), ('top', '0'), ('z-index', '1')
-                    ]},
-                    {'selector': 'td', 'props': [
-                        ('border', border_css), ('padding', '6px'), ('text-align', 'center'), ('transition', 'all 0.2s ease-in-out')
-                    ]},
-                    {'selector': 'tbody tr:hover td', 'props': [
-                        ('background-color', 'rgba(4, 8, 20, 0.85) !important'), 
-                        ('text-shadow', '0 0 8px rgba(255, 255, 255, 0.5) !important')
-                    ]}
-                ])
-                return styler.to_html()
+            # 🔥 保留原本貼心的紅綠字體提示，但改用 Pandas 內建的 Style 傳給 st.dataframe
+            def highlight_price(row):
+                styles = [''] * len(row)
+                try:
+                    target_idx = row.index.get_loc(dynamic_price_col)
+                    prices = [float(p) for p in str(row[dynamic_price_col]).split(' / ')]
+                    avg_p = sum(prices) / len(prices)
+                    c_p = float(str(row['▼收盤價']).replace(',', ''))
+                    
+                    if c_p > avg_p:
+                        styles[target_idx] = 'color: #FF4B4B; font-weight: bold;'
+                    elif c_p == avg_p:
+                        styles[target_idx] = 'color: #FFA500; font-weight: bold;'
+                    else:
+                        styles[target_idx] = 'color: #00E272; font-weight: bold;'
+                except: pass
+                return styles
 
-            html_table = style_block_table(display_df)
-            scrollable_div = f"""
-            <div style="max-height: 350px; overflow-y: auto; border: 1px solid #808495; border-radius: 5px;">
-            {html_table}
-            </div>
-            """
-            st.markdown(scrollable_div, unsafe_allow_html=True)
+            # 🔥 使用原生且穩定的 st.dataframe 渲染
+            st.dataframe(display_df.style.apply(highlight_price, axis=1), use_container_width=True, hide_index=True)
+            
         else:
             st.error("⚠️ 欄位名稱無法匹配，請確認爬蟲格式。")
     else:
         st.info("🕒 目前查無今日鉅額交易資料，請確認資料夾中是否有對應的 CSV 檔案。")
+
 
 # ==================== Tab 2: 歷史防守價追蹤表 ====================
 with tab_hist:
