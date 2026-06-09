@@ -3499,7 +3499,7 @@ with tab_hist:
         
 # ==========================================以上網頁核心區塊
 # ==========================================
-# 🏆 頂級選股池核心引擎 (動態日期捕捉 + 暗盤連動)
+# 🏆 頂級選股池核心引擎 (千張/四百張雙軌雷達 + 籌碼集中判定)
 # ==========================================
 with top_pool_container:
     st.write("---")
@@ -3511,56 +3511,43 @@ with top_pool_container:
     import json
     import pandas as pd
 
-    # 1. 自動掃描最新資料日期 (🔥 終極升級：四大區塊獨立日期追蹤引擎)
+    # 1. 自動掃描最新資料日期
     all_files = glob.glob(os.path.join(DATA_DIR, "*"))
-    anchor_date_str = "00000000" # 供存檔用的全局最大日期
+    anchor_date_str = "00000000"
     
-    # 🔥 完整建立各區塊專屬的日期追蹤器
-    d_b1_inst = "00000000"  # 區塊1：法人持股排名
-    d_b23_chip = "00000000" # 區塊2&3：買賣佔比、連買
-    d_b4_margin = "00000000"# 區塊4：融資券、借券
-    d_b5_share = "00000000" # 區塊5：大股東、神秘金字塔
+    d_b1_inst = "00000000"
+    d_b23_chip = "00000000"
+    d_b4_margin = "00000000"
+    d_b5_share = "00000000"
     
     for f in all_files:
         filename = os.path.basename(f)
-        # 尋找檔名中 8 位數的日期 (例如 20260604)
         match = re.search(r'(202\d{5})', filename)
         if match:
             file_date = match.group(1)
-            
-            # 紀錄全局最大日期 (存檔用)
-            if file_date > anchor_date_str:
-                anchor_date_str = file_date
+            if file_date > anchor_date_str: anchor_date_str = file_date
                 
-            # 🔥 完整分類掃描各區塊的最新日期
             if "持股排名變化" in filename or "JSON_History" in filename:
                 if file_date > d_b1_inst: d_b1_inst = file_date
-                
             elif "佔成交比" in filename or "連買" in filename or "買賣超" in filename:
                 if file_date > d_b23_chip: d_b23_chip = file_date
-                
             elif "融資" in filename or "融券" in filename or "借券" in filename or "資券" in filename:
                 if file_date > d_b4_margin: d_b4_margin = file_date
-                
             elif "大股東" in filename or "集保" in filename or "神秘金字塔" in filename:
                 if file_date > d_b5_share: d_b5_share = file_date
 
-    # 日期格式化小工具 (只顯示 月/日)
     def fmt_d(d_str):
         return f"{d_str[4:6]}/{d_str[6:]}" if d_str != "00000000" else "--/--"
 
-    # 🔥 恢復四大區塊獨立日期顯示，掌握所有籌碼的開牌進度！
     st.markdown(
         f"## 🏆 數據分析觀察名單 <br>"
         f"<span style='font-size:14px; color:#00D2FF; font-weight:500; display:inline-block; margin-top:5px; background-color:rgba(0, 210, 255, 0.1); padding:5px 10px; border-radius:5px;'>"
-        f"📊 資料基準日 ➔ 📍區塊1(法人): {fmt_d(d_b1_inst)} ｜ 📍區塊2&3(佔比/連買): {fmt_d(d_b23_chip)} ｜ 📍區塊4(資券): {fmt_d(d_b4_margin)} ｜ 📍區塊5(大股東): {fmt_d(d_b5_share)}"
+        f"📊 資料基準日 ➔ 📍區塊1(法人): {fmt_d(d_b1_inst)} ｜ 📍區塊2&3(佔比/連買): {fmt_d(d_b23_chip)} ｜ 📍區塊4(資券): {fmt_d(d_b4_margin)} ｜ 📍區塊5(大戶): {fmt_d(d_b5_share)}"
         f"</span>", 
         unsafe_allow_html=True
     )
     
-    st.info("💡 **評分方式**：區塊一之法人持股上榜搭配其他數據分析積分。(請搜尋參考今日短動態追蹤法人行為,評分數據僅供參考)")
-
-    # (接下來保留原本的 if 'my_final_df' not in st.session_state... 以下都不用動)
+    st.info("💡 **評分方式**：法人籌碼上榜為底，搭配「千張大戶權重加乘」與其他數據積分。(請參考▼明細)")
 
     if 'my_final_df' not in st.session_state or st.session_state['my_final_df'].empty:
         st.warning("⚠️ 尚未載入區塊 1 資料，無法進行選股池評比。")
@@ -3608,7 +3595,10 @@ with top_pool_container:
             s_b4_mar_pct, s_b4_mar_vol = set(df_b4_mar_pct.get('股票代號', [])), set(df_b4_mar_vol.get('股票代號', []))
             s_b4_sho_pct, s_b4_sho_vol = set(df_b4_sho_pct.get('股票代號', [])), set(df_b4_sho_vol.get('股票代號', []))
             s_b4_mp_pct, s_b4_mp_vol = set(df_b4_mp_pct.get('股票代號', [])), set(df_b4_mp_vol.get('股票代號', []))
-            df_b5 = get_df_safe('df_blk5')
+            
+            # 🔥 升級：獨立抓取 1000張與 400張的資料庫
+            df_b5_1000 = get_df_safe('df_blk5_1000')
+            df_b5_400 = get_df_safe('df_blk5')
 
             def check_b2_strict(df, sid, bad_keywords):
                 if df.empty or sid not in df['股票代號'].values: return False
@@ -3684,7 +3674,7 @@ with top_pool_container:
                 s_iw, r_b3_iw = get_b3_score(df_b3, sid, '投信週'); score += s_iw; 
                 if s_iw > 0: details.append(f"投信週連: +{s_iw}")
                 
-                # 區塊四核心升級 (幅+1, 量+0.5)
+                # 區塊四評分
                 r_b4_mar = ""
                 b4_list_count = 0
                 if sid in s_b4_mar_pct: r_b4_mar += "✔️(幅)"; score += 1.0; details.append("資減(幅): +1.0"); b4_list_count += 1
@@ -3722,16 +3712,44 @@ with top_pool_container:
                     if abs(short_decrease_val) >= 1:
                         score += 1.2; details.append("空頭認輸(借券減>1%): +1.2")
 
-                # 區塊五評分
-                r_b5 = ""
-                if not df_b5.empty and sid in df_b5['股票代號'].values:
-                    trend = str(df_b5[df_b5['股票代號'] == sid].iloc[0].get('週動態', ''))
-                    if '大增' in trend or ('增' in trend and '微' not in trend): score += 2; r_b5 = "🔥大增(+2)"; details.append("大股東大增: +2")
-                    elif '微增' in trend: score += 1; r_b5 = "↗️微增(+1)"; details.append("大股東微增: +1")
-                    elif '大減' in trend: score -= 1; r_b5 = "🚨大減(-1)"; details.append("大股東大減: -1")
-                    elif '減' in trend and '微' in trend: score -= 0.5; r_b5 = "↘️微減(-0.5)"; details.append("大股東微減: -0.5")
-                    elif '減' in trend: score -= 0.5; r_b5 = "📉減(-0.5)"; details.append("大股東減: -0.5")
-                    else: r_b5 = trend
+                # ==========================================
+                # 🔥 區塊五評分 (1000張/400張 雙軌動能引擎)
+                # ==========================================
+                r_b5_1000, r_b5_400 = "-", "-"
+                trend_1000_val, trend_400_val = "", ""
+                
+                # 1. 評測 1000張超級大戶 (拉高權重，減緩倒扣)
+                if not df_b5_1000.empty and sid in df_b5_1000['股票代號'].values:
+                    trend_1000_val = str(df_b5_1000[df_b5_1000['股票代號'] == sid].iloc[0].get('週動態', ''))
+                    if '大增' in trend_1000_val: score += 2.0; r_b5_1000 = "🔥千大增(+2)"; details.append("千張大戶大增: +2")
+                    elif '增' in trend_1000_val and '微' not in trend_1000_val: score += 1.0; r_b5_1000 = "📈千增(+1)"; details.append("千張大戶增: +1")
+                    elif '微增' in trend_1000_val: score += 0.5; r_b5_1000 = "↗️千微增(+0.5)"; details.append("千張大戶微增: +0.5")
+                    elif '大減' in trend_1000_val: score -= 0.5; r_b5_1000 = "🚨千大減(-0.5)"; details.append("千張大戶大減: -0.5")
+                    elif '減' in trend_1000_val: score -= 0.5; r_b5_1000 = "📉千減(-0.5)"; details.append("千張大戶減: -0.5")
+                    else: r_b5_1000 = f"千{trend_1000_val}"
+
+                # 2. 評測 400張中大戶 (調低權重，直接取消倒扣)
+                if not df_b5_400.empty and sid in df_b5_400['股票代號'].values:
+                    trend_400_val = str(df_b5_400[df_b5_400['股票代號'] == sid].iloc[0].get('週動態', ''))
+                    if '大增' in trend_400_val: score += 1.0; r_b5_400 = "🔥四大增(+1)"; details.append("四百張大增: +1")
+                    elif '增' in trend_400_val and '微' not in trend_400_val: score += 0.5; r_b5_400 = "📈四增(+0.5)"; details.append("四百張增: +0.5")
+                    elif '微增' in trend_400_val: score += 0.0; r_b5_400 = "↗️四微增(0)"
+                    elif '大減' in trend_400_val: score -= 0.0; r_b5_400 = "🚨四大減(0)" 
+                    elif '減' in trend_400_val: score -= 0.0; r_b5_400 = "📉四減(0)"
+                    else: r_b5_400 = f"四{trend_400_val}"
+
+                # 3. 🎯 終極策略判定：籌碼集中現象 (大魚吃小魚)
+                if ('增' in trend_1000_val and '減' in trend_400_val):
+                    score += 1.0
+                    details.append("🌟籌碼極集中(千吃四吐): +1")
+                    r_b5_1000 = f"{r_b5_1000}🌟"
+
+                # 視覺化組合顯示
+                if r_b5_1000 != "-" or r_b5_400 != "-":
+                    r_b5 = f"{r_b5_1000} | {r_b5_400}"
+                else:
+                    r_b5 = "-"
+                # ==========================================
                 
                 is_fo_sell = sid in fo_sell_ids; is_it_sell = sid in it_sell_ids
                 if is_fo_sell and is_it_sell: r_warn = "🚨外投雙倒"; score -= 2.0; details.append("外投雙倒: -2")
@@ -3753,7 +3771,7 @@ with top_pool_container:
             res_df = pd.DataFrame(results).sort_values(by='總分', ascending=False).drop_duplicates(subset=['代號']).reset_index(drop=True)
             
             # ==========================================
-            # 🔥 Delta (▼變量) 計算引擎 (升級為 Google Sheets 讀取版)
+            # 🔥 Delta (▼變量) 計算引擎
             # ==========================================
             prev_scores_dict = {}
             hist_combined = pd.DataFrame() 
@@ -3808,7 +3826,7 @@ with top_pool_container:
 
             st.session_state['top_pool_df'] = res_df
             
-            # 💾 歷史紀錄存檔機制 (嚴格依據動態日期 anchor_date_str 寫入)
+            # 💾 歷史紀錄存檔機制
             if res_df is not None and not res_df.empty:
                 try:
                     if anchor_date_str != "00000000":
@@ -3820,7 +3838,6 @@ with top_pool_container:
                             old_df = old_df.dropna(how="all")
                             if '紀錄日期' in old_df.columns:
                                 old_df['紀錄日期'] = old_df['紀錄日期'].astype(str).str.replace(r'\.0$', '', regex=True).str.zfill(8)
-                                # 🔥 關鍵防護：只刪除「相同總最新日期」的舊資料，絕對不刪除前一天的紀錄！
                                 old_df = old_df[old_df['紀錄日期'] != anchor_date_str]
                             final_save_df = pd.concat([old_df, save_df], ignore_index=True)
                         except:
@@ -3828,7 +3845,7 @@ with top_pool_container:
 
                         conn.update(spreadsheet=SHEET_URL, worksheet="選股歷史", data=final_save_df)
                 except Exception as e: 
-                    pass # 隱藏報錯，保持版面乾淨
+                    pass 
 
             # 🌟 Streamlit 頁籤渲染
             tab1, tab2 = st.tabs(["🔥 今日最新排行", "📈 歷史分數追蹤表"])
