@@ -32,7 +32,7 @@ jobs:
     - name: 執行 18:20 Python 爬蟲程式
       run: |
         # ⚠️ 請確保這裡的檔名跟你剛剛存檔的 Python 檔名一模一樣
-        python "daily1820_scraper.py" 
+        python "newdaily1820_scraper.py" 
 
     - name: 自動將更新的 CSV 資料推回 GitHub
       run: |
