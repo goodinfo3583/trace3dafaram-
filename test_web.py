@@ -1445,22 +1445,31 @@ def agg_sections_func(x):
     return ",".join([s for s in ['5日', '20日', '60日', '120日'] if s in valid_x])
 
 # ==========================================
-# 🔄 歷史資料合併與邏輯運算 (底層大表重建)
+# 🔄 歷史資料合併與邏輯運算 (底層大表重建 - 極致寬容雷達版)
 # ==========================================
-all_txt_files = glob.glob(os.path.join(DATA_DIR, "*持股排名變化*.txt"))
-all_csv_files = glob.glob(os.path.join(DATA_DIR, "*_JSON_History.csv"))
+all_txt_files = glob.glob(os.path.join(DATA_DIR, "*.txt")) # 🔥 降維打擊：抓取所有 txt
+all_csv_files = glob.glob(os.path.join(DATA_DIR, "*JSON*.csv")) # 🔥 放寬 JSON 檔名條件
 
 date_files = defaultdict(lambda: {'txt': [], 'csv': []})
+
+# 🔥 智慧日期提取器：無論是 20260606 還是 0606 開頭，通通抓出來！
+def extract_date_from_filename(filename):
+    m8 = re.search(r'(202\d{5})', filename)
+    if m8: return m8.group(1)
+    m4 = re.search(r'^(0[1-9]|1[0-2])([0-3]\d)', filename) 
+    if m4: return f"2026{m4.group(1)}{m4.group(2)}"
+    return None
+
 for f in all_txt_files:
-    date_label = os.path.basename(f)[:8]
-    if date_label.isdigit(): date_files[date_label]['txt'].append(f)
+    d_label = extract_date_from_filename(os.path.basename(f))
+    if d_label: date_files[d_label]['txt'].append(f)
+
 for f in all_csv_files:
-    date_label = os.path.basename(f)[:8]
-    if date_label.isdigit(): date_files[date_label]['csv'].append(f)
+    d_label = extract_date_from_filename(os.path.basename(f))
+    if d_label: date_files[d_label]['csv'].append(f)
 
 sorted_dates = sorted(date_files.keys(), reverse=True)
 final_df = pd.DataFrame()
-
 if sorted_dates:
     latest_d = sorted_dates[0]
     fmt_date = f"{latest_d[:4]}/{latest_d[4:6]}/{latest_d[6:]}"
@@ -3750,7 +3759,7 @@ with top_pool_container:
             hist_combined = pd.DataFrame() 
             
             try:
-                gs_history = conn.read(spreadsheet=SHEET_URL, worksheet="選股歷史", ttl=600)
+                gs_history = conn.read(spreadsheet=SHEET_URL, worksheet="選股歷史", ttl=10)
                 gs_history = gs_history.dropna(how="all")
                 
                 if not gs_history.empty and '紀錄日期' in gs_history.columns:
@@ -3807,7 +3816,7 @@ with top_pool_container:
                         save_df.insert(0, '紀錄日期', anchor_date_str)
                         
                         try:
-                            old_df = conn.read(spreadsheet=SHEET_URL, worksheet="選股歷史", ttl=600)
+                            old_df = conn.read(spreadsheet=SHEET_URL, worksheet="選股歷史", ttl=0)
                             old_df = old_df.dropna(how="all")
                             if '紀錄日期' in old_df.columns:
                                 old_df['紀錄日期'] = old_df['紀錄日期'].astype(str).str.replace(r'\.0$', '', regex=True).str.zfill(8)
