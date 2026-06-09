@@ -3884,8 +3884,9 @@ with top_pool_container:
                 except Exception as e: 
                     pass 
 
-            # 🌟 Streamlit 頁籤渲染
-            tab1, tab2 = st.tabs(["🔥 今日最新排行", "📈 歷史分數追蹤表"])
+            # 🌟 Streamlit 頁籤渲染 (新增每週 Top 5 模型驗證)
+            tab1, tab2, tab3 = st.tabs(["🔥 今日最新排行", "📈 歷史分數追蹤表", "🎯 模型驗證：每週 Top 5 追蹤"])
+            
             with tab1:
                 st.dataframe(
                     res_df, 
@@ -3896,6 +3897,7 @@ with top_pool_container:
                     }
                 )
                 st.success(f"選股池掃描完成！今日共過濾出 {len(res_df)} 檔潛力標的。")
+                
             with tab2:
                 try:
                     if not hist_combined.empty:
@@ -3931,6 +3933,110 @@ with top_pool_container:
                         st.warning("尚無足夠的歷史分數紀錄。")
                 except Exception as e: 
                     pass
+
+            # ==========================================
+            # 🎯 新增：每週 Top 5 模型驗證區塊
+            # ==========================================
+            with tab3:
+                st.markdown("### 🏆 AI 嚴選：今日最強 5 檔 (模型驗證候選)")
+                st.info("💡 **篩選邏輯**：排除任何帶有「外/投倒貨」警示的標的，並依據「總分」與「當日△」選出前 5 名。建議每週五進行一次快照追蹤。")
+                
+                # 1. 嚴格過濾與排序
+                if not res_df.empty:
+                    # 踢掉有危險警示的股票
+                    safe_df = res_df[res_df['賣出警示'] == "-"].copy()
+                    
+                    if not safe_df.empty:
+                        # 將 △ 轉為數字以輔助排序 (同分時，單日買超越多的排前面)
+                        safe_df['數值△'] = safe_df['△'].astype(str).str.replace('+', '').str.replace('%', '')
+                        safe_df['數值△'] = pd.to_numeric(safe_df['數值△'], errors='coerce').fillna(0)
+                        
+                        top5_df = safe_df.sort_values(by=['總分', '數值△'], ascending=[False, False]).head(5)
+                        top5_df = top5_df.drop(columns=['數值△'])
+                        
+                        # 2. 顯示這 5 檔的精華卡片
+                        cols = st.columns(5)
+                        for idx, (i, row) in enumerate(top5_df.iterrows()):
+                            with cols[idx]:
+                                st.markdown(
+                                    f"""
+                                    <div style="background-color:rgba(0, 210, 255, 0.05); border-top: 3px solid #00D2FF; padding: 10px; border-radius: 5px;">
+                                        <h4 style="margin:0; color:#E2E8F0;">{row['名稱']}</h4>
+                                        <p style="margin:0; font-size:12px; color:#A0AEC0;">{row['代號']}</p>
+                                        <h2 style="margin:10px 0; color:#00D2FF;">{row['總分']} 分</h2>
+                                        <p style="margin:0; font-size:14px;"><strong>當日△:</strong> <span style="color:#50C878;">{row['△']}</span></p>
+                                        <p style="margin:5px 0 0 0; font-size:12px; line-height:1.2;">{row['大股東動向']}</p>
+                                    </div>
+                                    """, unsafe_allow_html=True
+                                )
+                        
+                        st.write("")
+                        st.dataframe(top5_df[['代號', '名稱', '總分', '▼變量', '△', '最新動態', '▼明細']], use_container_width=True, hide_index=True)
+                        
+                        # 3. 站長一鍵封存功能 (儲存為本週追蹤名單)
+                        st.write("---")
+                        with st.expander("🛠 站長專用：鎖定本週追蹤名單", expanded=False):
+                            c_pw, c_btn = st.columns([1, 2])
+                            with c_pw:
+                                track_pw = st.text_input("請輸入密碼解鎖", type="password", key="track_pw")
+                            with c_btn:
+                                st.write("")
+                                if track_pw == "DDong888":
+                                    if st.button("💾 將以上 5 檔儲存為『本週驗證名單』", type="primary", use_container_width=True):
+                                        track_date = datetime.datetime.now().strftime("%Y-%m-%d")
+                                        top5_df['鎖定日期'] = track_date
+                                        track_path = os.path.join(DATA_DIR, "Weekly_Top5_Tracking.csv")
+                                        
+                                        # 讀取舊紀錄並附加新紀錄
+                                        if os.path.exists(track_path):
+                                            try: old_track = pd.read_csv(track_path, encoding='utf-8-sig')
+                                            except: old_track = pd.DataFrame()
+                                            new_track = pd.concat([old_track, top5_df], ignore_index=True)
+                                        else:
+                                            new_track = top5_df
+                                            
+                                        new_track.to_csv(track_path, index=False, encoding='utf-8-sig')
+                                        st.success(f"✅ 已成功將 {track_date} 的 Top 5 寫入追蹤資料庫！")
+                                elif track_pw != "":
+                                    st.error("密碼錯誤")
+                                    
+                # 4. 顯示歷史追蹤績效
+                st.markdown("### 📊 歷史名單回測觀察")
+                track_file = os.path.join(DATA_DIR, "Weekly_Top5_Tracking.csv")
+                if os.path.exists(track_file):
+                    try:
+                        history_track_df = pd.read_csv(track_file, encoding='utf-8-sig')
+                        if not history_track_df.empty:
+                            # 抓出不重複的鎖定日期，讓站長可以選擇要看哪一週
+                            available_weeks = sorted(history_track_df['鎖定日期'].unique(), reverse=True)
+                            selected_week = st.selectbox("📅 選擇要回顧的鎖定日期", available_weeks)
+                            
+                            week_df = history_track_df[history_track_df['鎖定日期'] == selected_week].copy()
+                            
+                            # 與「今日最新分數」進行即時比對
+                            if not res_df.empty:
+                                today_scores = dict(zip(res_df['代號'].astype(str), res_df['總分']))
+                                today_deltas = dict(zip(res_df['代號'].astype(str), res_df['△']))
+                                
+                                week_df['今日分數'] = week_df['代號'].astype(str).map(today_scores).fillna(0)
+                                week_df['今日△'] = week_df['代號'].astype(str).map(today_deltas).fillna("未進榜")
+                                
+                                def score_diff(row):
+                                    diff = float(row['今日分數']) - float(row['總分']) # 今日 - 鎖定日
+                                    if diff > 0: return f"📈 +{diff:.1f}"
+                                    elif diff < 0: return f"📉 {diff:.1f}"
+                                    else: return "-"
+                                    
+                                week_df['模型分數變化'] = week_df.apply(score_diff, axis=1)
+                            
+                            show_cols = ['鎖定日期', '代號', '名稱', '總分', '今日分數', '模型分數變化', '今日△', '大股東動向']
+                            st.dataframe(week_df[[c for c in show_cols if c in week_df.columns]], use_container_width=True, hide_index=True)
+                            
+                            st.info("💡 **驗證方法**：觀察這些鎖定的股票在未來一週的『模型分數變化』是否持續上升？如果分數持續上升且股價也上漲，代表我們的【大股東+集中度】指標非常精準！如果分數下降，可以觀察『今日△』是否被主力倒貨。")
+                    except:
+                        st.warning("讀取追蹤檔案失敗。")
+                else:
+                    st.write("⚪ 尚無歷史追蹤紀錄，請點擊上方按鈕建立第一筆！")
 # ==========================================
 # ==========================================
 # 🧪 測試區：Google Sheets 連線測試
