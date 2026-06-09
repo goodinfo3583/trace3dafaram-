@@ -31,7 +31,7 @@ jobs:
       run: |
         # ⚠️ 下面這行，請務必把 main.py 換成你真正的 Python 檔名！
         # 例如你的檔案叫 spider.py，就改成 python spider.py
-        python new抓取融資融券借券(晚上10點)20260519.py 
+        python "newdaily2200_scraper.py" 
 
     - name: 自動將更新的 CSV 資料推回 GitHub
       run: |
