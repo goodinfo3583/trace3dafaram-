@@ -3499,7 +3499,7 @@ with tab_hist:
         
 # ==========================================以上網頁核心區塊
 # ==========================================
-# 🏆 頂級選股池核心引擎 (千張/四百張雙軌雷達 + 籌碼集中判定)
+# 🏆 頂級選股池核心引擎 (千張/四百張雙軌雷達 + 籌碼集中判定 + 單日△追蹤)
 # ==========================================
 with top_pool_container:
     st.write("---")
@@ -3596,7 +3596,6 @@ with top_pool_container:
             s_b4_sho_pct, s_b4_sho_vol = set(df_b4_sho_pct.get('股票代號', [])), set(df_b4_sho_vol.get('股票代號', []))
             s_b4_mp_pct, s_b4_mp_vol = set(df_b4_mp_pct.get('股票代號', [])), set(df_b4_mp_vol.get('股票代號', []))
             
-            # 🔥 升級：獨立抓取 1000張與 400張的資料庫
             df_b5_1000 = get_df_safe('df_blk5_1000')
             df_b5_400 = get_df_safe('df_blk5')
 
@@ -3642,6 +3641,14 @@ with top_pool_container:
                 sid = str(row['股票代號']).strip()
                 sname = str(row.get('股票名稱', '')).strip()
                 b1_dyn = str(row.get(dyn_col, '')) if dyn_col else '-'
+                
+                # 🔥 新增：擷取區塊 1 的單日「△」並格式化為 + / - 數值
+                try:
+                    delta_val = float(row.get('△', 0.0))
+                    if abs(delta_val) < 0.005: b1_delta = "0.00"
+                    else: b1_delta = f"+{delta_val:.2f}" if delta_val > 0 else f"{delta_val:.2f}"
+                except:
+                    b1_delta = "0.00"
                 
                 if sid in block_sids: b1_dyn = f"{b1_dyn} | 💸 鉅額交易"
                     
@@ -3712,13 +3719,10 @@ with top_pool_container:
                     if abs(short_decrease_val) >= 1:
                         score += 1.2; details.append("空頭認輸(借券減>1%): +1.2")
 
-                # ==========================================
-                # 🔥 區塊五評分 (1000張/400張 雙軌動能引擎)
-                # ==========================================
+                # 區塊五評分 (1000張/400張 雙軌動能引擎)
                 r_b5_1000, r_b5_400 = "-", "-"
                 trend_1000_val, trend_400_val = "", ""
                 
-                # 1. 評測 1000張超級大戶 (拉高權重，減緩倒扣)
                 if not df_b5_1000.empty and sid in df_b5_1000['股票代號'].values:
                     trend_1000_val = str(df_b5_1000[df_b5_1000['股票代號'] == sid].iloc[0].get('週動態', ''))
                     if '大增' in trend_1000_val: score += 2.0; r_b5_1000 = "🔥千大增(+2)"; details.append("千張大戶大增: +2")
@@ -3728,7 +3732,6 @@ with top_pool_container:
                     elif '減' in trend_1000_val: score -= 0.5; r_b5_1000 = "📉千減(-0.5)"; details.append("千張大戶減: -0.5")
                     else: r_b5_1000 = f"千{trend_1000_val}"
 
-                # 2. 評測 400張中大戶 (調低權重，直接取消倒扣)
                 if not df_b5_400.empty and sid in df_b5_400['股票代號'].values:
                     trend_400_val = str(df_b5_400[df_b5_400['股票代號'] == sid].iloc[0].get('週動態', ''))
                     if '大增' in trend_400_val: score += 1.0; r_b5_400 = "🔥四大增(+1)"; details.append("四百張大增: +1")
@@ -3738,18 +3741,15 @@ with top_pool_container:
                     elif '減' in trend_400_val: score -= 0.0; r_b5_400 = "📉四減(0)"
                     else: r_b5_400 = f"四{trend_400_val}"
 
-                # 3. 🎯 終極策略判定：籌碼集中現象 (大魚吃小魚)
                 if ('增' in trend_1000_val and '減' in trend_400_val):
                     score += 1.0
                     details.append("🌟籌碼極集中(千吃四吐): +1")
                     r_b5_1000 = f"{r_b5_1000}🌟"
 
-                # 視覺化組合顯示
                 if r_b5_1000 != "-" or r_b5_400 != "-":
                     r_b5 = f"{r_b5_1000} | {r_b5_400}"
                 else:
                     r_b5 = "-"
-                # ==========================================
                 
                 is_fo_sell = sid in fo_sell_ids; is_it_sell = sid in it_sell_ids
                 if is_fo_sell and is_it_sell: r_warn = "🚨外投雙倒"; score -= 2.0; details.append("外投雙倒: -2")
@@ -3759,8 +3759,9 @@ with top_pool_container:
 
                 score_breakdown = " \n".join(details) if details else "無加扣分"
 
+                # 🔥 這裡把「△」寫入暫存結果字典中
                 results.append({
-                    '總分': score, '代號': sid, '名稱': sname, '▼明細': score_breakdown, 
+                    '總分': score, '代號': sid, '名稱': sname, '▼明細': score_breakdown, '△': b1_delta,
                     '最新動態': b1_dyn, '今日上榜': b1_rank, '賣出警示': r_warn,
                     '外買佔比': r_b2_1, '投買佔比': r_b2_2, '外佔發行': r_b2_3, '投佔發行': r_b2_4,
                     '外日連': r_b3_fd, '外週連': r_b3_fw, '投日連': r_b3_id, '投週連': r_b3_iw,
@@ -3815,11 +3816,17 @@ with top_pool_container:
             if not res_df.empty and '總分' in res_df.columns:
                 res_df['▼變量'] = res_df.apply(calc_table_delta, axis=1)
 
-            cols = [c for c in res_df.columns if c not in ['▼變量', '▼明細', '賣出警示']]
+            # 🔥 排列欄位：將「△」精準安插在「▼明細」的右邊
+            cols = [c for c in res_df.columns if c not in ['▼變量', '▼明細', '△', '賣出警示']]
             score_idx = cols.index('總分')
             cols.insert(score_idx + 1, '▼變量')
+            
             name_idx = cols.index('名稱')
             cols.insert(name_idx + 1, '▼明細')
+            
+            detail_idx = cols.index('▼明細')
+            cols.insert(detail_idx + 1, '△')
+            
             rank_idx = cols.index('今日上榜')
             cols.insert(rank_idx + 1, '賣出警示')
             res_df = res_df[cols]
@@ -3894,7 +3901,6 @@ with top_pool_container:
                         st.warning("尚無足夠的歷史分數紀錄。")
                 except Exception as e: 
                     pass
-
 # ==========================================
 # ==========================================
 # 🧪 測試區：Google Sheets 連線測試
