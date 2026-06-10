@@ -1354,7 +1354,7 @@ if sorted_dates:
     fmt_date = f"{latest_d[:4]}/{latest_d[4:6]}/{latest_d[6:]}"
     header_placeholder.markdown(
         f"<h2 style='margin-bottom: 0px;'>👑 區塊1：三大法人短中長線持股比追蹤 "
-        f"<span style='color:#00D2FF; font-size:16px; font-weight:500; margin-left:12px;'>歷史基準日：{fmt_date}</span></h2>", 
+        f"<span style='color:#00D2FF; font-size:16px; font-weight:500; margin-left:12px;'>資料基準日：{fmt_date}</span></h2>", 
         unsafe_allow_html=True
     )
     
@@ -3430,7 +3430,7 @@ with top_pool_container:
     st.markdown(
         f"## 🏆 數據分析觀察名單 <br>"
         f"<span style='font-size:14px; color:#00D2FF; font-weight:500; display:inline-block; margin-top:5px; background-color:rgba(0, 210, 255, 0.1); padding:5px 10px; border-radius:5px;'>"
-        f"📊 資料基準日 ➔ 📍區塊1(法人): {fmt_d(d_b1_inst)} ｜ 📍區塊2&3(佔比/連買): {fmt_d(d_b23_chip)} ｜ 📍區塊4(資券): {fmt_d(d_b4_margin)} ｜ 📍區塊5(大戶): {fmt_d(d_b5_share)}"
+        f"📊 資料基準日 : 📍區塊1(法人): {fmt_d(d_b1_inst)} ｜ 📍區塊2&3(佔比/連買): {fmt_d(d_b23_chip)} ｜ 📍區塊4(資券): {fmt_d(d_b4_margin)} ｜ 📍區塊5(大戶): {fmt_d(d_b5_share)}"
         f"</span>", 
         unsafe_allow_html=True
     )
