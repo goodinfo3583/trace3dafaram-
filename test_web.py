@@ -917,7 +917,7 @@ def render_sidebar_market_summary():
     df_spot, date_spot = get_latest_csv("三大法人買賣超金額")
     df_fut, _ = get_latest_csv("三大法人期貨多空")
     df_fut_prev = get_prev_csv("三大法人期貨多空", date_spot)
-    df_margin, _ = get_latest_csv("融資融券餘額") # 💡 檔名對應
+    df_margin, margin_csv_name = get_latest_csv("融資融券餘額") # 💡 檔名對應
     
     if df_spot is None or df_fut is None:
         st.warning("尚無大盤數據，請確認資料夾中已有今日 CSV。")
