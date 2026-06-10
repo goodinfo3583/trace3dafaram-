@@ -1268,20 +1268,19 @@ def parse_special_txt(file_path, date_label):
 def parse_json_history_csv(file_path, date_label):
     try:
         df = pd.read_csv(file_path, encoding='utf-8-sig')
+        
+        # 1. 先強制轉為字串，並處理掉可能出現的 .0 結尾與前後空白
         df['股票代號'] = df['股票代號'].astype(str).str.replace(r'\.0$', '', regex=True).str.strip()
+        
+        # 2. 🌟 加入這行終極補零防禦 🌟 (如果是純數字就自動補滿 4 碼)
+        df['股票代號'] = df['股票代號'].apply(lambda x: x.zfill(4) if x.isdigit() else x)
+        
+        # 3. 繼續原本的名稱清理與欄位重新命名
         df['股票名稱'] = df['股票名稱'].astype(str).str.strip()
         df = df.rename(columns={'法人持股': f"{date_label}持股%"})
         return df
-    except: return pd.DataFrame()
-
-def agg_sections_func(x):
-    valid_x = set()
-    for val in x:
-        if pd.notna(val) and str(val).strip() != "":
-            for p in str(val).split(','):
-                valid_x.add(p.strip())
-    return ",".join([s for s in ['5日', '20日', '60日', '120日'] if s in valid_x])
-
+    except: 
+        return pd.DataFrame()
 # ==========================================
 # 🔄 歷史資料合併與邏輯運算 (底層大表重建)
 # ==========================================
