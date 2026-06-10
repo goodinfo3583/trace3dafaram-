@@ -1001,7 +1001,8 @@ def render_sidebar_market_summary():
     too_c, too_os = get_color(total_oi, False)
     m_c, m_s = get_color(margin_diff_yi)
 
-    html = f"<div style='font-size: 13px; color: #00E272;'>📅 {date_spot} | ⚡ 本地極速版</div>"
+    # 1. 移除「本地極速版」字眼，只保留俐落的日期
+    html = f"<div style='font-size: 13px; color: #00D2FF;'>📅 {date_spot} | 資金風向球</div>"
     html += "<table style='width: 100%; text-align: center; border-collapse: collapse; margin-top: 5px; font-size: 14px;'>"
     html += "<tr style='border-bottom: 1px solid #555; background-color: #262730;'>"
     html += "<th style='padding: 5px;'>法人</th><th style='padding: 5px;'>現貨(億)</th><th style='padding: 5px;'>TX未平倉</th></tr>"
@@ -1014,14 +1015,18 @@ def render_sidebar_market_summary():
     html += "</table>"
     
     if margin_today_yi != 0.0:
+        # 2. 獲取融資檔案的專屬日期
+        margin_date = margin_csv_name[:8] if margin_csv_name else "未知"
+        
         html += "<div style='margin-top: 8px; padding: 6px; background-color: #1e1e24; border: 1px solid #555; border-radius: 5px; font-size: 13px;'>"
-        html += f"<div style='font-weight: bold;'>📉 大盤融資餘額</div>"
+        # 3. 標題加上專屬日期標示
+        html += f"<div style='font-weight: bold;'>📉 大盤融資餘額 <span style='font-size: 11px; color: #888; font-weight: normal; margin-left: 5px;'>({margin_date})</span></div>"
         html += f"<div style='color: #aaa; margin-top: 4px;'>今日增減(億) <span style='color: {m_c}; font-weight: bold; float: right;'>{m_s}</span></div>"
         html += f"<div style='color: #aaa; margin-top: 2px;'>餘額總計(億) <span style='float: right; color: #fff;'>{margin_today_yi:,.1f}</span></div>"
         html += "</div>"
         
     st.markdown(html, unsafe_allow_html=True)
-    return date_spot 
+    return date_spot
 
 # ------------------------------------------
 # 2. 選擇權關鍵兵力分布 (36000 智慧底線 + 變化量追蹤版)
