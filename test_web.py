@@ -1265,9 +1265,9 @@ with c_btn2:
                 else: st.error("❌ 尚未獲取到 GitHub 數據，封存失敗。")
         elif admin_pw != "": st.error("❌ 密碼錯誤，無法使用此功能。")
 
-# ------------------------------------------
+# ==========================================
 # 🔄 歷史資料合併與邏輯運算 (底層大表重建)
-# ------------------------------------------
+# ==========================================
 date_files = defaultdict(lambda: {'txt': [], 'csv': []})
 
 def extract_date_from_filename(filename):
@@ -1364,6 +1364,7 @@ if sorted_dates:
         final_df['最新動態'] = final_df.apply(evaluate_trend, axis=1)
         final_df['法人持股'] = final_df[date_cols[0]]
         
+        # 🔥 把單日精準變化補上去
         if not latest_all_df.empty and '股票代號' in latest_all_df.columns:
             final_df = pd.merge(final_df, latest_all_df, on='股票代號', how='left')
             final_df['△'] = final_df['精準單日△'].fillna(0.0)
@@ -1373,6 +1374,12 @@ if sorted_dates:
             else: final_df['△'] = 0.0
             
         final_df['法人金額'] = 0.0 
+
+        # 🔥 關鍵修復：把 GitHub JSON 的「期程專屬排名」與「專屬ΔChange」合併回大表
+        for d in [5, 20, 60, 120]:
+            if d in json_dfs and not json_dfs[d].empty:
+                temp_json = json_dfs[d][['股票代號', f'{d}日ΔChange', f'{d}日排名']]
+                final_df = pd.merge(final_df, temp_json, on='股票代號', how='left')
 
         color_ref = final_df.set_index('股票代號')['上榜數量'].to_dict()
         for col in date_cols: final_df[col] = final_df[col].apply(lambda x: "未進榜" if pd.isna(x) or abs(x) < 0.0001 else f"{x:.2f}")
@@ -1385,7 +1392,7 @@ else:
     header_placeholder.markdown("<h2 style='margin-bottom: 0px;'>👑 區塊1：三大法人短中長線持股比追蹤</h2>", unsafe_allow_html=True)
 
 # ==========================================
-# 🔧 UI 數據渲染 (四大榜單完美同步本地資料)
+# 🔧 UI 數據渲染 (四大榜單完美還原期程排序)
 # ==========================================
 c1, c2, c3 = st.columns([1, 1, 2])
 show_etf = c1.checkbox("顯示 ETF", value=True, key="blk1_etf_sync")
@@ -1405,9 +1412,11 @@ def format_delta(x):
 
 def get_local_tab_df(target_day_str):
     if final_df is None or final_df.empty: return pd.DataFrame()
+    # 篩選出有在這個期程上榜的股票
     df = final_df[final_df['今日上榜'].str.contains(f'{target_day_str}日', na=False)].copy()
     if df.empty: return df
     
+    # 執行 ETF/債券/搜尋 過濾
     is_bond = df['股票代號'].str.endswith('B')
     is_etf = (df['股票代號'].str.len() >= 5) & (~is_bond)
     is_stock = df['股票代號'].str.len() == 4
@@ -1416,35 +1425,48 @@ def get_local_tab_df(target_day_str):
     if show_bond: mask |= is_bond
     if search_kw:
         mask &= (df['股票代號'].str.contains(search_kw, na=False)) | (df['股票名稱'].str.contains(search_kw, na=False))
-        
     df = df[mask].copy()
-    # 建立排名
-    df[f'{target_day_str}日排名'] = range(1, len(df) + 1)
+    
+    # 🔥 關鍵修復：依據該期程專屬的「排名」來重新排序！
+    rank_col = f'{target_day_str}日排名'
+    change_col = f'{target_day_str}日ΔChange'
+    
+    # 若有抓到專屬排名，就依據排名由小到大 (1~200) 排序；若只有 Change 就依 Change 降冪排序
+    if rank_col in df.columns:
+        df = df.sort_values(by=rank_col, ascending=True)
+    elif change_col in df.columns:
+        df[change_col] = pd.to_numeric(df[change_col], errors='coerce').fillna(0)
+        df = df.sort_values(by=change_col, ascending=False)
+        df[f'{target_day_str}日排名'] = range(1, len(df) + 1)
+        
     df['法人持股'] = df['法人持股'].apply(lambda x: f"{x:.2f}%" if pd.notna(x) else "0.00%")
     df['△'] = df['△'].apply(format_delta)
+    if change_col in df.columns: 
+        df[change_col] = df[change_col].apply(format_delta)
+        
     df['法人金額'] = "0.00"
     df['最新動態'] = df['最新動態'].fillna("⚪ 尚無比對紀錄")
     return df
 
 with tab5:
     df_5 = get_local_tab_df(5)
-    display_cols = ['5日排名', '股票代號', '股票名稱', '法人持股', '△', '法人金額', '最新動態', '今日上榜']
+    display_cols = ['5日排名', '股票代號', '股票名稱', '法人持股', '△', '5日ΔChange', '法人金額', '最新動態', '今日上榜']
     if not df_5.empty: st.dataframe(df_5[[c for c in display_cols if c in df_5.columns]], use_container_width=True, hide_index=True)
     else: st.info("⚪ 尚無 5日進榜數據。")
 
 with tab20:
     df_20 = get_local_tab_df(20)
-    display_cols = ['20日排名', '股票代號', '股票名稱', '法人持股', '△', '法人金額', '最新動態', '今日上榜']
+    display_cols = ['20日排名', '股票代號', '股票名稱', '法人持股', '△', '20日ΔChange', '法人金額', '最新動態', '今日上榜']
     if not df_20.empty: st.dataframe(df_20[[c for c in display_cols if c in df_20.columns]], use_container_width=True, hide_index=True)
 
 with tab60:
     df_60 = get_local_tab_df(60)
-    display_cols = ['60日排名', '股票代號', '股票名稱', '法人持股', '△', '法人金額', '最新動態', '今日上榜']
+    display_cols = ['60日排名', '股票代號', '股票名稱', '法人持股', '△', '60日ΔChange', '法人金額', '最新動態', '今日上榜']
     if not df_60.empty: st.dataframe(df_60[[c for c in display_cols if c in df_60.columns]], use_container_width=True, hide_index=True)
 
 with tab120:
     df_120 = get_local_tab_df(120)
-    display_cols = ['120日排名', '股票代號', '股票名稱', '法人持股', '△', '法人金額', '最新動態', '今日上榜']
+    display_cols = ['120日排名', '股票代號', '股票名稱', '法人持股', '△', '120日ΔChange', '法人金額', '最新動態', '今日上榜']
     if not df_120.empty: st.dataframe(df_120[[c for c in display_cols if c in df_120.columns]], use_container_width=True, hide_index=True)
         
 with tab_all:
@@ -1476,7 +1498,7 @@ with tab_all:
         st.dataframe(filtered_df[all_display_cols].style.apply(highlight_row, axis=1), use_container_width=True)
 
 st.write("")
-st.info("💡 欄位說明：【△】為精準單日法人持股增減；歷史軌跡為天期累積變化。四大榜單已與本地數據完美同步！")
+st.info("💡 欄位說明：【△】為精準單日法人持股增減；【◯日ΔChange】為天期累積變化。")
 st.session_state['my_final_df'] = final_df
 # ==========================================
 # 🎯 區塊2-1：外資 5 日買超 佔成交量比 追蹤 (穩定精確版)
