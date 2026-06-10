@@ -13,6 +13,11 @@ permissions:
 jobs:
   scrape_and_commit:
     runs-on: ubuntu-latest
+    
+    # 🌟 關鍵修復：強制將 GitHub 虛擬機時區設為台灣！
+    # 確保 python 裡的 datetime.now() 抓到的絕對是台灣時間的「今天」
+    env:
+      TZ: Asia/Taipei
 
     steps:
     - name: 檢查並複製專案程式碼
@@ -26,17 +31,25 @@ jobs:
     - name: 安裝執行爬蟲所需的套件
       run: |
         python -m pip install --upgrade pip
-        # 你的新程式多用到了 requests 和 bs4(beautifulsoup4)，記得在這裡補上安裝
         pip install pandas selenium lxml html5lib requests beautifulsoup4
 
     - name: 執行 18:20 Python 爬蟲程式
       run: |
-        # ⚠️ 請確保這裡的檔名跟你剛剛存檔的 Python 檔名一模一樣
+        # ⚠️ 請確保這裡的檔名就是 newdaily1820_scraper.py
         python "newdaily1820_scraper.py" 
 
     - name: 自動將更新的 CSV 資料推回 GitHub
       run: |
         git config --local user.email "action@github.com"
         git config --local user.name "GitHub Action"
-        git add Goodinfo_Rankings/*.csv
-        git diff --quiet && git diff --staged --quiet || (git commit -m "自動更新 18:20 籌碼資料 $(date +'%Y-%m-%d')" && git push)
+        
+        # 使用 git status 確認狀態，避免直接 add 報錯
+        git add Goodinfo_Rankings/
+        
+        # 檢查是否有檔案變動，有變動才 commit 和 push
+        if ! git diff --staged --quiet; then
+          git commit -m "自動更新 18:20 籌碼資料 $(date +'%Y-%m-%d')"
+          git push
+        else
+          echo "No changes to commit."
+        fi
