@@ -43,12 +43,18 @@ jobs:
         git config --local user.email "action@github.com"
         git config --local user.name "GitHub Action"
         
-        # 使用 git status 確認狀態，避免直接 add 報錯
+        # 🌟 關鍵修復 1：先把遠端最新的進度拉下來 (合併)
+        git pull --rebase origin main
+        
+        # 加入所有抓取到的 CSV 檔案
         git add Goodinfo_Rankings/
         
-        # 檢查是否有檔案變動，有變動才 commit 和 push
+        # 🌟 關鍵修復 2：檢查是否有變動，如果有就 Commit 並 Push
         if ! git diff --staged --quiet; then
           git commit -m "自動更新 18:20 籌碼資料 $(date +'%Y-%m-%d')"
+          
+          # 推播前再保險拉取一次，然後推播！
+          git pull --rebase origin main
           git push
         else
           echo "No changes to commit."
