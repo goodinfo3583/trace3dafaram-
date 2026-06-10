@@ -824,7 +824,7 @@ with st.container(border=True):
         with col_1000: scan_and_display("🐳 1000張以上超級大戶動向", 'df_blk5_1000', search_query)
 ############################################    
 # ==========================================
-# 🧭 側邊欄導航 (極速光速版：零爬蟲、零延遲、讀取本地 CSV)
+# 🧭 側邊欄導航與共用函數 (極速光速版：零爬蟲、零延遲、讀取本地 CSV)
 # ==========================================
 import os
 import glob
@@ -832,8 +832,38 @@ import pandas as pd
 import streamlit as st
 import datetime
 import yfinance as yf
+import re  # 確保加上這個，防呆字串處理會用到
 
 DATA_DIR = "./Goodinfo_Rankings"
+
+# ==========================================
+# 🌟 核心共用函數 (放置於最頂端，解決 NameError 與 Excel 掉 0 問題)
+# ==========================================
+def parse_json_history_csv(file_path, date_label):
+    try:
+        df = pd.read_csv(file_path, encoding='utf-8-sig')
+        
+        # 1. 先強制轉為字串，並處理掉可能出現的 .0 結尾與前後空白
+        df['股票代號'] = df['股票代號'].astype(str).str.replace(r'\.0$', '', regex=True).str.strip()
+        
+        # 2. 🌟 終極補零防禦 🌟 (如果是純數字就自動補滿 4 碼)
+        df['股票代號'] = df['股票代號'].apply(lambda x: x.zfill(4) if x.isdigit() else x)
+        
+        # 3. 繼續原本的名稱清理與欄位重新命名
+        df['股票名稱'] = df['股票名稱'].astype(str).str.strip()
+        df = df.rename(columns={'法人持股': f"{date_label}持股%"})
+        return df
+    except: 
+        return pd.DataFrame()
+
+def agg_sections_func(x):
+    valid_x = set()
+    for val in x:
+        if pd.notna(val) and str(val).strip() != "":
+            for p in str(val).split(','):
+                valid_x.add(p.strip())
+    return ",".join([s for s in ['5日', '20日', '60日', '120日'] if s in valid_x])
+# ==========================================
 
 @st.cache_data(ttl=60) 
 def get_latest_csv(keyword):
