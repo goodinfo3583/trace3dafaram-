@@ -275,28 +275,32 @@ def generate_stock_commentary(row):
     else:
         return "❄️ 【弱勢整理】籌碼處於流失或無主力認養狀態，資金效率低。若無特殊題材發酵，短期內建議暫不考量。"
 # ==========================================
-# 🔍 個股籌碼快搜 "標題" (全區塊聯動掃描版 - 終極深藍玻璃卡片版)
+# 🔍 個股籌碼快搜 "標題" (保證生效：電競風科技橫幅版)
 # ==========================================
 st.write("---")
+st.markdown("<div id='section-search'></div>", unsafe_allow_html=True)
 
-# 🌟 啟動 CSS 滲透魔法：尋找底下建立的原生 container 並把它變成深藍玻璃卡片
+# 🌟 使用 100% 絕對生效的 Inline HTML 設計超高質感橫幅
 st.markdown("""
-<style>
-div[data-testid="stVerticalBlockBorderWrapper"]:has(#section-search) {
-    background: linear-gradient(145deg, #0f172a 0%, #1e293b 100%) !important;
-    border: 1px solid #38bdf8 !important;
-    border-radius: 12px !important;
-    box-shadow: 0 4px 20px rgba(0, 210, 255, 0.15) !important;
-    padding: 15px !important;
-}
-</style>
+<div style="background: linear-gradient(90deg, rgba(15,23,42,1) 0%, rgba(14,165,233,0.3) 50%, rgba(15,23,42,1) 100%); 
+            border-top: 1px solid #38bdf8; 
+            border-bottom: 1px solid #38bdf8; 
+            padding: 20px 20px; 
+            border-radius: 10px;
+            text-align: center;
+            box-shadow: 0px 0px 20px rgba(56, 189, 248, 0.2);
+            margin-bottom: 25px;">
+    <h2 style="color: #e0f2fe; margin: 0; letter-spacing: 2px; text-shadow: 0 0 15px rgba(56, 189, 248, 0.8);">
+        🔍 個股籌碼快搜 (戰情診斷室)
+    </h2>
+    <p style="color: #94a3b8; margin-top: 8px; font-size: 14px; margin-bottom: 0;">
+        輸入代號一鍵聯動：AI 型態掃描 ｜ 法人動向 ｜ 1000張大戶追蹤
+    </p>
+</div>
 """, unsafe_allow_html=True)
 
-# 🌟 使用 Streamlit 原生帶邊框的容器，這樣裡面所有的 K線、表格才不會掉出去
+# 使用預設的帶邊框容器把圖表和表格包起來
 with st.container(border=True):
-    st.markdown("<div id='section-search'></div>", unsafe_allow_html=True)
-    st.subheader("🔍 個股籌碼快搜 (全方位診斷)")
-
     # ==========================================
     # 📈 繪製 K 線圖與技術分析引擎
     # ==========================================
@@ -832,24 +836,18 @@ import pandas as pd
 import streamlit as st
 import datetime
 import yfinance as yf
-import re  # 確保加上這個，防呆字串處理會用到
+import re
 
 DATA_DIR = "./Goodinfo_Rankings"
 
 # ==========================================
-# 🌟 核心共用函數 (放置於最頂端，解決 NameError 與 Excel 掉 0 問題)
+# 🌟 核心共用函數 (終極防呆：從此免疫 Excel 吃掉 0 的問題)
 # ==========================================
 def parse_json_history_csv(file_path, date_label):
     try:
         df = pd.read_csv(file_path, encoding='utf-8-sig')
-        
-        # 1. 先強制轉為字串，並處理掉可能出現的 .0 結尾與前後空白
         df['股票代號'] = df['股票代號'].astype(str).str.replace(r'\.0$', '', regex=True).str.strip()
-        
-        # 2. 🌟 終極補零防禦 🌟 (如果是純數字就自動補滿 4 碼)
         df['股票代號'] = df['股票代號'].apply(lambda x: x.zfill(4) if x.isdigit() else x)
-        
-        # 3. 繼續原本的名稱清理與欄位重新命名
         df['股票名稱'] = df['股票名稱'].astype(str).str.strip()
         df = df.rename(columns={'法人持股': f"{date_label}持股%"})
         return df
@@ -863,15 +861,21 @@ def agg_sections_func(x):
             for p in str(val).split(','):
                 valid_x.add(p.strip())
     return ",".join([s for s in ['5日', '20日', '60日', '120日'] if s in valid_x])
-# ==========================================
 
+# 🌟 全域資料夾讀取引擎：所有 CSV 一讀進來，代號全部強制補零！
 @st.cache_data(ttl=60) 
 def get_latest_csv(keyword):
     if not os.path.exists(DATA_DIR): return None, "未知"
     files = glob.glob(os.path.join(DATA_DIR, f"*{keyword}*csv"))
     if not files: return None, "未知"
     files.sort(reverse=True)
-    try: return pd.read_csv(files[0]), os.path.basename(files[0])[:8]
+    try: 
+        df = pd.read_csv(files[0])
+        for col in ['股票代號', '代號', '證券代號']:
+            if col in df.columns:
+                df[col] = df[col].astype(str).str.replace(r'\.0$', '', regex=True).str.strip()
+                df[col] = df[col].apply(lambda x: x.zfill(4) if x.isdigit() else x)
+        return df, os.path.basename(files[0])[:8]
     except: return None, "未知"
 
 @st.cache_data(ttl=60)
@@ -881,7 +885,13 @@ def get_prev_csv(keyword, current_date):
     past_files = [f for f in files if os.path.basename(f)[:8] < current_date]
     if not past_files: return None
     past_files.sort(reverse=True)
-    try: return pd.read_csv(past_files[0])
+    try: 
+        df = pd.read_csv(past_files[0])
+        for col in ['股票代號', '代號', '證券代號']:
+            if col in df.columns:
+                df[col] = df[col].astype(str).str.replace(r'\.0$', '', regex=True).str.strip()
+                df[col] = df[col].apply(lambda x: x.zfill(4) if x.isdigit() else x)
+        return df
     except: return None
 
 def get_diff_ui(today_val, prev_val):
@@ -896,6 +906,9 @@ def get_diff_ui(today_val, prev_val):
 
 tab1, tab2 = st.sidebar.tabs(["📊 大盤與期權", "🧭 戰情導航"])
 
+# ------------------------------------------
+# 1. 大盤籌碼導航總覽 (終極精準融資 + 期貨變化量)
+# ------------------------------------------
 # ------------------------------------------
 # 1. 大盤籌碼導航總覽 (終極精準融資 + 期貨變化量)
 # ------------------------------------------
