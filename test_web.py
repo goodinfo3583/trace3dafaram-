@@ -614,7 +614,7 @@ with st.container(border=True):
     # ==========================================
     # 🎯 搜尋輸入框
     # ==========================================
-    search_query = st.text_input("請輸入想觀測的股票代號或名稱 (例如: 3231 或 緯創)：", key="global_search_final")
+    search_query = st.text_input("輸入代號或名稱 (例如: 3231 或 緯創 或3231緯創)：", key="global_search_final")
 
     pure_stock_id = ""
     display_name = search_query
