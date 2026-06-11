@@ -1226,7 +1226,7 @@ div.stButton > button::after {
     left: -150%;
     width: 30%;
     height: 200%;
-    background: linear-gradient(90deg, transparent, rgba(255, 255, 255, 0.4), transparent);
+    background: linear-gradient(90deg, transparent, rgba(200, 205, 211, 0.4), transparent);
     transform: rotate(30deg);
     animation: shimmer 4s infinite; /* 4秒循環一次，達到偶爾反光的效果 */
 }
