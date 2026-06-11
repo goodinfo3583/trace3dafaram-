@@ -3697,7 +3697,7 @@ with top_pool_container:
                             conn.update(spreadsheet=SHEET_URL, worksheet="選股歷史", data=final_save_df)
                     except: pass 
 
-                tab1, tab2, tab3 = st.tabs(["◈ 今日最新排行", "◈ 歷史分數追蹤表", "◈ 模型驗證：每週 Top 5 追蹤"])
+                tab1, tab2, tab3 = st.tabs(["🔹 今日最新排行", "🔹 歷史分數追蹤表", "🔹 模型驗證：每週 Top 5 追蹤"])
                 
                 with tab1:
                     st.dataframe(
