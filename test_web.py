@@ -3411,7 +3411,7 @@ with top_pool_container:
             🏆 數據分析觀察名單
         </h2>
         <div style='font-size:13px; color:#00D2FF; font-weight:500; margin-top:8px;'>
-            📊 資料基準日 : 📍區塊1(法人): {fmt_d(d_b1_inst)} ｜ 📍區塊2&3(籌碼): {fmt_d(d_b23_chip)} ｜ 📍區塊4(資券): {fmt_d(d_b4_margin)} ｜ 📍區塊5(大戶): {fmt_d(d_b5_share)}
+             資料基準日 : 📍區塊1(法人): {fmt_d(d_b1_inst)} ｜ 📍區塊2&3(籌碼): {fmt_d(d_b23_chip)} ｜ 📍區塊4(資券): {fmt_d(d_b4_margin)} ｜ 📍區塊5(大戶): {fmt_d(d_b5_share)}
         </div>
     </div>
     """, unsafe_allow_html=True)
@@ -3697,7 +3697,7 @@ with top_pool_container:
                             conn.update(spreadsheet=SHEET_URL, worksheet="選股歷史", data=final_save_df)
                     except: pass 
 
-                tab1, tab2, tab3 = st.tabs(["🔥 今日最新排行", "📈 歷史分數追蹤表", "🎯 模型驗證：每週 Top 5 追蹤"])
+                tab1, tab2, tab3 = st.tabs(["◈ 今日最新排行", "◈ 歷史分數追蹤表", "◈ 模型驗證：每週 Top 5 追蹤"])
                 
                 with tab1:
                     st.dataframe(
