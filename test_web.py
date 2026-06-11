@@ -1205,6 +1205,40 @@ def fetch_github_json_all():
 
 json_dfs, latest_all_df = fetch_github_json_all()
 
+
+# ------------------------------------------
+# 💡 UI 特效區：按鈕反光 (Shimmer) 動畫
+# ------------------------------------------
+st.markdown("""
+<style>
+/* 針對所有 Streamlit 按鈕的特效 */
+div.stButton > button {
+    position: relative;
+    overflow: hidden;
+    transition: all 0.3s ease;
+}
+
+/* 反光掃描的核心動畫 */
+div.stButton > button::after {
+    content: "";
+    position: absolute;
+    top: -50%;
+    left: -150%;
+    width: 30%;
+    height: 200%;
+    background: linear-gradient(90deg, transparent, rgba(255, 255, 255, 0.4), transparent);
+    transform: rotate(30deg);
+    animation: shimmer 4s infinite; /* 4秒循環一次，達到偶爾反光的效果 */
+}
+
+@keyframes shimmer {
+    0% { left: -150%; }
+    25% { left: 150%; } /* 閃過去 */
+    100% { left: 150%; } /* 剩下的時間靜止，營造偶爾出現感 */
+}
+</style>
+""", unsafe_allow_html=True)
+
 # ------------------------------------------
 # 💾 站長專屬：JSON 200名快照存檔區
 # ------------------------------------------
