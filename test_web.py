@@ -2912,7 +2912,7 @@ st.markdown(f"""
         💰 區塊 5：大股東動向
     </h2>
     <div style='font-size:13px; color:#00D2FF; font-weight:500; margin-top:8px;'>
-         基準日 : {fmt_global_date} ｜ 雙分頁對稱系統 + ETF與債券過濾引擎
+         基準日 : {fmt_global_date} 
     </div>
 </div>
 """, unsafe_allow_html=True)
