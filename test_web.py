@@ -2954,9 +2954,10 @@ filtered_1000_df = pd.DataFrame()
 filtered_400_df = pd.DataFrame()
 
 # ==========================================
-# 👑 TAB 1: 1000張大戶系統 (增補：週動態、6週增減)
+# 👑 TAB 1: 1000張大戶系統 (已修正為精準讀取「比例%」欄位)
 # ==========================================
 with tab_1000:
+    # 修正：檔名 Pattern 改為對應新的命名方式
     csv_pattern_b5_1000 = os.path.join(DATA_DIR, "*大股東1000張數週增加*.csv")
     all_files_b5_1000 = glob.glob(csv_pattern_b5_1000)
     
@@ -2986,15 +2987,19 @@ with tab_1000:
                     
                     c_code = next((c for c in df_chunk.columns if '代號' in c), None)
                     c_name = next((c for c in df_chunk.columns if '名稱' in c), None)
-                    c_target = next((c for c in df_chunk.columns if '1千張' in c and '%' in c), None)
+                    
+                    # 🎯 修正：讀取新版的「比例」與「增減」欄位
+                    c_abs_pct = next((c for c in df_chunk.columns if '持股超過1千張(%)' in c), None)
+                    c_delta = next((c for c in df_chunk.columns if '超過1千張增減' in c), None)
                     c_date = next((c for c in df_chunk.columns if '更新 日期' in c or '更新日期' in c), None)
                     
-                    if not all([c_code, c_name, c_target]):
+                    if not all([c_code, c_name, c_delta]):
                         continue
                         
                     df_chunk['股票代號'] = df_chunk[c_code].astype(str).str.extract(r'(\d+)')
                     df_chunk['股票名稱'] = df_chunk[c_name].astype(str).str.strip()
-                    df_chunk['增減值'] = pd.to_numeric(df_chunk[c_target].astype(str).str.replace(',', '').str.replace('%', ''), errors='coerce')
+                    # 將增減值清理並轉為數值 (自動過濾 + 號與 % 符號)
+                    df_chunk['增減值'] = pd.to_numeric(df_chunk[c_delta].astype(str).str.replace('+', '').str.replace('%', ''), errors='coerce')
                     
                     if detected_date_col is None and c_date and not df_chunk[c_date].dropna().empty:
                         raw_date = str(df_chunk[c_date].dropna().iloc[0]).replace('/', '').strip()
@@ -3028,8 +3033,10 @@ with tab_1000:
                 
             latest_1000_col = sorted_1000_dates[0]
             
+            # 🔥 智慧計算週動態
             def get_trend_1000(val):
                 if pd.isna(val): return "無資料"
+                # 這裡的邏輯適用於您的新數據格式 (佔總股權的增減 %)
                 if val >= 1.5: return "🔥 大增"
                 if val >= 0.5: return "📈 增"
                 if val > 0: return "↗️ 微增"
@@ -3040,9 +3047,11 @@ with tab_1000:
             
             master_1000['週動態'] = master_1000[latest_1000_col].apply(get_trend_1000)
             
+            # 累加近 6 週增減
             available_1000_weeks = sorted_1000_dates[:6]
             master_1000['6週增減'] = master_1000[available_1000_weeks].sum(axis=1, min_count=1)
             
+            # 顯示格式整理
             master_1000 = master_1000.rename(columns={latest_1000_col: f"▼{latest_1000_col}"})
             sorted_1000_dates[0] = f"▼{latest_1000_col}"
             
@@ -3050,11 +3059,11 @@ with tab_1000:
             
             final_1000_cols = ['股票代號', '股票名稱', '週動態', '6週增減'] + sorted_1000_dates
             
+            # 過濾並輸出
             filtered_1000_df = apply_b5_market_filters(master_1000[final_1000_cols], show_etf, show_bond)
             st.dataframe(filtered_1000_df, use_container_width=True, hide_index=True)
             
             st.session_state['df_blk5_1000'] = filtered_1000_df
-
 # ==========================================
 # 💰 TAB 2: 400張大戶系統
 # ==========================================
