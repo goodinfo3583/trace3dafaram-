@@ -904,7 +904,7 @@ def get_diff_ui(today_val, prev_val):
         return f"<br><span style='color:{color}; font-size:11px;'>({sign}{diff:,})</span>"
     except: return ""
 
-tab1, tab2 = st.sidebar.tabs(["📊 大盤與期權", "🧭 戰情導航"])
+tab1, tab2 = st.sidebar.tabs(["🔹 大盤與期權", "🔹 戰情導航"])
 
 
 # ------------------------------------------
@@ -1227,7 +1227,7 @@ with c_btn1:
     st.link_button("📊 DDong 台股法人籌碼數據儀表板", "https://goodinfo3583.github.io/DDong_tw-institutional-stocker/", use_container_width=True)
 
 with c_btn2:
-    try: exp_container = st.popover(f"🛠 站長：下載 200名快照 ({status_text})", use_container_width=True)
+    try: exp_container = st.popover(f"🛠 站長快照 ({status_text})", use_container_width=True)
     except AttributeError: exp_container = st.expander(f"🛠 站長：下載 200名快照 ({status_text})", expanded=False)
         
     with exp_container:
@@ -2925,7 +2925,7 @@ def apply_b5_market_filters(df, show_etf, show_bond):
     return df[mask]
 
 # 🎯 升級點 1：統一分頁名稱
-tab_1000, tab_400 = st.tabs(["👑 1000張大戶系統 (週持有%)", "💰 400張大戶系統 (週持有%)"])
+tab_1000, tab_400 = st.tabs(["🔹 1000張大戶系統 (週持有%)", "🔹 400張大戶系統 (週持有%)"])
 
 # ==========================================
 # 👑 TAB 1: 1000張大戶系統 (增補：週動態、6週增減)
@@ -3222,7 +3222,7 @@ status_icon = "🟢" if df_block is not None else "🌕"
 st.markdown(f"### 💸 區塊 6：鉅額交易動向 <span style='font-size: 0.6em; color: #00D2FF;'>({formatted_date} {status_icon})</span>", unsafe_allow_html=True)
 st.write("💡 鉅額交易常為大戶私下換手籌碼，成交價可視為「支撐/壓力」防守線；短線跌破建議嚴設停損。")
 
-tab_today, tab_hist = st.tabs(["🆕 今日最新鉅額交易", "📅 歷史防守價追蹤表"])
+tab_today, tab_hist = st.tabs(["🔹 今日最新鉅額交易", "🔹 歷史防守價追蹤表"])
 
 # ==================== Tab 1: 今日鉅額交易 ====================
 with tab_today:
