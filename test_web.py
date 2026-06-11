@@ -3344,6 +3344,7 @@ with top_pool_container:
     import re
     import json
     import pandas as pd
+    import datetime
 
     def get_df_safe(key): return st.session_state.get(key, pd.DataFrame())
     
@@ -3370,12 +3371,17 @@ with top_pool_container:
             elif "融資" in filename or "融券" in filename or "借券" in filename or "資券" in filename:
                 if file_date > d_b4_margin: d_b4_margin = file_date
 
-    # 直接從大戶 DataFrame 裡面挖出真正的集保結算日期
-    if not df_b5_1000.empty:
-        date_col = next((c for c in df_b5_1000.columns if '週動態' in c), None)
-        if date_col:
-            d_match = re.search(r'(\d{4})週動態', date_col)
-            if d_match: d_b5_share = f"2026{d_match.group(1)}"
+    # 🔥 關鍵修復：直接去讀取大戶 CSV 檔案的「標題列」，強行挖出真實結算日期！
+    b5_files = glob.glob(os.path.join(DATA_DIR, "*大股東*千張*.csv")) + glob.glob(os.path.join(DATA_DIR, "*大股東*400張*.csv"))
+    if b5_files:
+        latest_b5_file = sorted(b5_files, reverse=True)[0]
+        try:
+            with open(latest_b5_file, 'r', encoding='utf-8-sig') as f:
+                header_line = f.readline()
+                d_match = re.search(r'(\d{4})週動態', header_line)
+                if d_match:
+                    d_b5_share = f"2026{d_match.group(1)}"
+        except: pass
 
     def fmt_d(d_str): return f"{d_str[4:6]}/{d_str[6:]}" if d_str != "00000000" else "--/--"
 
@@ -3563,7 +3569,7 @@ with top_pool_container:
                         if abs(short_decrease_val) >= 1:
                             score += 1.2; details.append("空頭認輸(借券減>1%): +1.2")
 
-                    # 🔥 關鍵修復：大戶文字顯示「精簡化」 (千張/四百)
+                    # 🔥 大戶文字顯示精簡化 (千張/四百)
                     r_b5_1000, r_b5_400 = "-", "-"
                     trend_1000_val, trend_400_val = "", ""
                     
@@ -3756,6 +3762,7 @@ with top_pool_container:
                             cols = st.columns(5)
                             for idx, (i, row) in enumerate(top5_df.iterrows()):
                                 with cols[idx]:
+                                    # 動態判定「當日△」的顏色 (正數紅、負數綠)
                                     delta_str = str(row['△'])
                                     delta_color = "#FF4B4B" if "+" in delta_str else ("#00E272" if "-" in delta_str else "#E2E8F0")
                                     
@@ -3800,7 +3807,39 @@ with top_pool_container:
                                         st.error("密碼錯誤")
                                         
                     st.markdown("### 📊 歷史名單回測觀察")
-                    track_file = os.path.join(DATA_DIR, "Weekly_Top5_Tracking
+                    track_file = os.path.join(DATA_DIR, "Weekly_Top5_Tracking.csv")
+                    if os.path.exists(track_file):
+                        try:
+                            history_track_df = pd.read_csv(track_file, encoding='utf-8-sig')
+                            if not history_track_df.empty:
+                                available_weeks = sorted(history_track_df['鎖定日期'].unique(), reverse=True)
+                                selected_week = st.selectbox("📅 選擇要回顧的鎖定日期", available_weeks)
+                                
+                                week_df = history_track_df[history_track_df['鎖定日期'] == selected_week].copy()
+                                
+                                if not res_df.empty:
+                                    today_scores = dict(zip(res_df['代號'].astype(str), res_df['總分']))
+                                    today_deltas = dict(zip(res_df['代號'].astype(str), res_df['△']))
+                                    
+                                    week_df['今日分數'] = week_df['代號'].astype(str).map(today_scores).fillna(0)
+                                    week_df['今日△'] = week_df['代號'].astype(str).map(today_deltas).fillna("未進榜")
+                                    
+                                    def score_diff(row):
+                                        diff = float(row['今日分數']) - float(row['總分']) 
+                                        if diff > 0: return f"📈 +{diff:.1f}"
+                                        elif diff < 0: return f"📉 {diff:.1f}"
+                                        else: return "-"
+                                        
+                                    week_df['模型分數變化'] = week_df.apply(score_diff, axis=1)
+                                
+                                show_cols = ['鎖定日期', '代號', '名稱', '總分', '今日分數', '模型分數變化', '今日△', '大股東動向']
+                                st.dataframe(week_df[[c for c in show_cols if c in week_df.columns]], use_container_width=True, hide_index=True)
+                                
+                                st.info("💡 **驗證方法**：觀察這些鎖定的股票在未來一週的『模型分數變化』是否持續上升？如果分數持續上升且股價也上漲，代表我們的【大股東+集中度】指標非常精準！")
+                        except:
+                            st.warning("讀取追蹤檔案失敗。")
+                    else:
+                        st.write("⚪ 尚無歷史追蹤紀錄，請點擊上方按鈕建立第一筆！")
 # ==========================================
 # ==========================================
 # 🧪 測試區：Google Sheets 連線測試
