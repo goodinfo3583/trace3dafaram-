@@ -1205,7 +1205,6 @@ def fetch_github_json_all():
 
 json_dfs, latest_all_df = fetch_github_json_all()
 
-
 # ------------------------------------------
 # 💡 UI 特效區：按鈕反光 (Shimmer) 動畫
 # ------------------------------------------
@@ -1218,23 +1217,29 @@ div.stButton > button {
     transition: all 0.3s ease;
 }
 
-/* 反光掃描的核心動畫 */
+/* 高對比反光掃描特效 */
 div.stButton > button::after {
     content: "";
     position: absolute;
     top: -50%;
     left: -150%;
-    width: 30%;
-    height: 200%;
-    background: linear-gradient(90deg, transparent, rgba(200, 205, 211, 0.4), transparent);
-    transform: rotate(30deg);
-    animation: shimmer 4s infinite; /* 4秒循環一次，達到偶爾反光的效果 */
+    width: 200%; /* 加大覆蓋範圍 */
+    height: 300%;
+    /* 使用更亮、更純白的反光條 */
+    background: linear-gradient(
+        90deg, 
+        transparent 30%, 
+        rgba(255, 255, 255, 0.9) 50%, 
+        transparent 70%
+    );
+    transform: rotate(25deg);
+    animation: shimmer 3s infinite; /* 3秒循環一次，閃爍感更強 */
 }
 
 @keyframes shimmer {
-    0% { left: -150%; }
-    25% { left: 150%; } /* 閃過去 */
-    100% { left: 150%; } /* 剩下的時間靜止，營造偶爾出現感 */
+    0% { left: -150%; top: -100%; }
+    30% { left: 100%; top: -50%; } /* 閃過的時間 */
+    100% { left: 100%; top: -50%; } /* 靜止等待下一次閃爍 */
 }
 </style>
 """, unsafe_allow_html=True)
