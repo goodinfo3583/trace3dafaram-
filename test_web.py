@@ -2957,11 +2957,11 @@ filtered_400_df = pd.DataFrame()
 # 👑 TAB 1: 1000張大戶系統 (增補：週動態、6週增減)
 # ==========================================
 with tab_1000:
-    csv_pattern_b5_1000 = os.path.join(DATA_DIR, "*大股東800張數週增加*.csv")
+    csv_pattern_b5_1000 = os.path.join(DATA_DIR, "*大股東1000張數週增加*.csv")
     all_files_b5_1000 = glob.glob(csv_pattern_b5_1000)
     
     if not all_files_b5_1000:
-        st.info("⚪ 暫無 1000張大戶相關資料，請確認資料夾中含有「大股東800張數週增加」之 CSV 檔案。")
+        st.info("⚪ 暫無 1000張大戶相關資料，請確認資料夾中含有「大股東1000張數週增加」之 CSV 檔案。")
     else:
         file_groups_1000 = {}
         for f in all_files_b5_1000:
