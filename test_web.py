@@ -3371,7 +3371,7 @@ with top_pool_container:
             elif "融資" in filename or "融券" in filename or "借券" in filename or "資券" in filename:
                 if file_date > d_b4_margin: d_b4_margin = file_date
 
-    # 🔥 終極修復：放寬大戶檔案關鍵字（全面包含大股東與神秘金字塔），並掃描內容挖出 0605 真實日期！
+    # 🔥 大戶檔案掃描 (找出真實 0605 日期)
     b5_files = (
         glob.glob(os.path.join(DATA_DIR, "*大股東*")) + 
         glob.glob(os.path.join(DATA_DIR, "*神秘金字塔*")) + 
@@ -3381,26 +3381,23 @@ with top_pool_container:
         latest_b5_file = sorted(b5_files, reverse=True)[0]
         try:
             with open(latest_b5_file, 'r', encoding='utf-8-sig', errors='ignore') as f:
-                head_content = f.read(4000)  # 擴大讀取範圍至前 4000 字元，確保涵蓋所有欄位標題
+                head_content = f.read(4000)
                 
-                # 優先尋找是否有 "XXXX週動態" 欄位 (例如 0605週動態)
                 d_match = re.search(r'(\d{4})週動態', head_content)
                 if d_match:
                     d_b5_share = f"2026{d_match.group(1)}"
                 else:
-                    # 備用方案一：尋找是否含有 "更新 日期" 欄位與後續數字
                     d_match2 = re.search(r'更新\s*日期[^\d]*(\d{4})', head_content)
                     if d_match2:
                         d_b5_share = f"2026{d_match2.group(1)}"
                     else:
-                        # 保底方案二：如果內容中沒寫，直接從最新大戶檔名抓取日期，絕不讓它變成 --/--
                         f_match = re.search(r'(202\d{5})', os.path.basename(latest_b5_file))
                         if f_match: d_b5_share = f_match.group(1)
         except: pass
 
     def fmt_d(d_str): return f"{d_str[4:6]}/{d_str[6:]}" if d_str != "00000000" else "--/--"
 
-    # 🌟 加上超高質感的科技風漸層橫幅標題
+    # 🌟 科技風漸層橫幅標題
     st.markdown(f"""
     <div style="background: linear-gradient(90deg, rgba(15,23,42,1) 0%, rgba(14,165,233,0.3) 50%, rgba(15,23,42,1) 100%); 
                 border-top: 1px solid #38bdf8; 
@@ -3419,7 +3416,6 @@ with top_pool_container:
     </div>
     """, unsafe_allow_html=True)
 
-    # 🌟 用 st.container(border=True) 讓整個區塊繼承深藍色發光玻璃卡片效果
     with st.container(border=True):
         st.info("💡 **評分方式**：法人籌碼上榜為底，搭配「千張大戶權重加乘」與其他數據積分。(請參考▼明細)")
 
@@ -3575,16 +3571,16 @@ with top_pool_container:
                             if change_val > 3:
                                 score += 0.7; details.append("榜上+漲幅>3%: +0.7")
                                 
+                        # 🔥 已修復 && 為 and
                         short_decrease_val = 0.0
-                        if not df_b4_sho_pct.empty && sid in df_b4_sho_pct['股票代號'].values:
-                            s_col = next((c for c in df_b4_sho_pct.columns if '當日' in str(c) && ('%' in str(c) or '增減' in str(c))), None)
+                        if not df_b4_sho_pct.empty and sid in df_b4_sho_pct['股票代號'].values:
+                            s_col = next((c for c in df_b4_sho_pct.columns if '當日' in str(c) and ('%' in str(c) or '增減' in str(c))), None)
                             if s_col:
                                 try: short_decrease_val = float(str(df_b4_sho_pct.loc[df_b4_sho_pct['股票代號'] == sid, s_col].iloc[0]).replace('%', ''))
                                 except: pass
                         if abs(short_decrease_val) >= 1:
                             score += 1.2; details.append("空頭認輸(借券減>1%): +1.2")
 
-                    # 精簡化大戶標籤
                     r_b5_1000, r_b5_400 = "-", "-"
                     trend_1000_val, trend_400_val = "", ""
                     
@@ -3825,7 +3821,7 @@ with top_pool_container:
                                 
                                 show_cols = ['鎖定日期', '代號', '名稱', '總分', '今日分數', '模型分數變化', '今日△', '大股東動向']
                                 st.dataframe(week_df[[c for c in show_cols if c in week_df.columns]], use_container_width=True, hide_index=True)
-                                st.info("💡 **驗證方法**：觀察這些鎖定的股票在未來一週的『模型分數變化』是否持續上升？如果分數持續上升且股價也上擺，代表我們的【大股東+集中度】指標非常精準！")
+                                st.info("💡 **驗證方法**：觀察這些鎖定的股票在未來一週的『模型分數變化』是否持續上升？如果分數持續上升且股價也上漲，代表我們的【大股東+集中度】指標非常精準！")
                         except: st.warning("讀取追蹤檔案失敗。")
                     else: st.write("⚪ 尚無歷史追蹤紀錄，請點擊上方按鈕建立第一筆！")
 # ==========================================
