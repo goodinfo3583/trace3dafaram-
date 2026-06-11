@@ -2912,7 +2912,7 @@ st.markdown(f"""
         💰 區塊 5：大股東動向
     </h2>
     <div style='font-size:13px; color:#00D2FF; font-weight:500; margin-top:8px;'>
-        📊 基準日 : {fmt_global_date} ｜ 雙分頁對稱系統 + ETF與債券過濾引擎
+         基準日 : {fmt_global_date} ｜ 雙分頁對稱系統 + ETF與債券過濾引擎
     </div>
 </div>
 """, unsafe_allow_html=True)
@@ -2946,7 +2946,7 @@ def apply_b5_market_filters(df, show_etf, show_bond):
 tab_1000, tab_400, tab_sync = st.tabs([
     "🔹 1000張大戶系統 (週持有%)", 
     "🔹 400張大戶系統 (週持有%)",
-    "🎯 雙引擎同步共振 (千/四百同增)"
+    "🔹 雙引擎同步共振 (千/四百同增)"
 ])
 
 # 預先宣告這兩個變數，以供分頁 3 使用
