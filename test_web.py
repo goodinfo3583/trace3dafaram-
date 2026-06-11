@@ -614,7 +614,7 @@ with st.container(border=True):
     # ==========================================
     # 🎯 搜尋輸入框
     # ==========================================
-    search_query = st.text_input("輸入代號或名稱 (例如: 3231 或 緯創 或3231緯創)：", key="global_search_final")
+    search_query = st.text_input("輸入代號或名稱 (例如: 3231 或 緯創 或 3231緯創)：", key="global_search_final")
 
     pure_stock_id = ""
     display_name = search_query
@@ -2897,13 +2897,31 @@ fmt_global_date = f"{global_latest_date[:4]}/{global_latest_date[4:6]}/{global_l
 
 st.write("---")
 st.markdown("<div id='section-5'></div>", unsafe_allow_html=True)
-st.markdown(f"## 💰 區塊 5：大股東動向 <span style='font-size: 0.5em; color: #00D2FF;'>(基準日 {fmt_global_date})</span>", unsafe_allow_html=True)
 
-# 🎯 升級點 2：更新貼心提示文字
+# 🌟 升級點：科技風漸層橫幅標題 (玻璃卡片 UI)
+st.markdown(f"""
+<div style="background: linear-gradient(90deg, rgba(15,23,42,1) 0%, rgba(14,165,233,0.3) 50%, rgba(15,23,42,1) 100%); 
+            border-top: 1px solid #38bdf8; 
+            border-bottom: 1px solid #38bdf8; 
+            padding: 15px 20px; 
+            border-radius: 10px;
+            text-align: center;
+            box-shadow: 0px 0px 20px rgba(56, 189, 248, 0.2);
+            margin-bottom: 20px;">
+    <h2 style="color: #e0f2fe; margin: 0; letter-spacing: 2px; text-shadow: 0 0 15px rgba(56, 189, 248, 0.8);">
+        💰 區塊 5：大股東動向
+    </h2>
+    <div style='font-size:13px; color:#00D2FF; font-weight:500; margin-top:8px;'>
+        📊 基準日 : {fmt_global_date} ｜ 雙分頁對稱系統 + ETF與債券過濾引擎
+    </div>
+</div>
+""", unsafe_allow_html=True)
+
+# 🎯 更新貼心提示文字
 st.write("💡 千張與四百張長線千金大戶股權動態週持有張數更新軌跡。")
 
 # ------------------------------------------
-# 🧭 升級點 3：新增功能篩選器 (ETF、債券功能聯動)
+# 🧭 新增功能篩選器 (ETF、債券功能聯動)
 # ------------------------------------------
 filter_c1, filter_c2, _filter_space = st.columns([2, 3, 5])
 show_etf = filter_c1.checkbox("顯示 ETF", value=True, key="b5_global_etf")
@@ -2924,8 +2942,16 @@ def apply_b5_market_filters(df, show_etf, show_bond):
         mask = mask & ~is_bond              # 隱藏債券與債券 ETF
     return df[mask]
 
-# 🎯 升級點 1：統一分頁名稱
-tab_1000, tab_400 = st.tabs(["🔹 1000張大戶系統 (週持有%)", "🔹 400張大戶系統 (週持有%)"])
+# 🎯 升級點：新增第 3 分頁 (雙引擎共振)
+tab_1000, tab_400, tab_sync = st.tabs([
+    "🔹 1000張大戶系統 (週持有%)", 
+    "🔹 400張大戶系統 (週持有%)",
+    "🎯 雙引擎同步共振 (千/四百同增)"
+])
+
+# 預先宣告這兩個變數，以供分頁 3 使用
+filtered_1000_df = pd.DataFrame()
+filtered_400_df = pd.DataFrame()
 
 # ==========================================
 # 👑 TAB 1: 1000張大戶系統 (增補：週動態、6週增減)
@@ -3002,7 +3028,6 @@ with tab_1000:
                 
             latest_1000_col = sorted_1000_dates[0]
             
-            # 🔥 升級點 1：智慧計算千張大戶的「週動態」
             def get_trend_1000(val):
                 if pd.isna(val): return "無資料"
                 if val >= 1.5: return "🔥 大增"
@@ -3015,11 +3040,9 @@ with tab_1000:
             
             master_1000['週動態'] = master_1000[latest_1000_col].apply(get_trend_1000)
             
-            # 🔥 升級點 1：動態將最近 6 週的每週增減數字進行累加，組出「6週增減」
             available_1000_weeks = sorted_1000_dates[:6]
             master_1000['6週增減'] = master_1000[available_1000_weeks].sum(axis=1, min_count=1)
             
-            # 僅最新一欄加 ▼
             master_1000 = master_1000.rename(columns={latest_1000_col: f"▼{latest_1000_col}"})
             sorted_1000_dates[0] = f"▼{latest_1000_col}"
             
@@ -3027,7 +3050,6 @@ with tab_1000:
             
             final_1000_cols = ['股票代號', '股票名稱', '週動態', '6週增減'] + sorted_1000_dates
             
-            # 執行市場過濾器
             filtered_1000_df = apply_b5_market_filters(master_1000[final_1000_cols], show_etf, show_bond)
             st.dataframe(filtered_1000_df, use_container_width=True, hide_index=True)
             
@@ -3139,11 +3161,42 @@ with tab_400:
                     
             final_df = final_df.rename(columns=rename_dict)
             
-            # 執行市場過濾器
             filtered_400_df = apply_b5_market_filters(final_df, show_etf, show_bond)
             st.dataframe(filtered_400_df, use_container_width=True, hide_index=True)
             
             st.session_state['df_blk5'] = filtered_400_df
+
+# ==========================================
+# 🎯 TAB 3: 雙引擎同步共振 (千張與四百張同增)
+# ==========================================
+with tab_sync:
+    if not filtered_1000_df.empty and not filtered_400_df.empty:
+        # 分別篩選出「週動態」包含 "增" 的標的 (涵蓋: 微增、增、大增)
+        df1_inc = filtered_1000_df[filtered_1000_df['週動態'].astype(str).str.contains('增', na=False)].copy()
+        df2_inc = filtered_400_df[filtered_400_df['週動態'].astype(str).str.contains('增', na=False)].copy()
+        
+        # 為了合併後欄位不打架，幫除了代號與名稱外的欄位加上後綴
+        df1_cols = [c for c in df1_inc.columns if c not in ['股票代號', '股票名稱']]
+        df1_inc.rename(columns={c: f"{c} (千張)" for c in df1_cols}, inplace=True)
+        
+        df2_cols = [c for c in df2_inc.columns if c not in ['股票代號', '股票名稱']]
+        df2_inc.rename(columns={c: f"{c} (四百)" for c in df2_cols}, inplace=True)
+        
+        # 進行交集合併 (Inner Join)，找出兩邊都符合的股票
+        sync_df = pd.merge(df1_inc, df2_inc, on=['股票代號', '股票名稱'], how='inner')
+        
+        if not sync_df.empty:
+            # 嘗試用 1000 張大戶的最新週數據進行遞減排序
+            sort_col = next((c for c in sync_df.columns if '▼' in c and '千張' in c), None)
+            if sort_col:
+                sync_df = sync_df.sort_values(by=sort_col, ascending=False)
+                
+            st.success(f"🔥 強烈訊號！共有 **{len(sync_df)}** 檔標的出現大戶雙引擎共振 (千張與四百張同增)！")
+            st.dataframe(sync_df, use_container_width=True, hide_index=True)
+        else:
+            st.info("⚪ 最新一週目前沒有「千張與四百張」同時增加的共振標的。")
+    else:
+        st.warning("⚠️ 需先確保 1000 張與 400 張資料皆有成功載入，才能啟動共振掃描引擎。")
             
 # ==========================================
 # 💸 區塊 6：盤後鉅額交易總表 (原生 Dataframe 升級版 + 交易別顯示)
