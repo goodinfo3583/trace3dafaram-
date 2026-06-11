@@ -3371,16 +3371,22 @@ with top_pool_container:
             elif "融資" in filename or "融券" in filename or "借券" in filename or "資券" in filename:
                 if file_date > d_b4_margin: d_b4_margin = file_date
 
-    # 🔥 關鍵修復：直接去讀取大戶 CSV 檔案的「標題列」，強行挖出真實結算日期！
+    # 🔥 關鍵修復：暴力掃描大戶 CSV 檔案前 2000 字元，強行挖出真實結算日期！
     b5_files = glob.glob(os.path.join(DATA_DIR, "*大股東*千張*.csv")) + glob.glob(os.path.join(DATA_DIR, "*大股東*400張*.csv"))
     if b5_files:
         latest_b5_file = sorted(b5_files, reverse=True)[0]
         try:
-            with open(latest_b5_file, 'r', encoding='utf-8-sig') as f:
-                header_line = f.readline()
-                d_match = re.search(r'(\d{4})週動態', header_line)
+            with open(latest_b5_file, 'r', encoding='utf-8-sig', errors='ignore') as f:
+                head_content = f.read(2000)  # 讀取最前面的內容就好
+                # 優先尋找 "0605週動態" 這種格式
+                d_match = re.search(r'(\d{4})週動態', head_content)
                 if d_match:
                     d_b5_share = f"2026{d_match.group(1)}"
+                else:
+                    # 備用尋找：有些檔案可能是寫 "更新 日期: 0605"
+                    d_match2 = re.search(r'更新\s*日期[^\d]*(\d{4})', head_content)
+                    if d_match2:
+                        d_b5_share = f"2026{d_match2.group(1)}"
         except: pass
 
     def fmt_d(d_str): return f"{d_str[4:6]}/{d_str[6:]}" if d_str != "00000000" else "--/--"
@@ -3840,7 +3846,6 @@ with top_pool_container:
                             st.warning("讀取追蹤檔案失敗。")
                     else:
                         st.write("⚪ 尚無歷史追蹤紀錄，請點擊上方按鈕建立第一筆！")
-# ==========================================
 # ==========================================
 # 🧪 測試區：Google Sheets 連線測試
 # ==========================================
