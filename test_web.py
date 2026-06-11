@@ -2872,7 +2872,7 @@ else:
     st.warning(f"避險雷達載入失敗：{msg}")
     
 # ==========================================
-# 💰 區塊 5：大股東動向 (雙分頁對稱系統 + 4碼日期顯示版)
+# 💰 區塊 5：大股東動向 (雙分頁對稱系統 + ETF與債券過濾引擎 + 數值修正版)
 # ==========================================
 import re
 import os
@@ -2883,162 +2883,361 @@ import streamlit as st
 # ------------------------------------------
 # 0. 預先掃描最新檔案日期以供標題基準日顯示
 # ------------------------------------------
-global_latest_date = "0605"
-all_b5_raw_files = glob.glob(os.path.join(DATA_DIR, "*神秘金字塔*")) + glob.glob(os.path.join(DATA_DIR, "*大股東*"))
+global_latest_date = "20260605"  # 預設防護值
+all_b5_raw_files = glob.glob(os.path.join(DATA_DIR, "*神秘金字塔*")) + glob.glob(os.path.join(DATA_DIR, "*大股東800張*"))
 for f in all_b5_raw_files:
     match = re.search(r'(\d{8})', os.path.basename(f))
-    if match and match.group(1).startswith("202"):
-        if match.group(1)[4:] > global_latest_date:
-            global_latest_date = match.group(1)[4:]
+    if match and match.group(1) > global_latest_date and match.group(1).startswith("202"):
+        if match.group(1) == "20260608":
+            global_latest_date = "20260605"
+        else:
+            global_latest_date = match.group(1)
+
+fmt_global_date = f"{global_latest_date[:4]}/{global_latest_date[4:6]}/{global_latest_date[6:]}"
 
 st.write("---")
 st.markdown("<div id='section-5'></div>", unsafe_allow_html=True)
 
-# 科技風漸層橫幅標題
+# 🌟 升級點：科技風漸層橫幅標題 (玻璃卡片 UI)
 st.markdown(f"""
 <div style="background: linear-gradient(90deg, rgba(15,23,42,1) 0%, rgba(14,165,233,0.3) 50%, rgba(15,23,42,1) 100%); 
-            border-top: 1px solid #38bdf8; border-bottom: 1px solid #38bdf8; padding: 15px 20px; 
-            border-radius: 10px; text-align: center; box-shadow: 0px 0px 20px rgba(56, 189, 248, 0.2); margin-bottom: 20px;">
+            border-top: 1px solid #38bdf8; 
+            border-bottom: 1px solid #38bdf8; 
+            padding: 15px 20px; 
+            border-radius: 10px;
+            text-align: center;
+            box-shadow: 0px 0px 20px rgba(56, 189, 248, 0.2);
+            margin-bottom: 20px;">
     <h2 style="color: #e0f2fe; margin: 0; letter-spacing: 2px; text-shadow: 0 0 15px rgba(56, 189, 248, 0.8);">
         💰 區塊 5：大股東動向
     </h2>
     <div style='font-size:13px; color:#00D2FF; font-weight:500; margin-top:8px;'>
-        📊 基準日 : {global_latest_date[:2]}/{global_latest_date[2:]} ｜ 雙分頁對稱系統
+         基準日 : {fmt_global_date} ｜ 雙分頁對稱系統 + ETF與債券過濾引擎
     </div>
 </div>
 """, unsafe_allow_html=True)
 
+# 🎯 更新貼心提示文字
 st.write("💡 千張與四百張長線千金大戶股權動態週持有張數更新軌跡。")
 
-# 篩選器
-filter_c1, filter_c2, _ = st.columns([2, 3, 5])
+# ------------------------------------------
+# 🧭 新增功能篩選器 (ETF、債券功能聯動)
+# ------------------------------------------
+filter_c1, filter_c2, _filter_space = st.columns([2, 3, 5])
 show_etf = filter_c1.checkbox("顯示 ETF", value=True, key="b5_global_etf")
 show_bond = filter_c2.checkbox("顯示 債券 / 債券 ETF", value=True, key="b5_global_bond")
 
 def apply_b5_market_filters(df, show_etf, show_bond):
-    if df is None or df.empty: return df
+    if df is None or df.empty:
+        return df
+    # ETF 定義：代號開頭為 '00'
     is_etf = df['股票代號'].astype(str).str.startswith('00')
+    # 債券/債券ETF 定義：代號以 'B' 結尾，或名稱包含 '債'
     is_bond = df['股票代號'].astype(str).str.endswith('B') | df['股票名稱'].astype(str).str.contains('債')
+    
     mask = pd.Series(True, index=df.index)
-    if not show_etf: mask = mask & ~(is_etf & ~is_bond)
-    if not show_bond: mask = mask & ~is_bond
+    if not show_etf:
+        mask = mask & ~(is_etf & ~is_bond)  # 隱藏非債券的純型 ETF
+    if not show_bond:
+        mask = mask & ~is_bond              # 隱藏債券與債券 ETF
     return df[mask]
 
-tab_1000, tab_400, tab_sync = st.tabs(["🔹 1000張大戶", "🔹 400張大戶", "🎯 雙引擎共振"])
-filtered_1000_df, filtered_400_df = pd.DataFrame(), pd.DataFrame()
+# 🎯 升級點：新增第 3 分頁 (雙引擎共振)
+tab_1000, tab_400, tab_sync = st.tabs([
+    "🔹 1000張大戶系統 (週持有%)", 
+    "🔹 400張大戶系統 (週持有%)",
+    "🔹 雙引擎同步共振 (千/四百同增)"
+])
 
-# ================= TAB 1: 1000張大戶 =================
+# 預先宣告這兩個變數，以供分頁 3 使用
+filtered_1000_df = pd.DataFrame()
+filtered_400_df = pd.DataFrame()
+
+# ==========================================
+# 👑 TAB 1: 1000張大戶系統 (修正：同步顯示持股%與增減%)
+# ==========================================
 with tab_1000:
-    files = glob.glob(os.path.join(DATA_DIR, "*大股東1000張數週增加*.csv"))
-    if files:
-        groups = {}
-        for f in files:
-            m = re.search(r'(\d{8})', os.path.basename(f))
-            key = m.group(1) if m else "UNKNOWN"
-            groups.setdefault(key, []).append(f)
+    csv_pattern_b5_1000 = os.path.join(DATA_DIR, "*大股東1000張數週增加*.csv")
+    all_files_b5_1000 = glob.glob(csv_pattern_b5_1000)
+    
+    if not all_files_b5_1000:
+        st.info("⚪ 暫無 1000張大戶相關資料，請確認資料夾中含有「大股東1000張數週增加」之 CSV 檔案。")
+    else:
+        file_groups_1000 = {}
+        for f in all_files_b5_1000:
+            fn = os.path.basename(f)
+            date_match = re.search(r'(\d{8})', fn)
+            f_prefix = date_match.group(1) if date_match else "UNKNOWN"
+            if f_prefix not in file_groups_1000: file_groups_1000[f_prefix] = []
+            file_groups_1000[f_prefix].append(f)
+            
+        merged_dfs = []
+        all_dates = []
         
-        merged, all_dates = [], []
-        for prefix, fs in sorted(groups.items(), reverse=True):
-            chunks = []
-            for f in fs:
+        # 處理檔案分組
+        for prefix, files in sorted(file_groups_1000.items(), reverse=True):
+            group_chunks = []
+            detected_date = None
+            
+            for file in files:
                 try:
-                    df = pd.read_csv(f, encoding='utf-8-sig')
+                    df = pd.read_csv(file, encoding='utf-8-sig')
                     df.columns = [str(c).strip() for c in df.columns]
-                    # 抓取「持股超過1千張(%)」與「超過1千張增減」
-                    c_code, c_name = next((c for c in df.columns if '代號' in c), None), next((c for c in df.columns if '名稱' in c), None)
-                    c_abs, c_delta = next((c for c in df.columns if '持股超過1千張(%)' in c), None), next((c for c in df.columns if '超過1千張增減' in c), None)
-                    if not all([c_code, c_name, c_abs, c_delta]): continue
                     
+                    c_code = next((c for c in df.columns if '代號' in c), None)
+                    c_name = next((c for c in df.columns if '名稱' in c), None)
+                    c_abs = next((c for c in df.columns if '持股超過1千張(%)' in c), None)
+                    c_delta = next((c for c in df.columns if '超過1千張增減' in c), None)
+                    c_date = next((c for c in df.columns if '更新 日期' in c or '更新日期' in c), None)
+                    
+                    if not all([c_code, c_name, c_abs, c_delta]): continue
+                        
                     df['股票代號'] = df[c_code].astype(str).str.extract(r'(\d+)')
                     df['股票名稱'] = df[c_name].astype(str).str.strip()
                     df['持股%'] = pd.to_numeric(df[c_abs].astype(str).str.replace('%', ''), errors='coerce')
                     df['增減%'] = pd.to_numeric(df[c_delta].astype(str).str.replace('+', '').str.replace('%', ''), errors='coerce')
-                    chunks.append(df[['股票代號', '股票名稱', '持股%', '增減%']])
+                    
+                    if detected_date is None and c_date:
+                        raw_date = str(df[c_date].dropna().iloc[0]).replace('/', '').strip()
+                        detected_date = f"2026{raw_date}" if len(raw_date) == 4 else raw_date
+                        
+                    group_chunks.append(df[['股票代號', '股票名稱', '持股%', '增減%']])
                 except: continue
-            if chunks:
-                comb = pd.concat(chunks).groupby(['股票代號', '股票名稱']).max().reset_index()
-                d_str = prefix
-                all_dates.append(d_str)
-                comb = comb.rename(columns={'持股%': f"{d_str[-4:]}持有%", '增減%': f"▼{d_str[-4:]}"})
-                merged.append(comb)
-        
-        if merged:
-            master = merged[0]
-            for m in merged[1:]: master = pd.merge(master, m, on=['股票代號', '股票名稱'], how='outer')
-            sorted_dates = sorted(all_dates, reverse=True)
+                    
+            if group_chunks:
+                comb = pd.concat(group_chunks, ignore_index=True).groupby(['股票代號', '股票名稱']).max().reset_index()
+                # 這裡定義該週的欄位名稱
+                date_label = detected_date if detected_date else prefix
+                all_dates.append(date_label)
+                
+                # 重新命名欄位，加上日期後綴以便合併
+                comb = comb.rename(columns={'持股%': f"{date_label}持有%", '增減%': f"▼{date_label}"})
+                merged_dfs.append(comb)
+
+        if merged_dfs:
+            master_1000 = merged_dfs[0]
+            for sub_df in merged_dfs[1:]:
+                master_1000 = pd.merge(master_1000, sub_df, on=['股票代號', '股票名稱'], how='outer')
             
-            # 計算動態 (使用最新增減)
-            latest_delta_col = f"▼{sorted_dates[0][-4:]}"
-            def get_trend(val):
-                if pd.isna(val): return "無"
+            # 計算最新的動態
+            sorted_dates = sorted(all_dates, reverse=True)
+            latest_date = sorted_dates[0]
+            
+            def get_trend_1000(val):
+                if pd.isna(val): return "無資料"
                 if val >= 1.5: return "🔥 大增"
                 if val >= 0.5: return "📈 增"
                 if val > 0: return "↗️ 微增"
-                return "📉 減/持平"
-            master['週動態'] = master[latest_delta_col].apply(get_trend)
+                if val == 0: return "🔄 持平"
+                if val > -0.5: return "↘️ 微減"
+                if val > -1.5: return "📉 減"
+                return "🚨 大減"
             
-            # 排列：代號 名稱 動態 + 日期對
-            cols = ['股票代號', '股票名稱', '週動態']
+            master_1000['週動態'] = master_1000[f"▼{latest_date}"].apply(get_trend_1000)
+            
+            # 計算 6 週累積增減 (只取增減欄位)
+            delta_cols = [f"▼{d}" for d in sorted_dates if f"▼{d}" in master_1000.columns]
+            master_1000['6週增減'] = master_1000[delta_cols[:6]].sum(axis=1, min_count=1)
+            
+            # 排版優化：代號、名稱、動態、6週累計、接著是日期的成對欄位
+            cols_order = ['股票代號', '股票名稱', '週動態', '6週增減']
             for d in sorted_dates:
-                if f"{d[-4:]}持有%" in master.columns: cols.append(f"{d[-4:]}持有%")
-                if f"▼{d[-4:]}" in master.columns: cols.append(f"▼{d[-4:]}")
+                # 每一個日期，並排顯示 持有% 與 增減%
+                if f"{d}持有%" in master_1000.columns: cols_order.append(f"{d}持有%")
+                if f"▼{d}" in master_1000.columns: cols_order.append(f"▼{d}")
             
-            master = master.sort_values(by=latest_delta_col, ascending=False)
-            filtered_1000_df = apply_b5_market_filters(master[cols], show_etf, show_bond)
+            final_df = master_1000[[c for c in cols_order if c in master_1000.columns]]
+            final_df = final_df.sort_values(by=f"▼{latest_date}", ascending=False)
+            
+            # 過濾並顯示
+            filtered_1000_df = apply_b5_market_filters(final_df, show_etf, show_bond)
             st.dataframe(filtered_1000_df, use_container_width=True, hide_index=True)
             st.session_state['df_blk5_1000'] = filtered_1000_df
-
-# ================= TAB 2: 400張大戶 =================
+# ==========================================
+# 💰 TAB 2: 400張大戶系統
+# ==========================================
 with tab_400:
-    files = glob.glob(os.path.join(DATA_DIR, "*神秘金字塔*.csv"))
-    if files:
-        files = sorted(files, key=os.path.basename, reverse=True)
-        master = None
-        all_dates = set()
-        for f in files:
+    csv_pattern_b5 = os.path.join(DATA_DIR, "*神秘金字塔 - 股權類股排行(5日之400張以上股東排行)*.csv")
+    all_files_b5 = glob.glob(csv_pattern_b5)
+    
+    if not all_files_b5:
+        st.info("⚪ 暫無 400張大戶相關資料。")
+    else:
+        all_files_b5 = sorted(all_files_b5, key=os.path.basename, reverse=True)
+        master_df = None
+        all_date_cols = set()
+    
+        for idx, file in enumerate(all_files_b5):
             try:
-                df = pd.read_csv(f, encoding='utf-8-sig')
+                df = pd.read_csv(file, encoding='utf-8-sig')
                 df.columns = [str(c).strip() for c in df.columns]
-                # 簡單化日期欄位處理
-                new_cols = []
+                
+                standardized_cols = []
                 for c in df.columns:
-                    if re.match(r'202\d{5}', c): new_cols.append(f"▼{c[-4:]}")
-                    elif re.match(r'\d{4}', c): new_cols.append(f"▼{c}")
-                    else: new_cols.append(c)
-                df.columns = new_cols
+                    if re.match(r'^202\d{5}$', c):  
+                        standardized_cols.append(c)
+                    elif re.match(r'^\d{4}$', c):   
+                        standardized_cols.append(f"2026{c}")
+                    else:
+                        standardized_cols.append(c)
+                df.columns = standardized_cols
+                df = df.loc[:, ~df.columns.duplicated()]
                 
                 if '股票代號/名稱' in df.columns:
                     df['股票代號'] = df['股票代號/名稱'].astype(str).str.extract(r'(\d+)')
                     df['股票名稱'] = df['股票代號/名稱'].astype(str).str.replace(r'^\d+', '', regex=True)
                 
-                df = df.set_index(['股票代號', '股票名稱'])
-                master = df.combine_first(master) if master is not None else df
-            except: continue
-        
-        if master is not None:
-            master = master.reset_index()
-            # 過濾並顯示
-            filtered_400_df = apply_b5_market_filters(master, show_etf, show_bond)
+                if '股票代號' not in df.columns:
+                    continue
+                    
+                date_cols = [c for c in df.columns if re.match(r'^202\d{5}$', c)]
+                all_date_cols.update(date_cols)
+                cols_to_keep = ['股票代號', '股票名稱'] + date_cols
+                
+                if idx == 0:
+                    if '上週持有%' in df.columns: cols_to_keep.append('上週持有%')
+                    if '總增減' in df.columns: cols_to_keep.append('總增減')
+                
+                cols_to_keep = [c for c in cols_to_keep if c in df.columns]
+                temp_df = df[cols_to_keep].copy()
+                temp_df = temp_df.set_index(['股票代號', '股票名稱'])
+                
+                if master_df is None:
+                    master_df = temp_df
+                else:
+                    master_df = master_df.combine_first(temp_df)
+            except:
+                continue
+    
+        if master_df is not None:
+            master_df = master_df.reset_index()
+            sorted_dates = sorted(list(all_date_cols), reverse=True)
+            
+            if sorted_dates:
+                newest, prev = sorted_dates[0], sorted_dates[1] if len(sorted_dates) >= 2 else (sorted_dates[0], sorted_dates[0])
+                master_df[newest] = pd.to_numeric(master_df[newest], errors='coerce')
+                if len(sorted_dates) >= 2: master_df[prev] = pd.to_numeric(master_df[prev], errors='coerce')
+                
+                def get_trend(row):
+                    v1, v2 = row.get(newest), row.get(prev)
+                    if pd.isna(v1) or pd.isna(v2): return "無資料"
+                    diff = v1 - v2
+                    if diff >= 1.5: return "🔥 大增"
+                    if diff >= 0.5: return "📈 增"
+                    if diff > 0: return "↗️ 微增"
+                    if diff == 0: return "🔄 持平"
+                    if diff > -0.5: return "↘️ 微減"
+                    if diff > -1.5: return "📉 減"
+                    return "🚨 大減"
+                master_df['週動態'] = master_df.apply(get_trend, axis=1) if len(sorted_dates) >= 2 else "持平"
+            else:
+                master_df['週動態'] = "無資料"
+    
+            final_cols = ['股票代號', '股票名稱', '週動態']
+            if '總增減' in master_df.columns: final_cols.append('總增減')
+            if '上週持有%' in master_df.columns: final_cols.append('上週持有%')
+            final_cols.extend(sorted_dates)
+            
+            final_df = master_df[[c for c in final_cols if c in master_df.columns]].copy()
+            if sorted_dates:
+                final_df = final_df.sort_values(by=sorted_dates[0], ascending=False)
+            
+            cols_to_numeric = sorted_dates.copy()
+            if '上週持有%' in final_df.columns: cols_to_numeric.append('上週持有%')
+            if '總增減' in final_df.columns: cols_to_numeric.append('總增減')
+                
+            for col in cols_to_numeric:
+                final_df[col] = pd.to_numeric(final_df[col], errors='coerce')
+            
+            rename_dict = {}
+            if sorted_dates:
+                latest_col = sorted_dates[0]
+                short_date = latest_col[-4:] if len(latest_col) == 8 else latest_col 
+                rename_dict[latest_col] = f"▼{latest_col}"
+                if '上週持有%' in final_df.columns: rename_dict['上週持有%'] = f"{short_date}持有%"
+                if '總增減' in final_df.columns: rename_dict['總增減'] = "▼6周增減"
+                    
+            final_df = final_df.rename(columns=rename_dict)
+            
+            filtered_400_df = apply_b5_market_filters(final_df, show_etf, show_bond)
             st.dataframe(filtered_400_df, use_container_width=True, hide_index=True)
+            
             st.session_state['df_blk5'] = filtered_400_df
 
-# ================= TAB 3: 雙引擎共振 =================
+# ==========================================
+# 🎯 TAB 3: 雙引擎同步共振 (千張與四百張同增)
+# ==========================================
 with tab_sync:
     if not filtered_1000_df.empty and not filtered_400_df.empty:
-        # 標記千張與四百張後綴
-        df1 = filtered_1000_df.add_suffix(' (千張)')
-        df1 = df1.rename(columns={'股票代號 (千張)': '股票代號', '股票名稱 (千張)': '股票名稱'})
+        # 分別篩選出「週動態」包含 "增" 的標的 (涵蓋: 微增、增、大增)
+        df1_inc = filtered_1000_df[filtered_1000_df['週動態'].astype(str).str.contains('增', na=False)].copy()
+        df2_inc = filtered_400_df[filtered_400_df['週動態'].astype(str).str.contains('增', na=False)].copy()
         
-        df2 = filtered_400_df.add_suffix(' (四百)')
-        df2 = df2.rename(columns={'股票代號 (四百)': '股票代號', '股票名稱 (四百)': '股票名稱'})
+        # 為了合併後欄位不打架，幫除了代號與名稱外的欄位加上後綴
+        df1_cols = [c for c in df1_inc.columns if c not in ['股票代號', '股票名稱']]
+        df1_inc.rename(columns={c: f"{c} (千張)" for c in df1_cols}, inplace=True)
         
-        sync = pd.merge(df1, df2, on=['股票代號', '股票名稱'], how='inner')
-        # 簡單篩選：兩邊都呈現「增」
-        if not sync.empty:
-            st.success(f"🔥 大戶雙引擎共振標的：{len(sync)} 檔")
-            st.dataframe(sync, use_container_width=True, hide_index=True)
+        df2_cols = [c for c in df2_inc.columns if c not in ['股票代號', '股票名稱']]
+        df2_inc.rename(columns={c: f"{c} (四百)" for c in df2_cols}, inplace=True)
+        
+        # 進行交集合併 (Inner Join)，找出兩邊都符合的股票
+        sync_df = pd.merge(df1_inc, df2_inc, on=['股票代號', '股票名稱'], how='inner')
+        
+        if not sync_df.empty:
+            # ====== 🔥 智慧欄位穿插排序引擎 ======
+            # 1. 抓出所有日期基礎名稱 (例如 ▼20260605, 20260529)
+            date_bases = set()
+            for c in sync_df.columns:
+                base = c.replace(' (千張)', '').replace(' (四百)', '')
+                if re.match(r'^(▼)?202\d{5}$', base):
+                    date_bases.add(base)
+            
+            # 日期由新到舊排序
+            sorted_dates = sorted(list(date_bases), reverse=True)
+            
+            # 2. 定義完美的閱讀順序
+            new_col_order = ['股票代號', '股票名稱']
+            
+            # 動態指標成對顯示
+            if '週動態 (千張)' in sync_df.columns: new_col_order.append('週動態 (千張)')
+            if '週動態 (四百)' in sync_df.columns: new_col_order.append('週動態 (四百)')
+            
+            # 6週總增減成對顯示
+            if '6週增減 (千張)' in sync_df.columns: new_col_order.append('6週增減 (千張)')
+            if '▼6周增減 (四百)' in sync_df.columns: new_col_order.append('▼6周增減 (四百)')
+            
+            # 其他文字或比率欄位 (例如 持有%)
+            for c in sync_df.columns:
+                if '持有%' in c and c not in new_col_order:
+                    new_col_order.append(c)
+            
+            # 🔥 歷史日期數據成對穿插顯示
+            for d in sorted_dates:
+                c1000 = f"{d} (千張)"
+                c400 = f"{d} (四百)"
+                if c1000 in sync_df.columns: new_col_order.append(c1000)
+                if c400 in sync_df.columns: new_col_order.append(c400)
+            
+            # 保底：把沒有排到的欄位塞到最後面 (防呆機制)
+            for c in sync_df.columns:
+                if c not in new_col_order:
+                    new_col_order.append(c)
+            
+            # 重新套用完美排序
+            sync_df = sync_df[new_col_order]
+            # ==================================
+
+            # 嘗試用 1000 張大戶的最新週數據進行遞減排序
+            sort_col = next((c for c in sync_df.columns if '▼' in c and '千張' in c), None)
+            if sort_col:
+                sync_df = sync_df.sort_values(by=sort_col, ascending=False)
+                
+            st.success(f"🔥 強烈訊號！共有 **{len(sync_df)}** 檔標的出現大戶雙引擎共振 (千張與四百張同增)！")
+            st.dataframe(sync_df, use_container_width=True, hide_index=True)
+        else:
+            st.info("⚪ 最新一週目前沒有「千張與四百張」同時增加的共振標的。")
     else:
-        st.warning("請確保兩張分頁皆已正確載入資料。")
+        st.warning("⚠️ 需先確保 1000 張與 400 張資料皆有成功載入，才能啟動共振掃描引擎。")
             
 # ==========================================
 # 💸 區塊 6：盤後鉅額交易總表 (原生 Dataframe 升級版 + 交易別顯示)
