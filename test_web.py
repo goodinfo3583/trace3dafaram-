@@ -3345,6 +3345,12 @@ with top_pool_container:
     import json
     import pandas as pd
 
+    def get_df_safe(key): return st.session_state.get(key, pd.DataFrame())
+    
+    # 先把資料表讀出來，方便後面抓取精準日期
+    df_b5_1000 = get_df_safe('df_blk5_1000')
+    df_b5_400 = get_df_safe('df_blk5')
+    
     # 1. 自動掃描最新資料日期
     all_files = glob.glob(os.path.join(DATA_DIR, "*"))
     anchor_date_str = "00000000"
@@ -3367,8 +3373,15 @@ with top_pool_container:
                 if file_date > d_b23_chip: d_b23_chip = file_date
             elif "融資" in filename or "融券" in filename or "借券" in filename or "資券" in filename:
                 if file_date > d_b4_margin: d_b4_margin = file_date
-            elif "大股東" in filename or "集保" in filename or "神秘金字塔" in filename:
-                if file_date > d_b5_share: d_b5_share = file_date
+
+    # 🔥 關鍵修復：直接從大戶 DataFrame 裡面挖出真正的集保結算日期 (解決檔名日期錯誤的問題)
+    if not df_b5_1000.empty:
+        # 尋找像 "0605週動態" 這樣的欄位
+        date_col = next((c for c in df_b5_1000.columns if '週動態' in c), None)
+        if date_col:
+            d_match = re.search(r'(\d{4})週動態', date_col)
+            if d_match:
+                d_b5_share = f"2026{d_match.group(1)}"
 
     def fmt_d(d_str):
         return f"{d_str[4:6]}/{d_str[6:]}" if d_str != "00000000" else "--/--"
@@ -3416,8 +3429,6 @@ with top_pool_container:
                     if id_c: it_sell_ids = set(df_is[id_c].astype(str).str.replace(r'\D', '', regex=True))
             except: pass
 
-            def get_df_safe(key): return st.session_state.get(key, pd.DataFrame())
-
             df_b2_1, df_b2_2 = get_df_safe('df_blk2_1'), get_df_safe('df_blk2_2')
             df_b2_3, df_b2_4 = get_df_safe('df_blk2_3'), get_df_safe('df_blk2_4')
             df_b3 = get_df_safe('df_blk3_main')
@@ -3429,9 +3440,6 @@ with top_pool_container:
             s_b4_mar_pct, s_b4_mar_vol = set(df_b4_mar_pct.get('股票代號', [])), set(df_b4_mar_vol.get('股票代號', []))
             s_b4_sho_pct, s_b4_sho_vol = set(df_b4_sho_pct.get('股票代號', [])), set(df_b4_sho_vol.get('股票代號', []))
             s_b4_mp_pct, s_b4_mp_vol = set(df_b4_mp_pct.get('股票代號', [])), set(df_b4_mp_vol.get('股票代號', []))
-            
-            df_b5_1000 = get_df_safe('df_blk5_1000')
-            df_b5_400 = get_df_safe('df_blk5')
 
             def check_b2_strict(df, sid, bad_keywords):
                 if df.empty or sid not in df['股票代號'].values: return False
@@ -3476,7 +3484,6 @@ with top_pool_container:
                 sname = str(row.get('股票名稱', '')).strip()
                 b1_dyn = str(row.get(dyn_col, '')) if dyn_col else '-'
                 
-                # 🔥 新增：擷取區塊 1 的單日「△」並格式化為 + / - 數值
                 try:
                     delta_val = float(row.get('△', 0.0))
                     if abs(delta_val) < 0.005: b1_delta = "0.00"
@@ -3490,7 +3497,6 @@ with top_pool_container:
                 score = 0.0
                 details = [] 
                 
-                # 區塊二評分
                 if check_b2_strict(df_b2_1, sid, bad_b2_vol): score += 1; details.append("外買佔: +1"); r_b2_1 = "✔️"
                 else: r_b2_1 = ""
                 if check_b2_strict(df_b2_2, sid, bad_b2_vol): score += 1; details.append("投買佔: +1"); r_b2_2 = "✔️"
@@ -3505,7 +3511,6 @@ with top_pool_container:
                 if get_today_ratio(df_b2_3, sid, '當日買發比%') <= -10: score -= 0.5; details.append("外佔發(<-10%): -0.5")
                 if get_today_ratio(df_b2_4, sid, '當日買發比%') <= -10: score -= 0.5; details.append("投佔發(<-10%): -0.5")
                 
-                # 區塊三評分
                 s_fd, r_b3_fd = get_b3_score(df_b3, sid, '外資日'); score += s_fd; 
                 if s_fd > 0: details.append(f"外資日連: +{s_fd}")
                 s_fw, r_b3_fw = get_b3_score(df_b3, sid, '外資週'); score += s_fw; 
@@ -3515,7 +3520,6 @@ with top_pool_container:
                 s_iw, r_b3_iw = get_b3_score(df_b3, sid, '投信週'); score += s_iw; 
                 if s_iw > 0: details.append(f"投信週連: +{s_iw}")
                 
-                # 區塊四評分
                 r_b4_mar = ""
                 b4_list_count = 0
                 if sid in s_b4_mar_pct: r_b4_mar += "✔️(幅)"; score += 1.0; details.append("資減(幅): +1.0"); b4_list_count += 1
@@ -3553,14 +3557,14 @@ with top_pool_container:
                     if abs(short_decrease_val) >= 1:
                         score += 1.2; details.append("空頭認輸(借券減>1%): +1.2")
 
-                # 區塊五評分 (1000張/400張 雙軌動能引擎)
+                # 🔥 關鍵修復：大戶文字顯示優化
                 r_b5_1000, r_b5_400 = "-", "-"
                 trend_1000_val, trend_400_val = "", ""
                 
                 if not df_b5_1000.empty and sid in df_b5_1000['股票代號'].values:
                     trend_1000_val = str(df_b5_1000[df_b5_1000['股票代號'] == sid].iloc[0].get('週動態', ''))
-                    if '大增' in trend_1000_val: score += 2.0; r_b5_1000 = "🔥千大增(+2)"; details.append("千張大戶大增: +2")
-                    elif '增' in trend_1000_val and '微' not in trend_1000_val: score += 1.0; r_b5_1000 = "📈千增(+1)"; details.append("千張大戶增: +1")
+                    if '大增' in trend_1000_val: score += 2.0; r_b5_1000 = "🔥千張大戶大增(+2)"; details.append("千張大戶大增: +2")
+                    elif '增' in trend_1000_val and '微' not in trend_1000_val: score += 1.0; r_b5_1000 = "📈千張大戶增(+1)"; details.append("千張大戶增: +1")
                     elif '微增' in trend_1000_val: score += 0.5; r_b5_1000 = "↗️千微增(+0.5)"; details.append("千張大戶微增: +0.5")
                     elif '大減' in trend_1000_val: score -= 0.5; r_b5_1000 = "🚨千大減(-0.5)"; details.append("千張大戶大減: -0.5")
                     elif '減' in trend_1000_val: score -= 0.5; r_b5_1000 = "📉千減(-0.5)"; details.append("千張大戶減: -0.5")
@@ -3568,12 +3572,12 @@ with top_pool_container:
 
                 if not df_b5_400.empty and sid in df_b5_400['股票代號'].values:
                     trend_400_val = str(df_b5_400[df_b5_400['股票代號'] == sid].iloc[0].get('週動態', ''))
-                    if '大增' in trend_400_val: score += 1.0; r_b5_400 = "🔥四大增(+1)"; details.append("四百張大增: +1")
-                    elif '增' in trend_400_val and '微' not in trend_400_val: score += 0.5; r_b5_400 = "📈四增(+0.5)"; details.append("四百張增: +0.5")
-                    elif '微增' in trend_400_val: score += 0.0; r_b5_400 = "↗️四微增(0)"
-                    elif '大減' in trend_400_val: score -= 0.0; r_b5_400 = "🚨四大減(0)" 
-                    elif '減' in trend_400_val: score -= 0.0; r_b5_400 = "📉四減(0)"
-                    else: r_b5_400 = f"四{trend_400_val}"
+                    if '大增' in trend_400_val: score += 1.0; r_b5_400 = "🔥四百大戶大增(+1)"; details.append("四百張大增: +1")
+                    elif '增' in trend_400_val and '微' not in trend_400_val: score += 0.5; r_b5_400 = "📈四百大戶增(+0.5)"; details.append("四百張增: +0.5")
+                    elif '微增' in trend_400_val: score += 0.0; r_b5_400 = "↗️四百微增(0)"
+                    elif '大減' in trend_400_val: score -= 0.0; r_b5_400 = "🚨四百大減(0)" 
+                    elif '減' in trend_400_val: score -= 0.0; r_b5_400 = "📉四百減(0)"
+                    else: r_b5_400 = f"四百{trend_400_val}"
 
                 if ('增' in trend_1000_val and '減' in trend_400_val):
                     score += 1.0
@@ -3593,7 +3597,6 @@ with top_pool_container:
 
                 score_breakdown = " \n".join(details) if details else "無加扣分"
 
-                # 🔥 這裡把「△」寫入暫存結果字典中
                 results.append({
                     '總分': score, '代號': sid, '名稱': sname, '▼明細': score_breakdown, '△': b1_delta,
                     '最新動態': b1_dyn, '今日上榜': b1_rank, '賣出警示': r_warn,
@@ -3650,7 +3653,6 @@ with top_pool_container:
             if not res_df.empty and '總分' in res_df.columns:
                 res_df['▼變量'] = res_df.apply(calc_table_delta, axis=1)
 
-            # 🔥 排列欄位：將「△」精準安插在「▼明細」的右邊
             cols = [c for c in res_df.columns if c not in ['▼變量', '▼明細', '△', '賣出警示']]
             score_idx = cols.index('總分')
             cols.insert(score_idx + 1, '▼變量')
@@ -3688,7 +3690,6 @@ with top_pool_container:
                 except Exception as e: 
                     pass 
 
-            # 🌟 Streamlit 頁籤渲染 (新增每週 Top 5 模型驗證)
             tab1, tab2, tab3 = st.tabs(["🔥 今日最新排行", "📈 歷史分數追蹤表", "🎯 模型驗證：每週 Top 5 追蹤"])
             
             with tab1:
@@ -3738,37 +3739,33 @@ with top_pool_container:
                 except Exception as e: 
                     pass
 
-            # ==========================================
-            # 🎯 新增：每週 Top 5 模型驗證區塊
-            # ==========================================
             with tab3:
                 st.markdown("### 🏆 AI 嚴選：今日最強 5 檔 (模型驗證候選)")
                 st.info("💡 **篩選邏輯**：排除任何帶有「外/投倒貨」警示的標的，並依據「總分」與「當日△」選出前 5 名。建議每週五進行一次快照追蹤。")
                 
-                # 1. 嚴格過濾與排序
                 if not res_df.empty:
-                    # 踢掉有危險警示的股票
                     safe_df = res_df[res_df['賣出警示'] == "-"].copy()
                     
                     if not safe_df.empty:
-                        # 將 △ 轉為數字以輔助排序 (同分時，單日買超越多的排前面)
                         safe_df['數值△'] = safe_df['△'].astype(str).str.replace('+', '').str.replace('%', '')
                         safe_df['數值△'] = pd.to_numeric(safe_df['數值△'], errors='coerce').fillna(0)
                         
                         top5_df = safe_df.sort_values(by=['總分', '數值△'], ascending=[False, False]).head(5)
                         top5_df = top5_df.drop(columns=['數值△'])
                         
-                        # 2. 顯示這 5 檔的精華卡片
                         cols = st.columns(5)
                         for idx, (i, row) in enumerate(top5_df.iterrows()):
                             with cols[idx]:
+                                # 🔥 關鍵修復：動態判定「當日△」的顏色 (正數紅、負數綠)
+                                delta_str = str(row['△'])
+                                delta_color = "#FF4B4B" if "+" in delta_str else ("#00E272" if "-" in delta_str else "#E2E8F0")
+                                
                                 st.markdown(
                                     f"""
                                     <div style="background-color:rgba(0, 210, 255, 0.05); border-top: 3px solid #00D2FF; padding: 10px; border-radius: 5px;">
                                         <h4 style="margin:0; color:#E2E8F0;">{row['名稱']}</h4>
                                         <p style="margin:0; font-size:12px; color:#A0AEC0;">{row['代號']}</p>
-                                        <h2 style="margin:10px 0; color:#00D2FF;">{row['總分']} 分</h2>
-                                        <p style="margin:0; font-size:14px;"><strong>當日△:</strong> <span style="color:#50C878;">{row['△']}</span></p>
+                                        <h2 style="margin:10px 0; color:#00D2FF;">{row['總分']:.1f} 分</h2> <p style="margin:0; font-size:14px;"><strong>當日△:</strong> <span style="color:{delta_color}; font-weight:bold;">{delta_str}</span></p>
                                         <p style="margin:5px 0 0 0; font-size:12px; line-height:1.2;">{row['大股東動向']}</p>
                                     </div>
                                     """, unsafe_allow_html=True
@@ -3777,7 +3774,6 @@ with top_pool_container:
                         st.write("")
                         st.dataframe(top5_df[['代號', '名稱', '總分', '▼變量', '△', '最新動態', '▼明細']], use_container_width=True, hide_index=True)
                         
-                        # 3. 站長一鍵封存功能 (儲存為本週追蹤名單)
                         st.write("---")
                         with st.expander("🛠 站長專用：鎖定本週追蹤名單", expanded=False):
                             c_pw, c_btn = st.columns([1, 2])
@@ -3791,7 +3787,6 @@ with top_pool_container:
                                         top5_df['鎖定日期'] = track_date
                                         track_path = os.path.join(DATA_DIR, "Weekly_Top5_Tracking.csv")
                                         
-                                        # 讀取舊紀錄並附加新紀錄
                                         if os.path.exists(track_path):
                                             try: old_track = pd.read_csv(track_path, encoding='utf-8-sig')
                                             except: old_track = pd.DataFrame()
@@ -3804,20 +3799,17 @@ with top_pool_container:
                                 elif track_pw != "":
                                     st.error("密碼錯誤")
                                     
-                # 4. 顯示歷史追蹤績效
                 st.markdown("### 📊 歷史名單回測觀察")
                 track_file = os.path.join(DATA_DIR, "Weekly_Top5_Tracking.csv")
                 if os.path.exists(track_file):
                     try:
                         history_track_df = pd.read_csv(track_file, encoding='utf-8-sig')
                         if not history_track_df.empty:
-                            # 抓出不重複的鎖定日期，讓站長可以選擇要看哪一週
                             available_weeks = sorted(history_track_df['鎖定日期'].unique(), reverse=True)
                             selected_week = st.selectbox("📅 選擇要回顧的鎖定日期", available_weeks)
                             
                             week_df = history_track_df[history_track_df['鎖定日期'] == selected_week].copy()
                             
-                            # 與「今日最新分數」進行即時比對
                             if not res_df.empty:
                                 today_scores = dict(zip(res_df['代號'].astype(str), res_df['總分']))
                                 today_deltas = dict(zip(res_df['代號'].astype(str), res_df['△']))
@@ -3826,7 +3818,7 @@ with top_pool_container:
                                 week_df['今日△'] = week_df['代號'].astype(str).map(today_deltas).fillna("未進榜")
                                 
                                 def score_diff(row):
-                                    diff = float(row['今日分數']) - float(row['總分']) # 今日 - 鎖定日
+                                    diff = float(row['今日分數']) - float(row['總分']) 
                                     if diff > 0: return f"📈 +{diff:.1f}"
                                     elif diff < 0: return f"📉 {diff:.1f}"
                                     else: return "-"
