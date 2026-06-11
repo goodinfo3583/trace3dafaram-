@@ -3186,6 +3186,49 @@ with tab_sync:
         sync_df = pd.merge(df1_inc, df2_inc, on=['股票代號', '股票名稱'], how='inner')
         
         if not sync_df.empty:
+            # ====== 🔥 智慧欄位穿插排序引擎 ======
+            # 1. 抓出所有日期基礎名稱 (例如 ▼20260605, 20260529)
+            date_bases = set()
+            for c in sync_df.columns:
+                base = c.replace(' (千張)', '').replace(' (四百)', '')
+                if re.match(r'^(▼)?202\d{5}$', base):
+                    date_bases.add(base)
+            
+            # 日期由新到舊排序
+            sorted_dates = sorted(list(date_bases), reverse=True)
+            
+            # 2. 定義完美的閱讀順序
+            new_col_order = ['股票代號', '股票名稱']
+            
+            # 動態指標成對顯示
+            if '週動態 (千張)' in sync_df.columns: new_col_order.append('週動態 (千張)')
+            if '週動態 (四百)' in sync_df.columns: new_col_order.append('週動態 (四百)')
+            
+            # 6週總增減成對顯示
+            if '6週增減 (千張)' in sync_df.columns: new_col_order.append('6週增減 (千張)')
+            if '▼6周增減 (四百)' in sync_df.columns: new_col_order.append('▼6周增減 (四百)')
+            
+            # 其他文字或比率欄位 (例如 持有%)
+            for c in sync_df.columns:
+                if '持有%' in c and c not in new_col_order:
+                    new_col_order.append(c)
+            
+            # 🔥 歷史日期數據成對穿插顯示
+            for d in sorted_dates:
+                c1000 = f"{d} (千張)"
+                c400 = f"{d} (四百)"
+                if c1000 in sync_df.columns: new_col_order.append(c1000)
+                if c400 in sync_df.columns: new_col_order.append(c400)
+            
+            # 保底：把沒有排到的欄位塞到最後面 (防呆機制)
+            for c in sync_df.columns:
+                if c not in new_col_order:
+                    new_col_order.append(c)
+            
+            # 重新套用完美排序
+            sync_df = sync_df[new_col_order]
+            # ==================================
+
             # 嘗試用 1000 張大戶的最新週數據進行遞減排序
             sort_col = next((c for c in sync_df.columns if '▼' in c and '千張' in c), None)
             if sort_col:
