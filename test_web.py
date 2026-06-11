@@ -3371,22 +3371,31 @@ with top_pool_container:
             elif "融資" in filename or "融券" in filename or "借券" in filename or "資券" in filename:
                 if file_date > d_b4_margin: d_b4_margin = file_date
 
-    # 🔥 關鍵修復：暴力掃描大戶 CSV 檔案前 2000 字元，強行挖出真實結算日期！
-    b5_files = glob.glob(os.path.join(DATA_DIR, "*大股東*千張*.csv")) + glob.glob(os.path.join(DATA_DIR, "*大股東*400張*.csv"))
+    # 🔥 終極修復：放寬大戶檔案關鍵字（全面包含大股東與神秘金字塔），並掃描內容挖出 0605 真實日期！
+    b5_files = (
+        glob.glob(os.path.join(DATA_DIR, "*大股東*")) + 
+        glob.glob(os.path.join(DATA_DIR, "*神秘金字塔*")) + 
+        glob.glob(os.path.join(DATA_DIR, "*集保*"))
+    )
     if b5_files:
         latest_b5_file = sorted(b5_files, reverse=True)[0]
         try:
             with open(latest_b5_file, 'r', encoding='utf-8-sig', errors='ignore') as f:
-                head_content = f.read(2000)  # 讀取最前面的內容就好
-                # 優先尋找 "0605週動態" 這種格式
+                head_content = f.read(4000)  # 擴大讀取範圍至前 4000 字元，確保涵蓋所有欄位標題
+                
+                # 優先尋找是否有 "XXXX週動態" 欄位 (例如 0605週動態)
                 d_match = re.search(r'(\d{4})週動態', head_content)
                 if d_match:
                     d_b5_share = f"2026{d_match.group(1)}"
                 else:
-                    # 備用尋找：有些檔案可能是寫 "更新 日期: 0605"
+                    # 備用方案一：尋找是否含有 "更新 日期" 欄位與後續數字
                     d_match2 = re.search(r'更新\s*日期[^\d]*(\d{4})', head_content)
                     if d_match2:
                         d_b5_share = f"2026{d_match2.group(1)}"
+                    else:
+                        # 保底方案二：如果內容中沒寫，直接從最新大戶檔名抓取日期，絕不讓它變成 --/--
+                        f_match = re.search(r'(202\d{5})', os.path.basename(latest_b5_file))
+                        if f_match: d_b5_share = f_match.group(1)
         except: pass
 
     def fmt_d(d_str): return f"{d_str[4:6]}/{d_str[6:]}" if d_str != "00000000" else "--/--"
@@ -3567,15 +3576,15 @@ with top_pool_container:
                                 score += 0.7; details.append("榜上+漲幅>3%: +0.7")
                                 
                         short_decrease_val = 0.0
-                        if not df_b4_sho_pct.empty and sid in df_b4_sho_pct['股票代號'].values:
-                            s_col = next((c for c in df_b4_sho_pct.columns if '當日' in str(c) and ('%' in str(c) or '增減' in str(c))), None)
+                        if not df_b4_sho_pct.empty && sid in df_b4_sho_pct['股票代號'].values:
+                            s_col = next((c for c in df_b4_sho_pct.columns if '當日' in str(c) && ('%' in str(c) or '增減' in str(c))), None)
                             if s_col:
                                 try: short_decrease_val = float(str(df_b4_sho_pct.loc[df_b4_sho_pct['股票代號'] == sid, s_col].iloc[0]).replace('%', ''))
                                 except: pass
                         if abs(short_decrease_val) >= 1:
                             score += 1.2; details.append("空頭認輸(借券減>1%): +1.2")
 
-                    # 🔥 大戶文字顯示精簡化 (千張/四百)
+                    # 精簡化大戶標籤
                     r_b5_1000, r_b5_400 = "-", "-"
                     trend_1000_val, trend_400_val = "", ""
                     
@@ -3602,10 +3611,8 @@ with top_pool_container:
                         details.append("🌟籌碼極集中: +1")
                         r_b5_1000 = f"{r_b5_1000}🌟"
 
-                    if r_b5_1000 != "-" or r_b5_400 != "-":
-                        r_b5 = f"{r_b5_1000} | {r_b5_400}"
-                    else:
-                        r_b5 = "-"
+                    if r_b5_1000 != "-" or r_b5_400 != "-": r_b5 = f"{r_b5_1000} | {r_b5_400}"
+                    else: r_b5 = "-"
                     
                     is_fo_sell = sid in fo_sell_ids; is_it_sell = sid in it_sell_ids
                     if is_fo_sell and is_it_sell: r_warn = "🚨外投雙倒"; score -= 2.0; details.append("外投雙倒: -2")
@@ -3635,29 +3642,23 @@ with top_pool_container:
                 try:
                     gs_history = conn.read(spreadsheet=SHEET_URL, worksheet="選股歷史", ttl=10)
                     gs_history = gs_history.dropna(how="all")
-                    
                     if not gs_history.empty and '紀錄日期' in gs_history.columns:
                         gs_history['紀錄日期'] = gs_history['紀錄日期'].astype(str).str.replace(r'\.0$', '', regex=True).str.zfill(8)
                         hist_combined = gs_history.copy()
-                        
                         available_dates = sorted(gs_history['紀錄日期'].unique(), reverse=True)
-                        
                         if len(available_dates) >= 2:
                             prev_date = available_dates[1]
                             prev_df = gs_history[gs_history['紀錄日期'] == prev_date]
-                            
                             id_col = '代號' if '代號' in prev_df.columns else '股票代號' if '股票代號' in prev_df.columns else None
                             if id_col:
                                 clean_ids = prev_df[id_col].astype(str).str.replace(r'\.0$', '', regex=True).str.replace(r'\D', '', regex=True)
                                 prev_scores_dict = dict(zip(clean_ids, prev_df['總分']))
-                except Exception as e:
-                    pass 
+                except: pass 
 
                 def calc_table_delta(row):
                     sid = str(row['代號']).strip()
                     try: curr_score = float(row.get('總分', 0))
                     except: curr_score = 0.0
-                    
                     if sid in prev_scores_dict:
                         try: prev_score = float(prev_scores_dict[sid])
                         except: prev_score = 0.0
@@ -3665,8 +3666,7 @@ with top_pool_container:
                         if delta > 0.01: return f"+{delta:.1f}"
                         elif delta < -0.01: return f"{delta:.1f}"
                         else: return "0.0"
-                    else:
-                        return f"🆕 +{curr_score:.1f}"
+                    else: return f"🆕 +{curr_score:.1f}"
 
                 if not res_df.empty and '總分' in res_df.columns:
                     res_df['▼變量'] = res_df.apply(calc_table_delta, axis=1)
@@ -3690,7 +3690,6 @@ with top_pool_container:
                         if anchor_date_str != "00000000":
                             save_df = res_df.copy()
                             save_df.insert(0, '紀錄日期', anchor_date_str)
-                            
                             try:
                                 old_df = conn.read(spreadsheet=SHEET_URL, worksheet="選股歷史", ttl=0)
                                 old_df = old_df.dropna(how="all")
@@ -3698,12 +3697,9 @@ with top_pool_container:
                                     old_df['紀錄日期'] = old_df['紀錄日期'].astype(str).str.replace(r'\.0$', '', regex=True).str.zfill(8)
                                     old_df = old_df[old_df['紀錄日期'] != anchor_date_str]
                                 final_save_df = pd.concat([old_df, save_df], ignore_index=True)
-                            except:
-                                final_save_df = save_df
-
+                            except: final_save_df = save_df
                             conn.update(spreadsheet=SHEET_URL, worksheet="選股歷史", data=final_save_df)
-                    except Exception as e: 
-                        pass 
+                    except: pass 
 
                 tab1, tab2, tab3 = st.tabs(["🔥 今日最新排行", "📈 歷史分數追蹤表", "🎯 模型驗證：每週 Top 5 追蹤"])
                 
@@ -3740,16 +3736,12 @@ with top_pool_container:
                                 
                                 latest_day = sorted_date_columns[0]
                                 hist_pivot = hist_pivot[hist_pivot['名稱'] != '-']
-                                
                                 if not hist_pivot.empty and latest_day in hist_pivot.columns:
                                     hist_pivot = hist_pivot.sort_values(by=latest_day, ascending=False).reset_index(drop=True)
-                                
                                 st.dataframe(hist_pivot, use_container_width=True, hide_index=True)
                                 st.info("💡 二篩進榜標的在選股池中的總分變化，觀察籌碼動能的延續性與驗證 ▼變量！")
-                        else: 
-                            st.warning("尚無足夠的歷史分數紀錄。")
-                    except Exception as e: 
-                        pass
+                        else: st.warning("尚無足夠的歷史分數紀錄。")
+                    except: pass
 
                 with tab3:
                     st.markdown("### 🏆 AI 嚴選：今日最強 5 檔")
@@ -3757,7 +3749,6 @@ with top_pool_container:
                     
                     if not res_df.empty:
                         safe_df = res_df[res_df['賣出警示'] == "-"].copy()
-                        
                         if not safe_df.empty:
                             safe_df['數值△'] = safe_df['△'].astype(str).str.replace('+', '').str.replace('%', '')
                             safe_df['數值△'] = pd.to_numeric(safe_df['數值△'], errors='coerce').fillna(0)
@@ -3768,7 +3759,6 @@ with top_pool_container:
                             cols = st.columns(5)
                             for idx, (i, row) in enumerate(top5_df.iterrows()):
                                 with cols[idx]:
-                                    # 動態判定「當日△」的顏色 (正數紅、負數綠)
                                     delta_str = str(row['△'])
                                     delta_color = "#FF4B4B" if "+" in delta_str else ("#00E272" if "-" in delta_str else "#E2E8F0")
                                     
@@ -3804,13 +3794,11 @@ with top_pool_container:
                                                 try: old_track = pd.read_csv(track_path, encoding='utf-8-sig')
                                                 except: old_track = pd.DataFrame()
                                                 new_track = pd.concat([old_track, top5_df], ignore_index=True)
-                                            else:
-                                                new_track = top5_df
+                                            else: new_track = top5_df
                                                 
                                             new_track.to_csv(track_path, index=False, encoding='utf-8-sig')
                                             st.success(f"✅ 已成功將 {track_date} 的 Top 5 寫入追蹤資料庫！")
-                                    elif track_pw != "":
-                                        st.error("密碼錯誤")
+                                    elif track_pw != "": st.error("密碼錯誤")
                                         
                     st.markdown("### 📊 歷史名單回測觀察")
                     track_file = os.path.join(DATA_DIR, "Weekly_Top5_Tracking.csv")
@@ -3820,13 +3808,11 @@ with top_pool_container:
                             if not history_track_df.empty:
                                 available_weeks = sorted(history_track_df['鎖定日期'].unique(), reverse=True)
                                 selected_week = st.selectbox("📅 選擇要回顧的鎖定日期", available_weeks)
-                                
                                 week_df = history_track_df[history_track_df['鎖定日期'] == selected_week].copy()
                                 
                                 if not res_df.empty:
                                     today_scores = dict(zip(res_df['代號'].astype(str), res_df['總分']))
                                     today_deltas = dict(zip(res_df['代號'].astype(str), res_df['△']))
-                                    
                                     week_df['今日分數'] = week_df['代號'].astype(str).map(today_scores).fillna(0)
                                     week_df['今日△'] = week_df['代號'].astype(str).map(today_deltas).fillna("未進榜")
                                     
@@ -3835,17 +3821,13 @@ with top_pool_container:
                                         if diff > 0: return f"📈 +{diff:.1f}"
                                         elif diff < 0: return f"📉 {diff:.1f}"
                                         else: return "-"
-                                        
                                     week_df['模型分數變化'] = week_df.apply(score_diff, axis=1)
                                 
                                 show_cols = ['鎖定日期', '代號', '名稱', '總分', '今日分數', '模型分數變化', '今日△', '大股東動向']
                                 st.dataframe(week_df[[c for c in show_cols if c in week_df.columns]], use_container_width=True, hide_index=True)
-                                
-                                st.info("💡 **驗證方法**：觀察這些鎖定的股票在未來一週的『模型分數變化』是否持續上升？如果分數持續上升且股價也上漲，代表我們的【大股東+集中度】指標非常精準！")
-                        except:
-                            st.warning("讀取追蹤檔案失敗。")
-                    else:
-                        st.write("⚪ 尚無歷史追蹤紀錄，請點擊上方按鈕建立第一筆！")
+                                st.info("💡 **驗證方法**：觀察這些鎖定的股票在未來一週的『模型分數變化』是否持續上升？如果分數持續上升且股價也上擺，代表我們的【大股東+集中度】指標非常精準！")
+                        except: st.warning("讀取追蹤檔案失敗。")
+                    else: st.write("⚪ 尚無歷史追蹤紀錄，請點擊上方按鈕建立第一筆！")
 # ==========================================
 # 🧪 測試區：Google Sheets 連線測試
 # ==========================================
