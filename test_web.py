@@ -231,13 +231,10 @@ st.markdown(
 
 # ==========================================
 # ==========================================
-# 📍 頂部：戰情室快速導航 (單排對齊 + 統一字體 + 移除標題)
+# 📍 頂部：戰情室快速導航 (系統常見字體 + 強制統一 + 單排對齊)
 # ==========================================
 st.markdown("""
 <style>
-/* 引入 Google Fonts 的可愛/藝術字體：站酷快樂體 */
-@import url('https://fonts.googleapis.com/css2?family=ZCOOL+KuaiLe&display=swap');
-
 /* 強制釘在瀏覽器最頂端 */
 .sticky-nav-bar {
     position: fixed;
@@ -250,17 +247,15 @@ st.markdown("""
     padding: 12px 0px;
     box-shadow: 0px 4px 20px rgba(0, 0, 0, 0.6);
     
-    /* 🌟 字體統一：套用到整條導航列，確保每個字風格一致 */
-    font-family: 'ZCOOL KuaiLe', 'Microsoft JhengHei', sans-serif;
+    /* 🌟 改用最常見、最穩定的現代系統黑體 (包含微軟正黑體、蘋果蘋方體) */
+    font-family: -apple-system, BlinkMacSystemFont, "PingFang TC", "Microsoft JhengHei", "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif !important;
     
-    /* 🌟 強制單行對齊：禁止換行，並讓內容置中 */
+    /* 強制單行對齊：禁止換行，並讓內容置中 */
     display: flex;
     flex-wrap: nowrap; 
     justify-content: center;
     align-items: center;
     white-space: nowrap;
-    
-    /* 如果使用者的螢幕真的太小，允許左右滑動而不會跑版 */
     overflow-x: auto; 
 }
 
@@ -269,34 +264,40 @@ st.markdown("""
     display: none;
 }
 
+/* 🌟 強制超連結與分隔線繼承外層字體，避免 Streamlit 預設覆蓋造成字體不統一 */
+.nav-text-link, .nav-divider {
+    font-family: inherit !important;
+}
+
 /* 導航文字超連結樣式 */
 .nav-text-link {
     text-decoration: none !important;
     color: #94A3B8 !important;
-    font-size: 24px; /* 調整為適中大小，確保能塞進同一行 */
+    font-size: 20px; /* 大小適中，確保單行顯示不擁擠 */
+    font-weight: 600; /* 加粗讓字體更有份量感且清晰 */
     padding: 5px 10px;
-    margin: 0px 5px;
+    margin: 0px 6px;
     transition: all 0.2s ease-in-out;
 }
 
-/* 滑鼠移上去時：變亮、發光，並有「可愛微幅放大」的彈跳感 */
+/* 滑鼠移上去時：變亮、發光，並微幅放大 */
 .nav-text-link:hover {
     color: #00D2FF !important;
     text-shadow: 0 0 15px rgba(0, 210, 255, 0.8);
-    transform: scale(1.1); 
+    transform: scale(1.08); 
 }
 
 /* 項目之間的分隔直線 */
 .nav-divider {
     color: #334155;
-    font-size: 24px;
-    margin: 0 2px;
+    font-size: 22px;
+    margin: 0 4px;
     user-select: none;
 }
 
-/* 導航列因為變成單行，高度變矮了，這裡同步把下推距離縮小 */
+/* 導航列下推距離 */
 .stApp {
-    margin-top: 70px;
+    margin-top: 60px;
 }
 </style>
 
