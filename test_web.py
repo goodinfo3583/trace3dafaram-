@@ -964,8 +964,7 @@ def render_sidebar_market_summary():
         
         html += "<div style='margin-top: 8px; padding: 6px; background-color: #1e1e24; border: 1px solid #555; border-radius: 5px; font-size: 13px;'>"
         # 3. 標題加上專屬日期標示
-        html += f"<div style='font-weight: bold;'>🔄 大盤融資餘額 
-        <span style='font-size: 11px; color:#00D2FF; font-weight: normal; margin-left: 5px;'>基準日：{margin_date}</span></div>"
+        html += f"<div style='font-weight: bold;'>🔄 大盤融資餘額 <span style='font-size: 11px; color:#00D2FF; font-weight: normal; margin-left: 5px;'>基準日：{margin_date}</span></div>"
         html += f"<div style='color: #aaa; margin-top: 4px;'>今日增減(億) <span style='color: {m_c}; font-weight: bold; float: right;'>{m_s}</span></div>"
         html += f"<div style='color: #aaa; margin-top: 2px;'>餘額總計(億) <span style='float: right; color: #fff;'>{margin_today_yi:,.1f}</span></div>"
         html += "</div>"
@@ -1074,26 +1073,125 @@ def render_options_dashboard(target_date_str):
     html_opt += "</table>"
     st.markdown(html_opt, unsafe_allow_html=True)
 
-with tab1:
-    actual_data_date = render_sidebar_market_summary()
-    render_options_dashboard(actual_data_date)
+# ==========================================
+# 🌐 總經指標抓取引擎 (含快取記憶機制)
+# ==========================================
+# ttl=1800 代表快取 30 分鐘。30 分鐘內的重整都不會重新發送網路請求
+@st.cache_data(ttl=1800) 
+def fetch_macro_indicators():
+    data = {
+        "vix": {"value": None, "pct": None},
+        "vixtwn": {"value": None, "pct": None},
+        "fng": {"score": None, "rating": "無法取得"}
+    }
     
+    # 1. 抓取美股 VIX (^VIX)
+    try:
+        hist_vix = yf.Ticker("^VIX").history(period="2d")
+        if len(hist_vix) >= 2:
+            latest = hist_vix['Close'].iloc[-1]
+            prev = hist_vix['Close'].iloc[-2]
+            data["vix"]["value"] = latest
+            data["vix"]["pct"] = (latest - prev) / prev * 100
+    except:
+        pass
+
+    # 2. 抓取台股 VIX (^VIXTWN)
+    try:
+        hist_twn = yf.Ticker("^VIXTWN").history(period="2d")
+        if len(hist_twn) >= 2:
+            latest = hist_twn['Close'].iloc[-1]
+            prev = hist_twn['Close'].iloc[-2]
+            data["vixtwn"]["value"] = latest
+            data["vixtwn"]["pct"] = (latest - prev) / prev * 100
+    except:
+        pass
+
+    # 3. 抓取 CNN 恐懼與貪婪指數
+    try:
+        # 必須偽裝成瀏覽器，否則 CNN 會阻擋
+        headers = {"User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36"}
+        url = "https://production.dataviz.cnn.io/index/fearandgreed/graphdata"
+        res = requests.get(url, headers=headers, timeout=5)
+        if res.status_code == 200:
+            fg_data = res.json()
+            score = int(fg_data['fear_and_greed']['score'])
+            rating = fg_data['fear_and_greed']['rating'].lower()
+            
+            # 將英文狀態翻譯成中文
+            rating_tw = rating.replace("extreme fear", "極度恐懼") \
+                              .replace("fear", "恐懼") \
+                              .replace("neutral", "中立") \
+                              .replace("extreme greed", "極度貪婪") \
+                              .replace("greed", "貪婪")
+            
+            data["fng"]["score"] = score
+            data["fng"]["rating"] = rating_tw
+    except:
+        pass
+
+    return data
+
+
+# ==========================================
+# 📊 原本的 Tab2 介面替換區塊
+# ==========================================
 with tab2:
-    st.subheader("📊 大盤總體經濟指標")
-    c_btn1, c_btn2 = st.columns(2)
-    with c_btn1: st.link_button("📈 恐懼貪婪", "https://www.wantgoo.com/global/macroeconomics/fearandgreed", use_container_width=True)
-    with c_btn2: st.link_button("⚠️ VIX 指數", "https://www.wantgoo.com/global/vix", use_container_width=True)
+    st.subheader("📊 大盤總體經濟指標 (每30分鐘更新)")
+    
+    # 呼叫快取函數獲取資料
+    macro_data = fetch_macro_indicators()
+    
+    # 使用 3 個欄位漂亮地展示數據 (使用 st.metric)
+    c1, c2, c3 = st.columns(3)
+    
+    with c1:
+        if macro_data["vix"]["value"] is not None:
+            # delta_color="inverse" 讓 VIX 漲(數值為正)時顯示紅色警告，跌時顯示綠色安全
+            st.metric(label="🇺🇸 美股 VIX 恐慌指數", 
+                      value=f"{macro_data['vix']['value']:.2f}", 
+                      delta=f"{macro_data['vix']['pct']:.2f}%", 
+                      delta_color="inverse")
+        else:
+            st.metric(label="🇺🇸 美股 VIX 恐慌指數", value="無資料")
+            
+    with c2:
+        if macro_data["vixtwn"]["value"] is not None:
+            st.metric(label="🇹🇼 台股 VIX 恐慌指數", 
+                      value=f"{macro_data['vixtwn']['value']:.2f}", 
+                      delta=f"{macro_data['vixtwn']['pct']:.2f}%", 
+                      delta_color="inverse")
+        else:
+            st.metric(label="🇹🇼 台股 VIX 恐慌指數", value="無資料")
+            
+    with c3:
+        if macro_data["fng"]["score"] is not None:
+            # 恐懼貪婪指數沒有明顯的綠紅好壞(看策略)，所以 delta_color 設為 off 或是 normal
+            st.metric(label="🧭 恐懼與貪婪指數", 
+                      value=f"{macro_data['fng']['score']}", 
+                      delta=f"狀態: {macro_data['fng']['rating']}", 
+                      delta_color="off")
+        else:
+            st.metric(label="🧭 恐懼與貪婪指數", value="無資料")
+
+    st.write("") # 留白
+    
+    # 如果使用者還是想看原網站的圖表，保留小按鈕讓他們點擊
+    with st.expander("🔗 點此開啟原始圖表網頁", expanded=False):
+        btn_c1, btn_c2 = st.columns(2)
+        with btn_c1: st.link_button("📈 CNN 恐懼貪婪圖表", "https://edition.cnn.com/markets/fear-and-greed", use_container_width=True)
+        with btn_c2: st.link_button("⚠️ WantGoo VIX 圖表", "https://www.wantgoo.com/global/vix", use_container_width=True)
+
     st.markdown("---")
     st.subheader("📍 戰情室快速導航")
     st.markdown("[🏆 數據分析觀察名單](#section-top-pool)")
-    st.markdown("[🔍 個股籌碼快搜 (診斷區)](#section-search)")
+    st.markdown("[🔍 個股籌碼快搜](#section-search)")
     st.markdown("[👑 區塊1：三大法人持股比追蹤](#section-1)")
     st.markdown("[🎯 區塊2系列：法人5日淨買佔比](#section-2-1)")
     st.markdown("[📅 區塊3：法人連續買超](#section-3)")
     st.markdown("[🔄 區塊4系列：融資券與軋空雷達](#section-4-1)")
     st.markdown("[💰 區塊5：大股東動向](#section-5)")
     st.markdown("[💸 區塊6：鉅額交易動向](#section-6)")
-
 # ==========================================
 # 🏠 核心五大區塊
 # ==========================================
