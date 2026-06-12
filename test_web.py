@@ -3827,7 +3827,7 @@ with top_pool_container:
                             "▼明細": st.column_config.TextColumn("▼明細", help="滑鼠游標停留在這裡，查看完整明細", width="small", max_chars=4)
                         }
                     )
-                    st.success(f"選股池掃描完成！今日共過濾出 {len(res_df)} 檔潛力標的。")
+                    
                     
                 with tab2:
                     try:
