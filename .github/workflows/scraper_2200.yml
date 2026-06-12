@@ -1,4 +1,4 @@
-name: Daily Stock Scraper
+name: Night Stock Scraper (22:05)
 
 on:
   schedule:
