@@ -1284,7 +1284,7 @@ st.write("")
 c_btn1, c_btn2 = st.columns(2)
 
 with c_btn1: 
-    st.link_button("📊 DDong 台股法人籌碼數據儀表板", "https://goodinfo3583.github.io/DDong_tw-institutional-stocker/", use_container_width=True)
+    st.link_button("📈 三大法人持股變化排名", "https://goodinfo3583.github.io/DDong_tw-institutional-stocker/", use_container_width=True)
 
 with c_btn2:
     try: exp_container = st.popover(f"🛠 站長快照 ({status_text})", use_container_width=True)
@@ -1347,7 +1347,7 @@ if sorted_dates:
     fmt_date = f"{latest_d[:4]}/{latest_d[4:6]}/{latest_d[6:]}"
     header_placeholder.markdown(
         f"<h2 style='margin-bottom: 0px;'>👑 區塊1：三大法人短中長線持股比追蹤 "
-        f"<span style='color:#00D2FF; font-size:16px; font-weight:500; margin-left:12px;'>基準日：{fmt_date}</span></h2>", 
+        f"<span style='color:#00D2FF; font-size:16px; font-weight:500; margin-left:10px;'>基準日：{fmt_date}</span></h2>", 
         unsafe_allow_html=True
     )
     
@@ -1557,7 +1557,7 @@ with tab_all:
         st.dataframe(filtered_df[all_display_cols].style.apply(highlight_row, axis=1), use_container_width=True)
 
 st.write("")
-st.info("💡 欄位說明：【△】為精準單日法人持股增減；【◯日ΔChange】為天期累積變化。")
+st.info("💡 欄位說明：法人持股增減當日動向 △ ；不同天期累積變化 ◯日ΔChange 。")
 st.session_state['my_final_df'] = final_df
 # ==========================================
 # 🎯 區塊2-1：外資 5 日買超 佔成交量比 追蹤 (穩定精確版)
@@ -3730,7 +3730,7 @@ with top_pool_container:
                     else: r_b5 = "-"
                     
                     is_fo_sell = sid in fo_sell_ids; is_it_sell = sid in it_sell_ids
-                    if is_fo_sell and is_it_sell: r_warn = "🚨外投雙倒"; score -= 2.0; details.append("外投雙倒: -2")
+                    if is_fo_sell and is_it_sell: r_warn = "🈹️外投雙倒"; score -= 2.0; details.append("外投雙倒: -2")
                     elif is_fo_sell: r_warn = "⚠️外資倒"
                     elif is_it_sell: r_warn = "⚠️投信倒"
                     else: r_warn = "-"
@@ -3816,7 +3816,7 @@ with top_pool_container:
                             conn.update(spreadsheet=SHEET_URL, worksheet="選股歷史", data=final_save_df)
                     except: pass 
 
-                tab1, tab2, tab3 = st.tabs(["🔹 今日最新排行", "🔹 歷史分數追蹤表", "🔹 模型驗證測試"])
+                tab1, tab2, tab3 = st.tabs(["🔹 今日積分排行", "🔹 歷史積分追蹤", "🔹 模型驗證測試"])
                 
                 with tab1:
                     st.dataframe(
