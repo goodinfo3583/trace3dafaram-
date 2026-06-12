@@ -228,6 +228,61 @@ st.markdown(
     """,
     unsafe_allow_html=True
 )
+
+# ==========================================
+# ==========================================
+# 📍 頂部：戰情室快速導航按鈕列
+# ==========================================
+st.markdown("""
+<style>
+/* 導航按鈕專屬樣式，完美融入極致黑看盤軟體風格 */
+.nav-btn {
+    text-decoration: none !important;
+    background-color: #1E293B;
+    color: #94A3B8 !important;
+    padding: 10px 18px;
+    border-radius: 6px;
+    border: 1px solid #334155;
+    font-size: 15px;
+    font-weight: 500;
+    transition: all 0.2s ease-in-out;
+    display: inline-block;
+    margin: 5px;
+}
+/* 滑鼠懸停時發出科技藍光暈 */
+.nav-btn:hover {
+    border-color: #00D2FF;
+    color: #00D2FF !important;
+    box-shadow: 0 0 10px rgba(0, 210, 255, 0.3);
+}
+/* 導航列外框容器 */
+.nav-container {
+    display: flex;
+    flex-wrap: wrap;
+    justify-content: center;
+    margin-bottom: 25px;
+    padding: 15px;
+    background-color: #111622;
+    border: 1px solid #1E293B;
+    border-radius: 10px;
+    box-shadow: 0px 4px 15px rgba(0, 0, 0, 0.5);
+}
+</style>
+
+<div class="nav-container">
+    <div style="width: 100%; text-align: center; margin-bottom: 12px; color: #00D2FF; font-weight: bold; font-size: 18px; text-shadow: 0 0 10px rgba(0, 210, 255, 0.5);">
+        📍 戰情室快速導航
+    </div>
+    <a href="#section-top-pool" target="_self" class="nav-btn">🏆 數據分析觀察名單</a>
+    <a href="#section-search" target="_self" class="nav-btn">🔍 個股籌碼快搜</a>
+    <a href="#section-1" target="_self" class="nav-btn">👑 區塊 1：三大法人持股比</a>
+    <a href="#section-2-1" target="_self" class="nav-btn">🎯 區塊 2：法人 5 日淨買佔比</a>
+    <a href="#section-3" target="_self" class="nav-btn">📅 區塊 3：法人連續買超</a>
+    <a href="#section-4-1" target="_self" class="nav-btn">🔄 區塊 4：融資券與軋空雷達</a>
+    <a href="#section-5" target="_self" class="nav-btn">💰 區塊 5：大股東動向</a>
+    <a href="#section-6" target="_self" class="nav-btn">💸 區塊 6：鉅額交易動向</a>
+</div>
+""", unsafe_allow_html=True)
 # ==========================================
 # 🏆 預留置頂空間：頂級選股池容器
 # ==========================================
@@ -3931,7 +3986,7 @@ with top_pool_container:
                             "▼明細": st.column_config.TextColumn("▼明細", help="滑鼠游標停留在這裡，查看完整明細", width="small", max_chars=4)
                         }
                     )
-                    st.success(f"選股池掃描完成！今日共過濾出 {len(res_df)} 檔潛力標的。")
+
                     
                 with tab2:
                     try:
