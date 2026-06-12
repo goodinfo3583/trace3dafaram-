@@ -1114,15 +1114,17 @@ def render_options_dashboard(target_date_str):
 
 
 # ==========================================
-# 🌐 總經指標抓取引擎 (含快取記憶機制)
+# 🌐 總經指標抓取引擎 (含快取記憶機制 & 玩股網備援)
 # ==========================================
 @st.cache_data(ttl=2400) 
 def fetch_macro_indicators():
     data = {
         "vix": {"value": None, "pct": None},
+        "vixtwn": {"value": None, "pct": None},
         "fng": {"score": None, "rating": "無法取得"}
     }
     
+    # 1. 抓取美股 VIX (^VIX)
     try:
         hist_vix = yf.Ticker("^VIX").history(period="2d")
         if len(hist_vix) >= 2:
@@ -1132,6 +1134,23 @@ def fetch_macro_indicators():
             data["vix"]["pct"] = (latest - prev) / prev * 100
     except: pass
 
+    # 2. 抓取台股 VIX (玩股網備援)
+    try:
+        headers = {"User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36"}
+        url = "https://www.wantgoo.com/index/vixtwn"
+        res = requests.get(url, headers=headers, timeout=5)
+        if res.status_code == 200:
+            from bs4 import BeautifulSoup
+            soup = BeautifulSoup(res.text, 'html.parser')
+            # 抓取玩股網上的指數數值
+            vix_element = soup.select_one(".index-price") 
+            if vix_element:
+                latest = float(vix_element.text.replace(',', '').strip())
+                data["vixtwn"]["value"] = latest
+                data["vixtwn"]["pct"] = 0.0 # 靜態抓取，暫不計算漲跌幅
+    except: pass
+
+    # 3. 抓取 CNN 恐懼貪婪指數
     try:
         headers = {"User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36"}
         url = "https://production.dataviz.cnn.io/index/fearandgreed/graphdata"
@@ -1162,10 +1181,11 @@ with tab1:
     render_options_dashboard(actual_data_date)
     
 with tab2:
-    st.subheader("📊 大盤總體經濟指標")
+    st.subheader("📊 大盤總體經濟指標 (每40分鐘更新)")
     
     macro_data = fetch_macro_indicators()
     
+    # --- 美股 VIX 邏輯 ---
     vix_val = macro_data["vix"]["value"]
     vix_color = "#a1a1aa" 
     if vix_val is not None:
@@ -1173,43 +1193,64 @@ with tab2:
         elif vix_val < 28.7: vix_color = "#3b82f6" 
         elif vix_val < 33.5: vix_color = "#f59e0b" 
         else: vix_color = "#ef4444" 
-        
     vix_tooltip = f"VIX 市場恐慌指標&#10;目前 VIX： {vix_val if vix_val else '無'}&#10;綠色（VIX < 20）：市場平穩。&#10;藍色（20 ≤ VIX < 28.7）： 1年的投資報酬率較差。&#10;橘色（28.7 ≤ VIX < 33.5）： 🉐1年的報酬可達 15%。&#10;紅色（VIX ≥ 33.5）：🈵1年的報酬可達 25%。"
 
+    # --- 台股 VIX 邏輯 ---
+    vixtwn_val = macro_data["vixtwn"]["value"]
+    vixtwn_color = "#a1a1aa"
+    if vixtwn_val is not None:
+        if vixtwn_val < 20: vixtwn_color = "#3b82f6" 
+        elif vixtwn_val < 30: vixtwn_color = "#10b981" 
+        elif vixtwn_val < 40: vixtwn_color = "#f59e0b" 
+        else: vixtwn_color = "#ef4444" 
+    vixtwn_tooltip = f"VIXTWN 台灣市場恐慌指標&#10;目前 VIXTWN： {vixtwn_val if vixtwn_val else '無'}&#10;藍色（VIXTWN < 20）：市場平穩，多頭常態。&#10;綠色（20 ≤ VIXTWN < 30）：🈹波動加劇，注意風險。&#10;橘色（30 ≤ VIXTWN < 40）：🉐恐慌殺盤，布局機會。(法人避險)&#10;紅色（VIXTWN ≥ 40）：🈵極度恐慌，強力買點。(系統風險、黑天鵝)"
+
+    # --- 恐懼貪婪 邏輯 ---
     fng_val = macro_data["fng"]["score"]
     fng_color = "#a1a1aa"
     if fng_val is not None:
         if fng_val < 25: fng_color = "#ef4444" 
         elif fng_val > 75: fng_color = "#10b981" 
         else: fng_color = "#f59e0b" 
-        
     fng_tooltip = f"目前 FNG： {fng_val if fng_val else '無'}&#10;恐懼貪婪指數 < 25 🈵積極買點&#10;恐懼貪婪 < 15 🉐分批加碼&#10;恐懼貪婪 > 75 🈴分批減碼不追高&#10;恐懼貪婪 > 85 🈹獲利了結&#10;恐懼貪婪 > 90 🈲提高現金部位"
 
-    _, c1, c2, _ = st.columns([1, 4, 4, 1]) 
+    # --- 版面渲染：左側上下兩小塊，右側一長塊 ---
+    col_left, col_right = st.columns([1, 1])
     
-    def render_custom_metric(col, title, value, pct_str, color, tooltip):
-        val_str = f"{value:.2f}" if isinstance(value, float) else str(value)
-        html = f"""
-        <div title="{tooltip}" style="background-color: rgba(255,255,255,0.03); padding: 15px; border-radius: 10px; border: 1px solid rgba(255,255,255,0.1); text-align: center; cursor: help; transition: 0.3s;" onmouseover="this.style.borderColor='{color}'; this.style.backgroundColor='rgba(255,255,255,0.08)';" onmouseout="this.style.borderColor='rgba(255,255,255,0.1)'; this.style.backgroundColor='rgba(255,255,255,0.03)';">
-            <div style="font-size: 14px; color: #a1a1aa; margin-bottom: 6px;">{title}</div>
-            <div style="font-size: 26px; font-weight: 700; color: {color}; margin-bottom: 4px;">{val_str}</div>
-            <div style="font-size: 14px; color: #71717a;">{pct_str}</div>
+    with col_left:
+        # 美股 VIX 卡片
+        v1_str = f"{vix_val:.2f}" if vix_val else "無資料"
+        p1_str = f"{'+' if macro_data['vix']['pct'] and macro_data['vix']['pct'] > 0 else ''}{macro_data['vix']['pct']:.2f}%" if macro_data['vix']['pct'] is not None else "-"
+        st.markdown(f"""
+        <div title="{vix_tooltip}" style="background-color: rgba(255,255,255,0.03); padding: 12px; border-radius: 10px; border: 1px solid rgba(255,255,255,0.1); text-align: center; cursor: help; margin-bottom: 10px; transition: 0.3s;" onmouseover="this.style.borderColor='{vix_color}'; this.style.backgroundColor='rgba(255,255,255,0.08)';" onmouseout="this.style.borderColor='rgba(255,255,255,0.1)'; this.style.backgroundColor='rgba(255,255,255,0.03)';">
+            <div style="font-size: 13px; color: #a1a1aa; margin-bottom: 4px;">🇺🇸 美股 VIX</div>
+            <div style="font-size: 22px; font-weight: 700; color: {vix_color}; margin-bottom: 2px;">{v1_str}</div>
+            <div style="font-size: 12px; color: #71717a;">{p1_str}</div>
         </div>
-        """
-        col.markdown(html, unsafe_allow_html=True)
+        """, unsafe_allow_html=True)
+        
+        # 台股 VIX 卡片
+        v2_str = f"{vixtwn_val:.2f}" if vixtwn_val else "無資料"
+        p2_str = "最新數值" if vixtwn_val else "-"
+        st.markdown(f"""
+        <div title="{vixtwn_tooltip}" style="background-color: rgba(255,255,255,0.03); padding: 12px; border-radius: 10px; border: 1px solid rgba(255,255,255,0.1); text-align: center; cursor: help; transition: 0.3s;" onmouseover="this.style.borderColor='{vixtwn_color}'; this.style.backgroundColor='rgba(255,255,255,0.08)';" onmouseout="this.style.borderColor='rgba(255,255,255,0.1)'; this.style.backgroundColor='rgba(255,255,255,0.03)';">
+            <div style="font-size: 13px; color: #a1a1aa; margin-bottom: 4px;">🇹🇼 台股 VIX</div>
+            <div style="font-size: 22px; font-weight: 700; color: {vixtwn_color}; margin-bottom: 2px;">{v2_str}</div>
+            <div style="font-size: 12px; color: #71717a;">{p2_str}</div>
+        </div>
+        """, unsafe_allow_html=True)
 
-    with c1:
-        if vix_val is not None:
-            pct_sign = "+" if macro_data['vix']['pct'] > 0 else ""
-            render_custom_metric(c1, "🇺🇸 美股 VIX", vix_val, f"{pct_sign}{macro_data['vix']['pct']:.2f}%", vix_color, vix_tooltip)
-        else:
-            render_custom_metric(c1, "🇺🇸 美股 VIX", "無資料", "-", "#a1a1aa", vix_tooltip)
-
-    with c2:
-        if fng_val is not None:
-            render_custom_metric(c2, "🧭 恐懼貪婪", fng_val, macro_data["fng"]["rating"], fng_color, fng_tooltip)
-        else:
-            render_custom_metric(c2, "🧭 恐懼貪婪", "無資料", "-", "#a1a1aa", fng_tooltip)
+    with col_right:
+        # 恐懼貪婪 長卡片 (透過 height: 100% 與 flex 排版讓它撐滿並置中對齊左邊)
+        f_str = str(fng_val) if fng_val else "無資料"
+        f_rating = macro_data["fng"]["rating"]
+        st.markdown(f"""
+        <div title="{fng_tooltip}" style="background-color: rgba(255,255,255,0.03); padding: 12px; height: calc(100% - 24px); display: flex; flex-direction: column; justify-content: center; align-items: center; border-radius: 10px; border: 1px solid rgba(255,255,255,0.1); text-align: center; cursor: help; transition: 0.3s;" onmouseover="this.style.borderColor='{fng_color}'; this.style.backgroundColor='rgba(255,255,255,0.08)';" onmouseout="this.style.borderColor='rgba(255,255,255,0.1)'; this.style.backgroundColor='rgba(255,255,255,0.03)';">
+            <div style="font-size: 15px; color: #a1a1aa; margin-bottom: 15px;">🧭 恐懼與貪婪指數</div>
+            <div style="font-size: 42px; font-weight: 700; color: {fng_color}; margin-bottom: 10px;">{f_str}</div>
+            <div style="font-size: 16px; font-weight: 600; color: {fng_color};">{f_rating}</div>
+        </div>
+        """, unsafe_allow_html=True)
 
     st.write("") 
 
