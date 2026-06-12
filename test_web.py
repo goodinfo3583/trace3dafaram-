@@ -836,6 +836,7 @@ import pandas as pd
 import streamlit as st
 import datetime
 import yfinance as yf
+import requests
 import re
 
 DATA_DIR = "./Goodinfo_Rankings"
@@ -862,7 +863,6 @@ def agg_sections_func(x):
                 valid_x.add(p.strip())
     return ",".join([s for s in ['5日', '20日', '60日', '120日'] if s in valid_x])
 
-# 🌟 全域資料夾讀取引擎：所有 CSV 一讀進來，代號全部強制補零！
 @st.cache_data(ttl=60) 
 def get_latest_csv(keyword):
     if not os.path.exists(DATA_DIR): return None, "未知"
@@ -906,7 +906,6 @@ def get_diff_ui(today_val, prev_val):
 
 tab1, tab2 = st.sidebar.tabs(["🔹 大盤與期權", "🔹 戰情導航"])
 
-
 # ------------------------------------------
 # 1. 大盤籌碼導航總覽 (終極精準融資 + 期貨變化量)
 # ------------------------------------------
@@ -915,13 +914,12 @@ def render_sidebar_market_summary():
     df_spot, date_spot = get_latest_csv("三大法人買賣超金額")
     df_fut, _ = get_latest_csv("三大法人期貨多空")
     df_fut_prev = get_prev_csv("三大法人期貨多空", date_spot)
-    df_margin, margin_csv_name = get_latest_csv("融資融券餘額") # 💡 檔名對應
+    df_margin, margin_csv_name = get_latest_csv("融資融券餘額")
     
     if df_spot is None or df_fut is None:
         st.warning("尚無大盤數據，請確認資料夾中已有今日 CSV。")
         return "未知"
 
-    # --- 1. 現貨 ---
     net_foreign, net_trust, net_dealer, net_total = 0.0, 0.0, 0.0, 0.0
     for _, row in df_spot.iterrows():
         name = str(row.get('單位名稱', ''))
@@ -933,7 +931,6 @@ def render_sidebar_market_summary():
         elif '自營商' in name: net_dealer += val
         elif '合計' in name: net_total = val
 
-    # --- 2. 期貨 (今日) ---
     oi_foreign, oi_trust, oi_dealer = 0, 0, 0
     if df_fut is not None:
         target_oi_col = next((c for c in df_fut.columns if '未平倉' in c and '多空淨額' in c), None)
@@ -949,7 +946,6 @@ def render_sidebar_market_summary():
                     elif '自營商' in iden: oi_dealer = val
     total_oi = oi_foreign + oi_trust + oi_dealer
 
-    # --- 3. 期貨 (前日，用來算變化量) ---
     oi_f_prev, oi_t_prev, oi_d_prev = None, None, None
     if df_fut_prev is not None:
         t_col_prev = next((c for c in df_fut_prev.columns if '未平倉' in c and '多空淨額' in c), None)
@@ -964,26 +960,20 @@ def render_sidebar_market_summary():
                     elif '投信' in iden: oi_t_prev = val
                     elif '自營商' in iden: oi_d_prev = val
 
-    # --- 4. 🚀 融資餘額 (絕對鎖定仟元與單位轉換) ---
     margin_diff_yi, margin_today_yi = 0.0, 0.0
     if df_margin is not None:
         for _, row in df_margin.iterrows():
             row_list = [str(x).replace(',', '').strip() for x in row.values]
             row_str = "".join(row_list)
-            # 🎯 絕對鎖定「金額(仟元)」這一列
             if '融資金額' in row_str:
                 try:
-                    # 證交所標準欄位：最後兩格必定是 [前日餘額, 今日餘額]
                     margin_prev = float(row_list[-2]) 
                     margin_today = float(row_list[-1])
-                    
-                    # 將仟元轉換為億元 (除以 100,000)
                     margin_diff_yi = (margin_today - margin_prev) / 100000
                     margin_today_yi = margin_today / 100000
                     break
                 except: pass
 
-    # --- UI 渲染 ---
     def get_color(val, is_float=True):
         if val > 0: return "#ff4b4b", f"+{val:,.1f}" if is_float else f"+{val:,}"
         elif val < 0: return "#00e676", f"{val:,.1f}" if is_float else f"{val:,}"
@@ -999,7 +989,6 @@ def render_sidebar_market_summary():
     too_c, too_os = get_color(total_oi, False)
     m_c, m_s = get_color(margin_diff_yi)
 
-    # 1. 移除「本地極速版」字眼，只保留俐落的日期
     html = f"<div style='font-size: 13px; color: #00D2FF;'>📅 {date_spot} | 資金風向球</div>"
     html += "<table style='width: 100%; text-align: center; border-collapse: collapse; margin-top: 5px; font-size: 14px;'>"
     html += "<tr style='border-bottom: 1px solid #555; background-color: #262730;'>"
@@ -1013,11 +1002,8 @@ def render_sidebar_market_summary():
     html += "</table>"
     
     if margin_today_yi != 0.0:
-        # 2. 獲取融資檔案的專屬日期
         margin_date = margin_csv_name[:8] if margin_csv_name else "未知"
-        
         html += "<div style='margin-top: 8px; padding: 6px; background-color: #1e1e24; border: 1px solid #555; border-radius: 5px; font-size: 13px;'>"
-        # 3. 標題加上專屬日期標示
         html += f"<div style='font-weight: bold;'>📉 大盤融資餘額 <span style='font-size: 11px; color: #888; font-weight: normal; margin-left: 5px;'>({margin_date})</span></div>"
         html += f"<div style='color: #aaa; margin-top: 4px;'>今日增減(億) <span style='color: {m_c}; font-weight: bold; float: right;'>{m_s}</span></div>"
         html += f"<div style='color: #aaa; margin-top: 2px;'>餘額總計(億) <span style='float: right; color: #fff;'>{margin_today_yi:,.1f}</span></div>"
@@ -1075,7 +1061,6 @@ def render_options_dashboard(target_date_str):
     max_pressure = int(top_calls.loc[0, col_strike]) if not top_calls.empty else 0
     max_support = int(top_puts.loc[0, col_strike]) if not top_puts.empty else 0
 
-    # 🚀 解析昨日資料供比對
     prev_oi_dict = {}
     if df_opt_prev is not None and col_strike in df_opt_prev.columns:
         valid_months_p = [m for m in df_opt_prev[col_month].dropna().unique() if str(m).startswith('20')]
@@ -1127,19 +1112,111 @@ def render_options_dashboard(target_date_str):
     html_opt += "</table>"
     st.markdown(html_opt, unsafe_allow_html=True)
 
+
+# ==========================================
+# 🌐 總經指標抓取引擎 (含快取記憶機制)
+# ==========================================
+@st.cache_data(ttl=2400) 
+def fetch_macro_indicators():
+    data = {
+        "vix": {"value": None, "pct": None},
+        "fng": {"score": None, "rating": "無法取得"}
+    }
+    
+    try:
+        hist_vix = yf.Ticker("^VIX").history(period="2d")
+        if len(hist_vix) >= 2:
+            latest = hist_vix['Close'].iloc[-1]
+            prev = hist_vix['Close'].iloc[-2]
+            data["vix"]["value"] = latest
+            data["vix"]["pct"] = (latest - prev) / prev * 100
+    except: pass
+
+    try:
+        headers = {"User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36"}
+        url = "https://production.dataviz.cnn.io/index/fearandgreed/graphdata"
+        res = requests.get(url, headers=headers, timeout=5)
+        if res.status_code == 200:
+            fg_data = res.json()
+            score = int(fg_data['fear_and_greed']['score'])
+            
+            if score < 15: rating_tw = "🉐 分批加碼"
+            elif score < 25: rating_tw = "🈵 積極買點"
+            elif score > 90: rating_tw = "🈲 提高現金"
+            elif score > 85: rating_tw = "🈹 獲利了結"
+            elif score > 75: rating_tw = "🈴 分批減碼"
+            else: rating_tw = "⚖️ 中立平穩"
+            
+            data["fng"]["score"] = score
+            data["fng"]["rating"] = rating_tw
+    except: pass
+
+    return data
+
+
+# ==========================================
+# 🔮 最終整合與渲染 (Tab1 / Tab2)
+# ==========================================
 with tab1:
     actual_data_date = render_sidebar_market_summary()
     render_options_dashboard(actual_data_date)
     
 with tab2:
-    st.subheader("📊 大盤總體經濟指標")
-    c_btn1, c_btn2 = st.columns(2)
-    with c_btn1: st.link_button("📈 恐懼貪婪", "https://www.wantgoo.com/global/macroeconomics/fearandgreed", use_container_width=True)
-    with c_btn2: st.link_button("⚠️ VIX 指數", "https://www.wantgoo.com/global/vix", use_container_width=True)
+    st.subheader("📊 大盤總體經濟指標 (每40分鐘更新)")
+    
+    macro_data = fetch_macro_indicators()
+    
+    vix_val = macro_data["vix"]["value"]
+    vix_color = "#a1a1aa" 
+    if vix_val is not None:
+        if vix_val < 20: vix_color = "#10b981" 
+        elif vix_val < 28.7: vix_color = "#3b82f6" 
+        elif vix_val < 33.5: vix_color = "#f59e0b" 
+        else: vix_color = "#ef4444" 
+        
+    vix_tooltip = f"VIX 市場恐慌指標&#10;目前 VIX： {vix_val if vix_val else '無'}&#10;綠色（VIX < 20）：市場平穩。&#10;藍色（20 ≤ VIX < 28.7）： 1年的投資報酬率較差。&#10;橘色（28.7 ≤ VIX < 33.5）： 🉐1年的報酬可達 15%。&#10;紅色（VIX ≥ 33.5）：🈵1年的報酬可達 25%。"
+
+    fng_val = macro_data["fng"]["score"]
+    fng_color = "#a1a1aa"
+    if fng_val is not None:
+        if fng_val < 25: fng_color = "#ef4444" 
+        elif fng_val > 75: fng_color = "#10b981" 
+        else: fng_color = "#f59e0b" 
+        
+    fng_tooltip = f"目前 FNG： {fng_val if fng_val else '無'}&#10;恐懼貪婪指數 < 25 🈵積極買點&#10;恐懼貪婪 < 15 🉐分批加碼&#10;恐懼貪婪 > 75 🈴分批減碼不追高&#10;恐懼貪婪 > 85 🈹獲利了結&#10;恐懼貪婪 > 90 🈲提高現金部位"
+
+    _, c1, c2, _ = st.columns([1, 4, 4, 1]) 
+    
+    def render_custom_metric(col, title, value, pct_str, color, tooltip):
+        val_str = f"{value:.2f}" if isinstance(value, float) else str(value)
+        html = f"""
+        <div title="{tooltip}" style="background-color: rgba(255,255,255,0.03); padding: 15px; border-radius: 10px; border: 1px solid rgba(255,255,255,0.1); text-align: center; cursor: help; transition: 0.3s;" onmouseover="this.style.borderColor='{color}'; this.style.backgroundColor='rgba(255,255,255,0.08)';" onmouseout="this.style.borderColor='rgba(255,255,255,0.1)'; this.style.backgroundColor='rgba(255,255,255,0.03)';">
+            <div style="font-size: 14px; color: #a1a1aa; margin-bottom: 6px;">{title}</div>
+            <div style="font-size: 26px; font-weight: 700; color: {color}; margin-bottom: 4px;">{val_str}</div>
+            <div style="font-size: 14px; color: #71717a;">{pct_str}</div>
+        </div>
+        """
+        col.markdown(html, unsafe_allow_html=True)
+
+    with c1:
+        if vix_val is not None:
+            pct_sign = "+" if macro_data['vix']['pct'] > 0 else ""
+            render_custom_metric(c1, "🇺🇸 美股 VIX", vix_val, f"{pct_sign}{macro_data['vix']['pct']:.2f}%", vix_color, vix_tooltip)
+        else:
+            render_custom_metric(c1, "🇺🇸 美股 VIX", "無資料", "-", "#a1a1aa", vix_tooltip)
+
+    with c2:
+        if fng_val is not None:
+            render_custom_metric(c2, "🧭 恐懼貪婪", fng_val, macro_data["fng"]["rating"], fng_color, fng_tooltip)
+        else:
+            render_custom_metric(c2, "🧭 恐懼貪婪", "無資料", "-", "#a1a1aa", fng_tooltip)
+
+    st.write("") 
+
     st.markdown("---")
     st.subheader("📍 戰情室快速導航")
     st.markdown("[🏆 數據分析觀察名單](#section-top-pool)")
-    st.markdown("[🔍 個股籌碼快搜 (診斷區)](#section-search)")
+    st.markdown("[🔍 個股籌碼快搜](#section-search)")
     st.markdown("[👑 區塊1：三大法人持股比追蹤](#section-1)")
     st.markdown("[🎯 區塊2系列：法人5日淨買佔比](#section-2-1)")
     st.markdown("[📅 區塊3：法人連續買超](#section-3)")
