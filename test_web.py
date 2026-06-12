@@ -1137,7 +1137,7 @@ def fetch_macro_indicators():
 # 📊 原本的 Tab2 介面替換區塊
 # ==========================================
 with tab2:
-    st.subheader("📊 大盤總體經濟指標 (每30分鐘更新)")
+    st.subheader("📊 大盤總體經濟指標")
     
     # 呼叫快取函數獲取資料
     macro_data = fetch_macro_indicators()
@@ -1173,15 +1173,8 @@ with tab2:
                       delta_color="off")
         else:
             st.metric(label="🧭 恐懼與貪婪指數", value="無資料")
-
     st.write("") # 留白
     
-    # 如果使用者還是想看原網站的圖表，保留小按鈕讓他們點擊
-    with st.expander("🔗 點此開啟原始圖表網頁", expanded=False):
-        btn_c1, btn_c2 = st.columns(2)
-        with btn_c1: st.link_button("📈 CNN 恐懼貪婪圖表", "https://edition.cnn.com/markets/fear-and-greed", use_container_width=True)
-        with btn_c2: st.link_button("⚠️ WantGoo VIX 圖表", "https://www.wantgoo.com/global/vix", use_container_width=True)
-
     st.markdown("---")
     st.subheader("📍 戰情室快速導航")
     st.markdown("[🏆 數據分析觀察名單](#section-top-pool)")
