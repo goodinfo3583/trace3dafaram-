@@ -1077,7 +1077,7 @@ def render_options_dashboard(target_date_str):
 # 🌐 總經指標抓取引擎 (含快取記憶機制)
 # ==========================================
 # ttl=1800 代表快取 30 分鐘。30 分鐘內的重整都不會重新發送網路請求
-@st.cache_data(ttl=1800) 
+@st.cache_data(ttl=2400) 
 def fetch_macro_indicators():
     data = {
         "vix": {"value": None, "pct": None},
@@ -1148,7 +1148,7 @@ with tab2:
     with c1:
         if macro_data["vix"]["value"] is not None:
             # delta_color="inverse" 讓 VIX 漲(數值為正)時顯示紅色警告，跌時顯示綠色安全
-            st.metric(label="🇺🇸 美股 VIX 恐慌指數", 
+            st.metric(label="🇺🇸 VIX", 
                       value=f"{macro_data['vix']['value']:.2f}", 
                       delta=f"{macro_data['vix']['pct']:.2f}%", 
                       delta_color="inverse")
@@ -1157,7 +1157,7 @@ with tab2:
             
     with c2:
         if macro_data["vixtwn"]["value"] is not None:
-            st.metric(label="🇹🇼 台股 VIX 恐慌指數", 
+            st.metric(label="🇹🇼 VIX", 
                       value=f"{macro_data['vixtwn']['value']:.2f}", 
                       delta=f"{macro_data['vixtwn']['pct']:.2f}%", 
                       delta_color="inverse")
@@ -1167,7 +1167,7 @@ with tab2:
     with c3:
         if macro_data["fng"]["score"] is not None:
             # 恐懼貪婪指數沒有明顯的綠紅好壞(看策略)，所以 delta_color 設為 off 或是 normal
-            st.metric(label="🧭 恐懼與貪婪指數", 
+            st.metric(label="🧭 恐懼貪婪指數", 
                       value=f"{macro_data['fng']['score']}", 
                       delta=f"狀態: {macro_data['fng']['rating']}", 
                       delta_color="off")
