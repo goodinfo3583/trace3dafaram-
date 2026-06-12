@@ -231,67 +231,72 @@ st.markdown(
 
 # ==========================================
 # ==========================================
-# 📍 頂部：戰情室快速導航按鈕列 (Streamlit 強制置頂修正版)
+# 📍 頂部：戰情室快速導航 (終極置頂 + 純文字無框極簡版)
 # ==========================================
 st.markdown("""
 <style>
-/* 🔴 核心修正：強制 Streamlit 預設產生的外層包裝元件變成置頂凍結狀態 */
-div[data-testid="element-container"]:has(.nav-container) {
-    position: sticky;
-    top: 45px;          /* 45px 剛好避開 Streamlit 最上方的預設黑條，完美貼齊 */
-    z-index: 99999;     /* 給予最高層級，保證不會被圖表或 K 線圖蓋過去 */
-    background-color: #0A0D14; /* 填滿您的全站主背景色，防止滑動時下方的文字穿透穿幫 */
-    padding-bottom: 10px;
+/* 🔴 終極修正：直接使用 position: fixed 強制釘在瀏覽器最頂端，徹底無視 Streamlit 的層級限制 */
+.sticky-nav-bar {
+    position: fixed;
+    top: 0;
+    left: 0;
+    width: 100%;
+    background-color: #0A0D14;     /* 實心主背景色，防止滾動時下方文字穿透 */
+    border-bottom: 1px solid #1E293B; /* 頂部下方細緻分隔線 */
+    z-index: 999999;               /* 給予至高無上的層級，保證壓在所有圖表與 K 線圖上方 */
+    padding: 12px 0px;
+    text-align: center;
+    box-shadow: 0px 4px 20px rgba(0, 0, 0, 0.6);
 }
 
-/* 導航列外框容器 */
-.nav-container {
-    display: flex;
-    flex-wrap: wrap;
-    justify-content: center;
-    padding: 15px;
-    background-color: rgba(17, 22, 34, 0.95); /* 稍微調高深色飽和度提升質感 */
-    border: 1px solid #1E293B;
-    border-bottom: 2px solid #00D2FF;         /* 底部科技藍發光線 */
-    border-radius: 8px;
-    box-shadow: 0px 8px 25px rgba(0, 0, 0, 0.9);
-}
-
-/* 導航按鈕專屬樣式 */
-.nav-btn {
+/* 導航文字超連結樣式：完全無外框、無背景、極簡風 */
+.nav-text-link {
     text-decoration: none !important;
-    background-color: #1E293B;
-    color: #94A3B8 !important;
-    padding: 10px 18px;
-    border-radius: 6px;
-    border: 1px solid #334155;
-    font-size: 15px;
+    color: #94A3B8 !important;     /* 平時為低調的灰白字 */
+    font-size: 14px;
     font-weight: 500;
+    padding: 5px 10px;
+    margin: 0px 2px;
     transition: all 0.2s ease-in-out;
     display: inline-block;
-    margin: 5px;
 }
 
-/* 滑鼠懸停時發出科技藍光暈 */
-.nav-btn:hover {
-    border-color: #00D2FF;
+/* 滑鼠移上去時：文字變亮科技藍，並帶有微微的霓虹發光特效 */
+.nav-text-link:hover {
     color: #00D2FF !important;
-    box-shadow: 0 0 10px rgba(0, 210, 255, 0.3);
+    text-shadow: 0 0 10px rgba(0, 210, 255, 0.8);
+}
+
+/* 項目之間的分隔直線 */
+.nav-divider {
+    color: #334155;
+    font-size: 14px;
+    user-select: none;
+}
+
+/* 貼心微調：將 Streamlit 頂部稍微往下推，避免內容被最上方的固定導航列遮擋 */
+.stApp {
+    margin-top: 25px;
 }
 </style>
 
-<div class="nav-container">
-    <div style="width: 100%; text-align: center; margin-bottom: 12px; color: #00D2FF; font-weight: bold; font-size: 18px; text-shadow: 0 0 10px rgba(0, 210, 255, 0.5);">
-        📍 戰情室快速導航
-    </div>
-    <a href="#section-top-pool" target="_self" class="nav-btn">🏆 數據分析觀察名單</a>
-    <a href="#section-search" target="_self" class="nav-btn">🔍 個股籌碼快搜</a>
-    <a href="#section-1" target="_self" class="nav-btn">👑 區塊 1：三大法人持股比</a>
-    <a href="#section-2-1" target="_self" class="nav-btn">🎯 區塊 2：法人淨買佔比</a>
-    <a href="#section-3" target="_self" class="nav-btn">📅 區塊 3：法人連續買超</a>
-    <a href="#section-4-1" target="_self" class="nav-btn">🔄 區塊 4：融資券與軋空雷達</a>
-    <a href="#section-5" target="_self" class="nav-btn">💰 區塊 5：大股東動向</a>
-    <a href="#section-6" target="_self" class="nav-btn">💸 區塊 6：鉅額交易動向</a>
+<div class="sticky-nav-bar">
+    <span style="color: #00D2FF; font-weight: bold; margin-right: 15px; font-size: 14px; letter-spacing: 1px;">📍 戰情導航：</span>
+    <a href="#section-top-pool" target="_self" class="nav-text-link">🏆 觀察名單</a>
+    <span class="nav-divider">|</span>
+    <a href="#section-search" target="_self" class="nav-text-link">🔍 個股快搜</a>
+    <span class="nav-divider">|</span>
+    <a href="#section-1" target="_self" class="nav-text-link">👑 法人持股</a>
+    <span class="nav-divider">|</span>
+    <a href="#section-2-1" target="_self" class="nav-text-link">🎯 買超佔比</a>
+    <span class="nav-divider">|</span>
+    <a href="#section-3" target="_self" class="nav-text-link">📅 法人連買</a>
+    <span class="nav-divider">|</span>
+    <a href="#section-4-1" target="_self" class="nav-text-link">🔄 資券軋空</a>
+    <span class="nav-divider">|</span>
+    <a href="#section-5" target="_self" class="nav-text-link">💰 大股東動向</a>
+    <span class="nav-divider">|</span>
+    <a href="#section-6" target="_self" class="nav-text-link">💸 鉅額交易</a>
 </div>
 """, unsafe_allow_html=True)
 # ==========================================
