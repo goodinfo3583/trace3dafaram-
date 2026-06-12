@@ -1698,7 +1698,7 @@ else:
         # ==========================================================
         # 計算實際成功串聯的天數 (計算有幾個"成交比%"欄位)
         days_count = len([c for c in csv_display.columns if "成交比%" in c])
-        st.success(f"串聯 {days_count} 個交易日追蹤共 {len(csv_display)} 檔")
+
         
         # 最後存入 Session State
         st.session_state['df_blk2_1'] = csv_display
