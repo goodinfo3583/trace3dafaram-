@@ -2927,7 +2927,7 @@ def apply_b5_market_filters(df, show_etf, show_bond):
 
 # 擴充為 5 個 Tab
 tab_1000, tab_800, tab_600, tab_400, tab_sync = st.tabs([
-    "🔹 1000張大戶", "🔹 800張大戶", "🔹 600張大戶", "🔹 400張大戶", "🎯 雙引擎共振"
+    "🔹 1000張大戶", "🔹 800張大戶", "🔹 600張大戶", "🔹 400張大戶", "🔹 雙引擎共振"
 ])
 
 filtered_1000_df, filtered_800_df, filtered_600_df, filtered_400_df = pd.DataFrame(), pd.DataFrame(), pd.DataFrame(), pd.DataFrame()
@@ -3136,15 +3136,76 @@ with tab_400:
 # ================= TAB 5: 雙引擎共振 =================
 with tab_sync:
     if not filtered_1000_df.empty and not filtered_400_df.empty:
-        df1 = filtered_1000_df.add_suffix(' (千張)').rename(columns={'股票代號 (千張)': '股票代號', '股票名稱 (千張)': '股票名稱'})
-        df2 = filtered_400_df.add_suffix(' (四百)').rename(columns={'股票代號 (四百)': '股票代號', '股票名稱 (四百)': '股票名稱'})
-        
+        # 1. 篩選兩邊大戶都呈現「增」的標的
+        df1_inc = filtered_1000_df[filtered_1000_df['週動態'].astype(str).str.contains('增', na=False)].copy()
+        df2_inc = filtered_400_df[filtered_400_df['週動態'].astype(str).str.contains('增', na=False)].copy()
+
+        # 2. 標記千張與四百張後綴
+        df1 = df1_inc.add_suffix(' (千張)').rename(columns={'股票代號 (千張)': '股票代號', '股票名稱 (千張)': '股票名稱'})
+        df2 = df2_inc.add_suffix(' (四百)').rename(columns={'股票代號 (四百)': '股票代號', '股票名稱 (四百)': '股票名稱'})
+
         sync = pd.merge(df1, df2, on=['股票代號', '股票名稱'], how='inner')
+
         if not sync.empty:
-            st.success(f"🔥 大戶雙引擎共振標的：{len(sync)} 檔")
+            # 3. 提取所有的 4 碼日期 (例如: 0605, 0529)
+            date_bases = set()
+            for c in sync.columns:
+                match = re.search(r'(?:▼)?(\d{4})', c)
+                if match:
+                    date_bases.add(match.group(1))
+
+            # 日期由新到舊排序
+            sorted_dates = sorted(list(date_bases), reverse=True)
+
+            # 4. 智慧欄位穿插排序
+            cols_order = ['股票代號', '股票名稱']
+
+            # - 動態指標放一起
+            if '週動態 (千張)' in sync.columns: cols_order.append('週動態 (千張)')
+            if '週動態 (四百)' in sync.columns: cols_order.append('週動態 (四百)')
+
+            # - 6周總增減放一起
+            if '▼6周增減 (千張)' in sync.columns: cols_order.append('▼6周增減 (千張)')
+            if '▼6周增減 (四百)' in sync.columns: cols_order.append('▼6周增減 (四百)')
+
+            # - 依日期降冪，同一日期千張與四百張完美成對排列
+            for d in sorted_dates:
+                # 先放持有比例 (如果有)
+                c_hold_1000 = f"{d}持有% (千張)"
+                c_hold_400 = f"{d}持有% (四百)"
+                if c_hold_1000 in sync.columns: cols_order.append(c_hold_1000)
+                if c_hold_400 in sync.columns: cols_order.append(c_hold_400)
+
+                # 再放增減張數/比例 (自動判斷最新日期是否有 ▼)
+                c_v_1000 = f"▼{d} (千張)"
+                c_v_400 = f"▼{d} (四百)"
+                c_n_1000 = f"{d} (千張)"
+                c_n_400 = f"{d} (四百)"
+
+                if c_v_1000 in sync.columns: cols_order.append(c_v_1000)
+                elif c_n_1000 in sync.columns: cols_order.append(c_n_1000)
+
+                if c_v_400 in sync.columns: cols_order.append(c_v_400)
+                elif c_n_400 in sync.columns: cols_order.append(c_n_400)
+
+            # 保底防呆：把剩下的欄位加進來
+            for c in sync.columns:
+                if c not in cols_order:
+                    cols_order.append(c)
+
+            sync = sync[cols_order]
+
+            # 5. 排序：以千張的最新增減值降冪排列
+            sort_col = next((c for c in sync.columns if '▼' in c and '千張' in c and '持有' not in c and '6周' not in c), None)
+            if sort_col:
+                sync = sync.sort_values(by=sort_col, ascending=False)
+
+            st.success(f"🔥 強烈訊號！共有 **{len(sync)}** 檔標的出現大戶雙引擎共振 (千張與四百張同增)！")
             st.dataframe(sync, use_container_width=True, hide_index=True)
+        else:
+            st.info("⚪ 最新一週目前沒有「千張與四百張」同時增加的共振標的。")
     else:
-        st.warning("請確保 1000 張與 400 張資料已載入以進行共振分析。")
+        st.warning("⚠️ 請確保 1000 張與 400 張資料皆有成功載入，才能啟動共振掃描引擎。")
 # ==========================================
 # 💸 區塊 6：盤後鉅額交易總表 (原生 Dataframe 升級版 + 交易別顯示)
 # ==========================================
