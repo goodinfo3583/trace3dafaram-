@@ -1081,7 +1081,6 @@ def render_options_dashboard(target_date_str):
 def fetch_macro_indicators():
     data = {
         "vix": {"value": None, "pct": None},
-        "vixtwn": {"value": None, "pct": None},
         "fng": {"score": None, "rating": "無法取得"}
     }
     
@@ -1096,28 +1095,7 @@ def fetch_macro_indicators():
     except:
         pass
 
-# 2. 抓取台股 VIX (改用玩股網 API 備援，避開 yfinance 的限制)
-    try:
-        headers = {"User-Agent": "Mozilla/5.0"}
-        url = "https://www.wantgoo.com/index/vixtwn"
-        res = requests.get(url, headers=headers, timeout=5)
-        if res.status_code == 200:
-            # 使用簡單的字串搜尋抓取當前數字 (這比爬蟲更穩定)
-            from bs4 import BeautifulSoup
-            soup = BeautifulSoup(res.text, 'html.parser')
-            # 找到指數所在的特定 class 或 meta tag
-            # 根據玩股網結構，指數通常在特定位置
-            vix_element = soup.select_one(".index-price") # 這是範例選擇器，需依實際結構微調
-            if vix_element:
-                latest = float(vix_element.text.replace(',', ''))
-                # 因為玩股網頁面不一定直接給漲跌幅，我們用昨日收盤比較
-                # 若無法直接比較，建議先顯示數值，漲跌幅設為 None
-                data["vixtwn"]["value"] = latest
-                data["vixtwn"]["pct"] = 0.0 # 暫時設為 0
-    except:
-        pass
-
-    # 3. 抓取 CNN 恐懼與貪婪指數
+    # 2. 抓取 CNN 恐懼與貪婪指數
     try:
         headers = {"User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36"}
         url = "https://production.dataviz.cnn.io/index/fearandgreed/graphdata"
@@ -1143,7 +1121,7 @@ def fetch_macro_indicators():
 
 
 # ==========================================
-# 📊 原本的 Tab2 介面替換區塊 (滑鼠懸停註解 + 自動變色 + 縮小字體)
+# 📊 Tab2 介面替換區塊 (滑鼠懸停註解 + 自動變色 + 置中雙卡片)
 # ==========================================
 with tab2:
     st.subheader("📊 大盤總體經濟指標 (每40分鐘更新)")
@@ -1164,17 +1142,6 @@ with tab2:
         
     vix_tooltip = f"VIX 市場恐慌指標&#10;目前 VIX： {vix_val if vix_val else '無'}&#10;綠色（VIX < 20）：市場平穩。&#10;藍色（20 ≤ VIX < 28.7）： 1年的投資報酬率較差。&#10;橘色（28.7 ≤ VIX < 33.5）： 🉐1年的報酬可達 15%。&#10;紅色（VIX ≥ 33.5）：🈵1年的報酬可達 25%。"
 
-    # 🇹🇼 VIXTWN 邏輯
-    vixtwn_val = macro_data["vixtwn"]["value"]
-    vixtwn_color = "#a1a1aa"
-    if vixtwn_val is not None:
-        if vixtwn_val < 20: vixtwn_color = "#3b82f6" # 藍色
-        elif vixtwn_val < 30: vixtwn_color = "#10b981" # 綠色
-        elif vixtwn_val < 40: vixtwn_color = "#f59e0b" # 橘色
-        else: vixtwn_color = "#ef4444" # 紅色
-        
-    vixtwn_tooltip = f"VIXTWN 台灣市場恐慌指標&#10;目前 VIXTWN： {vixtwn_val if vixtwn_val else '無'}&#10;藍色（VIXTWN < 20）：市場平穩，多頭常態。&#10;綠色（20 ≤ VIXTWN < 30）：🈹波動加劇，注意風險。&#10;橘色（30 ≤ VIXTWN < 40）：🉐恐慌殺盤，布局機會。(法人避險)&#10;紅色（VIXTWN ≥ 40）：🈵極度恐慌，強力買點。(系統風險、黑天鵝)"
-
     # 🧭 FNG 邏輯
     fng_val = macro_data["fng"]["score"]
     fng_color = "#a1a1aa"
@@ -1185,17 +1152,18 @@ with tab2:
         
     fng_tooltip = f"目前 FNG： {fng_val if fng_val else '無'}&#10;恐懼貪婪指數 < 25 🈵積極買點&#10;恐懼貪婪 < 15 🉐分批加碼&#10;恐懼貪婪 > 75 🈴分批減碼不追高&#10;恐懼貪婪 > 85 🈹獲利了結&#10;恐懼貪婪 > 90 🈲提高現金部位"
 
-    # -------- 渲染自訂義 UI --------
-    c1, c2, c3 = st.columns(3)
+    # -------- 渲染自訂義 UI (改為兩欄置中配置) --------
+    # 使用空白欄位將兩張卡片往中間擠，讓版面更好看
+    _, c1, c2, _ = st.columns([1, 4, 4, 1]) 
     
     def render_custom_metric(col, title, value, pct_str, color, tooltip):
         # HTML 實作：縮小字體至 22px、加上 title 達成滑鼠懸浮註解，並帶有微互動特效
         val_str = f"{value:.2f}" if isinstance(value, float) else str(value)
         html = f"""
-        <div title="{tooltip}" style="background-color: rgba(255,255,255,0.03); padding: 12px; border-radius: 8px; border: 1px solid rgba(255,255,255,0.1); text-align: center; cursor: help; transition: 0.3s;" onmouseover="this.style.borderColor='{color}'; this.style.backgroundColor='rgba(255,255,255,0.08)';" onmouseout="this.style.borderColor='rgba(255,255,255,0.1)'; this.style.backgroundColor='rgba(255,255,255,0.03)';">
-            <div style="font-size: 13px; color: #a1a1aa; margin-bottom: 4px;">{title}</div>
-            <div style="font-size: 22px; font-weight: 700; color: {color}; margin-bottom: 2px;">{val_str}</div>
-            <div style="font-size: 13px; color: #71717a;">{pct_str}</div>
+        <div title="{tooltip}" style="background-color: rgba(255,255,255,0.03); padding: 15px; border-radius: 10px; border: 1px solid rgba(255,255,255,0.1); text-align: center; cursor: help; transition: 0.3s;" onmouseover="this.style.borderColor='{color}'; this.style.backgroundColor='rgba(255,255,255,0.08)';" onmouseout="this.style.borderColor='rgba(255,255,255,0.1)'; this.style.backgroundColor='rgba(255,255,255,0.03)';">
+            <div style="font-size: 14px; color: #a1a1aa; margin-bottom: 6px;">{title}</div>
+            <div style="font-size: 26px; font-weight: 700; color: {color}; margin-bottom: 4px;">{val_str}</div>
+            <div style="font-size: 14px; color: #71717a;">{pct_str}</div>
         </div>
         """
         col.markdown(html, unsafe_allow_html=True)
@@ -1208,24 +1176,12 @@ with tab2:
             render_custom_metric(c1, "🇺🇸 美股 VIX", "無資料", "-", "#a1a1aa", vix_tooltip)
 
     with c2:
-        if vixtwn_val is not None:
-            pct_sign = "+" if macro_data['vixtwn']['pct'] > 0 else ""
-            render_custom_metric(c2, "🇹🇼 台股 VIX", vixtwn_val, f"{pct_sign}{macro_data['vixtwn']['pct']:.2f}%", vixtwn_color, vixtwn_tooltip)
-        else:
-            render_custom_metric(c2, "🇹🇼 台股 VIX", "無資料", "-", "#a1a1aa", vixtwn_tooltip)
-
-    with c3:
         if fng_val is not None:
-            render_custom_metric(c3, "🧭 恐懼貪婪", fng_val, macro_data["fng"]["rating"], fng_color, fng_tooltip)
+            render_custom_metric(c2, "🧭 恐懼貪婪", fng_val, macro_data["fng"]["rating"], fng_color, fng_tooltip)
         else:
-            render_custom_metric(c3, "🧭 恐懼貪婪", "無資料", "-", "#a1a1aa", fng_tooltip)
+            render_custom_metric(c2, "🧭 恐懼貪婪", "無資料", "-", "#a1a1aa", fng_tooltip)
 
     st.write("") # 留白
-    
-    with st.expander("🔗 點此開啟原始圖表網頁", expanded=False):
-        btn_c1, btn_c2 = st.columns(2)
-        with btn_c1: st.link_button("📈 CNN 恐懼貪婪圖表", "https://edition.cnn.com/markets/fear-and-greed", use_container_width=True)
-        with btn_c2: st.link_button("⚠️ WantGoo VIX 圖表", "https://www.wantgoo.com/global/vix", use_container_width=True)
 
     st.markdown("---")
     st.subheader("📍 戰情室快速導航")
