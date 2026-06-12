@@ -231,11 +231,11 @@ st.markdown(
 
 # ==========================================
 # ==========================================
-# 📍 頂部：戰情室快速導航按鈕列
+# 📍 頂部：戰情室快速導航按鈕列 (毛玻璃凍結置頂版)
 # ==========================================
 st.markdown("""
 <style>
-/* 導航按鈕專屬樣式，完美融入極致黑看盤軟體風格 */
+/* 導航按鈕專屬樣式 */
 .nav-btn {
     text-decoration: none !important;
     background-color: #1E293B;
@@ -255,17 +255,28 @@ st.markdown("""
     color: #00D2FF !important;
     box-shadow: 0 0 10px rgba(0, 210, 255, 0.3);
 }
-/* 導航列外框容器 */
+
+/* 導航列外框容器 - 關鍵凍結魔法在這裡 */
 .nav-container {
+    position: sticky;             /* 魔法 1：黏滯定位，跟著螢幕滾動 */
+    top: 0px;                     /* 魔法 2：吸附在距離頂部 0px 的位置 */
+    z-index: 9999;                /* 魔法 3：確保它在最上層，不會被下方滾動的圖表蓋住 */
+    
     display: flex;
     flex-wrap: wrap;
     justify-content: center;
     margin-bottom: 25px;
     padding: 15px;
-    background-color: #111622;
+    
+    /* 魔法 4：高級看盤軟體的毛玻璃特效 (Glassmorphism) */
+    background-color: rgba(17, 22, 34, 0.85); /* 稍微帶透明的極致黑底色 */
+    backdrop-filter: blur(10px);              /* 讓底下滾動過去的文字與圖表模糊化 */
+    -webkit-backdrop-filter: blur(10px);      /* 支援 Safari */
+    
     border: 1px solid #1E293B;
-    border-radius: 10px;
-    box-shadow: 0px 4px 15px rgba(0, 0, 0, 0.5);
+    border-bottom: 2px solid #00D2FF;         /* 底部加上科技藍發光線條 */
+    border-radius: 0px 0px 10px 10px;         /* 只有下方有圓角，貼齊頂部 */
+    box-shadow: 0px 8px 20px rgba(0, 0, 0, 0.8);
 }
 </style>
 
@@ -276,7 +287,7 @@ st.markdown("""
     <a href="#section-top-pool" target="_self" class="nav-btn">🏆 數據分析觀察名單</a>
     <a href="#section-search" target="_self" class="nav-btn">🔍 個股籌碼快搜</a>
     <a href="#section-1" target="_self" class="nav-btn">👑 區塊 1：三大法人持股比</a>
-    <a href="#section-2-1" target="_self" class="nav-btn">🎯 區塊 2：法人 5 日淨買佔比</a>
+    <a href="#section-2-1" target="_self" class="nav-btn">🎯 區塊 2：法人淨買佔比</a>
     <a href="#section-3" target="_self" class="nav-btn">📅 區塊 3：法人連續買超</a>
     <a href="#section-4-1" target="_self" class="nav-btn">🔄 區塊 4：融資券與軋空雷達</a>
     <a href="#section-5" target="_self" class="nav-btn">💰 區塊 5：大股東動向</a>
