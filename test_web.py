@@ -995,7 +995,8 @@ def get_diff_ui(today_val, prev_val):
         return f"<br><span style='color:{color}; font-size:11px;'>({sign}{diff:,})</span>"
     except: return ""
 
-tab1, tab2 = st.sidebar.tabs(["🔹 大盤與期權", "🔹 戰情導航"])
+# 🔥 修改點 1：將原本的兩個分頁擴增為三個分頁
+tab1, tab2, tab3 = st.sidebar.tabs(["🔹 大盤籌碼", "🔹 選擇權兵力", "🔹 總經導航"])
 
 # ------------------------------------------
 # 1. 大盤籌碼導航總覽 (終極精準融資 + 期貨變化量)
@@ -1080,7 +1081,7 @@ def render_sidebar_market_summary():
     too_c, too_os = get_color(total_oi, False)
     m_c, m_s = get_color(margin_diff_yi)
 
-    html = f"<div style='font-size: 13px; color: #00D2FF;'>基準日：{date_spot}</div>"
+    html = f"<div style='font-size: 13px; color: #00D2FF;'>資料基準日：{date_spot}</div>"
     html += "<table style='width: 100%; text-align: center; border-collapse: collapse; margin-top: 5px; font-size: 14px;'>"
     html += "<tr style='border-bottom: 1px solid #555; background-color: #262730;'>"
     html += "<th style='padding: 5px;'>法人</th><th style='padding: 5px;'>現貨(億)</th><th style='padding: 5px;'>TX未平倉</th></tr>"
@@ -1104,15 +1105,19 @@ def render_sidebar_market_summary():
     return date_spot
 
 # ------------------------------------------
-# 2. 選擇權關鍵兵力分布 (36000 智慧底線 + 變化量追蹤版)
+# 2. 選擇權關鍵兵力分布 (移至獨立分頁版)
 # ------------------------------------------
-def render_options_dashboard(target_date_str):
-    st.markdown("<hr style='margin:15px 0;'>", unsafe_allow_html=True)
+def render_options_dashboard():
+    # 🔥 拿掉原本的 <hr> 分隔線，因為已經是獨立分頁的第一個元素了
     st.markdown("<h2 style='margin-top: 0; margin-bottom: 5px;'>🏰 選擇權兵力分布</h2>", unsafe_allow_html=True)
     
     df_opt, date_opt = get_latest_csv("臺指選擇權行情簡表")
     df_pcr, _ = get_latest_csv("臺指選擇權PC比")
     df_opt_prev = get_prev_csv("臺指選擇權行情簡表", date_opt)
+    
+    # 🔥 修改點 2：新增資料來源的 8 碼基準日顯示
+    if date_opt and date_opt != "未知":
+        st.markdown(f"<div style='font-size: 13px; color: #00D2FF; margin-bottom: 12px;'>資料基準日：{date_opt}</div>", unsafe_allow_html=True)
     
     if df_opt is None:
         st.warning("尚無選擇權資料。")
@@ -1265,13 +1270,16 @@ def fetch_macro_indicators():
 
 
 # ==========================================
-# 🔮 最終整合與渲染 (Tab1 / Tab2)
+# 🔮 最終整合與渲染 (Tab1 / Tab2 / Tab3 獨立呈現)
 # ==========================================
 with tab1:
     actual_data_date = render_sidebar_market_summary()
-    render_options_dashboard(actual_data_date)
     
+# 🔥 修改點 3：將兵力分佈搬進獨立的第二分頁
 with tab2:
+    render_options_dashboard()
+    
+with tab3:
     st.subheader("📊 大盤總體經濟指標")
     
     macro_data = fetch_macro_indicators()
@@ -1332,7 +1340,7 @@ with tab2:
         """, unsafe_allow_html=True)
 
     with col_right:
-        # 恐懼貪婪 長卡片 (透過 height: 100% 與 flex 排版讓它撐滿並置中對齊左邊)
+        # 恐懼貪婪 長卡片
         f_str = str(fng_val) if fng_val else "無資料"
         f_rating = macro_data["fng"]["rating"]
         st.markdown(f"""
@@ -1342,7 +1350,6 @@ with tab2:
             <div style="font-size: 16px; font-weight: 600; color: {fng_color};">{f_rating}</div>
         </div>
         """, unsafe_allow_html=True)
-
 
 # ==========================================
 # 🏠 核心五大區塊
