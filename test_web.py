@@ -281,7 +281,7 @@ st.markdown("""
 </style>
 
 <div class="sticky-nav-bar">
-    <span style="color: #00D2FF; font-weight: bold; margin-right: 15px; font-size: 14px; letter-spacing: 1px;">📍 戰情導航：</span>
+    <span style="color: #00D2FF; font-weight: bold; margin-right: 24px; font-size: 24px; letter-spacing: 1px;"></span>
     <a href="#section-top-pool" target="_self" class="nav-text-link">🏆 觀察名單</a>
     <span class="nav-divider">|</span>
     <a href="#section-search" target="_self" class="nav-text-link">🔍 個股快搜</a>
