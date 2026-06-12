@@ -231,10 +231,32 @@ st.markdown(
 
 # ==========================================
 # ==========================================
-# 📍 頂部：戰情室快速導航按鈕列 (毛玻璃凍結置頂版)
+# 📍 頂部：戰情室快速導航按鈕列 (Streamlit 強制置頂修正版)
 # ==========================================
 st.markdown("""
 <style>
+/* 🔴 核心修正：強制 Streamlit 預設產生的外層包裝元件變成置頂凍結狀態 */
+div[data-testid="element-container"]:has(.nav-container) {
+    position: sticky;
+    top: 45px;          /* 45px 剛好避開 Streamlit 最上方的預設黑條，完美貼齊 */
+    z-index: 99999;     /* 給予最高層級，保證不會被圖表或 K 線圖蓋過去 */
+    background-color: #0A0D14; /* 填滿您的全站主背景色，防止滑動時下方的文字穿透穿幫 */
+    padding-bottom: 10px;
+}
+
+/* 導航列外框容器 */
+.nav-container {
+    display: flex;
+    flex-wrap: wrap;
+    justify-content: center;
+    padding: 15px;
+    background-color: rgba(17, 22, 34, 0.95); /* 稍微調高深色飽和度提升質感 */
+    border: 1px solid #1E293B;
+    border-bottom: 2px solid #00D2FF;         /* 底部科技藍發光線 */
+    border-radius: 8px;
+    box-shadow: 0px 8px 25px rgba(0, 0, 0, 0.9);
+}
+
 /* 導航按鈕專屬樣式 */
 .nav-btn {
     text-decoration: none !important;
@@ -249,34 +271,12 @@ st.markdown("""
     display: inline-block;
     margin: 5px;
 }
+
 /* 滑鼠懸停時發出科技藍光暈 */
 .nav-btn:hover {
     border-color: #00D2FF;
     color: #00D2FF !important;
     box-shadow: 0 0 10px rgba(0, 210, 255, 0.3);
-}
-
-/* 導航列外框容器 - 關鍵凍結魔法在這裡 */
-.nav-container {
-    position: sticky;             /* 魔法 1：黏滯定位，跟著螢幕滾動 */
-    top: 0px;                     /* 魔法 2：吸附在距離頂部 0px 的位置 */
-    z-index: 9999;                /* 魔法 3：確保它在最上層，不會被下方滾動的圖表蓋住 */
-    
-    display: flex;
-    flex-wrap: wrap;
-    justify-content: center;
-    margin-bottom: 25px;
-    padding: 15px;
-    
-    /* 魔法 4：高級看盤軟體的毛玻璃特效 (Glassmorphism) */
-    background-color: rgba(17, 22, 34, 0.85); /* 稍微帶透明的極致黑底色 */
-    backdrop-filter: blur(10px);              /* 讓底下滾動過去的文字與圖表模糊化 */
-    -webkit-backdrop-filter: blur(10px);      /* 支援 Safari */
-    
-    border: 1px solid #1E293B;
-    border-bottom: 2px solid #00D2FF;         /* 底部加上科技藍發光線條 */
-    border-radius: 0px 0px 10px 10px;         /* 只有下方有圓角，貼齊頂部 */
-    box-shadow: 0px 8px 20px rgba(0, 0, 0, 0.8);
 }
 </style>
 
