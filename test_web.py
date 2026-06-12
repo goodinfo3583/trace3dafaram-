@@ -1124,7 +1124,7 @@ def fetch_macro_indicators():
 # 📊 Tab2 介面替換區塊 (滑鼠懸停註解 + 自動變色 + 置中雙卡片)
 # ==========================================
 with tab2:
-    st.subheader("📊 大盤總體經濟指標 (每40分鐘更新)")
+    st.subheader("📊 大盤總體經濟指標")
     
     # 呼叫快取函數獲取資料
     macro_data = fetch_macro_indicators()
@@ -1177,9 +1177,9 @@ with tab2:
 
     with c2:
         if fng_val is not None:
-            render_custom_metric(c2, "🧭 恐懼貪婪", fng_val, macro_data["fng"]["rating"], fng_color, fng_tooltip)
+            render_custom_metric(c2, "恐懼貪婪", fng_val, macro_data["fng"]["rating"], fng_color, fng_tooltip)
         else:
-            render_custom_metric(c2, "🧭 恐懼貪婪", "無資料", "-", "#a1a1aa", fng_tooltip)
+            render_custom_metric(c2, "恐懼貪婪", "無資料", "-", "#a1a1aa", fng_tooltip)
 
     st.write("") # 留白
 
