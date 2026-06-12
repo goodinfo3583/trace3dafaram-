@@ -1252,7 +1252,7 @@ with tab1:
     render_options_dashboard(actual_data_date)
     
 with tab2:
-    st.subheader("📊 大盤總體經濟指標 (每40分鐘更新)")
+    st.subheader("📊 大盤總體經濟指標")
     
     macro_data = fetch_macro_indicators()
     
