@@ -6,7 +6,8 @@ import glob
 import re
 import datetime
 import requests  
-import pytz  
+import pytz
+import yfinance as yf
 # ==========================================
 # 1. 網頁基本設定 & 目錄路徑初始化
 # ==========================================
@@ -798,14 +799,9 @@ with st.container(border=True):
 # ==========================================
 # 🧭 側邊欄導航與共用函數 (極速光速版：零爬蟲、零延遲、讀取本地 CSV)
 # ==========================================
-import os
-import glob
-import pandas as pd
-import streamlit as st
-import datetime
-import yfinance as yf
-import requests
-import re
+
+
+
 
 DATA_DIR = "./Goodinfo_Rankings"
 
@@ -1244,12 +1240,7 @@ st.markdown("<div id='section-1'></div>", unsafe_allow_html=True)
 
 header_placeholder = st.empty()
 
-import re
-import os
-import glob
-import pandas as pd
-import requests
-import datetime
+
 from collections import defaultdict
 
 # ------------------------------------------
