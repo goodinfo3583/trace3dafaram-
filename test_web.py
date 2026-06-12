@@ -1817,7 +1817,7 @@ else:
         st.dataframe(csv_display, use_container_width=True)
         # 計算實際成功串聯的天數 (計算有幾個"成交比%"欄位)
         days_count = len([c for c in csv_display.columns if "成交比%" in c])
-        st.success(f"串聯 {days_count} 個交易日追蹤共 {len(csv_display)} 檔")
+
         
         # 🔥 【連動儲存】：存入對應的快搜抽屜
         st.session_state['df_blk2_2'] = csv_display
@@ -1918,7 +1918,7 @@ else:
         #表格
         st.dataframe(csv_display, use_container_width=True) 
         #說明
-        st.success(f"串聯 {len(date_labels)} 個交易日追蹤共 {len(csv_display)} 檔")
+
         
         # 🔥 【連動儲存】
         st.session_state['df_blk2_3'] = csv_display
@@ -2018,8 +2018,7 @@ else:
         
         
         st.dataframe(csv_display, use_container_width=True)
-        # 🔥 修改點 4：統一成功訊息的標點符號格式
-        st.success(f"串聯 {len(date_labels)} 個交易日追蹤共 {len(csv_display)} 檔")
+
         
         # 🔥 【連動儲存】
         st.session_state['df_blk2_4'] = csv_display
