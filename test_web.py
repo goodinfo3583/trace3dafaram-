@@ -1076,7 +1076,7 @@ def render_options_dashboard(target_date_str):
 # ==========================================
 # 🌐 總經指標抓取引擎 (含快取記憶機制)
 # ==========================================
-# ttl=1800 代表快取 30 分鐘。30 分鐘內的重整都不會重新發送網路請求
+# ttl=2400 代表快取 40 分鐘。期間內任何重整都會直接讀取記憶，不會重新爬蟲，防封鎖且極速！
 @st.cache_data(ttl=2400) 
 def fetch_macro_indicators():
     data = {
@@ -1096,34 +1096,44 @@ def fetch_macro_indicators():
     except:
         pass
 
-    # 2. 抓取台股 VIX (^VIXTWN)
+    # 2. 抓取台股 VIX (^VIXTWN) - 雙引擎防失效
     try:
+        # 方法 A: 嘗試使用 yfinance
         hist_twn = yf.Ticker("^VIXTWN").history(period="2d")
         if len(hist_twn) >= 2:
             latest = hist_twn['Close'].iloc[-1]
             prev = hist_twn['Close'].iloc[-2]
             data["vixtwn"]["value"] = latest
             data["vixtwn"]["pct"] = (latest - prev) / prev * 100
+        else:
+            # 方法 B: 備用 Yahoo API 直連 (解決 yfinance 抓不到台灣 VIX 的問題)
+            headers = {"User-Agent": "Mozilla/5.0"}
+            url = "https://query1.finance.yahoo.com/v8/finance/chart/^VIXTWN?interval=1d&range=2d"
+            res = requests.get(url, headers=headers, timeout=5).json()
+            quotes = res['chart']['result'][0]['indicators']['quote'][0]['close']
+            if len(quotes) >= 2:
+                latest, prev = quotes[-1], quotes[-2]
+                data["vixtwn"]["value"] = latest
+                data["vixtwn"]["pct"] = (latest - prev) / prev * 100
     except:
         pass
 
     # 3. 抓取 CNN 恐懼與貪婪指數
     try:
-        # 必須偽裝成瀏覽器，否則 CNN 會阻擋
         headers = {"User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36"}
         url = "https://production.dataviz.cnn.io/index/fearandgreed/graphdata"
         res = requests.get(url, headers=headers, timeout=5)
         if res.status_code == 200:
             fg_data = res.json()
             score = int(fg_data['fear_and_greed']['score'])
-            rating = fg_data['fear_and_greed']['rating'].lower()
             
-            # 將英文狀態翻譯成中文
-            rating_tw = rating.replace("extreme fear", "極度恐懼") \
-                              .replace("fear", "恐懼") \
-                              .replace("neutral", "中立") \
-                              .replace("extreme greed", "極度貪婪") \
-                              .replace("greed", "貪婪")
+            # 依照您的策略邏輯自動分級
+            if score < 15: rating_tw = "🉐 分批加碼"
+            elif score < 25: rating_tw = "🈵 積極買點"
+            elif score > 90: rating_tw = "🈲 提高現金"
+            elif score > 85: rating_tw = "🈹 獲利了結"
+            elif score > 75: rating_tw = "🈴 分批減碼"
+            else: rating_tw = "⚖️ 中立平穩"
             
             data["fng"]["score"] = score
             data["fng"]["rating"] = rating_tw
@@ -1134,47 +1144,90 @@ def fetch_macro_indicators():
 
 
 # ==========================================
-# 📊 原本的 Tab2 介面替換區塊
+# 📊 原本的 Tab2 介面替換區塊 (滑鼠懸停註解 + 自動變色 + 縮小字體)
 # ==========================================
 with tab2:
-    st.subheader("📊 大盤總體經濟指標")
+    st.subheader("📊 大盤總體經濟指標 (每40分鐘更新)")
     
     # 呼叫快取函數獲取資料
     macro_data = fetch_macro_indicators()
     
-    # 使用 3 個欄位漂亮地展示數據 (使用 st.metric)
+    # -------- 顏色與提示詞邏輯 (支援 HTML Title 換行 &#10;) --------
+    
+    # 🇺🇸 VIX 邏輯
+    vix_val = macro_data["vix"]["value"]
+    vix_color = "#a1a1aa" # 預設灰
+    if vix_val is not None:
+        if vix_val < 20: vix_color = "#10b981" # 綠色
+        elif vix_val < 28.7: vix_color = "#3b82f6" # 藍色
+        elif vix_val < 33.5: vix_color = "#f59e0b" # 橘色
+        else: vix_color = "#ef4444" # 紅色
+        
+    vix_tooltip = f"VIX 市場恐慌指標&#10;目前 VIX： {vix_val if vix_val else '無'}&#10;綠色（VIX < 20）：市場平穩。&#10;藍色（20 ≤ VIX < 28.7）： 1年的投資報酬率較差。&#10;橘色（28.7 ≤ VIX < 33.5）： 🉐1年的報酬可達 15%。&#10;紅色（VIX ≥ 33.5）：🈵1年的報酬可達 25%。"
+
+    # 🇹🇼 VIXTWN 邏輯
+    vixtwn_val = macro_data["vixtwn"]["value"]
+    vixtwn_color = "#a1a1aa"
+    if vixtwn_val is not None:
+        if vixtwn_val < 20: vixtwn_color = "#3b82f6" # 藍色
+        elif vixtwn_val < 30: vixtwn_color = "#10b981" # 綠色
+        elif vixtwn_val < 40: vixtwn_color = "#f59e0b" # 橘色
+        else: vixtwn_color = "#ef4444" # 紅色
+        
+    vixtwn_tooltip = f"VIXTWN 台灣市場恐慌指標&#10;目前 VIXTWN： {vixtwn_val if vixtwn_val else '無'}&#10;藍色（VIXTWN < 20）：市場平穩，多頭常態。&#10;綠色（20 ≤ VIXTWN < 30）：🈹波動加劇，注意風險。&#10;橘色（30 ≤ VIXTWN < 40）：🉐恐慌殺盤，布局機會。(法人避險)&#10;紅色（VIXTWN ≥ 40）：🈵極度恐慌，強力買點。(系統風險、黑天鵝)"
+
+    # 🧭 FNG 邏輯
+    fng_val = macro_data["fng"]["score"]
+    fng_color = "#a1a1aa"
+    if fng_val is not None:
+        if fng_val < 25: fng_color = "#ef4444" # 極度恐懼 (積極買點用紅色標示)
+        elif fng_val > 75: fng_color = "#10b981" # 極度貪婪 (減碼用綠色標示)
+        else: fng_color = "#f59e0b" # 中立橘色
+        
+    fng_tooltip = f"目前 FNG： {fng_val if fng_val else '無'}&#10;恐懼貪婪指數 < 25 🈵積極買點&#10;恐懼貪婪 < 15 🉐分批加碼&#10;恐懼貪婪 > 75 🈴分批減碼不追高&#10;恐懼貪婪 > 85 🈹獲利了結&#10;恐懼貪婪 > 90 🈲提高現金部位"
+
+    # -------- 渲染自訂義 UI --------
     c1, c2, c3 = st.columns(3)
     
+    def render_custom_metric(col, title, value, pct_str, color, tooltip):
+        # HTML 實作：縮小字體至 22px、加上 title 達成滑鼠懸浮註解，並帶有微互動特效
+        val_str = f"{value:.2f}" if isinstance(value, float) else str(value)
+        html = f"""
+        <div title="{tooltip}" style="background-color: rgba(255,255,255,0.03); padding: 12px; border-radius: 8px; border: 1px solid rgba(255,255,255,0.1); text-align: center; cursor: help; transition: 0.3s;" onmouseover="this.style.borderColor='{color}'; this.style.backgroundColor='rgba(255,255,255,0.08)';" onmouseout="this.style.borderColor='rgba(255,255,255,0.1)'; this.style.backgroundColor='rgba(255,255,255,0.03)';">
+            <div style="font-size: 13px; color: #a1a1aa; margin-bottom: 4px;">{title}</div>
+            <div style="font-size: 22px; font-weight: 700; color: {color}; margin-bottom: 2px;">{val_str}</div>
+            <div style="font-size: 13px; color: #71717a;">{pct_str}</div>
+        </div>
+        """
+        col.markdown(html, unsafe_allow_html=True)
+
     with c1:
-        if macro_data["vix"]["value"] is not None:
-            # delta_color="inverse" 讓 VIX 漲(數值為正)時顯示紅色警告，跌時顯示綠色安全
-            st.metric(label="🇺🇸 VIX", 
-                      value=f"{macro_data['vix']['value']:.2f}", 
-                      delta=f"{macro_data['vix']['pct']:.2f}%", 
-                      delta_color="inverse")
+        if vix_val is not None:
+            pct_sign = "+" if macro_data['vix']['pct'] > 0 else ""
+            render_custom_metric(c1, "🇺🇸 美股 VIX", vix_val, f"{pct_sign}{macro_data['vix']['pct']:.2f}%", vix_color, vix_tooltip)
         else:
-            st.metric(label="🇺🇸 美股 VIX 恐慌指數", value="無資料")
-            
+            render_custom_metric(c1, "🇺🇸 美股 VIX", "無資料", "-", "#a1a1aa", vix_tooltip)
+
     with c2:
-        if macro_data["vixtwn"]["value"] is not None:
-            st.metric(label="🇹🇼 VIX", 
-                      value=f"{macro_data['vixtwn']['value']:.2f}", 
-                      delta=f"{macro_data['vixtwn']['pct']:.2f}%", 
-                      delta_color="inverse")
+        if vixtwn_val is not None:
+            pct_sign = "+" if macro_data['vixtwn']['pct'] > 0 else ""
+            render_custom_metric(c2, "🇹🇼 台股 VIX", vixtwn_val, f"{pct_sign}{macro_data['vixtwn']['pct']:.2f}%", vixtwn_color, vixtwn_tooltip)
         else:
-            st.metric(label="🇹🇼 台股 VIX 恐慌指數", value="無資料")
-            
+            render_custom_metric(c2, "🇹🇼 台股 VIX", "無資料", "-", "#a1a1aa", vixtwn_tooltip)
+
     with c3:
-        if macro_data["fng"]["score"] is not None:
-            # 恐懼貪婪指數沒有明顯的綠紅好壞(看策略)，所以 delta_color 設為 off 或是 normal
-            st.metric(label="🧭 恐懼貪婪指數", 
-                      value=f"{macro_data['fng']['score']}", 
-                      delta=f"狀態: {macro_data['fng']['rating']}", 
-                      delta_color="off")
+        if fng_val is not None:
+            render_custom_metric(c3, "🧭 恐懼貪婪", fng_val, macro_data["fng"]["rating"], fng_color, fng_tooltip)
         else:
-            st.metric(label="🧭 恐懼與貪婪指數", value="無資料")
+            render_custom_metric(c3, "🧭 恐懼貪婪", "無資料", "-", "#a1a1aa", fng_tooltip)
+
     st.write("") # 留白
     
+    with st.expander("🔗 點此開啟原始圖表網頁", expanded=False):
+        btn_c1, btn_c2 = st.columns(2)
+        with btn_c1: st.link_button("📈 CNN 恐懼貪婪圖表", "https://edition.cnn.com/markets/fear-and-greed", use_container_width=True)
+        with btn_c2: st.link_button("⚠️ WantGoo VIX 圖表", "https://www.wantgoo.com/global/vix", use_container_width=True)
+
     st.markdown("---")
     st.subheader("📍 戰情室快速導航")
     st.markdown("[🏆 數據分析觀察名單](#section-top-pool)")
