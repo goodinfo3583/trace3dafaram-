@@ -1206,6 +1206,65 @@ def fetch_github_json_all():
 json_dfs, latest_all_df = fetch_github_json_all()
 
 
+import re
+import os
+import glob
+import datetime
+import pandas as pd
+import streamlit as st
+
+# ==========================================
+# 🌟 UI 特效區：科技感掃光 + 懸浮發光按鈕
+# ==========================================
+st.markdown("""
+<style>
+/* 針對所有類型的 Streamlit 按鈕 (包含一般按鈕、下載按鈕、連結按鈕) */
+div.stButton > button,
+div.stDownloadButton > button,
+div.stLinkButton > a {
+    position: relative !important;
+    overflow: hidden !important;
+    transition: all 0.3s ease !important;
+    /* 預設給一個很淡的科技藍邊框，增加立體感 */
+    border: 1px solid rgba(56, 189, 248, 0.3) !important; 
+}
+
+/* 1. 核心特效：反光掃描 (Shimmer) */
+div.stButton > button::after,
+div.stDownloadButton > button::after,
+div.stLinkButton > a::after {
+    content: "" !important;
+    position: absolute !important;
+    top: 0 !important;
+    left: -100% !important;
+    width: 50% !important;
+    height: 100% !important;
+    /* 高亮度白光漸層 */
+    background: linear-gradient(90deg, transparent, rgba(255, 255, 255, 0.8), transparent) !important;
+    transform: skewX(-25deg) !important; /* 光條傾斜角度 */
+    animation: tech-shimmer 4s infinite !important; /* 4秒循環一次 */
+    z-index: 10 !important;
+    pointer-events: none !important; /* 確保光條滑過時不會影響滑鼠點擊 */
+}
+
+/* 動畫時間軸：前20%時間閃過，後面80%時間靜止 (營造偶爾閃爍感) */
+@keyframes tech-shimmer {
+    0% { left: -100%; }
+    20% { left: 200%; }
+    100% { left: 200%; }
+}
+
+/* 2. 懸浮特效：滑鼠移上去時發光 + 上浮 */
+div.stButton > button:hover,
+div.stDownloadButton > button:hover,
+div.stLinkButton > a:hover {
+    box-shadow: 0px 0px 15px rgba(56, 189, 248, 0.6) !important; /* 霓虹發光 */
+    border-color: rgba(56, 189, 248, 1) !important;
+    transform: translateY(-2px) !important; /* 微微上浮 */
+}
+</style>
+""", unsafe_allow_html=True)
+
 # ------------------------------------------
 # 💾 站長專屬：JSON 200名快照存檔區
 # ------------------------------------------
@@ -1265,7 +1324,6 @@ with c_btn2:
                     )
                 else: st.error("❌ 尚未獲取到 GitHub 數據，封存失敗。")
         elif admin_pw != "": st.error("❌ 密碼錯誤，無法使用此功能。")
-
 # ==========================================
 # 🔄 歷史資料合併與邏輯運算 (底層大表重建)
 # ==========================================
