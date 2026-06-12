@@ -1224,7 +1224,6 @@ with tab_pool:
 # ==========================================
 # 🏆 頂級選股池核心引擎 (科技藍發光卡片版 + 千張/四百張雙軌雷達)
 # ==========================================
-with top_pool_container:
     st.write("---")
     st.markdown("<div id='section-top-pool'></div>", unsafe_allow_html=True)
     
