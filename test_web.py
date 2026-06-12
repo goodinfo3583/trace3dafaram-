@@ -1000,7 +1000,7 @@ def render_sidebar_market_summary():
     m_c, m_s = get_color(margin_diff_yi)
 
     # 1. 移除「本地極速版」字眼，只保留俐落的日期
-    html = f"<div style='font-size: 13px; color: #00D2FF;'>📅 {date_spot} | 資金風向球</div>"
+    html = f"<div style='font-size: 13px; color: #00D2FF;'>📅 {date_spot}</div>"
     html += "<table style='width: 100%; text-align: center; border-collapse: collapse; margin-top: 5px; font-size: 14px;'>"
     html += "<tr style='border-bottom: 1px solid #555; background-color: #262730;'>"
     html += "<th style='padding: 5px;'>法人</th><th style='padding: 5px;'>現貨(億)</th><th style='padding: 5px;'>TX未平倉</th></tr>"
