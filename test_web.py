@@ -1323,18 +1323,6 @@ with tab2:
         </div>
         """, unsafe_allow_html=True)
 
-    st.write("") 
-
-    st.markdown("---")
-    st.subheader("📍 戰情室快速導航")
-    st.markdown("[🏆 數據分析觀察名單](#section-top-pool)")
-    st.markdown("[🔍 個股籌碼快搜](#section-search)")
-    st.markdown("[👑 區塊1：三大法人持股比追蹤](#section-1)")
-    st.markdown("[🎯 區塊2系列：法人5日淨買佔比](#section-2-1)")
-    st.markdown("[📅 區塊3：法人連續買超](#section-3)")
-    st.markdown("[🔄 區塊4系列：融資券與軋空雷達](#section-4-1)")
-    st.markdown("[💰 區塊5：大股東動向](#section-5)")
-    st.markdown("[💸 區塊6：鉅額交易動向](#section-6)")
 
 # ==========================================
 # 🏠 核心五大區塊
