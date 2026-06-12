@@ -1289,7 +1289,7 @@ if sorted_dates:
     fmt_date = f"{latest_d[:4]}/{latest_d[4:6]}/{latest_d[6:]}"
     header_placeholder.markdown(
         f"<h2 style='margin-bottom: 0px;'>👑 區塊1：三大法人短中長線持股比追蹤 "
-        f"<span style='color:#00D2FF; font-size:16px; font-weight:500; margin-left:12px;'>資料基準日：{fmt_date}</span></h2>", 
+        f"<span style='color:#00D2FF; font-size:16px; font-weight:500; margin-left:12px;'>基準日：{fmt_date}</span></h2>", 
         unsafe_allow_html=True
     )
     
@@ -3472,7 +3472,7 @@ with top_pool_container:
             🏆 數據分析觀察名單
         </h2>
         <div style='font-size:13px; color:#00D2FF; font-weight:500; margin-top:8px;'>
-             資料基準日 : 📍區塊1(法人): {fmt_d(d_b1_inst)} ｜ 📍區塊2&3(籌碼): {fmt_d(d_b23_chip)} ｜ 📍區塊4(資券): {fmt_d(d_b4_margin)} ｜ 📍區塊5(大戶): {fmt_d(d_b5_share)}
+             基準日 : 📍區塊1(法人): {fmt_d(d_b1_inst)} ｜ 📍區塊2&3(籌碼): {fmt_d(d_b23_chip)} ｜ 📍區塊4(資券): {fmt_d(d_b4_margin)} ｜ 📍區塊5(大戶): {fmt_d(d_b5_share)}
         </div>
     </div>
     """, unsafe_allow_html=True)
