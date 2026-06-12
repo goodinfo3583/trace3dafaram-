@@ -911,7 +911,7 @@ tab1, tab2 = st.sidebar.tabs(["🔹 大盤與期權", "🔹 戰情導航"])
 # 1. 大盤籌碼導航總覽 (終極精準融資 + 期貨變化量)
 # ------------------------------------------
 def render_sidebar_market_summary():
-    st.markdown("<h2 style='margin-top: 0; margin-bottom: 5px;'>📊 大盤資金風向球</h2>", unsafe_allow_html=True)
+    st.markdown("<h2 style='margin-top: 0; margin-bottom: 5px;'>🎈 大盤資金風向球</h2>", unsafe_allow_html=True)
     df_spot, date_spot = get_latest_csv("三大法人買賣超金額")
     df_fut, _ = get_latest_csv("三大法人期貨多空")
     df_fut_prev = get_prev_csv("三大法人期貨多空", date_spot)
@@ -1000,7 +1000,7 @@ def render_sidebar_market_summary():
     m_c, m_s = get_color(margin_diff_yi)
 
     # 1. 移除「本地極速版」字眼，只保留俐落的日期
-    html = f"<div style='font-size: 13px; color: #00D2FF;'>📅 {date_spot}</div>"
+    html = f"<div style='font-size: 13px; color: #00D2FF;'>基準日： {date_spot}</div>"
     html += "<table style='width: 100%; text-align: center; border-collapse: collapse; margin-top: 5px; font-size: 14px;'>"
     html += "<tr style='border-bottom: 1px solid #555; background-color: #262730;'>"
     html += "<th style='padding: 5px;'>法人</th><th style='padding: 5px;'>現貨(億)</th><th style='padding: 5px;'>TX未平倉</th></tr>"
@@ -1018,7 +1018,7 @@ def render_sidebar_market_summary():
         
         html += "<div style='margin-top: 8px; padding: 6px; background-color: #1e1e24; border: 1px solid #555; border-radius: 5px; font-size: 13px;'>"
         # 3. 標題加上專屬日期標示
-        html += f"<div style='font-weight: bold;'>📉 大盤融資餘額 <span style='font-size: 11px; color: #888; font-weight: normal; margin-left: 5px;'>({margin_date})</span></div>"
+        html += f"<div style='font-weight: bold;'>🔄 大盤融資餘額 <span style='font-size: 11px; color:#00D2FF; font-weight: normal; margin-left: 5px;'>({margin_date})</span></div>"
         html += f"<div style='color: #aaa; margin-top: 4px;'>今日增減(億) <span style='color: {m_c}; font-weight: bold; float: right;'>{m_s}</span></div>"
         html += f"<div style='color: #aaa; margin-top: 2px;'>餘額總計(億) <span style='float: right; color: #fff;'>{margin_today_yi:,.1f}</span></div>"
         html += "</div>"
