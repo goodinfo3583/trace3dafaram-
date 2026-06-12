@@ -231,57 +231,77 @@ st.markdown(
 
 # ==========================================
 # ==========================================
-# 📍 頂部：戰情室快速導航 (終極置頂 + 純文字無框極簡版)
+# 📍 頂部：戰情室快速導航 (巨大化藝術字體版)
 # ==========================================
 st.markdown("""
 <style>
-/* 🔴 終極修正：直接使用 position: fixed 強制釘在瀏覽器最頂端，徹底無視 Streamlit 的層級限制 */
+/* 🔴 引入 Google Fonts 的可愛/藝術字體：站酷快樂體 */
+@import url('https://fonts.googleapis.com/css2?family=ZCOOL+KuaiLe&display=swap');
+
+/* 強制釘在瀏覽器最頂端 */
 .sticky-nav-bar {
     position: fixed;
     top: 0;
     left: 0;
     width: 100%;
-    background-color: #0A0D14;     /* 實心主背景色，防止滾動時下方文字穿透 */
-    border-bottom: 1px solid #1E293B; /* 頂部下方細緻分隔線 */
-    z-index: 999999;               /* 給予至高無上的層級，保證壓在所有圖表與 K 線圖上方 */
-    padding: 12px 0px;
-    text-align: center;
+    background-color: #0A0D14;
+    border-bottom: 2px solid #1E293B;
+    z-index: 999999;
+    padding: 10px 0px;
     box-shadow: 0px 4px 20px rgba(0, 0, 0, 0.6);
+    
+    /* 套用可愛字體，若載入失敗則用內建圓體字備用 */
+    font-family: 'ZCOOL KuaiLe', 'Comic Sans MS', cursive;
+    
+    /* 確保巨大的文字可以優雅地自動換行，不會擠破版面 */
+    display: flex;
+    flex-wrap: wrap;
+    justify-content: center;
+    align-items: center;
 }
 
-/* 導航文字超連結樣式：完全無外框、無背景、極簡風 */
+/* 標題文字設定 */
+.nav-title {
+    color: #00D2FF;
+    font-weight: bold;
+    margin-right: 15px;
+    font-size: 42px; /* 放大 3 倍 */
+    letter-spacing: 2px;
+}
+
+/* 導航文字超連結樣式 */
 .nav-text-link {
     text-decoration: none !important;
-    color: #94A3B8 !important;     /* 平時為低調的灰白字 */
-    font-size: 14px;
-    font-weight: 500;
+    color: #94A3B8 !important;
+    font-size: 42px; /* 放大 3 倍 (原本 14px -> 42px) */
     padding: 5px 10px;
-    margin: 0px 2px;
+    margin: 5px;
     transition: all 0.2s ease-in-out;
-    display: inline-block;
 }
 
-/* 滑鼠移上去時：文字變亮科技藍，並帶有微微的霓虹發光特效 */
+/* 滑鼠移上去時：變亮、發光，並有「可愛微幅放大」的彈跳感 */
 .nav-text-link:hover {
     color: #00D2FF !important;
-    text-shadow: 0 0 10px rgba(0, 210, 255, 0.8);
+    text-shadow: 0 0 15px rgba(0, 210, 255, 0.8);
+    transform: scale(1.08); 
 }
 
 /* 項目之間的分隔直線 */
 .nav-divider {
     color: #334155;
-    font-size: 14px;
+    font-size: 36px;
+    margin: 0 8px;
     user-select: none;
 }
 
-/* 貼心微調：將 Streamlit 頂部稍微往下推，避免內容被最上方的固定導航列遮擋 */
+/* 導航列因為字體放大變得非常高，需把整個 App 內容往下推，避免被遮擋 */
 .stApp {
-    margin-top: 25px;
+    margin-top: 140px;
 }
 </style>
 
 <div class="sticky-nav-bar">
-    <span style="color: #00D2FF; font-weight: bold; margin-right: 24px; font-size: 24px; letter-spacing: 1px;"></span>
+    <span class="nav-title">📍 戰情導航：</span>
     <a href="#section-top-pool" target="_self" class="nav-text-link">🏆 觀察名單</a>
     <span class="nav-divider">|</span>
     <a href="#section-search" target="_self" class="nav-text-link">🔍 個股快搜</a>
