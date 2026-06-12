@@ -87,61 +87,7 @@ def robust_read_csv(file_path):
             continue
     return pd.read_csv(file_path, encoding='cp950', errors='ignore')
 
-# ==========================================
-# 🗂️ 台股代號與名稱產業類別 萬用字典引擎 (後台靜默運作版)
-# ==========================================
-@st.cache_data(ttl=3600)
-def get_stock_dictionary():
-    """讀取證交所 ISIN 檔案，在後台安靜地建立雙向對照表"""
-    import re
-    mapping = {}
-    
-    search_patterns = [
-        os.path.join(DATA_DIR, "*辨識號碼*.txt"),
-        os.path.join("./goodinfo_rankings", "*辨識號碼*.txt"),
-        "./*辨識號碼*.txt"
-    ]
-    dict_files = []
-    for pattern in search_patterns:
-        dict_files.extend(glob.glob(pattern))
-        
-    if not dict_files:
-        return mapping
-        
-    target_file = dict_files[0]
-    raw_lines = []
-    
-    for encoding in ['utf-8-sig', 'utf-8', 'cp950', 'utf-16', 'big5']:
-        try:
-            with open(target_file, 'r', encoding=encoding) as f:
-                raw_lines = f.readlines()
-            if len(raw_lines) > 10:
-                break
-        except:
-            continue
-            
-    for line in raw_lines:
-        parts = line.split('\t') if '\t' in line else line.split(',')
-        if len(parts) >= 5:
-            name_part = parts[0].strip()
-            industry = parts[4].strip()
-            
-            clean_name = re.sub(r'[\s　]+', ' ', name_part).strip()
-            tokens = clean_name.split(' ')
-            
-            if len(tokens) >= 2:
-                sid = tokens[0].strip()
-                sname = tokens[1].strip()
-                
-                if sid.isdigit():
-                    # 建立雙向字典 (輸入代號或名稱都能通)
-                    mapping[sname] = {"id": sid, "name": sname, "industry": industry}
-                    mapping[sid] = {"id": sid, "name": sname, "industry": industry}
-                    
-    return mapping
 
-# 在系統啟動時，直接載入這本字典
-STOCK_DICT = get_stock_dictionary()
 # ==========================================
 #以上原始區塊0
 # ==========================================
