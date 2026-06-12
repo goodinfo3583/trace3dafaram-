@@ -964,7 +964,8 @@ def render_sidebar_market_summary():
         
         html += "<div style='margin-top: 8px; padding: 6px; background-color: #1e1e24; border: 1px solid #555; border-radius: 5px; font-size: 13px;'>"
         # 3. 標題加上專屬日期標示
-        html += f"<div style='font-weight: bold;'>🔄 大盤融資餘額 <span style='font-size: 11px; color:#00D2FF; font-weight: normal; margin-left: 5px;'>基準日：{margin_date}</span></div>"
+        html += f"<div style='font-weight: bold;'>🔄 大盤融資餘額 
+        <span style='font-size: 11px; color:#00D2FF; font-weight: normal; margin-left: 5px;'>基準日：{margin_date}</span></div>"
         html += f"<div style='color: #aaa; margin-top: 4px;'>今日增減(億) <span style='color: {m_c}; font-weight: bold; float: right;'>{m_s}</span></div>"
         html += f"<div style='color: #aaa; margin-top: 2px;'>餘額總計(億) <span style='float: right; color: #fff;'>{margin_today_yi:,.1f}</span></div>"
         html += "</div>"
