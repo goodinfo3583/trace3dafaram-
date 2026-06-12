@@ -291,10 +291,10 @@ st.markdown("""
             box-shadow: 0px 0px 20px rgba(56, 189, 248, 0.2);
             margin-bottom: 25px;">
     <h2 style="color: #e0f2fe; margin: 0; letter-spacing: 2px; text-shadow: 0 0 15px rgba(56, 189, 248, 0.8);">
-        🔍 個股籌碼快搜 (戰情診斷室)
+        🔍 個股籌碼快搜
     </h2>
     <p style="color: #94a3b8; margin-top: 8px; font-size: 14px; margin-bottom: 0;">
-        輸入代號一鍵聯動：AI 型態掃描 ｜ 法人動向 ｜ 1000張大戶追蹤
+        輸入代號調出各區塊資訊
     </p>
 </div>
 """, unsafe_allow_html=True)
@@ -1679,7 +1679,7 @@ else:
         # ==========================================================
         # 計算實際成功串聯的天數 (計算有幾個"成交比%"欄位)
         days_count = len([c for c in csv_display.columns if "成交比%" in c])
-        st.success(f"串聯 {days_count} 個交易日追蹤共 {len(csv_display)} 檔")
+
         
         # 最後存入 Session State
         st.session_state['df_blk2_1'] = csv_display
@@ -1798,7 +1798,7 @@ else:
         st.dataframe(csv_display, use_container_width=True)
         # 計算實際成功串聯的天數 (計算有幾個"成交比%"欄位)
         days_count = len([c for c in csv_display.columns if "成交比%" in c])
-        st.success(f"串聯 {days_count} 個交易日追蹤共 {len(csv_display)} 檔")
+
         
         # 🔥 【連動儲存】：存入對應的快搜抽屜
         st.session_state['df_blk2_2'] = csv_display
@@ -1899,7 +1899,7 @@ else:
         #表格
         st.dataframe(csv_display, use_container_width=True) 
         #說明
-        st.success(f"串聯 {len(date_labels)} 個交易日追蹤共 {len(csv_display)} 檔")
+
         
         # 🔥 【連動儲存】
         st.session_state['df_blk2_3'] = csv_display
@@ -2000,7 +2000,7 @@ else:
         
         st.dataframe(csv_display, use_container_width=True)
         # 🔥 修改點 4：統一成功訊息的標點符號格式
-        st.success(f"串聯 {len(date_labels)} 個交易日追蹤共 {len(csv_display)} 檔")
+
         
         # 🔥 【連動儲存】
         st.session_state['df_blk2_4'] = csv_display
@@ -3536,7 +3536,7 @@ with top_pool_container:
     """, unsafe_allow_html=True)
 
     with st.container(border=True):
-        st.info("💡 **評分方式**：法人籌碼上榜為底，搭配「千張大戶權重加乘」與其他數據積分。(請參考▼明細)")
+        st.info("💡 **評分方式**：法人籌碼Top 200，搭配大股東與其他數據加分(▼明細)，並提供當日動向(△)。")
 
         if 'my_final_df' not in st.session_state or st.session_state['my_final_df'].empty:
             st.warning("⚠️ 尚未載入區塊 1 資料，無法進行選股池評比。")
@@ -3816,7 +3816,7 @@ with top_pool_container:
                             conn.update(spreadsheet=SHEET_URL, worksheet="選股歷史", data=final_save_df)
                     except: pass 
 
-                tab1, tab2, tab3 = st.tabs(["🔹 今日最新排行", "🔹 歷史分數追蹤表", "🔹 模型驗證：每週 Top 5 追蹤"])
+                tab1, tab2, tab3 = st.tabs(["🔹 今日最新排行", "🔹 歷史分數追蹤表", "🔹 模型驗證測試"])
                 
                 with tab1:
                     st.dataframe(
