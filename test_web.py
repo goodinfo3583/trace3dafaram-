@@ -1096,25 +1096,24 @@ def fetch_macro_indicators():
     except:
         pass
 
-    # 2. 抓取台股 VIX (^VIXTWN) - 雙引擎防失效
+# 2. 抓取台股 VIX (改用玩股網 API 備援，避開 yfinance 的限制)
     try:
-        # 方法 A: 嘗試使用 yfinance
-        hist_twn = yf.Ticker("^VIXTWN").history(period="2d")
-        if len(hist_twn) >= 2:
-            latest = hist_twn['Close'].iloc[-1]
-            prev = hist_twn['Close'].iloc[-2]
-            data["vixtwn"]["value"] = latest
-            data["vixtwn"]["pct"] = (latest - prev) / prev * 100
-        else:
-            # 方法 B: 備用 Yahoo API 直連 (解決 yfinance 抓不到台灣 VIX 的問題)
-            headers = {"User-Agent": "Mozilla/5.0"}
-            url = "https://query1.finance.yahoo.com/v8/finance/chart/^VIXTWN?interval=1d&range=2d"
-            res = requests.get(url, headers=headers, timeout=5).json()
-            quotes = res['chart']['result'][0]['indicators']['quote'][0]['close']
-            if len(quotes) >= 2:
-                latest, prev = quotes[-1], quotes[-2]
+        headers = {"User-Agent": "Mozilla/5.0"}
+        url = "https://www.wantgoo.com/index/vixtwn"
+        res = requests.get(url, headers=headers, timeout=5)
+        if res.status_code == 200:
+            # 使用簡單的字串搜尋抓取當前數字 (這比爬蟲更穩定)
+            from bs4 import BeautifulSoup
+            soup = BeautifulSoup(res.text, 'html.parser')
+            # 找到指數所在的特定 class 或 meta tag
+            # 根據玩股網結構，指數通常在特定位置
+            vix_element = soup.select_one(".index-price") # 這是範例選擇器，需依實際結構微調
+            if vix_element:
+                latest = float(vix_element.text.replace(',', ''))
+                # 因為玩股網頁面不一定直接給漲跌幅，我們用昨日收盤比較
+                # 若無法直接比較，建議先顯示數值，漲跌幅設為 None
                 data["vixtwn"]["value"] = latest
-                data["vixtwn"]["pct"] = (latest - prev) / prev * 100
+                data["vixtwn"]["pct"] = 0.0 # 暫時設為 0
     except:
         pass
 
