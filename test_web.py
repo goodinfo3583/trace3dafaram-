@@ -1216,19 +1216,32 @@ with tab2:
         </div>
         """, unsafe_allow_html=True)
 
-    st.write("") 
+st.markdown("---")
 
-    st.markdown("---")
-    st.subheader("📍 戰情室快速導航")
-    st.markdown("[🏆 數據分析觀察名單](#section-top-pool)")
-    st.markdown("[🔍 個股籌碼快搜](#section-search)")
-    st.markdown("[👑 區塊1：三大法人持股比追蹤](#section-1)")
-    st.markdown("[🎯 區塊2系列：法人5日淨買佔比](#section-2-1)")
-    st.markdown("[📅 區塊3：法人連續買超](#section-3)")
-    st.markdown("[🔄 區塊4系列：融資券與軋空雷達](#section-4-1)")
-    st.markdown("[💰 區塊5：大股東動向](#section-5)")
-    st.markdown("[💸 區塊6：鉅額交易動向](#section-6)")
+# 3. 🌟 終極大改造：戰情室主選單 (使用 st.tabs)
+tab_pool, tab_search, tab_b1, tab_b2, tab_b3, tab_b4, tab_b5, tab_b6 = st.tabs([
+    "🏆 觀察名單", 
+    "🔍 籌碼快搜", 
+    "👑 Q1持股比", 
+    "🎯 Q2淨買佔比", 
+    "📅 Q3連買", 
+    "🔄 Q4融資券", 
+    "💰 Q5大股東", 
+    "💸 Q6鉅額"
+])
 
+# 4. 把您原本寫的區塊，分別塞進對應的 Tab 裡
+with tab_pool:
+    # 這裡放您原本 "數據分析觀察名單" 的所有程式碼
+
+with tab_search:
+    # 這裡放您原本 "個股籌碼快搜" 的所有程式碼
+
+with tab_b1:
+    # 這裡放您原本 "區塊1：三大法人持股比" 的所有程式碼
+
+
+    
 # ==========================================
 # 🏠 核心五大區塊
 # ==========================================
@@ -1239,7 +1252,6 @@ st.write("---")
 st.markdown("<div id='section-1'></div>", unsafe_allow_html=True)
 
 header_placeholder = st.empty()
-
 
 from collections import defaultdict
 
