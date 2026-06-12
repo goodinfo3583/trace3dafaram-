@@ -231,11 +231,11 @@ st.markdown(
 
 # ==========================================
 # ==========================================
-# 📍 頂部：戰情室快速導航 (巨大化藝術字體版)
+# 📍 頂部：戰情室快速導航 (單排對齊 + 統一字體 + 移除標題)
 # ==========================================
 st.markdown("""
 <style>
-/* 🔴 引入 Google Fonts 的可愛/藝術字體：站酷快樂體 */
+/* 引入 Google Fonts 的可愛/藝術字體：站酷快樂體 */
 @import url('https://fonts.googleapis.com/css2?family=ZCOOL+KuaiLe&display=swap');
 
 /* 強制釘在瀏覽器最頂端 */
@@ -244,38 +244,38 @@ st.markdown("""
     top: 0;
     left: 0;
     width: 100%;
-    background-color: #0A0D14;
+    background-color: #0A0D14; /* 實心背景，防止文字穿透 */
     border-bottom: 2px solid #1E293B;
     z-index: 999999;
-    padding: 10px 0px;
+    padding: 12px 0px;
     box-shadow: 0px 4px 20px rgba(0, 0, 0, 0.6);
     
-    /* 套用可愛字體，若載入失敗則用內建圓體字備用 */
-    font-family: 'ZCOOL KuaiLe', 'Comic Sans MS', cursive;
+    /* 🌟 字體統一：套用到整條導航列，確保每個字風格一致 */
+    font-family: 'ZCOOL KuaiLe', 'Microsoft JhengHei', sans-serif;
     
-    /* 確保巨大的文字可以優雅地自動換行，不會擠破版面 */
+    /* 🌟 強制單行對齊：禁止換行，並讓內容置中 */
     display: flex;
-    flex-wrap: wrap;
+    flex-wrap: nowrap; 
     justify-content: center;
     align-items: center;
+    white-space: nowrap;
+    
+    /* 如果使用者的螢幕真的太小，允許左右滑動而不會跑版 */
+    overflow-x: auto; 
 }
 
-/* 標題文字設定 */
-.nav-title {
-    color: #00D2FF;
-    font-weight: bold;
-    margin-right: 15px;
-    font-size: 42px; /* 放大 3 倍 */
-    letter-spacing: 2px;
+/* 隱藏滾動條保持美觀 (適用於 Chrome/Edge/Safari) */
+.sticky-nav-bar::-webkit-scrollbar {
+    display: none;
 }
 
 /* 導航文字超連結樣式 */
 .nav-text-link {
     text-decoration: none !important;
     color: #94A3B8 !important;
-    font-size: 42px; /* 放大 3 倍 (原本 14px -> 42px) */
+    font-size: 24px; /* 調整為適中大小，確保能塞進同一行 */
     padding: 5px 10px;
-    margin: 5px;
+    margin: 0px 5px;
     transition: all 0.2s ease-in-out;
 }
 
@@ -283,25 +283,24 @@ st.markdown("""
 .nav-text-link:hover {
     color: #00D2FF !important;
     text-shadow: 0 0 15px rgba(0, 210, 255, 0.8);
-    transform: scale(1.08); 
+    transform: scale(1.1); 
 }
 
 /* 項目之間的分隔直線 */
 .nav-divider {
     color: #334155;
-    font-size: 36px;
-    margin: 0 8px;
+    font-size: 24px;
+    margin: 0 2px;
     user-select: none;
 }
 
-/* 導航列因為字體放大變得非常高，需把整個 App 內容往下推，避免被遮擋 */
+/* 導航列因為變成單行，高度變矮了，這裡同步把下推距離縮小 */
 .stApp {
-    margin-top: 140px;
+    margin-top: 70px;
 }
 </style>
 
 <div class="sticky-nav-bar">
-    <span class="nav-title">📍 戰情導航：</span>
     <a href="#section-top-pool" target="_self" class="nav-text-link">🏆 觀察名單</a>
     <span class="nav-divider">|</span>
     <a href="#section-search" target="_self" class="nav-text-link">🔍 個股快搜</a>
