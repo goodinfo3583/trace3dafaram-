@@ -348,9 +348,9 @@ st.markdown("""
 <div class="sticky-header-wrapper">
     <div class="disclaimer-bar">
         <div class="disclaimer-header">
-            <span class="disclaimer-item">⚠️ 使用聲明</span>
-            <span class="disclaimer-item">🔒 隱私權政策 (建置中)</span>
-            <span class="disclaimer-item">📜 網站聲明 (建置中)</span>
+            <span class="disclaimer-item">使用聲明</span>
+            <span class="disclaimer-item">隱私權政策</span>
+            <span class="disclaimer-item">聯絡我們</span>
         </div>
         <div class="disclaimer-content">
             本平台僅供教育研究與籌碼觀察，絕不構成任何實質投資建議、勸誘或要約。所有資料源自 TWSE / TPEX / 公開資訊觀測站 等公開數據，受限於網路技術，可能有延遲、錯誤或不完整之情形。<br>投資必有風險，使用者依本平台資訊所做之任何投資決策與損益結果，均須由使用者自行負責，本平台不對資料正確性、即時性負擔任何法律賠償責任。
