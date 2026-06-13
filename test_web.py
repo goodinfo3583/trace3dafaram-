@@ -4214,7 +4214,7 @@ with st.container(border=True):
     with st.form("contact_us_form", clear_on_submit=True):
         c1, c2 = st.columns(2)
         with c1:
-            sender_name = st.text_input("您的稱呼 (選填)", placeholder="例如：股市阿東")
+            sender_name = st.text_input("您的稱呼 (選填)", placeholder="例如：股市小白")
         with c2:
             sender_email = st.text_input("電子信箱 (選填)", placeholder="若需站長回覆請務必留下 Email")
             
