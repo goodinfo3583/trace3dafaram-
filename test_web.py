@@ -1403,13 +1403,8 @@ with st.container(border=True):
 # 🏠 核心五大區塊
 # ==========================================
 # ==========================================
-# 🏠 區塊1：中長線 三大法人 持股比例 追蹤 (全本地同步極速版)
+# 🌟 區塊 1 專屬工具函數區 (必須放在 if 鎖外面，供應全站數據)
 # ==========================================
-st.write("---")
-st.markdown("<div id='section-1'></div>", unsafe_allow_html=True)
-
-header_placeholder = st.empty()
-
 import re
 import os
 import glob
@@ -1417,10 +1412,8 @@ import pandas as pd
 import requests
 import datetime
 from collections import defaultdict
+import streamlit as st
 
-# ------------------------------------------
-# 🌐 全自動 GitHub JSON 抓取引擎 (僅供站長按鈕下載使用)
-# ------------------------------------------
 @st.cache_data(ttl=3600)
 def fetch_github_json_all():
     days_list = [5, 20, 60, 120]
@@ -1455,311 +1448,323 @@ def fetch_github_json_all():
     except Exception: pass
     return json_dfs, latest_all_df
 
-json_dfs, latest_all_df = fetch_github_json_all()
-
-
-# ------------------------------------------
-# 💾 站長專屬：JSON 200名快照存檔區
-# ------------------------------------------
-DATA_DIR = "./Goodinfo_Rankings"
-all_json_csvs = glob.glob(os.path.join(DATA_DIR, "*JSON_History.csv"))
-local_latest_date = "無紀錄"
-if all_json_csvs:
-    dates = [m.group(1) for f in all_json_csvs if (m := re.search(r'(202\d{5})', os.path.basename(f)))]
-    if dates: local_latest_date = max(dates)
-
-today_str = datetime.datetime.now().strftime("%Y%m%d")
-is_updated_today = (local_latest_date == today_str)
-status_icon = "✅" if is_updated_today else "⚠️"
-status_text = f"{status_icon} 本地最新: {local_latest_date}"
-
-st.write("") 
-c_btn1, c_btn2 = st.columns(2)
-
-with c_btn1: 
-    st.link_button("📊 DDong 台股法人籌碼數據儀表板", "https://goodinfo3583.github.io/DDong_tw-institutional-stocker/", use_container_width=True)
-
-with c_btn2:
-    try: exp_container = st.popover(f"🛠 站長快照 ({status_text})", use_container_width=True)
-    except AttributeError: exp_container = st.expander(f"🛠 站長：下載 200名快照 ({status_text})", expanded=False)
-        
-    with exp_container:
-        if is_updated_today: st.success(f"✅ **今日已更新！** 資料夾中最新快照為 `{local_latest_date}`。")
-        else: st.warning(f"⚠️ **今日尚未更新！** 資料夾中最新快照停留在 `{local_latest_date}`，請記得下載！")
-            
-        admin_pw = st.text_input("請輸入站長密碼以解鎖功能", type="password", key="admin_pw_input")
-        if admin_pw == "DDong888": 
-            st.success("🔓 驗證成功！請執行快照封存。")
-            
-            # 👇 新增這顆「強制刷新按鈕」在這裡
-            if st.button("🔄 站長專屬：強制抓取 GitHub 最新數據", use_container_width=True):
-                fetch_github_json_all.clear()  # 瞬間清空這個函數的快取
-                st.rerun()                     # 重新整理網頁
-            # 👆 新增結束
-            
-            snap_date = st.date_input("選擇這份資料的實際基準日")
-            st.write("")
-            if st.button("💾 將 GitHub 200名數據封存為 CSV", use_container_width=True):
-                date_str = snap_date.strftime("%Y%m%d")
-                save_path = os.path.join(DATA_DIR, f"{date_str}_JSON_History.csv")
-                all_snap_data = []
-                for d in [5, 20, 60, 120]:
-                    if d in json_dfs and not json_dfs[d].empty:
-                        temp = json_dfs[d][['股票代號', '股票名稱', '法人持股']].copy()
-                        temp['上榜區塊'] = f"{d}日"
-                        all_snap_data.append(temp)
-                
-                if all_snap_data:
-                    snap_df = pd.concat(all_snap_data, ignore_index=True)
-                    snap_grouped = snap_df.groupby(['股票代號', '股票名稱']).agg({
-                        '法人持股': 'max', '上榜區塊': lambda x: ",".join(set(x))
-                    }).reset_index()
-                    csv_data = snap_grouped.to_csv(index=False).encode('utf-8-sig')
-                    snap_grouped.to_csv(save_path, index=False, encoding='utf-8-sig')
-                    
-                    st.success(f"✅ 成功生成 {len(snap_grouped)} 檔股票的歷史快照！")
-                    st.download_button(
-                        label="📥 點我下載快照 CSV 檔案", data=csv_data, file_name=f"{date_str}_JSON_History.csv",
-                        mime="text/csv", type="primary", use_container_width=True
-                    )
-                else: st.error("❌ 尚未獲取到 GitHub 數據，封存失敗。")
-        elif admin_pw != "": st.error("❌ 密碼錯誤，無法使用此功能。")
-
-# ==========================================
-# 🔄 歷史資料合併與邏輯運算 (底層大表重建)
-# ==========================================
-date_files = defaultdict(lambda: {'txt': [], 'csv': []})
-
 def extract_date_from_filename(filename):
     m8 = re.search(r'(202\d{5})', filename)
     if m8: return m8.group(1)
     return None
 
-all_csv_files = glob.glob(os.path.join(DATA_DIR, "*JSON*.csv"))
-for f in all_csv_files:
-    d_label = extract_date_from_filename(os.path.basename(f))
-    if d_label: date_files[d_label]['csv'].append(f)
-
-sorted_dates = sorted(date_files.keys(), reverse=True)
-final_df = pd.DataFrame()
-
-if sorted_dates:
-    latest_d = sorted_dates[0]
-    fmt_date = f"{latest_d[:4]}/{latest_d[4:6]}/{latest_d[6:]}"
-    header_placeholder.markdown(
-        f"<h2 style='margin-bottom: 0px;'>👑 區塊1：三大法人短中長線持股比追蹤 "
-        f"<span style='color:#00D2FF; font-size:16px; font-weight:500; margin-left:12px;'>基準日：{fmt_date}</span></h2>", 
-        unsafe_allow_html=True
-    )
+# 🛠️ 核心巨集：合併所有歷史快照與 GitHub 即時數據，產生全域母表
+@st.cache_data(ttl=300)
+def build_block1_master_df():
+    # 確保不會抓不到全域變數，這裡再宣告一次路徑
+    DATA_DIR = "./Goodinfo_Rankings"
+    date_files = defaultdict(lambda: {'txt': [], 'csv': []})
+    all_csv_files = glob.glob(os.path.join(DATA_DIR, "*JSON*.csv"))
     
-    for i, date_label in enumerate(sorted_dates[:30]): 
-        day_dfs = []
-        if date_files[date_label]['csv']:
-            df = pd.read_csv(date_files[date_label]['csv'][0], encoding='utf-8-sig')
-            if '股票代號' in df.columns:
-                df['股票代號'] = df['股票代號'].astype(str).str.replace(r'\.0$', '', regex=True).str.strip()
-                df['股票代號'] = df['股票代號'].apply(lambda x: x.zfill(4) if x.isdigit() else x)
-                df['股票名稱'] = df['股票名稱'].astype(str).str.strip()
-                df = df.rename(columns={'法人持股': f"{date_label}持股%"})
-                day_dfs.append(df)
-            
-        day_dfs = [df for df in day_dfs if not df.empty]
-        if not day_dfs: continue
-            
-        df_day_raw = pd.concat(day_dfs, ignore_index=True)
-        def agg_sections_func(x):
-            valid_x = set()
-            for val in x:
-                if pd.notna(val) and str(val).strip() != "":
-                    for p in str(val).split(','): valid_x.add(p.strip())
-            return ",".join([s for s in ['5日', '20日', '60日', '120日'] if s in valid_x])
-            
-        agg_dict = {f"{date_label}持股%": 'max', '上榜區塊': agg_sections_func}
-        df_day = df_day_raw.groupby(['股票代號', '股票名稱']).agg(agg_dict).reset_index().rename(columns={'上榜區塊': f"{date_label}_區塊"})
-            
-        if final_df is None or final_df.empty: final_df = df_day
-        else: final_df = pd.merge(final_df, df_day, on=['股票代號', '股票名稱'], how='outer')
-            
-    if final_df is not None and not final_df.empty:
-        date_cols = sorted([c for c in final_df.columns if '持股%' in c], reverse=True)
-        for c in date_cols: final_df[c] = pd.to_numeric(final_df[c], errors='coerce').fillna(0)
-            
-        def generate_tags(sections):
-            if pd.isna(sections) or not sections: return ""
-            sec_list = str(sections).split(',')
-            tags = [tag for tag, key in [('🔴5日', '5日'), ('🟡20日', '20日'), ('🟢60日', '60日'), ('🔵120日', '120日')] if key in sec_list]
-            return " ".join(tags)
-            
-        latest_sect_col = f"{sorted_dates[0]}_區塊"
-        if latest_sect_col not in final_df.columns: final_df[latest_sect_col] = ""
-        
-        final_df['今日上榜'] = final_df[latest_sect_col].apply(generate_tags)
-        final_df['上榜數量'] = final_df['今日上榜'].apply(lambda x: str(x).count('日'))
-            
-        def evaluate_trend(row):
-            if len(date_cols) < 2: return "⚪ 資料不足"
-            dynamics, v0, v1 = [], row[date_cols[0]], row[date_cols[1]]
-            diff1 = v0 - v1  
-            if diff1 > 0:
-                is_slowing = False
-                if len(date_cols) >= 3:
-                    v2 = row[date_cols[2]]
-                    if v0 > v1 > v2 > 0: dynamics.append("🪜 階梯吸籌")
-                    elif len(date_cols) >= 4 and v0 >= v1 >= v2 >= row[date_cols[3]] > 0 and v0 > row[date_cols[3]]: dynamics.append("🛡️ 穩健吸籌")
-                    if v1 != 0 and v2 != 0 and diff1 < (v1 - v2): dynamics.append("⚠️ 趨緩"); is_slowing = True
-                if not is_slowing: dynamics.append("📈 上升")
-            elif diff1 < 0: dynamics.append("📉 下降")
-            else: dynamics.append("🔄 持平")
+    for f in all_csv_files:
+        d_label = extract_date_from_filename(os.path.basename(f))
+        if d_label: date_files[d_label]['csv'].append(f)
+
+    sorted_dates = sorted(date_files.keys(), reverse=True)
+    f_df = pd.DataFrame()
+    
+    j_dfs, l_all_df = fetch_github_json_all()
+
+    if sorted_dates:
+        for i, date_label in enumerate(sorted_dates[:30]): 
+            day_dfs = []
+            if date_files[date_label]['csv']:
+                df = pd.read_csv(date_files[date_label]['csv'][0], encoding='utf-8-sig')
+                if '股票代號' in df.columns:
+                    df['股票代號'] = df['股票代號'].astype(str).str.replace(r'\.0$', '', regex=True).str.strip()
+                    df['股票代號'] = df['股票代號'].apply(lambda x: x.zfill(4) if x.isdigit() else x)
+                    df['股票名稱'] = df['股票名稱'].astype(str).str.strip()
+                    df = df.rename(columns={'法人持股': f"{date_label}持股%"})
+                    day_dfs.append(df)
                 
-            today_list = [s for s in str(row.get(f"{sorted_dates[0]}_區塊", "")).split(',') if s]
-            yest_list = [s for s in str(row.get(f"{sorted_dates[1]}_區塊", "")).split(',') if s]
-            
-            if v0 > 0 and v1 == 0 and any(row[c] > 0 for c in date_cols[2:]): dynamics.append("🔄 洗盤回歸")
-            if 1 <= len(yest_list) <= 3 and len(today_list) > len(yest_list):
-                new_entries = [i for i in today_list if i not in yest_list]
-                tags = [tag for tag, key in [('🔴5日', '5日'), ('🟡20日', '20日'), ('🟢60日', '60日'), ('🔵120日', '120日')] if any(key in item for item in new_entries)]
-                if tags: dynamics.append(f"🚀 衝進{'、'.join(tags)}榜單")
-            return " | ".join(dynamics)
+            day_dfs = [df for df in day_dfs if not df.empty]
+            if not day_dfs: continue
                 
-        final_df['最新動態'] = final_df.apply(evaluate_trend, axis=1)
-        final_df['法人持股'] = final_df[date_cols[0]]
-        
-        # 🔥 把單日精準變化補上去
-        if not latest_all_df.empty and '股票代號' in latest_all_df.columns:
-            final_df = pd.merge(final_df, latest_all_df, on='股票代號', how='left')
-            final_df['△'] = final_df['精準單日△'].fillna(0.0)
-        else:
-            if len(date_cols) >= 2:
-                final_df['△'] = final_df.apply(lambda row: row[date_cols[0]] - row[date_cols[1]] if row[date_cols[1]] > 0.001 else 0.0, axis=1)
-            else: final_df['△'] = 0.0
+            df_day_raw = pd.concat(day_dfs, ignore_index=True)
+            def agg_sections_func(x):
+                valid_x = set()
+                for val in x:
+                    if pd.notna(val) and str(val).strip() != "":
+                        for p in str(val).split(','): valid_x.add(p.strip())
+                return ",".join([s for s in ['5日', '20日', '60日', '120日'] if s in valid_x])
+                
+            agg_dict = {f"{date_label}持股%": 'max', '上榜區塊': agg_sections_func}
+            df_day = df_day_raw.groupby(['股票代號', '股票名稱']).agg(agg_dict).reset_index().rename(columns={'上榜區塊': f"{date_label}_區塊"})
+                
+            if f_df is None or f_df.empty: f_df = df_day
+            else: f_df = pd.merge(f_df, df_day, on=['股票代號', '股票名稱'], how='outer')
+                
+        if f_df is not None and not f_df.empty:
+            d_cols = sorted([c for c in f_df.columns if '持股%' in c], reverse=True)
+            for c in d_cols: f_df[c] = pd.to_numeric(f_df[c], errors='coerce').fillna(0)
+                
+            def generate_tags(sections):
+                if pd.isna(sections) or not sections: return ""
+                sec_list = str(sections).split(',')
+                tags = [tag for tag, key in [('🔴5日', '5日'), ('🟡20日', '20日'), ('🟢60日', '60日'), ('🔵120日', '120日')] if key in sec_list]
+                return " ".join(tags)
+                
+            latest_sect_col = f"{sorted_dates[0]}_區塊"
+            if latest_sect_col not in f_df.columns: f_df[latest_sect_col] = ""
             
-        final_df['法人金額'] = 0.0 
+            f_df['今日上榜'] = f_df[latest_sect_col].apply(generate_tags)
+            f_df['上榜數量'] = f_df['今日上榜'].apply(lambda x: str(x).count('日'))
+                
+            def evaluate_trend(row):
+                if len(d_cols) < 2: return "⚪ 資料不足"
+                dynamics, v0, v1 = [], row[d_cols[0]], row[d_cols[1]]
+                diff1 = v0 - v1  
+                if diff1 > 0:
+                    is_slowing = False
+                    if len(d_cols) >= 3:
+                        v2 = row[d_cols[2]]
+                        if v0 > v1 > v2 > 0: dynamics.append("🪜 階梯吸籌")
+                        elif len(d_cols) >= 4 and v0 >= v1 >= v2 >= row[d_cols[3]] > 0 and v0 > row[d_cols[3]]: dynamics.append("🛡️ 穩健吸籌")
+                        if v1 != 0 and v2 != 0 and diff1 < (v1 - v2): dynamics.append("⚠️ 趨緩"); is_slowing = True
+                    if not is_slowing: dynamics.append("📈 上升")
+                elif diff1 < 0: dynamics.append("📉 下降")
+                else: dynamics.append("🔄 持平")
+                    
+                today_list = [s for s in str(row.get(f"{sorted_dates[0]}_區塊", "")).split(',') if s]
+                yest_list = [s for s in str(row.get(f"{sorted_dates[1]}_區塊", "")).split(',') if s]
+                
+                if v0 > 0 and v1 == 0 and any(row[c] > 0 for c in d_cols[2:]): dynamics.append("🔄 洗盤回歸")
+                if 1 <= len(yest_list) <= 3 and len(today_list) > len(yest_list):
+                    new_entries = [i for i in today_list if i not in yest_list]
+                    tags = [tag for tag, key in [('🔴5日', '5日'), ('🟡20日', '20日'), ('🟢60日', '60日'), ('🔵120日', '120日')] if any(key in item for item in new_entries)]
+                    if tags: dynamics.append(f"🚀 衝進{'、'.join(tags)}榜單")
+                return " | ".join(dynamics)
+                    
+            f_df['最新動態'] = f_df.apply(evaluate_trend, axis=1)
+            f_df['法人持股'] = f_df[d_cols[0]]
+            
+            if not l_all_df.empty and '股票代號' in l_all_df.columns:
+                f_df = pd.merge(f_df, l_all_df, on='股票代號', how='left')
+                f_df['△'] = f_df['精準單日△'].fillna(0.0)
+            else:
+                if len(d_cols) >= 2:
+                    f_df['△'] = f_df.apply(lambda row: row[d_cols[0]] - row[d_cols[1]] if row[d_cols[1]] > 0.001 else 0.0, axis=1)
+                else: f_df['△'] = 0.0
+                
+            f_df['法人金額'] = 0.0 
 
-        # 🔥 關鍵修復：把 GitHub JSON 的「期程專屬排名」與「專屬ΔChange」合併回大表
-        for d in [5, 20, 60, 120]:
-            if d in json_dfs and not json_dfs[d].empty:
-                temp_json = json_dfs[d][['股票代號', f'{d}日ΔChange', f'{d}日排名']]
-                final_df = pd.merge(final_df, temp_json, on='股票代號', how='left')
+            for d in [5, 20, 60, 120]:
+                if d in j_dfs and not j_dfs[d].empty:
+                    temp_json = j_dfs[d][['股票代號', f'{d}日ΔChange', f'{d}日排名']]
+                    f_df = pd.merge(f_df, temp_json, on='股票代號', how='left')
 
-        color_ref = final_df.set_index('股票代號')['上榜數量'].to_dict()
-        for col in date_cols: final_df[col] = final_df[col].apply(lambda x: "未進榜" if pd.isna(x) or abs(x) < 0.0001 else f"{x:.2f}")
+            col_ref = f_df.set_index('股票代號')['上榜數量'].to_dict()
+            for col in d_cols: f_df[col] = f_df[col].apply(lambda x: "未進榜" if pd.isna(x) or abs(x) < 0.0001 else f"{x:.2f}")
 
-        final_df['今日有上榜_排序'] = final_df['今日上榜'] != ""
-        if date_cols:
-            final_df = final_df.sort_values(by=['今日有上榜_排序', '上榜數量', date_cols[0]], ascending=[False, False, False])
+            f_df['今日有上榜_排序'] = f_df['今日上榜'] != ""
+            if d_cols:
+                f_df = f_df.sort_values(by=['今日有上榜_排序', '上榜數量', d_cols[0]], ascending=[False, False, False])
+            
+            return f_df, sorted_dates, d_cols, col_ref
+    
+    return pd.DataFrame(), [], [], {}
 
-else:
-    header_placeholder.markdown("<h2 style='margin-bottom: 0px;'>👑 區塊1：三大法人短中長線持股比追蹤</h2>", unsafe_allow_html=True)
+# 🔥 背景預載：在任何頁面都會優先抓取母表，丟入全域記憶體中，供「快搜」與「觀察名單」使用！
+json_dfs, latest_all_df = fetch_github_json_all()
+final_df, sorted_dates, date_cols, color_ref = build_block1_master_df()
+st.session_state['my_final_df'] = final_df
+
 
 # ==========================================
-# 🔧 UI 數據渲染 (四大榜單完美還原期程排序)
+# 🔒 區塊 1 專屬包廂鎖 (畫面渲染與站長工具包進這裡)
 # ==========================================
-c1, c2, c3 = st.columns([1, 1, 2])
-show_etf = c1.checkbox("顯示 ETF", value=True, key="blk1_etf_sync")
-show_bond = c2.checkbox("顯示 債券/債券ETF", value=True, key="blk1_bond_sync")
-search_kw = c3.text_input("🔍 快速尋找標的 (輸入代號或名稱)", placeholder="例如: 2890 或 永豐金")
-
-tab5, tab20, tab60, tab120, tab_all = st.tabs([
-    "🔴 5日排行", "🟡 20日排行", "🟢 60日排行", "🔵 120日排行", "📊 歷史軌跡全能池"
-])
-
-def format_delta(x):
-    try:
-        val = float(x)
-        if abs(val) < 0.005: return "0.00"
-        return f"+{val:.2f}" if val > 0 else f"{val:.2f}"
-    except: return "0.00"
-
-def get_local_tab_df(target_day_str):
-    if final_df is None or final_df.empty: return pd.DataFrame()
-    # 篩選出有在這個期程上榜的股票
-    df = final_df[final_df['今日上榜'].str.contains(f'{target_day_str}日', na=False)].copy()
-    if df.empty: return df
+if current_page in ["all", "b1"]:
     
-    # 執行 ETF/債券/搜尋 過濾
-    is_bond = df['股票代號'].str.endswith('B')
-    is_etf = (df['股票代號'].str.len() >= 5) & (~is_bond)
-    is_stock = df['股票代號'].str.len() == 4
-    mask = is_stock
-    if show_etf: mask |= is_etf
-    if show_bond: mask |= is_bond
-    if search_kw:
-        mask &= (df['股票代號'].str.contains(search_kw, na=False)) | (df['股票名稱'].str.contains(search_kw, na=False))
-    df = df[mask].copy()
-    
-    # 🔥 關鍵修復：依據該期程專屬的「排名」來重新排序！
-    rank_col = f'{target_day_str}日排名'
-    change_col = f'{target_day_str}日ΔChange'
-    
-    # 若有抓到專屬排名，就依據排名由小到大 (1~200) 排序；若只有 Change 就依 Change 降冪排序
-    if rank_col in df.columns:
-        df = df.sort_values(by=rank_col, ascending=True)
-    elif change_col in df.columns:
-        df[change_col] = pd.to_numeric(df[change_col], errors='coerce').fillna(0)
-        df = df.sort_values(by=change_col, ascending=False)
-        df[f'{target_day_str}日排名'] = range(1, len(df) + 1)
+    st.write("---")
+    st.markdown("<div id='section-1'></div>", unsafe_allow_html=True)
+
+    if sorted_dates:
+        latest_d = sorted_dates[0]
+        fmt_date = f"{latest_d[:4]}/{latest_d[4:6]}/{latest_d[6:]}"
+        st.markdown(
+            f"<h2 style='margin-bottom: 0px;'>👑 區塊1：三大法人短中長線持股比追蹤 "
+            f"<span style='color:#00D2FF; font-size:16px; font-weight:500; margin-left:12px;'>基準日：{fmt_date}</span></h2>", 
+            unsafe_allow_html=True
+        )
+    else:
+        st.markdown("<h2 style='margin-bottom: 0px;'>👑 區塊1：三大法人短中長線持股比追蹤</h2>", unsafe_allow_html=True)
+
+    # ------------------------------------------
+    # 💾 站長專屬：JSON 200名快照存檔區
+    # ------------------------------------------
+    DATA_DIR = "./Goodinfo_Rankings"
+    all_json_csvs = glob.glob(os.path.join(DATA_DIR, "*JSON_History.csv"))
+    local_latest_date = "無紀錄"
+    if all_json_csvs:
+        dates = [m.group(1) for f in all_json_csvs if (m := re.search(r'(202\d{5})', os.path.basename(f)))]
+        if dates: local_latest_date = max(dates)
+
+    today_str = datetime.datetime.now().strftime("%Y%m%d")
+    is_updated_today = (local_latest_date == today_str)
+    status_icon = "✅" if is_updated_today else "⚠️"
+    status_text = f"{status_icon} 本地最新: {local_latest_date}"
+
+    st.write("") 
+    c_btn1, c_btn2 = st.columns(2)
+
+    with c_btn1: 
+        st.link_button("📊 DDong 台股法人籌碼數據儀表板", "https://goodinfo3583.github.io/DDong_tw-institutional-stocker/", use_container_width=True)
+
+    with c_btn2:
+        try: exp_container = st.popover(f"🛠 站長快照 ({status_text})", use_container_width=True)
+        except AttributeError: exp_container = st.expander(f"🛠 站長：下載 200名快照 ({status_text})", expanded=False)
+            
+        with exp_container:
+            if is_updated_today: st.success(f"✅ **今日已更新！** 資料夾中最新快照為 `{local_latest_date}`。")
+            else: st.warning(f"⚠️ **今日尚未更新！** 資料夾中最新快照停留在 `{local_latest_date}`，請記得下載！")
+                
+            admin_pw = st.text_input("請輸入站長密碼以解鎖功能", type="password", key="admin_pw_input")
+            if admin_pw == "DDong888": 
+                st.success("🔓 驗證成功！請執行快照封存。")
+                
+                if st.button("🔄 站長專屬：強制抓取 GitHub 最新數據", use_container_width=True):
+                    fetch_github_json_all.clear() 
+                    st.rerun()                     
+                
+                snap_date = st.date_input("選擇這份資料的實際基準日")
+                st.write("")
+                if st.button("💾 將 GitHub 200名數據封存為 CSV", use_container_width=True):
+                    date_str = snap_date.strftime("%Y%m%d")
+                    save_path = os.path.join(DATA_DIR, f"{date_str}_JSON_History.csv")
+                    all_snap_data = []
+                    for d in [5, 20, 60, 120]:
+                        if d in json_dfs and not json_dfs[d].empty:
+                            temp = json_dfs[d][['股票代號', '股票名稱', '法人持股']].copy()
+                            temp['上榜區塊'] = f"{d}日"
+                            all_snap_data.append(temp)
+                    
+                    if all_snap_data:
+                        snap_df = pd.concat(all_snap_data, ignore_index=True)
+                        snap_grouped = snap_df.groupby(['股票代號', '股票名稱']).agg({
+                            '法人持股': 'max', '上榜區塊': lambda x: ",".join(set(x))
+                        }).reset_index()
+                        csv_data = snap_grouped.to_csv(index=False).encode('utf-8-sig')
+                        snap_grouped.to_csv(save_path, index=False, encoding='utf-8-sig')
+                        
+                        build_block1_master_df.clear() # 🌟 清空母表快取，讓下次系統讀取包含最新資料
+                        st.success(f"✅ 成功生成 {len(snap_grouped)} 檔股票的歷史快照！")
+                        st.download_button(
+                            label="📥 點我下載快照 CSV 檔案", data=csv_data, file_name=f"{date_str}_JSON_History.csv",
+                            mime="text/csv", type="primary", use_container_width=True
+                        )
+                    else: st.error("❌ 尚未獲取到 GitHub 數據，封存失敗。")
+            elif admin_pw != "": st.error("❌ 密碼錯誤，無法使用此功能。")
+
+
+    # ==========================================
+    # 🔧 UI 數據渲染 (四大榜單完美還原期程排序)
+    # ==========================================
+    c1, c2, c3 = st.columns([1, 1, 2])
+    show_etf = c1.checkbox("顯示 ETF", value=True, key="blk1_etf_sync")
+    show_bond = c2.checkbox("顯示 債券/債券ETF", value=True, key="blk1_bond_sync")
+    search_kw = c3.text_input("🔍 快速尋找標的 (輸入代號或名稱)", placeholder="例如: 2890 或 永豐金")
+
+    tab5, tab20, tab60, tab120, tab_all = st.tabs([
+        "🔴 5日排行", "🟡 20日排行", "🟢 60日排行", "🔵 120日排行", "📊 歷史軌跡全能池"
+    ])
+
+    def format_delta(x):
+        try:
+            val = float(x)
+            if abs(val) < 0.005: return "0.00"
+            return f"+{val:.2f}" if val > 0 else f"{val:.2f}"
+        except: return "0.00"
+
+    def get_local_tab_df(target_day_str):
+        if final_df is None or final_df.empty: return pd.DataFrame()
+        df = final_df[final_df['今日上榜'].str.contains(f'{target_day_str}日', na=False)].copy()
+        if df.empty: return df
         
-    df['法人持股'] = df['法人持股'].apply(lambda x: f"{x:.2f}%" if pd.notna(x) else "0.00%")
-    df['△'] = df['△'].apply(format_delta)
-    if change_col in df.columns: 
-        df[change_col] = df[change_col].apply(format_delta)
-        
-    df['法人金額'] = "0.00"
-    df['最新動態'] = df['最新動態'].fillna("⚪ 尚無比對紀錄")
-    return df
-
-with tab5:
-    df_5 = get_local_tab_df(5)
-    display_cols = ['5日排名', '股票代號', '股票名稱', '法人持股', '△', '5日ΔChange', '法人金額', '最新動態', '今日上榜']
-    if not df_5.empty: st.dataframe(df_5[[c for c in display_cols if c in df_5.columns]], use_container_width=True, hide_index=True)
-    else: st.info("⚪ 尚無 5日進榜數據。")
-
-with tab20:
-    df_20 = get_local_tab_df(20)
-    display_cols = ['20日排名', '股票代號', '股票名稱', '法人持股', '△', '20日ΔChange', '法人金額', '最新動態', '今日上榜']
-    if not df_20.empty: st.dataframe(df_20[[c for c in display_cols if c in df_20.columns]], use_container_width=True, hide_index=True)
-
-with tab60:
-    df_60 = get_local_tab_df(60)
-    display_cols = ['60日排名', '股票代號', '股票名稱', '法人持股', '△', '60日ΔChange', '法人金額', '最新動態', '今日上榜']
-    if not df_60.empty: st.dataframe(df_60[[c for c in display_cols if c in df_60.columns]], use_container_width=True, hide_index=True)
-
-with tab120:
-    df_120 = get_local_tab_df(120)
-    display_cols = ['120日排名', '股票代號', '股票名稱', '法人持股', '△', '120日ΔChange', '法人金額', '最新動態', '今日上榜']
-    if not df_120.empty: st.dataframe(df_120[[c for c in display_cols if c in df_120.columns]], use_container_width=True, hide_index=True)
-        
-with tab_all:
-    if final_df is not None and not final_df.empty:
-        is_bond = final_df['股票代號'].str.endswith('B')
-        is_etf = (final_df['股票代號'].str.len() >= 5) & (~is_bond)
-        is_stock = final_df['股票代號'].str.len() == 4
+        is_bond = df['股票代號'].str.endswith('B')
+        is_etf = (df['股票代號'].str.len() >= 5) & (~is_bond)
+        is_stock = df['股票代號'].str.len() == 4
         mask = is_stock
         if show_etf: mask |= is_etf
         if show_bond: mask |= is_bond
-        
         if search_kw:
-            mask &= (final_df['股票代號'].str.contains(search_kw, na=False)) | (final_df['股票名稱'].str.contains(search_kw, na=False))
-            
-        filtered_df = final_df[mask].copy()
-        filtered_df['法人持股'] = filtered_df['法人持股'].apply(lambda x: f"{x:.2f}%")
-        filtered_df['△'] = filtered_df['△'].apply(format_delta)
+            mask &= (df['股票代號'].str.contains(search_kw, na=False)) | (df['股票名稱'].str.contains(search_kw, na=False))
+        df = df[mask].copy()
         
-        def highlight_row(row):
-            cnt = color_ref.get(row['股票代號'], 0)
-            if cnt == 4: bg = 'background-color: rgba(240, 90, 90, 0.25)'     
-            elif cnt == 3: bg = 'background-color: rgba(255, 165, 0, 0.25)'    
-            elif cnt == 2: bg = 'background-color: rgba(80, 200, 120, 0.25)'    
-            elif cnt == 1: bg = 'background-color: rgba(0, 127, 255, 0.25)'    
-            else: bg = 'background-color: #111622; color: #E2E8F0'                                                                                                                                                                                                                                                                 
-            return [bg] * len(row)
+        rank_col = f'{target_day_str}日排名'
+        change_col = f'{target_day_str}日ΔChange'
+        
+        if rank_col in df.columns:
+            df = df.sort_values(by=rank_col, ascending=True)
+        elif change_col in df.columns:
+            df[change_col] = pd.to_numeric(df[change_col], errors='coerce').fillna(0)
+            df = df.sort_values(by=change_col, ascending=False)
+            df[f'{target_day_str}日排名'] = range(1, len(df) + 1)
             
-        all_display_cols = ['股票代號', '股票名稱', '今日上榜', '最新動態', '△'] + date_cols
-        st.dataframe(filtered_df[all_display_cols].style.apply(highlight_row, axis=1), use_container_width=True)
+        df['法人持股'] = df['法人持股'].apply(lambda x: f"{x:.2f}%" if pd.notna(x) else "0.00%")
+        df['△'] = df['△'].apply(format_delta)
+        if change_col in df.columns: 
+            df[change_col] = df[change_col].apply(format_delta)
+            
+        df['法人金額'] = "0.00"
+        df['最新動態'] = df['最新動態'].fillna("⚪ 尚無比對紀錄")
+        return df
 
-st.write("")
-st.info("💡 欄位說明：【△】為精準單日法人持股增減；【◯日ΔChange】為天期累積變化。")
-st.session_state['my_final_df'] = final_df
+    with tab5:
+        df_5 = get_local_tab_df(5)
+        display_cols = ['5日排名', '股票代號', '股票名稱', '法人持股', '△', '5日ΔChange', '法人金額', '最新動態', '今日上榜']
+        if not df_5.empty: st.dataframe(df_5[[c for c in display_cols if c in df_5.columns]], use_container_width=True, hide_index=True)
+        else: st.info("⚪ 尚無 5日進榜數據。")
+
+    with tab20:
+        df_20 = get_local_tab_df(20)
+        display_cols = ['20日排名', '股票代號', '股票名稱', '法人持股', '△', '20日ΔChange', '法人金額', '最新動態', '今日上榜']
+        if not df_20.empty: st.dataframe(df_20[[c for c in display_cols if c in df_20.columns]], use_container_width=True, hide_index=True)
+
+    with tab60:
+        df_60 = get_local_tab_df(60)
+        display_cols = ['60日排名', '股票代號', '股票名稱', '法人持股', '△', '60日ΔChange', '法人金額', '最新動態', '今日上榜']
+        if not df_60.empty: st.dataframe(df_60[[c for c in display_cols if c in df_60.columns]], use_container_width=True, hide_index=True)
+
+    with tab120:
+        df_120 = get_local_tab_df(120)
+        display_cols = ['120日排名', '股票代號', '股票名稱', '法人持股', '△', '120日ΔChange', '法人金額', '最新動態', '今日上榜']
+        if not df_120.empty: st.dataframe(df_120[[c for c in display_cols if c in df_120.columns]], use_container_width=True, hide_index=True)
+            
+    with tab_all:
+        if final_df is not None and not final_df.empty:
+            is_bond = final_df['股票代號'].str.endswith('B')
+            is_etf = (final_df['股票代號'].str.len() >= 5) & (~is_bond)
+            is_stock = final_df['股票代號'].str.len() == 4
+            mask = is_stock
+            if show_etf: mask |= is_etf
+            if show_bond: mask |= is_bond
+            
+            if search_kw:
+                mask &= (final_df['股票代號'].str.contains(search_kw, na=False)) | (final_df['股票名稱'].str.contains(search_kw, na=False))
+                
+            filtered_df = final_df[mask].copy()
+            filtered_df['法人持股'] = filtered_df['法人持股'].apply(lambda x: f"{x:.2f}%")
+            filtered_df['△'] = filtered_df['△'].apply(format_delta)
+            
+            def highlight_row(row):
+                cnt = color_ref.get(row['股票代號'], 0)
+                if cnt == 4: bg = 'background-color: rgba(240, 90, 90, 0.25)'     
+                elif cnt == 3: bg = 'background-color: rgba(255, 165, 0, 0.25)'    
+                elif cnt == 2: bg = 'background-color: rgba(80, 200, 120, 0.25)'    
+                elif cnt == 1: bg = 'background-color: rgba(0, 127, 255, 0.25)'    
+                else: bg = 'background-color: #111622; color: #E2E8F0'                                                                                                                                                                                                                                                                                                                                                                                                  
+                return [bg] * len(row)
+                
+            all_display_cols = ['股票代號', '股票名稱', '今日上榜', '最新動態', '△'] + date_cols
+            st.dataframe(filtered_df[all_display_cols].style.apply(highlight_row, axis=1), use_container_width=True)
+
+    st.write("")
+    st.info("💡 欄位說明：【△】為精準單日法人持股增減；【◯日ΔChange】為天期累積變化。")
 # ==========================================
 # 🔒 區塊 2 專屬包廂鎖 (2-1 到 2-4 所有畫面渲染包進這裡)
 # ==========================================
