@@ -1081,7 +1081,7 @@ def render_sidebar_market_summary():
     too_c, too_os = get_color(total_oi, False)
     m_c, m_s = get_color(margin_diff_yi)
 
-    html = f"<div style='font-size: 13px; color: #00D2FF;'>資料基準日：{date_spot}</div>"
+    html = f"<div style='font-size: 13px; color: #00D2FF;'>基準日：{date_spot}</div>"
     html += "<table style='width: 100%; text-align: center; border-collapse: collapse; margin-top: 5px; font-size: 14px;'>"
     html += "<tr style='border-bottom: 1px solid #555; background-color: #262730;'>"
     html += "<th style='padding: 5px;'>法人</th><th style='padding: 5px;'>現貨(億)</th><th style='padding: 5px;'>TX未平倉</th></tr>"
@@ -1117,7 +1117,7 @@ def render_options_dashboard():
     
     # 🔥 修改點 2：新增資料來源的 8 碼基準日顯示
     if date_opt and date_opt != "未知":
-        st.markdown(f"<div style='font-size: 13px; color: #00D2FF; margin-bottom: 12px;'>資料基準日：{date_opt}</div>", unsafe_allow_html=True)
+        st.markdown(f"<div style='font-size: 13px; color: #00D2FF; margin-bottom: 12px;'>基準日：{date_opt}</div>", unsafe_allow_html=True)
     
     if df_opt is None:
         st.warning("尚無選擇權資料。")
@@ -1493,7 +1493,7 @@ if sorted_dates:
     fmt_date = f"{latest_d[:4]}/{latest_d[4:6]}/{latest_d[6:]}"
     header_placeholder.markdown(
         f"<h2 style='margin-bottom: 0px;'>👑 區塊1：三大法人短中長線持股比追蹤 "
-        f"<span style='color:#00D2FF; font-size:16px; font-weight:500; margin-left:12px;'>資料基準日：{fmt_date}</span></h2>", 
+        f"<span style='color:#00D2FF; font-size:16px; font-weight:500; margin-left:12px;'>基準日：{fmt_date}</span></h2>", 
         unsafe_allow_html=True
     )
     
@@ -3669,7 +3669,7 @@ with top_pool_container:
             🏆 數據分析觀察名單
         </h2>
         <div style='font-size:13px; color:#00D2FF; font-weight:500; margin-top:8px;'>
-             資料基準日 : 📍區塊1(法人): {fmt_d(d_b1_inst)} ｜ 📍區塊2&3(籌碼): {fmt_d(d_b23_chip)} ｜ 📍區塊4(資券): {fmt_d(d_b4_margin)} ｜ 📍區塊5(大戶): {fmt_d(d_b5_share)}
+             基準日 : 📍區塊1(法人): {fmt_d(d_b1_inst)} ｜ 📍區塊2&3(籌碼): {fmt_d(d_b23_chip)} ｜ 📍區塊4(資券): {fmt_d(d_b4_margin)} ｜ 📍區塊5(大戶): {fmt_d(d_b5_share)}
         </div>
     </div>
     """, unsafe_allow_html=True)
