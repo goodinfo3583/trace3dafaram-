@@ -3465,72 +3465,78 @@ if current_page in ["all", "b5"]:
 # ==========================================
 # 💸 區塊 6：盤後鉅額交易總表 (原生 Dataframe 升級版 + 交易別顯示)
 # ==========================================
-if current_page in ["all", "b6"]:
-    st.markdown("<div id='section-6'></div>", unsafe_allow_html=True)
-    def clean_number_for_display(val):
+
+# 💡 修正點 1：將函數定義放在 if 鎖的「外面」，確保 Streamlit 的快取正常運作
+def clean_number_for_display(val):
+    try:
+        if pd.isna(val) or str(val).strip() == '-': return '-'
+        f = float(str(val).replace(',', ''))
+        return str(int(f)) if f.is_integer() else str(f).rstrip('0').rstrip('.')
+    except: return str(val)
+
+@st.cache_data(ttl=60)
+def build_historical_block_matrix():
+    """搜尋資料夾中所有的鉅額交易紀錄，自動組成歷史矩陣 (最強寬容版 + 智慧箭頭標示)"""
+    import os, glob
+    import pandas as pd
+    if not os.path.exists(DATA_DIR): return None, []
+    files = glob.glob(os.path.join(DATA_DIR, "*鉅額*.csv"))
+    if not files: return None, []
+    
+    files.sort(reverse=True)
+    target_files = files[:10]
+    master_df = None
+    date_cols = []
+    
+    for f in target_files:
         try:
-            if pd.isna(val) or str(val).strip() == '-': return '-'
-            f = float(str(val).replace(',', ''))
-            return str(int(f)) if f.is_integer() else str(f).rstrip('0').rstrip('.')
-        except: return str(val)
-
-    @st.cache_data(ttl=60)
-    def build_historical_block_matrix():
-        """搜尋資料夾中所有的鉅額交易紀錄，自動組成歷史矩陣 (最強寬容版 + 智慧箭頭標示)"""
-        if not os.path.exists(DATA_DIR): return None, []
-        files = glob.glob(os.path.join(DATA_DIR, "*鉅額*.csv"))
-        if not files: return None, []
-        
-        files.sort(reverse=True)
-        target_files = files[:10]
-        master_df = None
-        date_cols = []
-        
-        for f in target_files:
-            try:
-                d_str = os.path.basename(f).replace('-', '').replace('_', '')[:8]
-                short_date = d_str[-4:]
-                col_name = short_date  # 🔥 修改點 1：先使用乾淨的純日期作為欄位名稱
-                if col_name not in date_cols: date_cols.append(col_name)
-                
-                df = pd.read_csv(f)
-                c_code = next((c for c in df.columns if '代號' in c or '證券代號' in c), None)
-                c_name = next((c for c in df.columns if '名稱' in c or '證券名稱' in c), None)
-                c_price = next((c for c in df.columns if '價' in c), None) 
-                
-                if not all([c_code, c_name, c_price]): continue
-                
-                df['代號'] = df[c_code].astype(str).str.replace(r'\.0$', '', regex=True).str.replace(r'\D', '', regex=True)
-                df = df[(df['代號'] != '0') & (df['代號'] != '') & (df['代號'] != 'nan')]
-                
-                day_df = df.groupby(['代號', c_name]).agg({
-                    c_price: lambda x: ' / '.join(sorted(set([clean_number_for_display(i) for i in x.dropna()])))
-                }).reset_index()
-                day_df = day_df.rename(columns={c_name: '股票名稱', c_price: col_name})
-                
-                if master_df is None: master_df = day_df
-                else: master_df = pd.merge(master_df, day_df, on=['代號', '股票名稱'], how='outer')
-            except: pass
+            d_str = os.path.basename(f).replace('-', '').replace('_', '')[:8]
+            short_date = d_str[-4:]
+            col_name = short_date  # 🔥 修改點 1：先使用乾淨的純日期作為欄位名稱
+            if col_name not in date_cols: date_cols.append(col_name)
             
-        if master_df is not None and not master_df.empty:
-            master_df = master_df.fillna('-')
-            master_df = master_df.loc[:, ~master_df.columns.duplicated()]
-            valid_date_cols = [c for c in date_cols if c in master_df.columns]
-            valid_date_cols.sort(reverse=True) # 排序日期，例如 ['0606', '0605', '0604']
+            df = pd.read_csv(f)
+            c_code = next((c for c in df.columns if '代號' in c or '證券代號' in c), None)
+            c_name = next((c for c in df.columns if '名稱' in c or '證券名稱' in c), None)
+            c_price = next((c for c in df.columns if '價' in c), None) 
             
-            # 🔥 修改點 2：只為「最新」的那一天加上 ▼ 標記，其餘保持純數字
-            if valid_date_cols:
-                latest_col = valid_date_cols[0]
-                new_latest_col = f"▼{latest_col}"
-                master_df = master_df.rename(columns={latest_col: new_latest_col})
-                valid_date_cols[0] = new_latest_col # 更新列表中的名稱
-                
-            master_df = master_df[['代號', '股票名稱'] + valid_date_cols]
-            if valid_date_cols:
-                master_df = master_df.sort_values(by=valid_date_cols[0], ascending=False)
-                
-        return master_df, [os.path.basename(f) for f in target_files]
+            if not all([c_code, c_name, c_price]): continue
+            
+            df['代號'] = df[c_code].astype(str).str.replace(r'\.0$', '', regex=True).str.replace(r'\D', '', regex=True)
+            df = df[(df['代號'] != '0') & (df['代號'] != '') & (df['代號'] != 'nan')]
+            
+            day_df = df.groupby(['代號', c_name]).agg({
+                c_price: lambda x: ' / '.join(sorted(set([clean_number_for_display(i) for i in x.dropna()])))
+            }).reset_index()
+            day_df = day_df.rename(columns={c_name: '股票名稱', c_price: col_name})
+            
+            if master_df is None: master_df = day_df
+            else: master_df = pd.merge(master_df, day_df, on=['代號', '股票名稱'], how='outer')
+        except: pass
+        
+    if master_df is not None and not master_df.empty:
+        master_df = master_df.fillna('-')
+        master_df = master_df.loc[:, ~master_df.columns.duplicated()]
+        valid_date_cols = [c for c in date_cols if c in master_df.columns]
+        valid_date_cols.sort(reverse=True) # 排序日期，例如 ['0606', '0605', '0604']
+        
+        # 🔥 修改點 2：只為「最新」的那一天加上 ▼ 標記，其餘保持純數字
+        if valid_date_cols:
+            latest_col = valid_date_cols[0]
+            new_latest_col = f"▼{latest_col}"
+            master_df = master_df.rename(columns={latest_col: new_latest_col})
+            valid_date_cols[0] = new_latest_col # 更新列表中的名稱
+            
+        master_df = master_df[['代號', '股票名稱'] + valid_date_cols]
+        if valid_date_cols:
+            master_df = master_df.sort_values(by=valid_date_cols[0], ascending=False)
+            
+    return master_df, [os.path.basename(f) for f in target_files]
 
+# ----------------------------------------------------
+# 🔒 區塊 6 專屬包廂鎖 (這以下才是 UI 渲染，包進 if 裡面)
+# ----------------------------------------------------
+if current_page in ["all", "b6"]:
     st.write("---")
     st.markdown("<div id='section-6'></div>", unsafe_allow_html=True)
 
@@ -3648,8 +3654,7 @@ if current_page in ["all", "b6"]:
         if hist_matrix is not None and not hist_matrix.empty:
             st.dataframe(hist_matrix, use_container_width=True, hide_index=True)
         else:
-            st.info("📂 資料夾內尚無足夠的歷史交易紀錄，請確認檔名包含「鉅額」字樣。")
-    pass            
+            st.info("📂 資料夾內尚無足夠的歷史交易紀錄，請確認檔名包含「鉅額」字樣。")       
 # ==========================================以上網頁核心區塊
 # ==========================================
 # 🏆 頂級選股池核心引擎 (科技藍發光卡片版 + 千張/四百張雙軌雷達)
