@@ -20,7 +20,9 @@ DATA_DIR = "./Goodinfo_Rankings"
 SCORE_HISTORY_DIR = os.path.join(DATA_DIR, "ScoreHistory")
 MARKET_HISTORY_DIR = os.path.join(DATA_DIR, "MarketHistory")
 BLOCK_HISTORY_DIR = os.path.join(DATA_DIR, "BlockHistory")
-
+from streamlit_gsheets import GSheetsConnection
+conn = st.connection("gsheets", type=GSheetsConnection)
+SHEET_URL = "https://docs.google.com/..."
 # 👉 步驟 2：
 # ==========================================
 # 🛑 隱形急救引擎 (請置於程式最頂端，絕對不要刪除！)
@@ -3628,7 +3630,7 @@ if current_page in ["all", "b6"]:
             st.info("📂 資料夾內尚無足夠的歷史交易紀錄，請確認檔名包含「鉅額」字樣。")       
 # ==========================================以上網頁核心區塊
 # ==========================================
-# 🌟 觀察名單專屬工具函數區 (放在 if 鎖外面)
+# 🌟 觀察名單專屬工具函數區 (放在 if 鎖外面，確保全域可用)
 # ==========================================
 import os, glob, re, json, datetime
 import pandas as pd
@@ -3636,11 +3638,13 @@ import streamlit as st
 
 def get_df_safe(key): return st.session_state.get(key, pd.DataFrame())
 def fmt_d(d_str): return f"{d_str[4:6]}/{d_str[6:]}" if d_str != "00000000" else "--/--"
+
 def check_b2_strict(df, sid, bad_keywords):
     if df.empty or sid not in df['股票代號'].values: return False
     dyn = str(df[df['股票代號'] == sid].iloc[0].get('今日短動態', ''))
     if any(bad in dyn for bad in bad_keywords): return False
     return True
+
 def get_b3_score(df, sid, type_keyword):
     if df.empty: return 0, ""
     match = df[(df['股票代號'] == sid) & (df['連買類型'].str.contains(type_keyword))]
@@ -3655,11 +3659,13 @@ def get_b3_score(df, sid, type_keyword):
         if days >= 10: return 2.0, f"✔️({days}週)"
         elif days >= 5: return 1.5, f"✔️({days}週)"
         else: return 1.0, f"✔️({days}週)"
+
 def get_today_ratio(df, stock_id, col_name):
     if df is not None and not df.empty and stock_id in df['股票代號'].values:
         try: return float(df.loc[df['股票代號'] == stock_id, col_name].iloc[0])
         except: return 0.0
     return 0.0
+
 def robust_read_csv_pool(file_path):
     for encoding in ['cp950', 'utf-8-sig', 'utf-8']:
         try:
@@ -3670,18 +3676,18 @@ def robust_read_csv_pool(file_path):
     return pd.read_csv(file_path, encoding='cp950', errors='ignore')
 
 # ==========================================
-# 🔒 觀察名單專屬包廂鎖 (🚨 請確保這段放在整份檔案的最下方，區塊6之後！)
+# 🔒 觀察名單專屬包廂鎖 (🚨 請確保這段放在整份檔案的下半部，區塊6之後！)
 # ==========================================
 if current_page in ["all", "pool"]:
     st.write("---")
     st.markdown("<div id='section-top-pool'></div>", unsafe_allow_html=True)
     
-    # 🌟 專屬載入數據按鈕 (完美融入黑夜派對風格)
+    # 🌟 專屬載入數據按鈕 (完美融入黑夜派對風格，直接放在頁面內)
     st.markdown("""
     <div style="background-color: #0A0D14; padding: 15px; border-radius: 10px; border: 1px solid #1E293B; text-align: center; margin-bottom: 20px;">
-        <p style="color: #94A3B8; font-size: 15px; margin-bottom: 12px; font-weight: 500;">⚡ 觀察名單需彙整全市場資料。若各區塊數值為 0 或尚未更新，請點擊下方按鈕：</p>
+        <p style="color: #94A3B8; font-size: 15px; margin-bottom: 12px; font-weight: 500;">⚡ 觀察名單需彙整全市場資料。若下方數據為空，請點擊啟動引擎：</p>
         <a href="?page=all#section-top-pool" target="_self" style="display: inline-block; background: linear-gradient(90deg, #0ea5e9, #2563eb); color: white; padding: 10px 30px; border-radius: 6px; text-decoration: none; font-weight: bold; letter-spacing: 1px; box-shadow: 0px 4px 15px rgba(14, 165, 233, 0.4); transition: all 0.3s ease;">
-            🚀 啟動全市場籌碼掃描 (重新計算總分)
+            🚀 載入全市場數據並計算總分
         </a>
     </div>
     """, unsafe_allow_html=True)
@@ -3689,6 +3695,7 @@ if current_page in ["all", "pool"]:
     df_b5_1000 = get_df_safe('df_blk5_1000')
     df_b5_400 = get_df_safe('df_blk5')
     
+    # 1. 自動掃描最新資料日期
     all_files = glob.glob(os.path.join(DATA_DIR, "*"))
     anchor_date_str = "00000000"
     d_b1_inst, d_b23_chip, d_b4_margin, d_b5_share = "00000000", "00000000", "00000000", "00000000"
@@ -3722,6 +3729,7 @@ if current_page in ["all", "pool"]:
                         if f_match: d_b5_share = f_match.group(1)
         except: pass
 
+    # 🌟 科技風漸層橫幅標題
     st.markdown(f"""
     <div style="background: linear-gradient(90deg, rgba(15,23,42,1) 0%, rgba(14,165,233,0.3) 50%, rgba(15,23,42,1) 100%); 
                 border-top: 1px solid #38bdf8; border-bottom: 1px solid #38bdf8; padding: 15px 20px; border-radius: 10px;
@@ -3739,7 +3747,7 @@ if current_page in ["all", "pool"]:
         st.info("💡 **評分方式**：法人籌碼上榜為底，搭配「千張大戶權重加乘」與其他數據積分。(請參考▼明細)")
 
         if 'my_final_df' not in st.session_state or st.session_state['my_final_df'].empty:
-            st.warning("⚠️ 尚未載入區塊 1 母表，無法進行選股池評比。")
+            st.warning("⚠️ 記憶體中尚無各區塊數據。請點擊上方藍色按鈕「🚀 載入全市場數據並計算總分」。")
         else:
             df_b1 = st.session_state['my_final_df'].copy()
             dyn_col = next((c for c in df_b1.columns if '動態' in c or '動能' in c), None)
@@ -3788,9 +3796,11 @@ if current_page in ["all", "pool"]:
 
                 block_sids = set()
                 try:
-                    temp_block = fetch_block_trades()
-                    if not temp_block.empty:
-                        block_sids = set(temp_block['證券代號'].astype(str).str.replace(r'\D', '', regex=True))
+                    # 確保即使 fetch_block_trades 未定義也不會報錯
+                    if 'fetch_block_trades' in globals():
+                        temp_block = fetch_block_trades()
+                        if not temp_block.empty:
+                            block_sids = set(temp_block['證券代號'].astype(str).str.replace(r'\D', '', regex=True))
                 except: pass
 
                 results = []
@@ -3900,10 +3910,15 @@ if current_page in ["all", "pool"]:
                     
                 res_df = pd.DataFrame(results).sort_values(by='總分', ascending=False).drop_duplicates(subset=['代號']).reset_index(drop=True)
                 
+                # ==========================================
+                # 🔥 Delta (▼變量) 計算引擎與存檔機制 (恢復報錯提示)
+                # ==========================================
                 prev_scores_dict = {}
                 hist_combined = pd.DataFrame() 
                 try:
-                    gs_history = conn.read(spreadsheet=SHEET_URL, worksheet="選股歷史", ttl=10).dropna(how="all")
+                    # 確保 conn 存在且可連線
+                    gs_history = conn.read(spreadsheet=SHEET_URL, worksheet="選股歷史", ttl=10)
+                    gs_history = gs_history.dropna(how="all")
                     if not gs_history.empty and '紀錄日期' in gs_history.columns:
                         gs_history['紀錄日期'] = gs_history['紀錄日期'].astype(str).str.replace(r'\.0$', '', regex=True).str.zfill(8)
                         hist_combined = gs_history.copy()
@@ -3912,7 +3927,8 @@ if current_page in ["all", "pool"]:
                             prev_df = gs_history[gs_history['紀錄日期'] == available_dates[1]]
                             id_col = '代號' if '代號' in prev_df.columns else '股票代號' if '股票代號' in prev_df.columns else None
                             if id_col: prev_scores_dict = dict(zip(prev_df[id_col].astype(str).str.replace(r'\.0$', '', regex=True).str.replace(r'\D', '', regex=True), prev_df['總分']))
-                except: pass 
+                except Exception as e: 
+                    st.warning(f"⚠️ 無法讀取 Google Sheets 歷史紀錄以計算變量，錯誤訊息：{e}")
 
                 def calc_table_delta(row):
                     sid = str(row['代號']).strip()
@@ -4048,7 +4064,7 @@ if current_page in ["all", "pool"]:
                                     st.dataframe(week_df[[c for c in show_cols if c in week_df.columns]], use_container_width=True, hide_index=True)
                                     st.info("💡 **驗證方法**：觀察這些鎖定的股票在未來一週的『模型分數變化』是否持續上升？如果分數持續上升且股價也上漲，代表我們的【大股東+集中度】指標非常精準！")
                         except: st.warning("讀取追蹤檔案失敗。")
-                    else: st.write("⚪ 尚無歷史追蹤紀錄，請點擊上方按鈕建立第一筆！")
+                    else: st.write("⚪ 尚無歷史追蹤紀錄，請鎖定建立第一筆！")
 # ==========================================
 # 🧪 測試區：Google Sheets 連線測試
 # ==========================================
