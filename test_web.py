@@ -3101,7 +3101,7 @@ st.markdown(f"""
         💰 區塊 5：大股東動向
     </h2>
     <div style='font-size:13px; color:#00D2FF; font-weight:500; margin-top:8px;'>
-        基準日 : {global_latest_date[:4]}/{global_latest_date[4:6]}/{global_latest_date[6:8]}
+        基準日 : {global_latest_date.strftime("%Y/%m/%d")} 
     </div>
 </div>
 """, unsafe_allow_html=True)
