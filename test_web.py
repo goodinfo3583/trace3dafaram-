@@ -231,7 +231,7 @@ st.markdown(
 
 # ==========================================
 # ==========================================
-# 📍 頂部：戰情室快速導航 (靠右對齊 + 懸停展開聲明列)
+# 📍 頂部：戰情室快速導航 (靠右對齊 + 懸停展開聲明列 - 消除 Markdown 斷行 Bug 版)
 # ==========================================
 st.markdown("""
 <style>
@@ -275,7 +275,7 @@ st.markdown("""
     color: #00D2FF;
 }
 
-/* 隱藏的完整聲明內容 (高度設為0，透明度為0) */
+/* 隱藏的完整聲明內容 */
 .disclaimer-content {
     max-height: 0;
     opacity: 0;
@@ -297,7 +297,7 @@ st.markdown("""
 .nav-btn-container {
     display: flex;
     flex-wrap: wrap;
-    justify-content: flex-end; /* 按鈕群組靠右對齊 */
+    justify-content: flex-end;
     align-items: center;
     padding: 8px 15px;
     background-color: #0A0D14;
@@ -332,10 +332,10 @@ st.markdown("""
 /* 📱 手機版特化：螢幕縮小時的防跑版機制 */
 @media (max-width: 768px) {
     .nav-btn-container {
-        justify-content: flex-end; /* 手機版確實靠右 */
+        justify-content: flex-end;
         padding: 5px 10px;
     }
-    .nav-divider { display: none; } /* 隱藏直線省空間 */
+    .nav-divider { display: none; }
     .nav-text-link { font-size: 14px; margin: 2px; }
 }
 
@@ -353,11 +353,9 @@ st.markdown("""
             <span class="disclaimer-item">📜 網站聲明 (建置中)</span>
         </div>
         <div class="disclaimer-content">
-            本平台僅供教育研究與籌碼觀察，絕不構成任何實質投資建議、勸誘或要約。所有資料源自 TWSE / TPEX / 公開資訊觀測站 等公開數據，受限於網路技術，可能有延遲、錯誤或不完整之情形。<br>
-            投資必有風險，使用者依本平台資訊所做之任何投資決策與損益結果，均須由使用者自行負責，本平台不對資料正確性、即時性負擔任何法律賠償責任。
+            本平台僅供教育研究與籌碼觀察，絕不構成任何實質投資建議、勸誘或要約。所有資料源自 TWSE / TPEX / 公開資訊觀測站 等公開數據，受限於網路技術，可能有延遲、錯誤或不完整之情形。<br>投資必有風險，使用者依本平台資訊所做之任何投資決策與損益結果，均須由使用者自行負責，本平台不對資料正確性、即時性負擔任何法律賠償責任。
         </div>
     </div>
-    
     <div class="nav-btn-container">
         <a href="#section-top-pool" target="_self" class="nav-text-link">🏆 觀察名單</a>
         <span class="nav-divider">|</span>
