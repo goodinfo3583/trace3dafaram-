@@ -971,600 +971,7 @@ if current_page == "contact":
     # 🛑 最核心的魔法：渲染完聯絡表單後，直接強制停止後續程式！完全不讀取底下的大數據！
     st.stop()
 
-# ==========================================
-# 🧠 AI 量化評語生成引擎 (土洋對作/換手升級版)
-# ==========================================
-def generate_stock_commentary(row):
-    """
-    根據選股池的綜合數據，自動生成一段人話評語
-    """
-    score = row.get('總分', 0)
-    warns = str(row.get('法人賣出警示', ''))
-    b5_trend = str(row.get('大股東動向', ''))
-    
-    # 判斷是否帶有賣出警示與高分
-    has_warning = "⚠️" in warns
-    high_score = score >= 3
-    
-    # 1. 矛盾訊號判定：土洋對作 / 主力強勢吃籌碼
-    if has_warning and high_score:
-        return f"⚔️ 【土洋對作 / 激烈換手】系統偵測到法人分歧 ({warns})，但該股依然獲得 {score} 分的高評估！這代表『一方的倒貨正被另一方(或大戶)強勢吃下』。籌碼換手後若能維持強勢(如大漲/漲停)，代表承接方實力極強，可沿短均線偏多操作，但需嚴設停損。"
-        
-    # 2. 致命風險判定：真倒貨、無買盤
-    if has_warning and not high_score:
-        return f"🚨 【風險警示】目前法人主力正在進行倒貨調節 ({warns})，且無強大買盤承接，籌碼結構面臨鬆動。建議暫避風頭，嚴控資金水位。"
-    
-    if "大減" in b5_trend:
-        return "⚠️ 【大戶撤退】400張以上大戶出現明顯減碼跡象，主力籌碼渙散，建議先行觀望，等待籌碼沉澱。"
 
-    # 3. 綜合分數常規判定
-    if score >= 6:
-        base_comment = "🔥 【強勢噴發】籌碼面極度優異！內外資法人與大戶同步共振做多，具備強大的波段上攻潛力。"
-        if "大增" in b5_trend:
-            base_comment += "特別是大股東籌碼大幅集中，是不可多得的強勢防守標的，建議積極關注。"
-        return base_comment
-        
-    elif score >= 3:
-        return "📈 【偏多佈局】主力籌碼持續進駐，法人買盤給予一定支撐。具備穩健的波段潛力，可逢低尋找技術面切入點。"
-        
-    elif score >= 1:
-        return "🔄 【中性觀望】籌碼表現較為平淡，雖有零星買盤但缺乏明確的連續性方向。建議多看少做，等待更強的表態訊號。"
-        
-    else:
-        return "❄️ 【弱勢整理】籌碼處於流失或無主力認養狀態，資金效率低。若無特殊題材發酵，短期內建議暫不考量。"
-# ==========================================
-# 🔍 個股籌碼快搜 "標題" (保證生效：電競風科技橫幅版)
-# ==========================================
-st.write("---")
-st.markdown("<div id='section-search'></div>", unsafe_allow_html=True)
-
-# 🌟 使用 100% 絕對生效的 Inline HTML 設計超高質感橫幅
-st.markdown("""
-<div style="background: linear-gradient(90deg, rgba(15,23,42,1) 0%, rgba(14,165,233,0.3) 50%, rgba(15,23,42,1) 100%); 
-            border-top: 1px solid #38bdf8; 
-            border-bottom: 1px solid #38bdf8; 
-            padding: 20px 20px; 
-            border-radius: 10px;
-            text-align: center;
-            box-shadow: 0px 0px 20px rgba(56, 189, 248, 0.2);
-            margin-bottom: 25px;">
-    <h2 style="color: #e0f2fe; margin: 0; letter-spacing: 2px; text-shadow: 0 0 15px rgba(56, 189, 248, 0.8);">
-        🔍 個股籌碼快搜 (戰情診斷室)
-    </h2>
-    <p style="color: #94a3b8; margin-top: 8px; font-size: 14px; margin-bottom: 0;">
-        輸入代號一鍵聯動：AI 型態掃描 ｜ 法人動向 ｜ 1000張大戶追蹤
-    </p>
-</div>
-""", unsafe_allow_html=True)
-
-# 使用預設的帶邊框容器把圖表和表格包起來
-with st.container(border=True):
-    # ==========================================
-    # 📈 繪製 K 線圖與技術分析引擎
-    # ==========================================
-    def render_technical_chart(stock_id, timeframe="日線", selected_mas=[], show_rsi=False, show_macd=False, show_kd=False):
-        import yfinance as yf
-        import plotly.graph_objects as go
-        from plotly.subplots import make_subplots
-        import pandas as pd
-
-        try:
-            ticker_tw = f"{stock_id}.TW"
-            ticker_two = f"{stock_id}.TWO"
-            
-            df = yf.download(ticker_tw, period="5y", progress=False)
-            if df is None or df.empty:
-                df = yf.download(ticker_two, period="5y", progress=False)
-                
-            if df is None or df.empty:
-                st.warning(f"⚠️ 無法從 Yahoo Finance 取得 {stock_id} 的即時報價。")
-                return
-
-            if isinstance(df.columns, pd.MultiIndex):
-                df.columns = df.columns.get_level_values(0)
-            df = df.loc[:, ~df.columns.duplicated()]
-
-            if df.index.tz is not None:
-                df.index = df.index.tz_convert('Asia/Taipei')
-            else:
-                df.index = df.index.tz_localize('UTC').tz_convert('Asia/Taipei')
-
-            daily_df = df.copy()
-
-            def generate_technical_signals(df):
-                signals = []
-                if df.empty or len(df) < 20: return signals
-                
-                latest_close = df['Close'].iloc[-1]
-                latest_vol = df['Volume'].iloc[-1]
-                
-                vol_20ma = df['Volume'].rolling(window=20).mean().iloc[-2] 
-                if pd.notna(vol_20ma) and vol_20ma > 0 and latest_vol > (vol_20ma * 2.5):
-                    signals.append(f"🧨 爆量出擊：今日成交量達 20 日均量的 {latest_vol/vol_20ma:.1f} 倍！")
-
-                mas = {'5MA': 5, '10MA': 10, '20MA': 20, '60MA': 60, '120MA': 120, '240MA': 240}
-                for ma_name, period in mas.items():
-                    if len(df) >= period:
-                        ma_val = df['Close'].rolling(window=period).mean().iloc[-1]
-                        if 0 < (latest_close - ma_val) / ma_val < 0.015:
-                            signals.append(f"🎯 回測支撐：股價目前極度貼近 {ma_name} ({ma_val:.2f}) 關鍵支撐線。")
-
-                if len(df) >= 20:
-                    ma5 = df['Close'].rolling(5).mean().iloc[-1]
-                    ma10 = df['Close'].rolling(10).mean().iloc[-1]
-                    ma20 = df['Close'].rolling(20).mean().iloc[-1]
-                    ma_max, ma_min = max(ma5, ma10, ma20), min(ma5, ma10, ma20)
-                    if pd.notna(ma_max) and (ma_max - ma_min) / ma_min < 0.02:
-                        signals.append("🌀 均線糾結：短天期 (5/10/20MA) 成本線高度重合壓縮，醞釀表態！")
-
-                if len(df) >= 60:
-                    recent_high = df['High'].iloc[-20:].max()
-                    recent_low = df['Low'].iloc[-20:].min()
-                    prev_high = df['High'].iloc[-40:-20].max()
-                    prev_low = df['Low'].iloc[-40:-20].min()
-                    
-                    recent_volatility = recent_high - recent_low
-                    prev_volatility = prev_high - prev_low
-                    if prev_volatility > 0 and recent_volatility < (prev_volatility * 0.6):
-                        signals.append("📐 型態壓縮：近一個月股價高低波幅急遽收斂，疑似三角收斂末端。")
-                        
-                if len(df) >= 60:
-                    highest_60d = df['High'].iloc[-60:].max()
-                    if df['High'].iloc[-1] >= highest_60d:
-                        signals.append("🚀 波段創高：今日股價突破 60 日 (約一季) 以來新高點，上攻動能極強！")
-
-                if len(df) >= 60:
-                    ma5 = df['Close'].rolling(5).mean().iloc[-1]
-                    ma10 = df['Close'].rolling(10).mean().iloc[-1]
-                    ma20 = df['Close'].rolling(20).mean().iloc[-1]
-                    ma60 = df['Close'].rolling(60).mean().iloc[-1]
-                    ma60_prev = df['Close'].rolling(60).mean().iloc[-2] 
-                    
-                    if pd.notna(ma60) and (latest_close > ma5 > ma10 > ma20 > ma60) and (ma60 > ma60_prev):
-                        signals.append("📈 多頭排列：短中長期均線 (5/10/20/60MA) 呈現完美多頭發散，趨勢明確翻多！")
-
-                return signals
-
-            tech_signals = generate_technical_signals(daily_df)
-
-            if tech_signals:
-                signal_html = "<div style='background-color: rgba(0, 210, 255, 0.1); border-left: 4px solid #00D2FF; padding: 10px; border-radius: 5px; margin-bottom: 15px;'>"
-                signal_html += "<h5 style='color: #00D2FF; margin-top:0px; margin-bottom: 10px;'>📡 AI 盤中技術型態雷達</h5>"
-                for sig in tech_signals:
-                    signal_html += f"<p style='color: #E2E8F0; margin: 5px 0px; font-size: 15px;'>{sig}</p>"
-                signal_html += "</div>"
-                st.markdown(signal_html, unsafe_allow_html=True)
-
-            if timeframe == "週線":
-                daily_df = daily_df.resample('W-FRI').agg({
-                    'Open': 'first', 'High': 'max', 'Low': 'min', 'Close': 'last', 'Volume': 'sum'
-                }).dropna()
-            elif timeframe == "月線":
-                daily_df = daily_df.resample('ME').agg({
-                    'Open': 'first', 'High': 'max', 'Low': 'min', 'Close': 'last', 'Volume': 'sum'
-                }).dropna()
-
-            ma_windows = [5, 10, 20, 60, 120, 240]
-            for ma in ma_windows:
-                daily_df[f'{ma}MA'] = daily_df['Close'].rolling(window=ma).mean()
-
-            close_series = daily_df['Close'].squeeze()
-            
-            if show_rsi:
-                delta = close_series.diff()
-                gain = delta.clip(lower=0)
-                loss = -delta.clip(upper=0)
-                ema_gain = gain.ewm(com=13, adjust=False).mean()
-                ema_loss = loss.ewm(com=13, adjust=False).mean()
-                rs = ema_gain / ema_loss.replace(0, 1e-9)
-                daily_df['RSI'] = 100 - (100 / (1 + rs))
-
-            if show_macd:
-                ema12 = close_series.ewm(span=12, adjust=False).mean()
-                ema26 = close_series.ewm(span=26, adjust=False).mean()
-                daily_df['DIF'] = ema12 - ema26
-                daily_df['MACD_Sign'] = daily_df['DIF'].ewm(span=9, adjust=False).mean()
-                daily_df['MACD_Hist'] = daily_df['DIF'] - daily_df['MACD_Sign']
-                
-            if show_kd:
-                low_9 = daily_df['Low'].rolling(window=9).min()
-                high_9 = daily_df['High'].rolling(window=9).max()
-                rsv = (close_series - low_9) / (high_9 - low_9).replace(0, 1e-9) * 100
-                daily_df['K'] = rsv.ewm(com=2, adjust=False).mean()
-                daily_df['D'] = daily_df['K'].ewm(com=2, adjust=False).mean()
-
-            def get_latest_price(col):
-                valid_data = daily_df[col].dropna()
-                if not valid_data.empty:
-                    val = valid_data.iloc[-1]
-                    if isinstance(val, pd.Series): val = val.iloc[0]
-                    return f"{float(val):.2f}"
-                return "-"
-
-            rows = 2
-            row_heights = [0.5, 0.15]
-            if show_rsi: rows += 1; row_heights.append(0.12)
-            if show_macd: rows += 1; row_heights.append(0.14)
-            if show_kd: rows += 1; row_heights.append(0.14)
-
-            fig = make_subplots(rows=rows, cols=1, shared_xaxes=True, vertical_spacing=0.02, row_heights=row_heights)
-                                
-            up_color = 'rgb(240, 90, 90)'     
-            down_color = 'rgb(80, 200, 120)'  
-
-            fig.add_trace(go.Candlestick(
-                x=daily_df.index, open=daily_df['Open'].squeeze(), high=daily_df['High'].squeeze(), 
-                low=daily_df['Low'].squeeze(), close=daily_df['Close'].squeeze(), 
-                name='K線', 
-                increasing=dict(line=dict(color=up_color, width=1.5), fillcolor=up_color),
-                decreasing=dict(line=dict(color=down_color, width=1.5), fillcolor=down_color),
-                hovertemplate="開：%{open:.2f}<br>高：%{high:.2f}<br>低：%{low:.2f}<br>收：%{close:.2f}<extra></extra>"
-            ), row=1, col=1)
-            
-            fig.update_yaxes(title_text="股價 (TWD)", row=1, col=1, title_font=dict(size=12, color="#E2E8F0"), rangemode="nonnegative")
-
-            if not daily_df.empty:
-                max_price = daily_df['High'].max()
-                max_date = daily_df['High'].idxmax()
-                
-                fig.add_hline(y=max_price, line_dash="dot", line_color="rgba(255, 215, 0, 0.4)", row=1, col=1)
-                fig.add_annotation(
-                    x=max_date, y=max_price,
-                    text=f"<b>前高: {max_price:.2f}</b>",
-                    showarrow=True, arrowhead=2, arrowsize=1, arrowwidth=1.5, arrowcolor="#FFD700",
-                    ax=0, ay=-40, 
-                    font=dict(size=13, color="#FFD700"),
-                    bgcolor="rgba(17, 22, 34, 0.85)", bordercolor="#FFD700", borderwidth=1, borderpad=4,
-                    row=1, col=1
-                )
-
-            ma_config = {
-                '5MA': {'color': '#FFFF37'}, '10MA': {'color': '#00FFFF'},
-                '20MA': {'color': '#921AFF'}, '60MA': {'color': '#D0D0D0'},
-                '120MA': {'color': '#D200D2'}, '240MA': {'color': '#BB3D00'}
-            }
-            for ma_name in selected_mas:
-                if ma_name in daily_df.columns:
-                    latest_val = get_latest_price(ma_name)
-                    fig.add_trace(go.Scatter(
-                        x=daily_df.index, y=daily_df[ma_name].squeeze(), mode='lines', 
-                        name=f'{ma_name} ({latest_val})', 
-                        line=dict(color=ma_config[ma_name]['color'], width=1.3),
-                        hovertemplate=f"<b>{ma_name}</b>： %{{y:.2f}}<extra></extra>"
-                    ), row=1, col=1)
-
-            vol_colors = [up_color if c >= o else down_color for c, o in zip(daily_df['Close'].squeeze(), daily_df['Open'].squeeze())]
-            fig.add_trace(go.Bar(
-                x=daily_df.index, y=daily_df['Volume'].squeeze(), 
-                name='成交量', 
-                marker_color=vol_colors,
-                showlegend=False, 
-                hovertemplate="<b>成交量</b>： %{y}<extra></extra>"
-            ), row=2, col=1)
-            fig.update_yaxes(title_text="成交量", row=2, col=1, title_font=dict(size=12, color="#E2E8F0"), rangemode="nonnegative")
-
-            current_row = 3
-            if show_kd:
-                fig.add_trace(go.Scatter(x=daily_df.index, y=daily_df['K'].squeeze(), mode='lines', name='K (9)', line=dict(color='#00CCFF', width=1.2), hovertemplate="<b>K</b>: %{y:.2f}<extra></extra>"), row=current_row, col=1)
-                fig.add_trace(go.Scatter(x=daily_df.index, y=daily_df['D'].squeeze(), mode='lines', name='D (3)', line=dict(color='#FFCC00', width=1.2), hovertemplate="<b>D</b>: %{y:.2f}<extra></extra>"), row=current_row, col=1)
-                fig.add_hline(y=80, line_dash="dash", line_color="rgba(240,90,90,0.4)", row=current_row, col=1)
-                fig.add_hline(y=20, line_dash="dash", line_color="rgba(80,200,120,0.4)", row=current_row, col=1)
-                fig.update_yaxes(title_text="KD(9,3,3)", row=current_row, col=1, title_font=dict(size=11, color="#E2E8F0"))
-                current_row += 1
-                
-            if show_rsi:
-                fig.add_trace(go.Scatter(x=daily_df.index, y=daily_df['RSI'].squeeze(), mode='lines', name='RSI (14)', line=dict(color='#E1BEE7', width=1.5), hovertemplate="<b>RSI</b>: %{y:.2f}<extra></extra>"), row=current_row, col=1)
-                fig.add_hline(y=80, line_dash="dash", line_color="rgba(240,90,90,0.4)", row=current_row, col=1)
-                fig.add_hline(y=20, line_dash="dash", line_color="rgba(80,200,120,0.4)", row=current_row, col=1)
-                fig.update_yaxes(title_text="RSI(14)", row=current_row, col=1, title_font=dict(size=11, color="#E2E8F0"))
-                current_row += 1
-
-            if show_macd:
-                fig.add_trace(go.Scatter(x=daily_df.index, y=daily_df['DIF'].squeeze(), mode='lines', name='DIF', line=dict(color='#FFF', width=1)), row=current_row, col=1)
-                fig.add_trace(go.Scatter(x=daily_df.index, y=daily_df['MACD_Sign'].squeeze(), mode='lines', name='MACD', line=dict(color='#FFCC00', width=1)), row=current_row, col=1)
-                hist_colors = [up_color if h >= 0 else down_color for h in daily_df['MACD_Hist'].squeeze()]
-                fig.add_trace(go.Bar(x=daily_df.index, y=daily_df['MACD_Hist'].squeeze(), name='柱狀圖', marker_color=hist_colors), row=current_row, col=1)
-                fig.update_yaxes(title_text="MACD", row=current_row, col=1, title_font=dict(size=11, color="#E2E8F0"))
-                current_row += 1
-
-            fig.update_layout(
-                xaxis_rangeslider_visible=False,
-                height=500 + (rows - 1) * 110, 
-                template='plotly_dark',       
-                paper_bgcolor='rgba(0,0,0,0)', 
-                plot_bgcolor='rgba(0,0,0,0)',  
-                margin=dict(l=10, r=65, t=30, b=10), 
-                hovermode='x unified',
-                hoverlabel=dict(bgcolor="#1A202C", font_size=15, font_color="#FFFFFF"),
-                legend=dict(orientation="h", yanchor="bottom", y=1.01, xanchor="left", x=0.01, font=dict(color='#E2E8F0', size=16), itemsizing='constant'),
-                dragmode='pan' 
-            )
-            
-            fig.update_xaxes(showspikes=True, spikecolor="rgba(255, 235, 100, 0.5)", spikesnap="cursor", spikemode="across", spikethickness=0.5, spikedash="dash", gridcolor="rgba(255, 255, 255, 0.05)")
-            fig.update_yaxes(showspikes=True, spikecolor="rgba(255, 235, 100, 0.5)", spikesnap="cursor", spikemode="across", spikethickness=0.5, spikedash="dash", side="right", gridcolor="rgba(255, 255, 255, 0.05)")
-            
-            for r in range(1, rows + 1): fig.update_xaxes(hoverformat="%Y-%m-%d", tickformat="%Y-%m-%d", row=r, col=1)
-            
-            if not daily_df.empty:
-                latest_date = daily_df.index[-1] 
-                start_date = latest_date - pd.Timedelta(days=140) 
-                zoom_range = [start_date.strftime('%Y-%m-%d'), latest_date.strftime('%Y-%m-%d')]
-                for r in range(1, rows + 1): fig.update_xaxes(range=zoom_range, row=r, col=1)
-            
-            if timeframe == "日線":
-                all_days = pd.date_range(start=daily_df.index.min().normalize(), end=daily_df.index.max().normalize(), freq='D')
-                actual_days = daily_df.index.normalize()
-                missing_days = all_days.difference(actual_days).strftime('%Y-%m-%d').tolist()
-                for r in range(1, rows + 1): fig.update_xaxes(rangebreaks=[dict(values=missing_days)], row=r, col=1)
-            
-            plotly_config = {'scrollZoom': True, 'displaylogo': False, 'modeBarButtonsToRemove': ['zoom2d', 'zoomIn2d', 'zoomOut2d', 'autoScale2d', 'select2d', 'lasso2d', 'hoverClosestCartesian', 'hoverCompareCartesian', 'toggleSpikelines']}
-            st.plotly_chart(fig, use_container_width=True, key=f"kline_{stock_id}_{timeframe}_{len(selected_mas)}_{show_rsi}_{show_macd}_{show_kd}", config=plotly_config)
-            
-        except Exception as e:
-            st.error(f"❌ 繪製 K 線圖時發生錯誤: {str(e)}")
-
-    def robust_search_engine(df, query):
-        if df is None or df.empty: return pd.DataFrame()
-        df = df.loc[:, ~df.columns.duplicated()].copy()
-        query = str(query).strip()
-        mask = pd.Series(False, index=df.index)
-        if '股票代號' in df.columns:
-            df['股票代號'] = df['股票代號'].astype(str).str.strip()
-            mask = mask | (df['股票代號'] == query)
-        if '股票名稱' in df.columns:
-            df['股票名稱'] = df['股票名稱'].astype(str).str.strip()
-            mask = mask | df['股票名稱'].str.contains(query, na=False, case=False)
-        return df[mask]
-
-    def scan_and_display(title, session_key, query):
-        st.markdown(f"<h5 style='color: #E2E8F0;'>{title}</h5>", unsafe_allow_html=True)
-        if session_key not in st.session_state:
-            st.write("⚪ 尚未載入資料表")
-            return
-        df = st.session_state[session_key]
-        if df is None or df.empty:
-            st.write("⚪ 該榜單無任何資料")
-            return
-        res = robust_search_engine(df, query)
-        
-        if not res.empty:
-            pct_cols = [c for c in res.columns if '持股' in c or '佔' in c or '%' in c]
-            if pct_cols:
-                all_zero = True
-                for c in pct_cols:
-                    val = res.iloc[0][c]
-                    import pandas as pd
-                    if pd.isna(val): continue
-                    val_str = str(val).strip().replace('%', '')
-                    if val_str.lower() in ['', '-', 'nan', 'none', 'null']: continue
-                    try:
-                        if abs(float(val_str)) > 0.0001:
-                            all_zero = False
-                            break
-                    except ValueError: continue
-                if all_zero:
-                    st.write("⚪ 未進榜")
-                    return
-            st.dataframe(res, use_container_width=True, hide_index=True)
-        else:
-            st.write("⚪ 未進榜")
-
-    # ==========================================
-    # 🎯 搜尋輸入框
-    # ==========================================
-    search_query = st.text_input("輸入代號或名稱 (例如: 3231 或 緯創 或 3231緯創)：", key="global_search_final")
-
-    pure_stock_id = ""
-    display_name = search_query
-
-    if search_query:
-        query_clean = search_query.strip()
-        industry_label = "未分類"
-        
-        if 'STOCK_DICT' in locals() or 'STOCK_DICT' in globals():
-            if query_clean in STOCK_DICT:
-                pure_stock_id = STOCK_DICT[query_clean]["id"]
-                display_name = f"{STOCK_DICT[query_clean]['id']} {STOCK_DICT[query_clean]['name']}"
-                industry_label = STOCK_DICT[query_clean]["industry"]
-            else:
-                for k, v in STOCK_DICT.items():
-                    if query_clean in k:
-                        pure_stock_id = v["id"]
-                        display_name = f"{v['id']} {v['name']}"
-                        industry_label = v["industry"]
-                        break
-        
-        if pure_stock_id == "":
-            import re
-            match_num = re.search(r'\d+', query_clean)
-            if match_num: pure_stock_id = match_num.group(0)
-
-        st.markdown(f"### 🎯 綜合診斷標的：<span style='color: #00D2FF;'>{display_name}</span> <span style='font-size:16px; background-color:#1E293B; padding:4px 10px; border-radius:6px; color:#38BDF8; border: 1px solid #38BDF8; margin-left:10px;'>🏷️ {industry_label}</span>", unsafe_allow_html=True)
-
-        pool_df = st.session_state.get('top_pool_df', pd.DataFrame())
-        target_score = None
-        current_stock_id = pure_stock_id 
-        delta_val = 0.0
-
-        if not pool_df.empty:
-            match = robust_search_engine(pool_df, current_stock_id) if current_stock_id else robust_search_engine(pool_df, search_query)
-            if not match.empty:
-                target_score = match.iloc[0].get('總分', 0)
-                delta_val = match.iloc[0].get('Delta (日變動)', 0.0) 
-
-        if target_score is not None and current_stock_id != "":
-            delta = delta_val 
-            delta_color = "#FF4B4B" if delta > 0 else "#00CC66" if delta < 0 else "#94A3B8"
-            delta_symbol = "🔥" if delta > 0 else "🚨" if delta < 0 else "🔄"
-            delta_str = f"+{delta}" if delta > 0 else f"{delta}" 
-            
-            st.markdown(f"""
-            #### 🏆 系統綜合評分：<span style='color:#FFD700; font-size:24px; text-shadow: 0 0 10px rgba(255,215,0,0.5);'>**{target_score}**</span> 分 
-            <span style='color:{delta_color}; font-size:16px; margin-left:15px;'>{delta_symbol} Delta變化: **{delta_str}**</span>
-            <span style='color:#94A3B8; font-size:14px; font-weight:normal; margin-left:10px;'>(評分數據僅供參考)</span>
-            """, unsafe_allow_html=True)
-        else:
-            st.markdown("#### 🏆 系統綜合評分：<span style='color:#64748B; font-size:18px;'>未達綜合進榜標準 (0分)</span>", unsafe_allow_html=True)
-
-        st.markdown("<hr style='border-color: #334155;'>", unsafe_allow_html=True)
-        if 'show_kline' not in st.session_state: st.session_state.show_kline = False
-        if 'kline_period' not in st.session_state: st.session_state.kline_period = "日線"
-
-        button_label = "❌ 關閉技術 K 線圖" if st.session_state.show_kline else "📊 載入最新技術 K 線圖"
-        if st.button(button_label, use_container_width=True):
-            st.session_state.show_kline = not st.session_state.show_kline
-            st.rerun()
-
-        if st.session_state.show_kline:
-            if 'pure_stock_id' in locals() and pure_stock_id != "":          
-                st.markdown("##### ⚙️ 技術線圖與指標配置面板")
-                tf_c1, tf_c2, tf_c3, _space = st.columns([1, 1, 1, 5])
-                
-                if tf_c1.button("日K", use_container_width=True, key="btn_p_day"):
-                    st.session_state.kline_period = "日線"
-                    st.rerun()
-                if tf_c2.button("週K", use_container_width=True, key="btn_p_week"):
-                    st.session_state.kline_period = "週線"
-                    st.rerun()
-                if tf_c3.button("月K", use_container_width=True, key="btn_p_month"):
-                    st.session_state.kline_period = "月線"
-                    st.rerun()
-                
-                ind_c1, ind_c2, ind_c3 = st.columns(3)
-                chk_kd = ind_c1.checkbox("顯示 KD (9,3,3)", value=False, key="kd_chk")
-                chk_macd = ind_c2.checkbox("顯示 MACD (12,26,9)", value=False, key="macd_chk")
-                chk_rsi = ind_c3.checkbox("顯示 RSI (14)", value=False, key="rsi_chk")
-                st.write("") 
-                
-                current_tf_name = {"日線": "日K", "週線": "週K", "月線": "月K"}.get(st.session_state.kline_period, "日K")
-                with st.spinner(f"正在擷取 {pure_stock_id} 的最新 {current_tf_name} 及指標數據..."):
-                    all_mas = ["5MA", "10MA", "20MA", "60MA", "120MA", "240MA"]
-                    render_technical_chart(pure_stock_id, st.session_state.kline_period, all_mas, chk_rsi, chk_macd, chk_kd)
-            else:
-                st.warning("⚠️ 技術 K 線圖目前僅支援代號查詢。")
-
-        st.markdown("<hr style='border-color: #334155;'>", unsafe_allow_html=True)
-        st.markdown("<h4 style='color: #FCD34D;'>👑 區塊 1：短中長線三大法人持股變化</h4>", unsafe_allow_html=True)
-        
-        if 'my_final_df' in st.session_state:
-            df_b1 = st.session_state['my_final_df']
-            res_b1 = robust_search_engine(df_b1, search_query)
-            
-            if not res_b1.empty:
-                date_cols = [c for c in res_b1.columns if '持股%' in c or c.isdigit()]
-                is_all_unranked = True
-                for c in date_cols:
-                    val = str(res_b1.iloc[0][c]).strip()
-                    if val != "未進榜" and val not in ['0', '0.0', 'nan', '-']:
-                        is_all_unranked = False
-                        break
-                        
-                if is_all_unranked:
-                    st.write("⚪ 未進榜")
-                else:
-                    hide_keywords = ['_區塊', '排序', '上榜數量', '原始上榜', '精準單日']
-                    clean_cols = [c for c in res_b1.columns if not any(k in c for k in hide_keywords)]
-                    st.dataframe(res_b1[clean_cols], use_container_width=True, hide_index=True)
-                    
-                    row = res_b1.iloc[0]
-                    stock_name = row.get('股票名稱', search_query)
-                    raw_x_vals = date_cols[::-1]
-                    clean_x_labels = [c.replace('持股%', '')[-4:] for c in raw_x_vals]
-                    
-                    y_vals = []
-                    for c in raw_x_vals:
-                        val = row[c]
-                        if str(val) == "未進榜" or pd.isna(val): y_vals.append(0.0)
-                        else:
-                            try: y_vals.append(float(val))
-                            except: y_vals.append(0.0)
-                                
-                    import plotly.graph_objects as go
-                    fig_b1 = go.Figure()
-                    fig_b1.add_trace(go.Bar(
-                        x=clean_x_labels, y=y_vals,  
-                        marker_color=['#FF4B4B' if i == len(y_vals)-1 else '#4B8BFF' for i in range(len(y_vals))],
-                        text=[f"{v}%" if v > 0 else "" for v in y_vals], textposition='outside'
-                    ))
-                    fig_b1.update_layout(
-                        title=dict(text=f"📈 持股波段真實軌跡 ({stock_name})", font=dict(color="#E2E8F0")),
-                        height=300, template='plotly_dark', paper_bgcolor='rgba(0,0,0,0)', plot_bgcolor='rgba(0,0,0,0)',
-                        margin=dict(l=20, r=20, t=40, b=20),
-                        yaxis=dict(title="持股比例 (%)", showgrid=True, gridcolor='#334155'), xaxis=dict(tickangle=45), dragmode='pan'
-                    )
-                    st.plotly_chart(fig_b1, use_container_width=True, config={'displayModeBar': False})
-            else: st.write("⚪ 未進榜")
-        else: st.info("⚪ 尚未載入資料表")
-
-        st.markdown("<hr style='border-color: #334155;'>", unsafe_allow_html=True)
-        st.markdown("<h4 style='color: #FCD34D;'>🎯 區塊 2：法人買超診斷</h4>", unsafe_allow_html=True)
-        c1, c2 = st.columns(2)
-        with c1: scan_and_display("🌐 外資 5 日淨買佔成交量", 'df_blk2_1', search_query)
-        with c2: scan_and_display("🏦 投信 5 日淨買佔成交量", 'df_blk2_2', search_query)
-        c3, c4 = st.columns(2)
-        with c3: scan_and_display("🌐 外資 5 日淨買佔發行量", 'df_blk2_3', search_query)
-        with c4: scan_and_display("🏦 投信 5 日淨買佔發行量", 'df_blk2_4', search_query)
-
-        st.markdown("<hr style='border-color: #334155;'>", unsafe_allow_html=True)
-        st.markdown("<h4 style='color: #FCD34D;'>📅 區塊 3：法人連買診斷 (日/週)</h4>", unsafe_allow_html=True)
-        if 'df_blk3_main' in st.session_state:
-            df_b3 = st.session_state['df_blk3_main']
-            res_b3 = robust_search_engine(df_b3, search_query)
-            display_id = res_b3.iloc[0]['股票代號'] if not res_b3.empty else search_query
-            display_name = res_b3.iloc[0]['股票名稱'] if not res_b3.empty else "-"
-            
-            base_types = ['🌐 外資日連買', '🌐 外資週連買', '🏦 投信日連買', '🏦 投信週連買']
-            display_list = []
-            for b_type in base_types:
-                match = res_b3[res_b3['連買類型'] == b_type] if not res_b3.empty else pd.DataFrame()
-                if not match.empty: display_list.append(match.iloc[0].to_dict())
-                else: display_list.append({'連買類型': b_type, '股票代號': display_id, '股票名稱': display_name, '狀態動態': '⚪ 未進榜', '連買週期數': '-'})
-            st.dataframe(pd.DataFrame(display_list), use_container_width=True, hide_index=True)
-        else: st.info("⚪ 區塊 3：尚未載入資料表")
-
-        st.markdown("<hr style='border-color: #334155;'>", unsafe_allow_html=True)
-        st.markdown("<h4 style='color: #FCD34D;'>🔄 區塊 4：券資有利排名</h4>", unsafe_allow_html=True)
-        
-        def render_b4_panorama(view_title, keys_and_labels, query):
-            display_list = []
-            display_id, display_name = query, "-"
-            for label, key in keys_and_labels:
-                if key in st.session_state:
-                    res = robust_search_engine(st.session_state[key], query)
-                    if not res.empty:
-                        display_id = res.iloc[0].get('股票代號', query)
-                        display_name = res.iloc[0].get('股票名稱', '-')
-                        break
-                        
-            for label, key in keys_and_labels:
-                if key in st.session_state:
-                    res = robust_search_engine(st.session_state[key], query)
-                    if not res.empty:
-                        row_data = res.iloc[0].to_dict()
-                        new_row = {'榜單類型': label}; new_row.update(row_data); display_list.append(new_row)
-                    else: display_list.append({'榜單類型': label, '股票代號': display_id, '股票名稱': display_name, '進榜狀態': '⚪ 未進榜'})
-                else: display_list.append({'榜單類型': label, '股票代號': display_id, '股票名稱': display_name, '進榜狀態': '⚠️ 尚未載入'})
-                    
-            df_panorama = pd.DataFrame(display_list).fillna('-')
-            front_cols = ['榜單類型', '股票代號', '股票名稱', '進榜狀態']
-            data_cols = [c for c in df_panorama.columns if c not in front_cols]
-            final_cols = [c for c in front_cols if c in df_panorama.columns] + data_cols
-            for c in final_cols: df_panorama[c] = df_panorama[c].apply(lambda x: str(x)[:-2] if str(x).endswith('.0') else x)
-            
-            st.markdown(f"<h5 style='color: #E2E8F0;'>{view_title}</h5>", unsafe_allow_html=True)
-            st.dataframe(df_panorama[final_cols], use_container_width=True, hide_index=True)
-
-        render_b4_panorama("5日幅度變動排名", [('📉 融資減少', 'df_margin_pct'), ('📉 借券減少', 'df_short_pct'), ('📈 融券增加', 'df_margin_plus_pct')], search_query)
-        st.write("") 
-        render_b4_panorama("5日張數變動排名", [('📉 融資減少', 'df_margin_vol'), ('📉 借券減少', 'df_short_vol'), ('📈 融券增加', 'df_margin_plus_vol')], search_query)
-
-        st.markdown("<hr style='border-color: #334155;'>", unsafe_allow_html=True)
-        st.markdown("<h4 style='color: #FCD34D;'>💰 區塊 5：大戶動向診斷</h4>", unsafe_allow_html=True)
-        
-        col_400, col_1000 = st.columns(2)
-        with col_400: scan_and_display("💎 400張以上大戶動向", 'df_blk5', search_query)
-        with col_1000: scan_and_display("🐳 1000張以上超級大戶動向", 'df_blk5_1000', search_query)
-############################################    
 
 # ==========================================
 # 🏠 核心五大區塊
@@ -4068,6 +3475,602 @@ if current_page in ["all", "pool"]:
 # ==========================================
 # 🧪 測試區：Google Sheets 連線測試
 # ==========================================
+# ==========================================
+# 🧠 AI 量化評語生成引擎 (土洋對作/換手升級版)
+# ==========================================
+def generate_stock_commentary(row):
+    """
+    根據選股池的綜合數據，自動生成一段人話評語
+    """
+    score = row.get('總分', 0)
+    warns = str(row.get('法人賣出警示', ''))
+    b5_trend = str(row.get('大股東動向', ''))
+    
+    # 判斷是否帶有賣出警示與高分
+    has_warning = "⚠️" in warns
+    high_score = score >= 3
+    
+    # 1. 矛盾訊號判定：土洋對作 / 主力強勢吃籌碼
+    if has_warning and high_score:
+        return f"⚔️ 【土洋對作 / 激烈換手】系統偵測到法人分歧 ({warns})，但該股依然獲得 {score} 分的高評估！這代表『一方的倒貨正被另一方(或大戶)強勢吃下』。籌碼換手後若能維持強勢(如大漲/漲停)，代表承接方實力極強，可沿短均線偏多操作，但需嚴設停損。"
+        
+    # 2. 致命風險判定：真倒貨、無買盤
+    if has_warning and not high_score:
+        return f"🚨 【風險警示】目前法人主力正在進行倒貨調節 ({warns})，且無強大買盤承接，籌碼結構面臨鬆動。建議暫避風頭，嚴控資金水位。"
+    
+    if "大減" in b5_trend:
+        return "⚠️ 【大戶撤退】400張以上大戶出現明顯減碼跡象，主力籌碼渙散，建議先行觀望，等待籌碼沉澱。"
+
+    # 3. 綜合分數常規判定
+    if score >= 6:
+        base_comment = "🔥 【強勢噴發】籌碼面極度優異！內外資法人與大戶同步共振做多，具備強大的波段上攻潛力。"
+        if "大增" in b5_trend:
+            base_comment += "特別是大股東籌碼大幅集中，是不可多得的強勢防守標的，建議積極關注。"
+        return base_comment
+        
+    elif score >= 3:
+        return "📈 【偏多佈局】主力籌碼持續進駐，法人買盤給予一定支撐。具備穩健的波段潛力，可逢低尋找技術面切入點。"
+        
+    elif score >= 1:
+        return "🔄 【中性觀望】籌碼表現較為平淡，雖有零星買盤但缺乏明確的連續性方向。建議多看少做，等待更強的表態訊號。"
+        
+    else:
+        return "❄️ 【弱勢整理】籌碼處於流失或無主力認養狀態，資金效率低。若無特殊題材發酵，短期內建議暫不考量。"
+# ==========================================
+# 🔍 個股籌碼快搜 "標題" (保證生效：電競風科技橫幅版)
+# ==========================================
+st.write("---")
+st.markdown("<div id='section-search'></div>", unsafe_allow_html=True)
+
+# 🌟 使用 100% 絕對生效的 Inline HTML 設計超高質感橫幅
+st.markdown("""
+<div style="background: linear-gradient(90deg, rgba(15,23,42,1) 0%, rgba(14,165,233,0.3) 50%, rgba(15,23,42,1) 100%); 
+            border-top: 1px solid #38bdf8; 
+            border-bottom: 1px solid #38bdf8; 
+            padding: 20px 20px; 
+            border-radius: 10px;
+            text-align: center;
+            box-shadow: 0px 0px 20px rgba(56, 189, 248, 0.2);
+            margin-bottom: 25px;">
+    <h2 style="color: #e0f2fe; margin: 0; letter-spacing: 2px; text-shadow: 0 0 15px rgba(56, 189, 248, 0.8);">
+        🔍 個股籌碼快搜 (戰情診斷室)
+    </h2>
+    <p style="color: #94a3b8; margin-top: 8px; font-size: 14px; margin-bottom: 0;">
+        輸入代號一鍵聯動：AI 型態掃描 ｜ 法人動向 ｜ 1000張大戶追蹤
+    </p>
+</div>
+""", unsafe_allow_html=True)
+
+# 使用預設的帶邊框容器把圖表和表格包起來
+with st.container(border=True):
+    # ==========================================
+    # 📈 繪製 K 線圖與技術分析引擎
+    # ==========================================
+    def render_technical_chart(stock_id, timeframe="日線", selected_mas=[], show_rsi=False, show_macd=False, show_kd=False):
+        import yfinance as yf
+        import plotly.graph_objects as go
+        from plotly.subplots import make_subplots
+        import pandas as pd
+
+        try:
+            ticker_tw = f"{stock_id}.TW"
+            ticker_two = f"{stock_id}.TWO"
+            
+            df = yf.download(ticker_tw, period="5y", progress=False)
+            if df is None or df.empty:
+                df = yf.download(ticker_two, period="5y", progress=False)
+                
+            if df is None or df.empty:
+                st.warning(f"⚠️ 無法從 Yahoo Finance 取得 {stock_id} 的即時報價。")
+                return
+
+            if isinstance(df.columns, pd.MultiIndex):
+                df.columns = df.columns.get_level_values(0)
+            df = df.loc[:, ~df.columns.duplicated()]
+
+            if df.index.tz is not None:
+                df.index = df.index.tz_convert('Asia/Taipei')
+            else:
+                df.index = df.index.tz_localize('UTC').tz_convert('Asia/Taipei')
+
+            daily_df = df.copy()
+
+            def generate_technical_signals(df):
+                signals = []
+                if df.empty or len(df) < 20: return signals
+                
+                latest_close = df['Close'].iloc[-1]
+                latest_vol = df['Volume'].iloc[-1]
+                
+                vol_20ma = df['Volume'].rolling(window=20).mean().iloc[-2] 
+                if pd.notna(vol_20ma) and vol_20ma > 0 and latest_vol > (vol_20ma * 2.5):
+                    signals.append(f"🧨 爆量出擊：今日成交量達 20 日均量的 {latest_vol/vol_20ma:.1f} 倍！")
+
+                mas = {'5MA': 5, '10MA': 10, '20MA': 20, '60MA': 60, '120MA': 120, '240MA': 240}
+                for ma_name, period in mas.items():
+                    if len(df) >= period:
+                        ma_val = df['Close'].rolling(window=period).mean().iloc[-1]
+                        if 0 < (latest_close - ma_val) / ma_val < 0.015:
+                            signals.append(f"🎯 回測支撐：股價目前極度貼近 {ma_name} ({ma_val:.2f}) 關鍵支撐線。")
+
+                if len(df) >= 20:
+                    ma5 = df['Close'].rolling(5).mean().iloc[-1]
+                    ma10 = df['Close'].rolling(10).mean().iloc[-1]
+                    ma20 = df['Close'].rolling(20).mean().iloc[-1]
+                    ma_max, ma_min = max(ma5, ma10, ma20), min(ma5, ma10, ma20)
+                    if pd.notna(ma_max) and (ma_max - ma_min) / ma_min < 0.02:
+                        signals.append("🌀 均線糾結：短天期 (5/10/20MA) 成本線高度重合壓縮，醞釀表態！")
+
+                if len(df) >= 60:
+                    recent_high = df['High'].iloc[-20:].max()
+                    recent_low = df['Low'].iloc[-20:].min()
+                    prev_high = df['High'].iloc[-40:-20].max()
+                    prev_low = df['Low'].iloc[-40:-20].min()
+                    
+                    recent_volatility = recent_high - recent_low
+                    prev_volatility = prev_high - prev_low
+                    if prev_volatility > 0 and recent_volatility < (prev_volatility * 0.6):
+                        signals.append("📐 型態壓縮：近一個月股價高低波幅急遽收斂，疑似三角收斂末端。")
+                        
+                if len(df) >= 60:
+                    highest_60d = df['High'].iloc[-60:].max()
+                    if df['High'].iloc[-1] >= highest_60d:
+                        signals.append("🚀 波段創高：今日股價突破 60 日 (約一季) 以來新高點，上攻動能極強！")
+
+                if len(df) >= 60:
+                    ma5 = df['Close'].rolling(5).mean().iloc[-1]
+                    ma10 = df['Close'].rolling(10).mean().iloc[-1]
+                    ma20 = df['Close'].rolling(20).mean().iloc[-1]
+                    ma60 = df['Close'].rolling(60).mean().iloc[-1]
+                    ma60_prev = df['Close'].rolling(60).mean().iloc[-2] 
+                    
+                    if pd.notna(ma60) and (latest_close > ma5 > ma10 > ma20 > ma60) and (ma60 > ma60_prev):
+                        signals.append("📈 多頭排列：短中長期均線 (5/10/20/60MA) 呈現完美多頭發散，趨勢明確翻多！")
+
+                return signals
+
+            tech_signals = generate_technical_signals(daily_df)
+
+            if tech_signals:
+                signal_html = "<div style='background-color: rgba(0, 210, 255, 0.1); border-left: 4px solid #00D2FF; padding: 10px; border-radius: 5px; margin-bottom: 15px;'>"
+                signal_html += "<h5 style='color: #00D2FF; margin-top:0px; margin-bottom: 10px;'>📡 AI 盤中技術型態雷達</h5>"
+                for sig in tech_signals:
+                    signal_html += f"<p style='color: #E2E8F0; margin: 5px 0px; font-size: 15px;'>{sig}</p>"
+                signal_html += "</div>"
+                st.markdown(signal_html, unsafe_allow_html=True)
+
+            if timeframe == "週線":
+                daily_df = daily_df.resample('W-FRI').agg({
+                    'Open': 'first', 'High': 'max', 'Low': 'min', 'Close': 'last', 'Volume': 'sum'
+                }).dropna()
+            elif timeframe == "月線":
+                daily_df = daily_df.resample('ME').agg({
+                    'Open': 'first', 'High': 'max', 'Low': 'min', 'Close': 'last', 'Volume': 'sum'
+                }).dropna()
+
+            ma_windows = [5, 10, 20, 60, 120, 240]
+            for ma in ma_windows:
+                daily_df[f'{ma}MA'] = daily_df['Close'].rolling(window=ma).mean()
+
+            close_series = daily_df['Close'].squeeze()
+            
+            if show_rsi:
+                delta = close_series.diff()
+                gain = delta.clip(lower=0)
+                loss = -delta.clip(upper=0)
+                ema_gain = gain.ewm(com=13, adjust=False).mean()
+                ema_loss = loss.ewm(com=13, adjust=False).mean()
+                rs = ema_gain / ema_loss.replace(0, 1e-9)
+                daily_df['RSI'] = 100 - (100 / (1 + rs))
+
+            if show_macd:
+                ema12 = close_series.ewm(span=12, adjust=False).mean()
+                ema26 = close_series.ewm(span=26, adjust=False).mean()
+                daily_df['DIF'] = ema12 - ema26
+                daily_df['MACD_Sign'] = daily_df['DIF'].ewm(span=9, adjust=False).mean()
+                daily_df['MACD_Hist'] = daily_df['DIF'] - daily_df['MACD_Sign']
+                
+            if show_kd:
+                low_9 = daily_df['Low'].rolling(window=9).min()
+                high_9 = daily_df['High'].rolling(window=9).max()
+                rsv = (close_series - low_9) / (high_9 - low_9).replace(0, 1e-9) * 100
+                daily_df['K'] = rsv.ewm(com=2, adjust=False).mean()
+                daily_df['D'] = daily_df['K'].ewm(com=2, adjust=False).mean()
+
+            def get_latest_price(col):
+                valid_data = daily_df[col].dropna()
+                if not valid_data.empty:
+                    val = valid_data.iloc[-1]
+                    if isinstance(val, pd.Series): val = val.iloc[0]
+                    return f"{float(val):.2f}"
+                return "-"
+
+            rows = 2
+            row_heights = [0.5, 0.15]
+            if show_rsi: rows += 1; row_heights.append(0.12)
+            if show_macd: rows += 1; row_heights.append(0.14)
+            if show_kd: rows += 1; row_heights.append(0.14)
+
+            fig = make_subplots(rows=rows, cols=1, shared_xaxes=True, vertical_spacing=0.02, row_heights=row_heights)
+                                
+            up_color = 'rgb(240, 90, 90)'     
+            down_color = 'rgb(80, 200, 120)'  
+
+            fig.add_trace(go.Candlestick(
+                x=daily_df.index, open=daily_df['Open'].squeeze(), high=daily_df['High'].squeeze(), 
+                low=daily_df['Low'].squeeze(), close=daily_df['Close'].squeeze(), 
+                name='K線', 
+                increasing=dict(line=dict(color=up_color, width=1.5), fillcolor=up_color),
+                decreasing=dict(line=dict(color=down_color, width=1.5), fillcolor=down_color),
+                hovertemplate="開：%{open:.2f}<br>高：%{high:.2f}<br>低：%{low:.2f}<br>收：%{close:.2f}<extra></extra>"
+            ), row=1, col=1)
+            
+            fig.update_yaxes(title_text="股價 (TWD)", row=1, col=1, title_font=dict(size=12, color="#E2E8F0"), rangemode="nonnegative")
+
+            if not daily_df.empty:
+                max_price = daily_df['High'].max()
+                max_date = daily_df['High'].idxmax()
+                
+                fig.add_hline(y=max_price, line_dash="dot", line_color="rgba(255, 215, 0, 0.4)", row=1, col=1)
+                fig.add_annotation(
+                    x=max_date, y=max_price,
+                    text=f"<b>前高: {max_price:.2f}</b>",
+                    showarrow=True, arrowhead=2, arrowsize=1, arrowwidth=1.5, arrowcolor="#FFD700",
+                    ax=0, ay=-40, 
+                    font=dict(size=13, color="#FFD700"),
+                    bgcolor="rgba(17, 22, 34, 0.85)", bordercolor="#FFD700", borderwidth=1, borderpad=4,
+                    row=1, col=1
+                )
+
+            ma_config = {
+                '5MA': {'color': '#FFFF37'}, '10MA': {'color': '#00FFFF'},
+                '20MA': {'color': '#921AFF'}, '60MA': {'color': '#D0D0D0'},
+                '120MA': {'color': '#D200D2'}, '240MA': {'color': '#BB3D00'}
+            }
+            for ma_name in selected_mas:
+                if ma_name in daily_df.columns:
+                    latest_val = get_latest_price(ma_name)
+                    fig.add_trace(go.Scatter(
+                        x=daily_df.index, y=daily_df[ma_name].squeeze(), mode='lines', 
+                        name=f'{ma_name} ({latest_val})', 
+                        line=dict(color=ma_config[ma_name]['color'], width=1.3),
+                        hovertemplate=f"<b>{ma_name}</b>： %{{y:.2f}}<extra></extra>"
+                    ), row=1, col=1)
+
+            vol_colors = [up_color if c >= o else down_color for c, o in zip(daily_df['Close'].squeeze(), daily_df['Open'].squeeze())]
+            fig.add_trace(go.Bar(
+                x=daily_df.index, y=daily_df['Volume'].squeeze(), 
+                name='成交量', 
+                marker_color=vol_colors,
+                showlegend=False, 
+                hovertemplate="<b>成交量</b>： %{y}<extra></extra>"
+            ), row=2, col=1)
+            fig.update_yaxes(title_text="成交量", row=2, col=1, title_font=dict(size=12, color="#E2E8F0"), rangemode="nonnegative")
+
+            current_row = 3
+            if show_kd:
+                fig.add_trace(go.Scatter(x=daily_df.index, y=daily_df['K'].squeeze(), mode='lines', name='K (9)', line=dict(color='#00CCFF', width=1.2), hovertemplate="<b>K</b>: %{y:.2f}<extra></extra>"), row=current_row, col=1)
+                fig.add_trace(go.Scatter(x=daily_df.index, y=daily_df['D'].squeeze(), mode='lines', name='D (3)', line=dict(color='#FFCC00', width=1.2), hovertemplate="<b>D</b>: %{y:.2f}<extra></extra>"), row=current_row, col=1)
+                fig.add_hline(y=80, line_dash="dash", line_color="rgba(240,90,90,0.4)", row=current_row, col=1)
+                fig.add_hline(y=20, line_dash="dash", line_color="rgba(80,200,120,0.4)", row=current_row, col=1)
+                fig.update_yaxes(title_text="KD(9,3,3)", row=current_row, col=1, title_font=dict(size=11, color="#E2E8F0"))
+                current_row += 1
+                
+            if show_rsi:
+                fig.add_trace(go.Scatter(x=daily_df.index, y=daily_df['RSI'].squeeze(), mode='lines', name='RSI (14)', line=dict(color='#E1BEE7', width=1.5), hovertemplate="<b>RSI</b>: %{y:.2f}<extra></extra>"), row=current_row, col=1)
+                fig.add_hline(y=80, line_dash="dash", line_color="rgba(240,90,90,0.4)", row=current_row, col=1)
+                fig.add_hline(y=20, line_dash="dash", line_color="rgba(80,200,120,0.4)", row=current_row, col=1)
+                fig.update_yaxes(title_text="RSI(14)", row=current_row, col=1, title_font=dict(size=11, color="#E2E8F0"))
+                current_row += 1
+
+            if show_macd:
+                fig.add_trace(go.Scatter(x=daily_df.index, y=daily_df['DIF'].squeeze(), mode='lines', name='DIF', line=dict(color='#FFF', width=1)), row=current_row, col=1)
+                fig.add_trace(go.Scatter(x=daily_df.index, y=daily_df['MACD_Sign'].squeeze(), mode='lines', name='MACD', line=dict(color='#FFCC00', width=1)), row=current_row, col=1)
+                hist_colors = [up_color if h >= 0 else down_color for h in daily_df['MACD_Hist'].squeeze()]
+                fig.add_trace(go.Bar(x=daily_df.index, y=daily_df['MACD_Hist'].squeeze(), name='柱狀圖', marker_color=hist_colors), row=current_row, col=1)
+                fig.update_yaxes(title_text="MACD", row=current_row, col=1, title_font=dict(size=11, color="#E2E8F0"))
+                current_row += 1
+
+            fig.update_layout(
+                xaxis_rangeslider_visible=False,
+                height=500 + (rows - 1) * 110, 
+                template='plotly_dark',       
+                paper_bgcolor='rgba(0,0,0,0)', 
+                plot_bgcolor='rgba(0,0,0,0)',  
+                margin=dict(l=10, r=65, t=30, b=10), 
+                hovermode='x unified',
+                hoverlabel=dict(bgcolor="#1A202C", font_size=15, font_color="#FFFFFF"),
+                legend=dict(orientation="h", yanchor="bottom", y=1.01, xanchor="left", x=0.01, font=dict(color='#E2E8F0', size=16), itemsizing='constant'),
+                dragmode='pan' 
+            )
+            
+            fig.update_xaxes(showspikes=True, spikecolor="rgba(255, 235, 100, 0.5)", spikesnap="cursor", spikemode="across", spikethickness=0.5, spikedash="dash", gridcolor="rgba(255, 255, 255, 0.05)")
+            fig.update_yaxes(showspikes=True, spikecolor="rgba(255, 235, 100, 0.5)", spikesnap="cursor", spikemode="across", spikethickness=0.5, spikedash="dash", side="right", gridcolor="rgba(255, 255, 255, 0.05)")
+            
+            for r in range(1, rows + 1): fig.update_xaxes(hoverformat="%Y-%m-%d", tickformat="%Y-%m-%d", row=r, col=1)
+            
+            if not daily_df.empty:
+                latest_date = daily_df.index[-1] 
+                start_date = latest_date - pd.Timedelta(days=140) 
+                zoom_range = [start_date.strftime('%Y-%m-%d'), latest_date.strftime('%Y-%m-%d')]
+                for r in range(1, rows + 1): fig.update_xaxes(range=zoom_range, row=r, col=1)
+            
+            if timeframe == "日線":
+                all_days = pd.date_range(start=daily_df.index.min().normalize(), end=daily_df.index.max().normalize(), freq='D')
+                actual_days = daily_df.index.normalize()
+                missing_days = all_days.difference(actual_days).strftime('%Y-%m-%d').tolist()
+                for r in range(1, rows + 1): fig.update_xaxes(rangebreaks=[dict(values=missing_days)], row=r, col=1)
+            
+            plotly_config = {'scrollZoom': True, 'displaylogo': False, 'modeBarButtonsToRemove': ['zoom2d', 'zoomIn2d', 'zoomOut2d', 'autoScale2d', 'select2d', 'lasso2d', 'hoverClosestCartesian', 'hoverCompareCartesian', 'toggleSpikelines']}
+            st.plotly_chart(fig, use_container_width=True, key=f"kline_{stock_id}_{timeframe}_{len(selected_mas)}_{show_rsi}_{show_macd}_{show_kd}", config=plotly_config)
+            
+        except Exception as e:
+            st.error(f"❌ 繪製 K 線圖時發生錯誤: {str(e)}")
+
+    def robust_search_engine(df, query):
+        if df is None or df.empty: return pd.DataFrame()
+        df = df.loc[:, ~df.columns.duplicated()].copy()
+        query = str(query).strip()
+        mask = pd.Series(False, index=df.index)
+        if '股票代號' in df.columns:
+            df['股票代號'] = df['股票代號'].astype(str).str.strip()
+            mask = mask | (df['股票代號'] == query)
+        if '股票名稱' in df.columns:
+            df['股票名稱'] = df['股票名稱'].astype(str).str.strip()
+            mask = mask | df['股票名稱'].str.contains(query, na=False, case=False)
+        return df[mask]
+
+    def scan_and_display(title, session_key, query):
+        st.markdown(f"<h5 style='color: #E2E8F0;'>{title}</h5>", unsafe_allow_html=True)
+        if session_key not in st.session_state:
+            st.write("⚪ 尚未載入資料表")
+            return
+        df = st.session_state[session_key]
+        if df is None or df.empty:
+            st.write("⚪ 該榜單無任何資料")
+            return
+        res = robust_search_engine(df, query)
+        
+        if not res.empty:
+            pct_cols = [c for c in res.columns if '持股' in c or '佔' in c or '%' in c]
+            if pct_cols:
+                all_zero = True
+                for c in pct_cols:
+                    val = res.iloc[0][c]
+                    import pandas as pd
+                    if pd.isna(val): continue
+                    val_str = str(val).strip().replace('%', '')
+                    if val_str.lower() in ['', '-', 'nan', 'none', 'null']: continue
+                    try:
+                        if abs(float(val_str)) > 0.0001:
+                            all_zero = False
+                            break
+                    except ValueError: continue
+                if all_zero:
+                    st.write("⚪ 未進榜")
+                    return
+            st.dataframe(res, use_container_width=True, hide_index=True)
+        else:
+            st.write("⚪ 未進榜")
+
+    # ==========================================
+    # 🎯 搜尋輸入框
+    # ==========================================
+    search_query = st.text_input("輸入代號或名稱 (例如: 3231 或 緯創 或 3231緯創)：", key="global_search_final")
+
+    pure_stock_id = ""
+    display_name = search_query
+
+    if search_query:
+        query_clean = search_query.strip()
+        industry_label = "未分類"
+        
+        if 'STOCK_DICT' in locals() or 'STOCK_DICT' in globals():
+            if query_clean in STOCK_DICT:
+                pure_stock_id = STOCK_DICT[query_clean]["id"]
+                display_name = f"{STOCK_DICT[query_clean]['id']} {STOCK_DICT[query_clean]['name']}"
+                industry_label = STOCK_DICT[query_clean]["industry"]
+            else:
+                for k, v in STOCK_DICT.items():
+                    if query_clean in k:
+                        pure_stock_id = v["id"]
+                        display_name = f"{v['id']} {v['name']}"
+                        industry_label = v["industry"]
+                        break
+        
+        if pure_stock_id == "":
+            import re
+            match_num = re.search(r'\d+', query_clean)
+            if match_num: pure_stock_id = match_num.group(0)
+
+        st.markdown(f"### 🎯 綜合診斷標的：<span style='color: #00D2FF;'>{display_name}</span> <span style='font-size:16px; background-color:#1E293B; padding:4px 10px; border-radius:6px; color:#38BDF8; border: 1px solid #38BDF8; margin-left:10px;'>🏷️ {industry_label}</span>", unsafe_allow_html=True)
+
+        pool_df = st.session_state.get('top_pool_df', pd.DataFrame())
+        target_score = None
+        current_stock_id = pure_stock_id 
+        delta_val = 0.0
+
+        if not pool_df.empty:
+            match = robust_search_engine(pool_df, current_stock_id) if current_stock_id else robust_search_engine(pool_df, search_query)
+            if not match.empty:
+                target_score = match.iloc[0].get('總分', 0)
+                delta_val = match.iloc[0].get('Delta (日變動)', 0.0) 
+
+        if target_score is not None and current_stock_id != "":
+            delta = delta_val 
+            delta_color = "#FF4B4B" if delta > 0 else "#00CC66" if delta < 0 else "#94A3B8"
+            delta_symbol = "🔥" if delta > 0 else "🚨" if delta < 0 else "🔄"
+            delta_str = f"+{delta}" if delta > 0 else f"{delta}" 
+            
+            st.markdown(f"""
+            #### 🏆 系統綜合評分：<span style='color:#FFD700; font-size:24px; text-shadow: 0 0 10px rgba(255,215,0,0.5);'>**{target_score}**</span> 分 
+            <span style='color:{delta_color}; font-size:16px; margin-left:15px;'>{delta_symbol} Delta變化: **{delta_str}**</span>
+            <span style='color:#94A3B8; font-size:14px; font-weight:normal; margin-left:10px;'>(評分數據僅供參考)</span>
+            """, unsafe_allow_html=True)
+        else:
+            st.markdown("#### 🏆 系統綜合評分：<span style='color:#64748B; font-size:18px;'>未達綜合進榜標準 (0分)</span>", unsafe_allow_html=True)
+
+        st.markdown("<hr style='border-color: #334155;'>", unsafe_allow_html=True)
+        if 'show_kline' not in st.session_state: st.session_state.show_kline = False
+        if 'kline_period' not in st.session_state: st.session_state.kline_period = "日線"
+
+        button_label = "❌ 關閉技術 K 線圖" if st.session_state.show_kline else "📊 載入最新技術 K 線圖"
+        if st.button(button_label, use_container_width=True):
+            st.session_state.show_kline = not st.session_state.show_kline
+            st.rerun()
+
+        if st.session_state.show_kline:
+            if 'pure_stock_id' in locals() and pure_stock_id != "":          
+                st.markdown("##### ⚙️ 技術線圖與指標配置面板")
+                tf_c1, tf_c2, tf_c3, _space = st.columns([1, 1, 1, 5])
+                
+                if tf_c1.button("日K", use_container_width=True, key="btn_p_day"):
+                    st.session_state.kline_period = "日線"
+                    st.rerun()
+                if tf_c2.button("週K", use_container_width=True, key="btn_p_week"):
+                    st.session_state.kline_period = "週線"
+                    st.rerun()
+                if tf_c3.button("月K", use_container_width=True, key="btn_p_month"):
+                    st.session_state.kline_period = "月線"
+                    st.rerun()
+                
+                ind_c1, ind_c2, ind_c3 = st.columns(3)
+                chk_kd = ind_c1.checkbox("顯示 KD (9,3,3)", value=False, key="kd_chk")
+                chk_macd = ind_c2.checkbox("顯示 MACD (12,26,9)", value=False, key="macd_chk")
+                chk_rsi = ind_c3.checkbox("顯示 RSI (14)", value=False, key="rsi_chk")
+                st.write("") 
+                
+                current_tf_name = {"日線": "日K", "週線": "週K", "月線": "月K"}.get(st.session_state.kline_period, "日K")
+                with st.spinner(f"正在擷取 {pure_stock_id} 的最新 {current_tf_name} 及指標數據..."):
+                    all_mas = ["5MA", "10MA", "20MA", "60MA", "120MA", "240MA"]
+                    render_technical_chart(pure_stock_id, st.session_state.kline_period, all_mas, chk_rsi, chk_macd, chk_kd)
+            else:
+                st.warning("⚠️ 技術 K 線圖目前僅支援代號查詢。")
+
+        st.markdown("<hr style='border-color: #334155;'>", unsafe_allow_html=True)
+        st.markdown("<h4 style='color: #FCD34D;'>👑 區塊 1：短中長線三大法人持股變化</h4>", unsafe_allow_html=True)
+        
+        if 'my_final_df' in st.session_state:
+            df_b1 = st.session_state['my_final_df']
+            res_b1 = robust_search_engine(df_b1, search_query)
+            
+            if not res_b1.empty:
+                date_cols = [c for c in res_b1.columns if '持股%' in c or c.isdigit()]
+                is_all_unranked = True
+                for c in date_cols:
+                    val = str(res_b1.iloc[0][c]).strip()
+                    if val != "未進榜" and val not in ['0', '0.0', 'nan', '-']:
+                        is_all_unranked = False
+                        break
+                        
+                if is_all_unranked:
+                    st.write("⚪ 未進榜")
+                else:
+                    hide_keywords = ['_區塊', '排序', '上榜數量', '原始上榜', '精準單日']
+                    clean_cols = [c for c in res_b1.columns if not any(k in c for k in hide_keywords)]
+                    st.dataframe(res_b1[clean_cols], use_container_width=True, hide_index=True)
+                    
+                    row = res_b1.iloc[0]
+                    stock_name = row.get('股票名稱', search_query)
+                    raw_x_vals = date_cols[::-1]
+                    clean_x_labels = [c.replace('持股%', '')[-4:] for c in raw_x_vals]
+                    
+                    y_vals = []
+                    for c in raw_x_vals:
+                        val = row[c]
+                        if str(val) == "未進榜" or pd.isna(val): y_vals.append(0.0)
+                        else:
+                            try: y_vals.append(float(val))
+                            except: y_vals.append(0.0)
+                                
+                    import plotly.graph_objects as go
+                    fig_b1 = go.Figure()
+                    fig_b1.add_trace(go.Bar(
+                        x=clean_x_labels, y=y_vals,  
+                        marker_color=['#FF4B4B' if i == len(y_vals)-1 else '#4B8BFF' for i in range(len(y_vals))],
+                        text=[f"{v}%" if v > 0 else "" for v in y_vals], textposition='outside'
+                    ))
+                    fig_b1.update_layout(
+                        title=dict(text=f"📈 持股波段真實軌跡 ({stock_name})", font=dict(color="#E2E8F0")),
+                        height=300, template='plotly_dark', paper_bgcolor='rgba(0,0,0,0)', plot_bgcolor='rgba(0,0,0,0)',
+                        margin=dict(l=20, r=20, t=40, b=20),
+                        yaxis=dict(title="持股比例 (%)", showgrid=True, gridcolor='#334155'), xaxis=dict(tickangle=45), dragmode='pan'
+                    )
+                    st.plotly_chart(fig_b1, use_container_width=True, config={'displayModeBar': False})
+            else: st.write("⚪ 未進榜")
+        else: st.info("⚪ 尚未載入資料表")
+
+        st.markdown("<hr style='border-color: #334155;'>", unsafe_allow_html=True)
+        st.markdown("<h4 style='color: #FCD34D;'>🎯 區塊 2：法人買超診斷</h4>", unsafe_allow_html=True)
+        c1, c2 = st.columns(2)
+        with c1: scan_and_display("🌐 外資 5 日淨買佔成交量", 'df_blk2_1', search_query)
+        with c2: scan_and_display("🏦 投信 5 日淨買佔成交量", 'df_blk2_2', search_query)
+        c3, c4 = st.columns(2)
+        with c3: scan_and_display("🌐 外資 5 日淨買佔發行量", 'df_blk2_3', search_query)
+        with c4: scan_and_display("🏦 投信 5 日淨買佔發行量", 'df_blk2_4', search_query)
+
+        st.markdown("<hr style='border-color: #334155;'>", unsafe_allow_html=True)
+        st.markdown("<h4 style='color: #FCD34D;'>📅 區塊 3：法人連買診斷 (日/週)</h4>", unsafe_allow_html=True)
+        if 'df_blk3_main' in st.session_state:
+            df_b3 = st.session_state['df_blk3_main']
+            res_b3 = robust_search_engine(df_b3, search_query)
+            display_id = res_b3.iloc[0]['股票代號'] if not res_b3.empty else search_query
+            display_name = res_b3.iloc[0]['股票名稱'] if not res_b3.empty else "-"
+            
+            base_types = ['🌐 外資日連買', '🌐 外資週連買', '🏦 投信日連買', '🏦 投信週連買']
+            display_list = []
+            for b_type in base_types:
+                match = res_b3[res_b3['連買類型'] == b_type] if not res_b3.empty else pd.DataFrame()
+                if not match.empty: display_list.append(match.iloc[0].to_dict())
+                else: display_list.append({'連買類型': b_type, '股票代號': display_id, '股票名稱': display_name, '狀態動態': '⚪ 未進榜', '連買週期數': '-'})
+            st.dataframe(pd.DataFrame(display_list), use_container_width=True, hide_index=True)
+        else: st.info("⚪ 區塊 3：尚未載入資料表")
+
+        st.markdown("<hr style='border-color: #334155;'>", unsafe_allow_html=True)
+        st.markdown("<h4 style='color: #FCD34D;'>🔄 區塊 4：券資有利排名</h4>", unsafe_allow_html=True)
+        
+        def render_b4_panorama(view_title, keys_and_labels, query):
+            display_list = []
+            display_id, display_name = query, "-"
+            for label, key in keys_and_labels:
+                if key in st.session_state:
+                    res = robust_search_engine(st.session_state[key], query)
+                    if not res.empty:
+                        display_id = res.iloc[0].get('股票代號', query)
+                        display_name = res.iloc[0].get('股票名稱', '-')
+                        break
+                        
+            for label, key in keys_and_labels:
+                if key in st.session_state:
+                    res = robust_search_engine(st.session_state[key], query)
+                    if not res.empty:
+                        row_data = res.iloc[0].to_dict()
+                        new_row = {'榜單類型': label}; new_row.update(row_data); display_list.append(new_row)
+                    else: display_list.append({'榜單類型': label, '股票代號': display_id, '股票名稱': display_name, '進榜狀態': '⚪ 未進榜'})
+                else: display_list.append({'榜單類型': label, '股票代號': display_id, '股票名稱': display_name, '進榜狀態': '⚠️ 尚未載入'})
+                    
+            df_panorama = pd.DataFrame(display_list).fillna('-')
+            front_cols = ['榜單類型', '股票代號', '股票名稱', '進榜狀態']
+            data_cols = [c for c in df_panorama.columns if c not in front_cols]
+            final_cols = [c for c in front_cols if c in df_panorama.columns] + data_cols
+            for c in final_cols: df_panorama[c] = df_panorama[c].apply(lambda x: str(x)[:-2] if str(x).endswith('.0') else x)
+            
+            st.markdown(f"<h5 style='color: #E2E8F0;'>{view_title}</h5>", unsafe_allow_html=True)
+            st.dataframe(df_panorama[final_cols], use_container_width=True, hide_index=True)
+
+        render_b4_panorama("5日幅度變動排名", [('📉 融資減少', 'df_margin_pct'), ('📉 借券減少', 'df_short_pct'), ('📈 融券增加', 'df_margin_plus_pct')], search_query)
+        st.write("") 
+        render_b4_panorama("5日張數變動排名", [('📉 融資減少', 'df_margin_vol'), ('📉 借券減少', 'df_short_vol'), ('📈 融券增加', 'df_margin_plus_vol')], search_query)
+
+        st.markdown("<hr style='border-color: #334155;'>", unsafe_allow_html=True)
+        st.markdown("<h4 style='color: #FCD34D;'>💰 區塊 5：大戶動向診斷</h4>", unsafe_allow_html=True)
+        
+        col_400, col_1000 = st.columns(2)
+        with col_400: scan_and_display("💎 400張以上大戶動向", 'df_blk5', search_query)
+        with col_1000: scan_and_display("🐳 1000張以上超級大戶動向", 'df_blk5_1000', search_query)
+############################################    
+
+
 # ==========================================
 # 🧪 測試區：Google Sheets 連線測試
 # ==========================================
