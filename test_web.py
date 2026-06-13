@@ -1015,17 +1015,18 @@ with st.sidebar:
                     <div style="font-size: 14px; font-weight: 600; color: {fng_color};">{f_rating}</div>
                 </div>
                 """, unsafe_allow_html=True)
+
+# 👇👇👇 執行引擎必須放在上面兩個 def 函數「定義完成」的下面！ 👇👇👇
 # ==========================================
 # 🛡️ 背景守護程式 (強制維持記憶體熱度，解決歸零問題)
 # ==========================================
-# 不管切換到哪一頁，只要記憶體裡沒有母表，或者強制更新標記被觸發，就立刻背景重算！
 if 'my_final_df' not in st.session_state or st.session_state['my_final_df'].empty or st.session_state.get('force_reload', False):
     with st.spinner("⚡ 背景引擎啟動中，正在載入全市場籌碼數據... (僅需數秒)"):
         json_dfs, latest_all_df = fetch_github_json_all()
         final_df, sorted_dates, date_cols, color_ref = build_block1_master_df()
         st.session_state['my_final_df'] = final_df
         st.session_state['force_reload'] = False # 重置標記
-
+# 👆👆👆 ======================================================================👆👆👆
 # ==========================================
 # ✉️ 獨立分頁：聯絡我們 (完美黑夜派對版)
 # ==========================================
