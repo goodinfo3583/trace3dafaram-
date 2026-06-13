@@ -231,7 +231,7 @@ st.markdown(
 
 # ==========================================
 # ==========================================
-# 📍 頂部：戰情室快速導航 (靠右對齊 + 懸停展開聲明列 - 消除 Markdown 斷行 Bug 版)
+# 📍 頂部：戰情室快速導航 (靠右對齊 + 懸停下拉抽屜 + 金黃發光版)
 # ==========================================
 st.markdown("""
 <style>
@@ -246,51 +246,63 @@ st.markdown("""
     background-color: #0A0D14;
 }
 
-/* ⚠️ 微型免責聲明橫幅 (預設狀態) */
+/* 微型聲明橫幅 (水平排列) */
 .disclaimer-bar {
+    display: flex;
     background-color: #111622;
-    padding: 6px 20px;
-    text-align: left;
+    padding: 0px 15px;
     border-bottom: 1px dashed #1E293B;
-    cursor: help;
-    display: flex;
-    flex-direction: column;
 }
 
-/* 頂端標題列 (平時只顯示這個) */
-.disclaimer-header {
-    display: flex;
-    gap: 20px;
-    font-size: 13px;
-    color: #64748B;
-    font-weight: 500;
-}
-
+/* 單個聲明項目 (作為下拉容器) */
 .disclaimer-item {
-    transition: color 0.2s;
+    position: relative;
+    padding: 6px 15px;
+    cursor: help;
 }
 
-/* 滑鼠移過去字體發亮 */
-.disclaimer-item:hover {
-    color: #00D2FF;
+/* 聲明標題 */
+.disclaimer-title {
+    color: #64748B;
+    font-size: 13px;
+    font-weight: 500;
+    transition: all 0.2s;
+    text-decoration: none;
 }
 
-/* 隱藏的完整聲明內容 */
+/* 滑鼠移過去字體變成金黃色並發亮 */
+.disclaimer-item:hover .disclaimer-title {
+    color: #FFD700;
+    text-shadow: 0 0 8px rgba(255, 215, 0, 0.5);
+}
+
+/* 隱藏的下拉抽屜內容 (絕對定位，不影響下方按鈕列) */
 .disclaimer-content {
+    position: absolute;
+    top: 100%;
+    left: 0;
+    width: 350px;
+    max-width: 90vw;
+    background-color: #111622;
+    border: 1px solid #1E293B;
+    border-top: none;
+    border-radius: 0 0 8px 8px;
+    padding: 0px 15px;
     max-height: 0;
     opacity: 0;
     overflow: hidden;
-    transition: all 0.4s ease-in-out;
+    transition: all 0.3s ease-in-out;
     font-size: 12px;
     color: #94A3B8;
     line-height: 1.6;
+    box-shadow: 0px 8px 20px rgba(0,0,0,0.8);
 }
 
-/* 🖱️ 滑鼠移到整個橫幅上時，抽屜向下拉開！ */
-.disclaimer-bar:hover .disclaimer-content {
-    max-height: 100px;
+/* 🖱️ 滑鼠懸停時向下展開抽屜！ */
+.disclaimer-item:hover .disclaimer-content {
+    max-height: 400px;
     opacity: 1;
-    margin-top: 8px;
+    padding: 12px 15px;
 }
 
 /* 🌟 導航按鈕容器：靠右對齊 */
@@ -316,10 +328,11 @@ st.markdown("""
     font-family: -apple-system, BlinkMacSystemFont, "Microsoft JhengHei", sans-serif !important;
 }
 
+/* 🌟 按鈕滑鼠懸停：改為金黃色發光與微放大 */
 .nav-text-link:hover {
-    color: #00D2FF !important;
-    text-shadow: 0 0 12px rgba(0, 210, 255, 0.8);
-    transform: scale(1.05); 
+    color: #FFD700 !important;
+    text-shadow: 0 0 12px rgba(255, 215, 0, 0.8);
+    transform: scale(1.08); 
 }
 
 /* 分隔線 */
@@ -329,7 +342,7 @@ st.markdown("""
     user-select: none;
 }
 
-/* 📱 手機版特化：螢幕縮小時的防跑版機制 */
+/* 📱 手機版特化防跑版機制 */
 @media (max-width: 768px) {
     .nav-btn-container {
         justify-content: flex-end;
@@ -339,7 +352,7 @@ st.markdown("""
     .nav-text-link { font-size: 14px; margin: 2px; }
 }
 
-/* 避免頁面內容被置頂列遮住，往下推 */
+/* 往下推避免置頂列遮住內容 */
 .stApp {
     margin-top: 90px;
 }
@@ -347,15 +360,31 @@ st.markdown("""
 
 <div class="sticky-header-wrapper">
     <div class="disclaimer-bar">
-        <div class="disclaimer-header">
-            <span class="disclaimer-item">使用聲明</span>
-            <span class="disclaimer-item">隱私權政策</span>
-            <span class="disclaimer-item">聯絡我們</span>
+        <!-- 項目 1：使用聲明 -->
+        <div class="disclaimer-item">
+            <span class="disclaimer-title">使用聲明</span>
+            <div class="disclaimer-content">
+                本平台僅供教育研究與籌碼觀察，絕不構成任何實質投資建議、勸誘或要約。所有資料源自公開數據，受限於網路技術，可能有延遲或錯誤。<br>
+                <br>
+                投資必有風險，依本平台資訊所做之任何決策與損益，均須由使用者自行負責，本平台不負擔任何法律賠償責任。
+            </div>
         </div>
-        <div class="disclaimer-content">
-            本平台僅供教育研究與籌碼觀察，絕不構成任何實質投資建議、勸誘或要約。所有資料源自 TWSE / TPEX / 公開資訊觀測站 等公開數據，受限於網路技術，可能有延遲、錯誤或不完整之情形。<br>投資必有風險，使用者依本平台資訊所做之任何投資決策與損益結果，均須由使用者自行負責，本平台不對資料正確性、即時性負擔任何法律賠償責任。
+        <!-- 項目 2：隱私權政策 (精簡改寫版) -->
+        <div class="disclaimer-item">
+            <span class="disclaimer-title">隱私權政策</span>
+            <div class="disclaimer-content">
+                <b>1. 蒐集目的與範圍：</b><br>本平台依個資法蒐集您的識別資料(如IP、使用紀錄)僅供維持系統安全與優化服務使用。<br>
+                <b>2. 資料保護與利用：</b><br>您的資料僅於本平台與合作範圍內合法使用，除司法或法規要求外，絕不向第三方洩露。<br>
+                <b>3. 資料請求與刪除：</b><br>您可透過「聯絡我們」請求查詢、更正或刪除資料。申請刪除註冊帳號視同終止服務。<br>
+                <b>4. 政策修訂與同意：</b><br>本站保留隨時修改政策之權利，繼續使用即視為同意最新規範。
+            </div>
+        </div>
+        <!-- 項目 3：聯絡我們 (點擊滑動至表單區塊) -->
+        <div class="disclaimer-item">
+            <a href="#section-contact" class="disclaimer-title" style="cursor: pointer;">聯絡我們</a>
         </div>
     </div>
+    
     <div class="nav-btn-container">
         <a href="#section-top-pool" target="_self" class="nav-text-link">🏆 觀察名單</a>
         <span class="nav-divider">|</span>
@@ -369,7 +398,7 @@ st.markdown("""
         <span class="nav-divider">|</span>
         <a href="#section-4-1" target="_self" class="nav-text-link">🔄 資券軋空</a>
         <span class="nav-divider">|</span>
-        <a href="#section-5" target="_self" class="nav-text-link">💰 大戶動向</a>
+        <a href="#section-5" target="_self" class="nav-text-link">💰 大股東動向</a>
         <span class="nav-divider">|</span>
         <a href="#section-6" target="_self" class="nav-text-link">💸 鉅額交易</a>
     </div>
@@ -4216,7 +4245,59 @@ with top_pool_container:
 # ==========================================
 # 🧪 測試區：Google Sheets 連線測試
 # ==========================================
+# ==========================================
+# ✉️ 聯絡我們 (回報系統)
+# ==========================================
+st.write("---")
+st.markdown("<div id='section-contact'></div>", unsafe_allow_html=True)
 
+with st.container(border=True):
+    st.markdown("<h3 style='color: #FFD700; margin-top: 0;'>✉️ 聯絡站長</h3>", unsafe_allow_html=True)
+    st.write("如果您發現任何系統 Bug、數據異常，或是對本平台有任何建議，歡迎填寫表單回報！")
+    
+    # 建立回報表單
+    with st.form("contact_us_form", clear_on_submit=True):
+        c1, c2 = st.columns(2)
+        with c1:
+            sender_name = st.text_input("您的稱呼 (選填)", placeholder="例如：股市阿東")
+        with c2:
+            sender_email = st.text_input("電子信箱 (選填)", placeholder="若需站長回覆請務必留下 Email")
+            
+        message_body = st.text_area("回報內容 / 建議事項*", placeholder="請描述您遇到的問題、發生時間或建議...", height=120)
+        
+        # 將按鈕設計成金色系
+        submit_btn = st.form_submit_button("🚀 傳送訊息給站長", use_container_width=True)
+        
+        if submit_btn:
+            if not message_body.strip():
+                st.error("⚠️ 傳送失敗：請務必填寫回報內容喔！")
+            else:
+                try:
+                    # 嘗試讀取 Google Sheets 中名為「聯絡我們」的工作表
+                    try:
+                        old_contact_df = conn.read(spreadsheet=SHEET_URL, worksheet="聯絡我們", ttl=0)
+                        old_contact_df = old_contact_df.dropna(how="all")
+                    except Exception:
+                        # 如果是第一次讀取或是工作表剛建好沒資料，就建一個空的 DataFrame
+                        old_contact_df = pd.DataFrame(columns=["時間", "稱呼", "信箱", "內容"])
+                    
+                    # 建立當下時間與回報資料
+                    now_str = datetime.datetime.now().strftime("%Y-%m-%d %H:%M:%S")
+                    new_data = pd.DataFrame([{
+                        "時間": now_str, 
+                        "稱呼": sender_name.strip() if sender_name else "匿名使用者", 
+                        "信箱": sender_email.strip() if sender_email else "-", 
+                        "內容": message_body.strip()
+                    }])
+                    
+                    # 合併資料並寫回 Google Sheets
+                    final_contact_df = pd.concat([old_contact_df, new_data], ignore_index=True)
+                    conn.update(spreadsheet=SHEET_URL, worksheet="聯絡我們", data=final_contact_df)
+                    
+                    st.success("✅ 感謝您的回報！訊息已成功傳送，我們會盡快處理。")
+                    st.balloons() # 增加一點互動儀式感
+                except Exception as e:
+                    st.error(f"❌ 傳送失敗，請確認 Google Sheets 連線狀態：{str(e)}")
 
 # ==========================================
 # 📊 【蜂蜜計數器】本站累計觀測人次統計
