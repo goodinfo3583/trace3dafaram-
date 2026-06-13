@@ -7,23 +7,23 @@ import re
 import datetime
 import requests  
 import pytz  
+
 # ==========================================
 # 1. 網頁基本設定 & 目錄路徑初始化
 # ==========================================
 st.set_page_config(page_title="台股籌碼五大核心矩陣儀表板", layout="wide")
-# 👇 新增啟動 Google Sheets 永久連線引擎紀錄爬蟲歷史成績
+
+# 👇 啟動 Google Sheets 永久連線引擎 (全域共用)
 from streamlit_gsheets import GSheetsConnection
 conn = st.connection("gsheets", type=GSheetsConnection)
 SHEET_URL = "https://docs.google.com/spreadsheets/d/1TxHDahg8ul6lmUtDN-7X75cBXbkU0jaZ3M9zg6exBgU/edit?usp=sharing"
+
 # 👉 步驟 1：先集中宣告所有的路徑變數
 DATA_DIR = "./Goodinfo_Rankings"
 SCORE_HISTORY_DIR = os.path.join(DATA_DIR, "ScoreHistory")
 MARKET_HISTORY_DIR = os.path.join(DATA_DIR, "MarketHistory")
 BLOCK_HISTORY_DIR = os.path.join(DATA_DIR, "BlockHistory")
-from streamlit_gsheets import GSheetsConnection
-conn = st.connection("gsheets", type=GSheetsConnection)
-SHEET_URL = "https://docs.google.com/..."
-# 👉 步驟 2：
+
 # ==========================================
 # 🛑 隱形急救引擎 (請置於程式最頂端，絕對不要刪除！)
 # ==========================================
@@ -48,6 +48,7 @@ if not os.path.exists(backup_df_path):
 # 2. 補融資備援
 if not os.path.exists(backup_margin_path):
     pd.DataFrame([{"today_bal": 556359646.0, "prev_bal": 535025764.0}]).to_csv(backup_margin_path, index=False, encoding='utf-8-sig')
+# ==========================================
 # ==========================================
 # ==========================================
 # ==========置頂區塊測試區==================
