@@ -753,9 +753,6 @@ with tab3:
 # ==========================================
 # 取得網址列中的 page 參數，若沒有點擊任何按鈕，則預設為 "all" (顯示長條全頁面)
 current_page = st.query_params.get("page", "all")
-json_dfs, latest_all_df = fetch_github_json_all()
-final_df, sorted_dates, date_cols, color_ref = build_block1_master_df()
-st.session_state['my_final_df'] = final_df
 
 # ==========================================
 # ==========================================
@@ -1974,7 +1971,6 @@ def extract_date_from_filename(filename):
 # 🛠️ 核心巨集：合併所有歷史快照與 GitHub 即時數據，產生全域母表
 @st.cache_data(ttl=300)
 def build_block1_master_df():
-    # 確保不會抓不到全域變數，這裡再宣告一次路徑
     DATA_DIR = "./Goodinfo_Rankings"
     date_files = defaultdict(lambda: {'txt': [], 'csv': []})
     all_csv_files = glob.glob(os.path.join(DATA_DIR, "*JSON*.csv"))
@@ -2087,10 +2083,11 @@ def build_block1_master_df():
     
     return pd.DataFrame(), [], [], {}
 
-# 🔥 背景預載：在任何頁面都會優先抓取母表，丟入全域記憶體中，供「快搜」與「觀察名單」使用！
+# 👇👇👇 致命錯誤修復：執行引擎必須放在上面兩個 def 函數「定義完成」的下面！ 👇👇👇
 json_dfs, latest_all_df = fetch_github_json_all()
 final_df, sorted_dates, date_cols, color_ref = build_block1_master_df()
 st.session_state['my_final_df'] = final_df
+# 👆👆👆 ======================================================================👆👆👆
 
 
 # ==========================================
