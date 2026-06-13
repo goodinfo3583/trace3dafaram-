@@ -319,211 +319,12 @@ st.markdown("""
 # 👇👇👇 魔法傳送門接收點 (必須在導航列下方，完全靠左不縮排) 👇👇👇
 top_pool_slot = st.container()
 # 👆👆👆 ========================================================== 👆👆👆
-# =======================================================
-# 側邊欄：戰情指揮中心 (內建個股快搜 + 大盤總經)
-# =======================================================
-with st.sidebar:
-    # ------------------------------------------
-    # 🔍 頂部模塊：側邊欄專屬個股快搜
-    # ------------------------------------------
-    st.markdown("""
-    <div style="background: linear-gradient(90deg, rgba(15,23,42,1) 0%, rgba(14,165,233,0.3) 50%, rgba(15,23,42,1) 100%); 
-                border-top: 1px solid #38bdf8; border-bottom: 1px solid #38bdf8; 
-                padding: 12px 10px; border-radius: 8px; text-align: center; 
-                box-shadow: 0px 0px 15px rgba(56, 189, 248, 0.2); margin-bottom: 15px;">
-        <h3 style="color: #e0f2fe; margin: 0; letter-spacing: 1px; text-shadow: 0 0 10px rgba(56, 189, 248, 0.8); font-size: 18px;">
-            🔍 側邊欄快搜診斷
-        </h3>
-        <p style="color: #94a3b8; margin-top: 5px; font-size: 12px; margin-bottom: 0;">一鍵聯動 K線 ｜ 法人 ｜ 大戶</p>
-    </div>
-    """, unsafe_allow_html=True)
 
-    search_query = st.text_input("輸入代號或名稱 (例: 3231 或 緯創)", key="sidebar_search_final", placeholder="在此輸入...")
-
-    if search_query:
-        pure_stock_id = ""
-        display_name = search_query
-        query_clean = search_query.strip()
-        industry_label = "未分類"
-        
-        if 'STOCK_DICT' in globals() or 'STOCK_DICT' in locals():
-            if query_clean in STOCK_DICT:
-                pure_stock_id = STOCK_DICT[query_clean]["id"]
-                display_name = f"{STOCK_DICT[query_clean]['id']} {STOCK_DICT[query_clean]['name']}"
-                industry_label = STOCK_DICT[query_clean]["industry"]
-            else:
-                for k, v in STOCK_DICT.items():
-                    if query_clean in k:
-                        pure_stock_id = v["id"]
-                        display_name = f"{v['id']} {v['name']}"
-                        industry_label = v["industry"]
-                        break
-        
-        if pure_stock_id == "":
-            match_num = re.search(r'\d+', query_clean)
-            if match_num: pure_stock_id = match_num.group(0)
-
-        st.markdown(f"**診斷標的：** <span style='color: #00D2FF;'>{display_name}</span> <span style='font-size:12px; background-color:#1E293B; padding:2px 6px; border-radius:4px; color:#38BDF8; border: 1px solid #38BDF8;'>🏷️ {industry_label}</span>", unsafe_allow_html=True)
-
-        pool_df = st.session_state.get('top_pool_df', pd.DataFrame())
-        target_score, delta_val, ai_comment = None, 0.0, ""
-
-        if not pool_df.empty:
-            match = robust_search_engine(pool_df, pure_stock_id) if pure_stock_id else robust_search_engine(pool_df, search_query)
-            if not match.empty:
-                row_data = match.iloc[0]
-                target_score = row_data.get('總分', 0)
-                delta_val = float(str(row_data.get('▼變量', '0.0')).replace('+', '').replace('🆕', '').strip())
-                ai_comment = generate_stock_commentary(row_data)
-
-        if target_score is not None and pure_stock_id != "":
-            delta_color = "#FF4B4B" if delta_val > 0 else "#00CC66" if delta_val < 0 else "#94A3B8"
-            delta_symbol = "🔥" if delta_val > 0 else "🚨" if delta_val < 0 else "🔄"
-            delta_str = f"+{delta_val}" if delta_val > 0 else f"{delta_val}" 
-            st.markdown(f"**綜合評分：** <span style='color:#FFD700; font-size:20px;'>{target_score}</span> 分 <span style='color:{delta_color}; font-size:13px;'>({delta_symbol} {delta_str})</span>", unsafe_allow_html=True)
-            if ai_comment:
-                st.info(ai_comment)
-        else:
-            st.markdown("**綜合評分：** <span style='color:#64748B;'>未達進榜標準 (0分)</span>", unsafe_allow_html=True)
-
-        # ------------------ K 線圖控制 ------------------
-        if 'show_kline' not in st.session_state: st.session_state.show_kline = False
-        if 'kline_period' not in st.session_state: st.session_state.kline_period = "日線"
-
-        btn_label = "❌ 關閉 K 線圖" if st.session_state.show_kline else "📊 展開 K 線圖"
-        if st.button(btn_label, use_container_width=True):
-            st.session_state.show_kline = not st.session_state.show_kline
-            st.rerun()
-
-        if st.session_state.show_kline and pure_stock_id != "":
-            tf_c1, tf_c2, tf_c3 = st.columns(3)
-            if tf_c1.button("日K", use_container_width=True): st.session_state.kline_period = "日線"; st.rerun()
-            if tf_c2.button("週K", use_container_width=True): st.session_state.kline_period = "週線"; st.rerun()
-            if tf_c3.button("月K", use_container_width=True): st.session_state.kline_period = "月線"; st.rerun()
-            
-            ind_c1, ind_c2 = st.columns(2)
-            chk_kd = ind_c1.checkbox("KD", value=False, key="kd_chk_side")
-            chk_macd = ind_c2.checkbox("MACD", value=False, key="macd_chk_side")
-            chk_rsi = st.checkbox("RSI", value=False, key="rsi_chk_side")
-            
-            with st.spinner("載入線圖中..."):
-                all_mas = ["5MA", "10MA", "20MA", "60MA"] # 側邊欄太擠，省略長均線
-                render_technical_chart(pure_stock_id, st.session_state.kline_period, all_mas, chk_rsi, chk_macd, chk_kd)
-
-        # ------------------ 籌碼大數據 ------------------
-        with st.expander("👑 區塊1：三大法人持股變化", expanded=False):
-            if 'my_final_df' in st.session_state:
-                df_b1 = st.session_state['my_final_df']
-                res_b1 = robust_search_engine(df_b1, search_query)
-                if not res_b1.empty:
-                    date_cols = [c for c in res_b1.columns if '持股%' in c or c.isdigit()]
-                    clean_cols = [c for c in res_b1.columns if not any(k in c for k in ['_區塊', '排序', '上榜數量', '原始上榜', '精準單日'])]
-                    st.dataframe(res_b1[clean_cols], use_container_width=True, hide_index=True)
-                else: st.write("⚪ 未進榜")
-
-        with st.expander("🎯 區塊2：法人買佔比診斷", expanded=False):
-            scan_and_display("外資佔成交", 'df_blk2_1', search_query)
-            scan_and_display("投信佔成交", 'df_blk2_2', search_query)
-            scan_and_display("外資佔發行", 'df_blk2_3', search_query)
-            scan_and_display("投信佔發行", 'df_blk2_4', search_query)
-
-        with st.expander("📅 區塊3：法人連買診斷", expanded=False):
-            if 'df_blk3_main' in st.session_state:
-                df_b3 = st.session_state['df_blk3_main']
-                res_b3 = robust_search_engine(df_b3, search_query)
-                display_id = res_b3.iloc[0]['股票代號'] if not res_b3.empty else pure_stock_id
-                display_name = res_b3.iloc[0]['股票名稱'] if not res_b3.empty else "-"
-                
-                base_types = ['🌐 外資日連買', '🌐 外資週連買', '🏦 投信日連買', '🏦 投信週連買']
-                display_list = []
-                for b_type in base_types:
-                    match = res_b3[res_b3['連買類型'] == b_type] if not res_b3.empty else pd.DataFrame()
-                    if not match.empty: display_list.append(match.iloc[0].to_dict())
-                    else: display_list.append({'連買類型': b_type, '股票代號': display_id, '股票名稱': display_name, '狀態動態': '⚪ 未進榜', '連買週期數': '-'})
-                st.dataframe(pd.DataFrame(display_list)[['連買類型','狀態動態','連買週期數']], use_container_width=True, hide_index=True)
-
-        with st.expander("💰 區塊5：大戶動向診斷", expanded=False):
-            scan_and_display("💎 400張大戶", 'df_blk5', search_query)
-            scan_and_display("🐳 1000張大戶", 'df_blk5_1000', search_query)
-
-    st.write("---") # 側邊欄快搜與三大導航 Tab 的分隔線
-
-    # ------------------------------------------
-    # 📊 下半部：原本的三大導航 Tab (大盤/選擇權/總經)
-    # ------------------------------------------
-    tab1, tab2, tab3 = st.tabs(["🔹 大盤籌碼", "🔹 選擇權", "🔹 總經導航"])
-    
-    with tab1:
-        actual_data_date = render_sidebar_market_summary()
-        
-    with tab2:
-        render_options_dashboard()
-        
-    with tab3:
-        macro_data = fetch_macro_indicators()
-        
-        vix_val = macro_data["vix"]["value"]
-        vix_color = "#a1a1aa" 
-        if vix_val is not None:
-            if vix_val < 20: vix_color = "#10b981" 
-            elif vix_val < 28.7: vix_color = "#3b82f6" 
-            elif vix_val < 33.5: vix_color = "#f59e0b" 
-            else: vix_color = "#ef4444" 
-        vix_tooltip = f"VIX 市場恐慌指標\n目前 VIX： {vix_val if vix_val else '無'}\n綠色：市場平穩。\n藍色：報酬較差。\n橘色：報酬達 15%。\n紅色：報酬達 25%。"
-
-        vixtwn_val = macro_data["vixtwn"]["value"]
-        vixtwn_color = "#a1a1aa"
-        if vixtwn_val is not None:
-            if vixtwn_val < 20: vixtwn_color = "#3b82f6" 
-            elif vixtwn_val < 30: vixtwn_color = "#10b981" 
-            elif vixtwn_val < 40: vixtwn_color = "#f59e0b" 
-            else: vixtwn_color = "#ef4444" 
-        vixtwn_tooltip = f"VIXTWN 台灣恐慌指標\n目前： {vixtwn_val if vixtwn_val else '無'}\n藍：多頭常態。\n綠：波動加劇。\n橘：恐慌殺盤布局。\n紅：極度恐慌買點。"
-
-        fng_val = macro_data["fng"]["score"]
-        fng_color = "#a1a1aa"
-        if fng_val is not None:
-            if fng_val < 25: fng_color = "#ef4444" 
-            elif fng_val > 75: fng_color = "#10b981" 
-            else: fng_color = "#f59e0b" 
-        fng_tooltip = f"FNG 恐懼貪婪指數\n目前： {fng_val if fng_val else '無'}\n<25 積極買點\n<15 分批加碼\n>75 分批減碼\n>85 獲利了結\n>90 提高現金"
-
-        col_left, col_right = st.columns([1, 1])
-        
-        with col_left:
-            v1_str = f"{vix_val:.2f}" if vix_val else "無資料"
-            p1_str = f"{'+' if macro_data['vix']['pct'] and macro_data['vix']['pct'] > 0 else ''}{macro_data['vix']['pct']:.2f}%" if macro_data['vix']['pct'] is not None else "-"
-            st.markdown(f"""
-            <div title="{vix_tooltip}" style="background-color: rgba(255,255,255,0.03); padding: 12px; border-radius: 10px; border: 1px solid rgba(255,255,255,0.1); text-align: center; cursor: help; margin-bottom: 10px;">
-                <div style="font-size: 13px; color: #a1a1aa; margin-bottom: 4px;">🇺🇸 美股 VIX</div>
-                <div style="font-size: 22px; font-weight: 700; color: {vix_color}; margin-bottom: 2px;">{v1_str}</div>
-                <div style="font-size: 12px; color: #71717a;">{p1_str}</div>
-            </div>
-            """, unsafe_allow_html=True)
-            
-            v2_str = f"{vixtwn_val:.2f}" if vixtwn_val else "無資料"
-            p2_str = "最新數值" if vixtwn_val else "-"
-            st.markdown(f"""
-            <div title="{vixtwn_tooltip}" style="background-color: rgba(255,255,255,0.03); padding: 12px; border-radius: 10px; border: 1px solid rgba(255,255,255,0.1); text-align: center; cursor: help;">
-                <div style="font-size: 13px; color: #a1a1aa; margin-bottom: 4px;">🇹🇼 台股 VIX</div>
-                <div style="font-size: 22px; font-weight: 700; color: {vixtwn_color}; margin-bottom: 2px;">{v2_str}</div>
-                <div style="font-size: 12px; color: #71717a;">{p2_str}</div>
-            </div>
-            """, unsafe_allow_html=True)
-
-        with col_right:
-            f_str = str(fng_val) if fng_val else "無資料"
-            f_rating = macro_data["fng"]["rating"]
-            st.markdown(f"""
-            <div title="{fng_tooltip}" style="background-color: rgba(255,255,255,0.03); padding: 12px; height: calc(100% - 24px); display: flex; flex-direction: column; justify-content: center; align-items: center; border-radius: 10px; border: 1px solid rgba(255,255,255,0.1); text-align: center; cursor: help;">
-                <div style="font-size: 15px; color: #a1a1aa; margin-bottom: 15px;">🧭 恐懼與貪婪</div>
-                <div style="font-size: 36px; font-weight: 700; color: {fng_color}; margin-bottom: 10px;">{f_str}</div>
-                <div style="font-size: 14px; font-weight: 600; color: {fng_color};">{f_rating}</div>
-            </div>
-            """, unsafe_allow_html=True)
 # ==========================================
-# 🌟 快搜專屬工具函數區 (請放在程式碼上半部，全域可用)
+# 🌟 所有側邊欄專屬工具函數區 (🚨 必須放在 with st.sidebar 的最上方！)
 # ==========================================
+
+# --- 1. 快搜專屬工具 ---
 def robust_search_engine(df, query):
     if df is None or df.empty: return pd.DataFrame()
     df = df.loc[:, ~df.columns.duplicated()].copy()
@@ -570,7 +371,7 @@ def scan_and_display(title, session_key, query):
 
 def generate_stock_commentary(row):
     score = row.get('總分', 0)
-    warns = str(row.get('法人賣出警示', ''))
+    warns = str(row.get('賣出警示', ''))
     b5_trend = str(row.get('大股東動向', ''))
     has_warning = "⚠️" in warns or "🚨" in warns
     high_score = score >= 3
@@ -588,11 +389,7 @@ def generate_stock_commentary(row):
     elif score >= 1: return "🔄 【中性觀望】籌碼表現較為平淡，雖有零星買盤但缺乏明確連續性。建議多看少做。"
     else: return "❄️ 【弱勢整理】籌碼處於流失或無主力認養狀態。建議暫不考量。"
 
-# ==========================================
-# 🌟 大盤與總經專屬工具函數區 (必須放在 with st.sidebar 上方)
-# ==========================================
-
-# (如果你原本的程式碼已經有 get_latest_csv, get_prev_csv, get_diff_ui，這三個可以不用重複貼)
+# --- 2. 大盤與總經專屬工具 ---
 def get_latest_csv(keyword):
     import os, glob, re
     files = glob.glob(os.path.join(DATA_DIR, f"*{keyword}*.csv"))
@@ -881,6 +678,212 @@ def fetch_macro_indicators():
     except: pass
 
     return data
+
+
+# =======================================================
+# 側邊欄：戰情指揮中心 (內建個股快搜 + 大盤總經)
+# =======================================================
+with st.sidebar:
+    # ------------------------------------------
+    # 🔍 頂部模塊：側邊欄專屬個股快搜
+    # ------------------------------------------
+    st.markdown("""
+    <div style="background: linear-gradient(90deg, rgba(15,23,42,1) 0%, rgba(14,165,233,0.3) 50%, rgba(15,23,42,1) 100%); 
+                border-top: 1px solid #38bdf8; border-bottom: 1px solid #38bdf8; 
+                padding: 12px 10px; border-radius: 8px; text-align: center; 
+                box-shadow: 0px 0px 15px rgba(56, 189, 248, 0.2); margin-bottom: 15px;">
+        <h3 style="color: #e0f2fe; margin: 0; letter-spacing: 1px; text-shadow: 0 0 10px rgba(56, 189, 248, 0.8); font-size: 18px;">
+            🔍 側邊欄快搜診斷
+        </h3>
+        <p style="color: #94a3b8; margin-top: 5px; font-size: 12px; margin-bottom: 0;">一鍵聯動 K線 ｜ 法人 ｜ 大戶</p>
+    </div>
+    """, unsafe_allow_html=True)
+
+    search_query = st.text_input("輸入代號或名稱 (例: 3231 或 緯創)", key="sidebar_search_final", placeholder="在此輸入...")
+
+    if search_query:
+        pure_stock_id = ""
+        display_name = search_query
+        query_clean = search_query.strip()
+        industry_label = "未分類"
+        
+        if 'STOCK_DICT' in globals() or 'STOCK_DICT' in locals():
+            if query_clean in STOCK_DICT:
+                pure_stock_id = STOCK_DICT[query_clean]["id"]
+                display_name = f"{STOCK_DICT[query_clean]['id']} {STOCK_DICT[query_clean]['name']}"
+                industry_label = STOCK_DICT[query_clean]["industry"]
+            else:
+                for k, v in STOCK_DICT.items():
+                    if query_clean in k:
+                        pure_stock_id = v["id"]
+                        display_name = f"{v['id']} {v['name']}"
+                        industry_label = v["industry"]
+                        break
+        
+        if pure_stock_id == "":
+            match_num = re.search(r'\d+', query_clean)
+            if match_num: pure_stock_id = match_num.group(0)
+
+        st.markdown(f"**診斷標的：** <span style='color: #00D2FF;'>{display_name}</span> <span style='font-size:12px; background-color:#1E293B; padding:2px 6px; border-radius:4px; color:#38BDF8; border: 1px solid #38BDF8;'>🏷️ {industry_label}</span>", unsafe_allow_html=True)
+
+        pool_df = st.session_state.get('top_pool_df', pd.DataFrame())
+        target_score, delta_val, ai_comment = None, 0.0, ""
+
+        if not pool_df.empty:
+            match = robust_search_engine(pool_df, pure_stock_id) if pure_stock_id else robust_search_engine(pool_df, search_query)
+            if not match.empty:
+                row_data = match.iloc[0]
+                target_score = row_data.get('總分', 0)
+                delta_val = float(str(row_data.get('▼變量', '0.0')).replace('+', '').replace('🆕', '').strip())
+                ai_comment = generate_stock_commentary(row_data)
+
+        if target_score is not None and pure_stock_id != "":
+            delta_color = "#FF4B4B" if delta_val > 0 else "#00CC66" if delta_val < 0 else "#94A3B8"
+            delta_symbol = "🔥" if delta_val > 0 else "🚨" if delta_val < 0 else "🔄"
+            delta_str = f"+{delta_val}" if delta_val > 0 else f"{delta_val}" 
+            st.markdown(f"**綜合評分：** <span style='color:#FFD700; font-size:20px;'>{target_score}</span> 分 <span style='color:{delta_color}; font-size:13px;'>({delta_symbol} {delta_str})</span>", unsafe_allow_html=True)
+            if ai_comment:
+                st.info(ai_comment)
+        else:
+            st.markdown("**綜合評分：** <span style='color:#64748B;'>未達進榜標準 (0分)</span>", unsafe_allow_html=True)
+
+        # ------------------ K 線圖控制 ------------------
+        if 'show_kline' not in st.session_state: st.session_state.show_kline = False
+        if 'kline_period' not in st.session_state: st.session_state.kline_period = "日線"
+
+        btn_label = "❌ 關閉 K 線圖" if st.session_state.show_kline else "📊 展開 K 線圖"
+        if st.button(btn_label, use_container_width=True):
+            st.session_state.show_kline = not st.session_state.show_kline
+            st.rerun()
+
+        if st.session_state.show_kline and pure_stock_id != "":
+            tf_c1, tf_c2, tf_c3 = st.columns(3)
+            if tf_c1.button("日K", use_container_width=True): st.session_state.kline_period = "日線"; st.rerun()
+            if tf_c2.button("週K", use_container_width=True): st.session_state.kline_period = "週線"; st.rerun()
+            if tf_c3.button("月K", use_container_width=True): st.session_state.kline_period = "月線"; st.rerun()
+            
+            ind_c1, ind_c2 = st.columns(2)
+            chk_kd = ind_c1.checkbox("KD", value=False, key="kd_chk_side")
+            chk_macd = ind_c2.checkbox("MACD", value=False, key="macd_chk_side")
+            chk_rsi = st.checkbox("RSI", value=False, key="rsi_chk_side")
+            
+            with st.spinner("載入線圖中..."):
+                all_mas = ["5MA", "10MA", "20MA", "60MA"] # 側邊欄太擠，省略長均線
+                # 如果你有 K 線繪製函數，請確保它也在上方宣告
+                try: render_technical_chart(pure_stock_id, st.session_state.kline_period, all_mas, chk_rsi, chk_macd, chk_kd)
+                except: pass
+
+        # ------------------ 籌碼大數據 ------------------
+        with st.expander("👑 區塊1：三大法人持股變化", expanded=False):
+            if 'my_final_df' in st.session_state:
+                df_b1 = st.session_state['my_final_df']
+                res_b1 = robust_search_engine(df_b1, search_query)
+                if not res_b1.empty:
+                    date_cols = [c for c in res_b1.columns if '持股%' in c or c.isdigit()]
+                    clean_cols = [c for c in res_b1.columns if not any(k in c for k in ['_區塊', '排序', '上榜數量', '原始上榜', '精準單日'])]
+                    st.dataframe(res_b1[clean_cols], use_container_width=True, hide_index=True)
+                else: st.write("⚪ 未進榜")
+
+        with st.expander("🎯 區塊2：法人買佔比診斷", expanded=False):
+            scan_and_display("外資佔成交", 'df_blk2_1', search_query)
+            scan_and_display("投信佔成交", 'df_blk2_2', search_query)
+            scan_and_display("外資佔發行", 'df_blk2_3', search_query)
+            scan_and_display("投信佔發行", 'df_blk2_4', search_query)
+
+        with st.expander("📅 區塊3：法人連買診斷", expanded=False):
+            if 'df_blk3_main' in st.session_state:
+                df_b3 = st.session_state['df_blk3_main']
+                res_b3 = robust_search_engine(df_b3, search_query)
+                display_id = res_b3.iloc[0]['股票代號'] if not res_b3.empty else pure_stock_id
+                display_name = res_b3.iloc[0]['股票名稱'] if not res_b3.empty else "-"
+                
+                base_types = ['🌐 外資日連買', '🌐 外資週連買', '🏦 投信日連買', '🏦 投信週連買']
+                display_list = []
+                for b_type in base_types:
+                    match = res_b3[res_b3['連買類型'] == b_type] if not res_b3.empty else pd.DataFrame()
+                    if not match.empty: display_list.append(match.iloc[0].to_dict())
+                    else: display_list.append({'連買類型': b_type, '股票代號': display_id, '股票名稱': display_name, '狀態動態': '⚪ 未進榜', '連買週期數': '-'})
+                st.dataframe(pd.DataFrame(display_list)[['連買類型','狀態動態','連買週期數']], use_container_width=True, hide_index=True)
+
+        with st.expander("💰 區塊5：大戶動向診斷", expanded=False):
+            scan_and_display("💎 400張大戶", 'df_blk5', search_query)
+            scan_and_display("🐳 1000張大戶", 'df_blk5_1000', search_query)
+
+    st.write("---") # 側邊欄快搜與三大導航 Tab 的分隔線
+
+    # ------------------------------------------
+    # 📊 下半部：原本的三大導航 Tab (大盤/選擇權/總經)
+    # ------------------------------------------
+    tab1, tab2, tab3 = st.tabs(["🔹 大盤籌碼", "🔹 選擇權", "🔹 總經導航"])
+    
+    with tab1:
+        actual_data_date = render_sidebar_market_summary()
+        
+    with tab2:
+        render_options_dashboard()
+        
+    with tab3:
+        macro_data = fetch_macro_indicators()
+        
+        vix_val = macro_data["vix"]["value"]
+        vix_color = "#a1a1aa" 
+        if vix_val is not None:
+            if vix_val < 20: vix_color = "#10b981" 
+            elif vix_val < 28.7: vix_color = "#3b82f6" 
+            elif vix_val < 33.5: vix_color = "#f59e0b" 
+            else: vix_color = "#ef4444" 
+        vix_tooltip = f"VIX 市場恐慌指標\n目前 VIX： {vix_val if vix_val else '無'}\n綠色：市場平穩。\n藍色：報酬較差。\n橘色：報酬達 15%。\n紅色：報酬達 25%。"
+
+        vixtwn_val = macro_data["vixtwn"]["value"]
+        vixtwn_color = "#a1a1aa"
+        if vixtwn_val is not None:
+            if vixtwn_val < 20: vixtwn_color = "#3b82f6" 
+            elif vixtwn_val < 30: vixtwn_color = "#10b981" 
+            elif vixtwn_val < 40: vixtwn_color = "#f59e0b" 
+            else: vixtwn_color = "#ef4444" 
+        vixtwn_tooltip = f"VIXTWN 台灣恐慌指標\n目前： {vixtwn_val if vixtwn_val else '無'}\n藍：多頭常態。\n綠：波動加劇。\n橘：恐慌殺盤布局。\n紅：極度恐慌買點。"
+
+        fng_val = macro_data["fng"]["score"]
+        fng_color = "#a1a1aa"
+        if fng_val is not None:
+            if fng_val < 25: fng_color = "#ef4444" 
+            elif fng_val > 75: fng_color = "#10b981" 
+            else: fng_color = "#f59e0b" 
+        fng_tooltip = f"FNG 恐懼貪婪指數\n目前： {fng_val if fng_val else '無'}\n<25 積極買點\n<15 分批加碼\n>75 分批減碼\n>85 獲利了結\n>90 提高現金"
+
+        col_left, col_right = st.columns([1, 1])
+        
+        with col_left:
+            v1_str = f"{vix_val:.2f}" if vix_val else "無資料"
+            p1_str = f"{'+' if macro_data['vix']['pct'] and macro_data['vix']['pct'] > 0 else ''}{macro_data['vix']['pct']:.2f}%" if macro_data['vix']['pct'] is not None else "-"
+            st.markdown(f"""
+            <div title="{vix_tooltip}" style="background-color: rgba(255,255,255,0.03); padding: 12px; border-radius: 10px; border: 1px solid rgba(255,255,255,0.1); text-align: center; cursor: help; margin-bottom: 10px;">
+                <div style="font-size: 13px; color: #a1a1aa; margin-bottom: 4px;">🇺🇸 美股 VIX</div>
+                <div style="font-size: 22px; font-weight: 700; color: {vix_color}; margin-bottom: 2px;">{v1_str}</div>
+                <div style="font-size: 12px; color: #71717a;">{p1_str}</div>
+            </div>
+            """, unsafe_allow_html=True)
+            
+            v2_str = f"{vixtwn_val:.2f}" if vixtwn_val else "無資料"
+            p2_str = "最新數值" if vixtwn_val else "-"
+            st.markdown(f"""
+            <div title="{vixtwn_tooltip}" style="background-color: rgba(255,255,255,0.03); padding: 12px; border-radius: 10px; border: 1px solid rgba(255,255,255,0.1); text-align: center; cursor: help;">
+                <div style="font-size: 13px; color: #a1a1aa; margin-bottom: 4px;">🇹🇼 台股 VIX</div>
+                <div style="font-size: 22px; font-weight: 700; color: {vixtwn_color}; margin-bottom: 2px;">{v2_str}</div>
+                <div style="font-size: 12px; color: #71717a;">{p2_str}</div>
+            </div>
+            """, unsafe_allow_html=True)
+
+        with col_right:
+            f_str = str(fng_val) if fng_val else "無資料"
+            f_rating = macro_data["fng"]["rating"]
+            st.markdown(f"""
+            <div title="{fng_tooltip}" style="background-color: rgba(255,255,255,0.03); padding: 12px; height: calc(100% - 24px); display: flex; flex-direction: column; justify-content: center; align-items: center; border-radius: 10px; border: 1px solid rgba(255,255,255,0.1); text-align: center; cursor: help;">
+                <div style="font-size: 15px; color: #a1a1aa; margin-bottom: 15px;">🧭 恐懼與貪婪</div>
+                <div style="font-size: 36px; font-weight: 700; color: {fng_color}; margin-bottom: 10px;">{f_str}</div>
+                <div style="font-size: 14px; font-weight: 600; color: {fng_color};">{f_rating}</div>
+            </div>
+            """, unsafe_allow_html=True)
 # ==========================================
 #  數據分析觀察名單專屬工具函數區 
 # ==========================================
