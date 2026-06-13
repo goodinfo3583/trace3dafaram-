@@ -231,92 +231,122 @@ st.markdown(
 
 # ==========================================
 # ==========================================
-# 📍 頂部：戰情室快速導航 (系統常見字體 + 強制統一 + 單排對齊)
+# 📍 頂部：戰情室快速導航 (靠右對齊自適應 + 免責聲明跑馬燈)
 # ==========================================
 st.markdown("""
 <style>
-/* 強制釘在瀏覽器最頂端 */
-.sticky-nav-bar {
+/* 強制釘在瀏覽器最頂端的外框 */
+.sticky-header-wrapper {
     position: fixed;
     top: 0;
     left: 0;
     width: 100%;
+    z-index: 999999;
+    box-shadow: 0px 4px 20px rgba(0, 0, 0, 0.6);
+}
+
+/* ⚠️ 微型免責聲明橫幅 */
+.disclaimer-bar {
+    background-color: #0A0D14;
+    color: #64748B;
+    font-size: 11px;
+    padding: 4px 15px;
+    text-align: center;
+    border-bottom: 1px dashed #1E293B;
+    white-space: nowrap;      /* 預設單行顯示 */
+    overflow: hidden;
+    text-overflow: ellipsis;  /* 太長會變成 ... */
+    letter-spacing: 0.5px;
+    transition: all 0.3s ease;
+    cursor: help;
+}
+/* 滑鼠移上去時，自動展開顯示完整法律免責內容 */
+.disclaimer-bar:hover {
+    white-space: normal;
+    color: #94A3B8;
+    background-color: #111622;
+}
+
+/* 🌟 導航按鈕容器：設定靠右與自動換行 */
+.nav-btn-container {
+    display: flex;
+    flex-wrap: wrap;           /* 允許換行，避免螢幕太小破版 */
+    justify-content: flex-end; /* 按鈕整體靠右對齊 */
+    align-items: center;
+    padding: 10px 15px;
     background-color: #0A0D14; /* 實心背景，防止文字穿透 */
     border-bottom: 2px solid #1E293B;
-    z-index: 999999;
-    padding: 12px 0px;
-    box-shadow: 0px 4px 20px rgba(0, 0, 0, 0.6);
-    
-    /* 🌟 改用最常見、最穩定的現代系統黑體 (包含微軟正黑體、蘋果蘋方體) */
-    font-family: -apple-system, BlinkMacSystemFont, "PingFang TC", "Microsoft JhengHei", "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif !important;
-    
-    /* 強制單行對齊：禁止換行，並讓內容置中 */
-    display: flex;
-    flex-wrap: nowrap; 
-    justify-content: center;
-    align-items: center;
-    white-space: nowrap;
-    overflow-x: auto; 
-}
-
-/* 隱藏滾動條保持美觀 (適用於 Chrome/Edge/Safari) */
-.sticky-nav-bar::-webkit-scrollbar {
-    display: none;
-}
-
-/* 🌟 強制超連結與分隔線繼承外層字體，避免 Streamlit 預設覆蓋造成字體不統一 */
-.nav-text-link, .nav-divider {
-    font-family: inherit !important;
+    gap: 8px;                  /* 按鈕之間的間距 */
 }
 
 /* 導航文字超連結樣式 */
 .nav-text-link {
     text-decoration: none !important;
     color: #94A3B8 !important;
-    font-size: 20px; /* 大小適中，確保單行顯示不擁擠 */
-    font-weight: 600; /* 加粗讓字體更有份量感且清晰 */
-    padding: 5px 10px;
-    margin: 0px 6px;
+    font-size: 18px; 
+    font-weight: 600; 
+    padding: 4px 8px;
     transition: all 0.2s ease-in-out;
+    font-family: -apple-system, BlinkMacSystemFont, "Microsoft JhengHei", sans-serif !important;
 }
 
-/* 滑鼠移上去時：變亮、發光，並微幅放大 */
+/* 滑鼠移上去時：發光微幅放大 */
 .nav-text-link:hover {
     color: #00D2FF !important;
-    text-shadow: 0 0 15px rgba(0, 210, 255, 0.8);
-    transform: scale(1.08); 
+    text-shadow: 0 0 12px rgba(0, 210, 255, 0.8);
+    transform: scale(1.05); 
 }
 
 /* 項目之間的分隔直線 */
 .nav-divider {
     color: #334155;
-    font-size: 22px;
-    margin: 0 4px;
+    font-size: 18px;
     user-select: none;
 }
 
-/* 導航列下推距離 */
+/* 📱 手機版特化微調 (螢幕寬度小於 768px 時觸發) */
+@media (max-width: 768px) {
+    .nav-btn-container {
+        justify-content: flex-end; /* 手機版確實靠右 */
+        padding: 8px 5px;
+    }
+    .nav-divider {
+        display: none; /* 手機上隱藏分隔直線，節省寶貴空間 */
+    }
+    .nav-text-link {
+        font-size: 15px; /* 手機版字體稍微縮小 */
+        margin: 2px;
+    }
+}
+
+/* 導航列變高了，把整個 App 內容往下推，避免被遮擋 */
 .stApp {
-    margin-top: 60px;
+    margin-top: 90px;
 }
 </style>
 
-<div class="sticky-nav-bar">
-    <a href="#section-top-pool" target="_self" class="nav-text-link">🏆 觀察名單</a>
-    <span class="nav-divider">|</span>
-    <a href="#section-search" target="_self" class="nav-text-link">🔍 個股快搜</a>
-    <span class="nav-divider">|</span>
-    <a href="#section-1" target="_self" class="nav-text-link">👑 法人持股</a>
-    <span class="nav-divider">|</span>
-    <a href="#section-2-1" target="_self" class="nav-text-link">🎯 買超佔比</a>
-    <span class="nav-divider">|</span>
-    <a href="#section-3" target="_self" class="nav-text-link">📅 法人連買</a>
-    <span class="nav-divider">|</span>
-    <a href="#section-4-1" target="_self" class="nav-text-link">🔄 資券軋空</a>
-    <span class="nav-divider">|</span>
-    <a href="#section-5" target="_self" class="nav-text-link">💰 大股東動向</a>
-    <span class="nav-divider">|</span>
-    <a href="#section-6" target="_self" class="nav-text-link">💸 鉅額交易</a>
+<div class="sticky-header-wrapper">
+    <div class="disclaimer-bar">
+        ⚠️ 平台免責聲明：本系統各項數據僅供量化學術研究與籌碼探討，絕不構成實質投資建議或勸誘。受限於網路技術，本平台無法擔保數據之絕對精確與即時性。投資決策與盈虧結果均須由使用者自行負責。 (滑鼠懸停查看)
+    </div>
+    
+    <div class="nav-btn-container">
+        <a href="#section-top-pool" target="_self" class="nav-text-link">🏆 觀察名單</a>
+        <span class="nav-divider">|</span>
+        <a href="#section-search" target="_self" class="nav-text-link">🔍 個股快搜</a>
+        <span class="nav-divider">|</span>
+        <a href="#section-1" target="_self" class="nav-text-link">👑 法人持股</a>
+        <span class="nav-divider">|</span>
+        <a href="#section-2-1" target="_self" class="nav-text-link">🎯 買超佔比</a>
+        <span class="nav-divider">|</span>
+        <a href="#section-3" target="_self" class="nav-text-link">📅 法人連買</a>
+        <span class="nav-divider">|</span>
+        <a href="#section-4-1" target="_self" class="nav-text-link">🔄 資券軋空</a>
+        <span class="nav-divider">|</span>
+        <a href="#section-5" target="_self" class="nav-text-link">💰 大戶動向</a>
+        <span class="nav-divider">|</span>
+        <a href="#section-6" target="_self" class="nav-text-link">💸 鉅額交易</a>
+    </div>
 </div>
 """, unsafe_allow_html=True)
 # ==========================================
@@ -1210,7 +1240,7 @@ def render_options_dashboard():
 
 
 # ==========================================
-# 🌐 總經指標抓取引擎 (含快取記憶機制 & 玩股網備援)
+# 🌐 總經指標抓取引擎 (含快取記憶機制 & 玩股網/期交所多重備援)
 # ==========================================
 @st.cache_data(ttl=2400) 
 def fetch_macro_indicators():
@@ -1230,6 +1260,56 @@ def fetch_macro_indicators():
             data["vix"]["pct"] = (latest - prev) / prev * 100
     except: pass
 
+    # 2. 抓取台股 VIX (玩股網 / 期交所雙重備援)
+    try:
+        headers = {"User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36"}
+        
+        # 備援 A: 玩股網 Global 頁面 (解決原本 /index/ 路徑失效的問題)
+        url_wantgoo = "https://www.wantgoo.com/global/vixtwn"
+        res = requests.get(url_wantgoo, headers=headers, timeout=5)
+        if res.status_code == 200:
+            import re
+            # 暴力正則法：直接在網頁原始碼的 JSON 封裝中找尋 price 數值，無視 HTML 改變
+            match = re.search(r'"price":\s*([\d\.]+)', res.text)
+            if not match:
+                # 備用尋找其他標籤
+                match = re.search(r'臺指VIX.*?(\d+\.\d{2})', res.text)
+            if match:
+                data["vixtwn"]["value"] = float(match.group(1))
+                data["vixtwn"]["pct"] = 0.0 
+                
+        # 備援 B: 若玩股網失敗，直接爬期交所首頁的行情表
+        if data["vixtwn"]["value"] is None:
+            url_taifex = "https://www.taifex.com.tw/cht/index"
+            res_t = requests.get(url_taifex, headers=headers, timeout=5)
+            import re
+            match_t = re.search(r'VIX.*?(\d+\.\d{2})', res_t.text, re.IGNORECASE)
+            if match_t:
+                data["vixtwn"]["value"] = float(match_t.group(1))
+                data["vixtwn"]["pct"] = 0.0 
+    except: pass
+
+    # 3. 抓取 CNN 恐懼貪婪指數
+    try:
+        headers = {"User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36"}
+        url = "https://production.dataviz.cnn.io/index/fearandgreed/graphdata"
+        res = requests.get(url, headers=headers, timeout=5)
+        if res.status_code == 200:
+            fg_data = res.json()
+            score = int(fg_data['fear_and_greed']['score'])
+            
+            if score < 15: rating_tw = "🉐 分批加碼"
+            elif score < 25: rating_tw = "🈵 積極買點"
+            elif score > 90: rating_tw = "🈲 提高現金"
+            elif score > 85: rating_tw = "🈹 獲利了結"
+            elif score > 75: rating_tw = "🈴 分批減碼"
+            else: rating_tw = "⚖️ 中立平穩"
+            
+            data["fng"]["score"] = score
+            data["fng"]["rating"] = rating_tw
+    except: pass
+
+    return data
     # 2. 抓取台股 VIX (玩股網備援)
     try:
         headers = {"User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36"}
