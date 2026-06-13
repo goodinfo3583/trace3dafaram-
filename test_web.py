@@ -331,14 +331,15 @@ def get_df_safe(key):
 def fmt_d(d_str): 
     return f"{d_str[4:6]}/{d_str[6:]}" if d_str != "00000000" else "--/--"
 
+# 💡 防呆升級版：即使讀到了壞掉的表，也絕對不會當機！
 def check_b2_strict(df, sid, bad_keywords):
-    if df.empty or sid not in df['股票代號'].values: return False
+    if df.empty or '股票代號' not in df.columns or sid not in df['股票代號'].values: return False
     dyn = str(df[df['股票代號'] == sid].iloc[0].get('今日短動態', ''))
     if any(bad in dyn for bad in bad_keywords): return False
     return True
 
 def get_b3_score(df, sid, type_keyword):
-    if df.empty: return 0, ""
+    if df.empty or '股票代號' not in df.columns: return 0, ""
     match = df[(df['股票代號'] == sid) & (df['連買類型'].str.contains(type_keyword))]
     if match.empty: return 0, ""
     days = pd.to_numeric(match.iloc[0].get('連買週期數', 0), errors='coerce')
@@ -353,9 +354,14 @@ def get_b3_score(df, sid, type_keyword):
         else: return 1.0, f"✔️({days}週)"
 
 def get_today_ratio(df, stock_id, col_name):
-    if df is not None and not df.empty and stock_id in df['股票代號'].values:
+    if df is not None and not df.empty and '股票代號' in df.columns and stock_id in df['股票代號'].values:
         try: return float(df.loc[df['股票代號'] == stock_id, col_name].iloc[0])
-        except: return 0.0
+        except: 
+            # 模糊比對欄位，避免 CSV 欄位名稱有些微差異
+            fuzzy_col = next((c for c in df.columns if '當日' in str(c) and ('買' in str(c) or '比' in str(c))), None)
+            if fuzzy_col:
+                try: return float(df.loc[df['股票代號'] == stock_id, fuzzy_col].iloc[0])
+                except: pass
     return 0.0
 
 def robust_read_csv_pool(file_path):
@@ -1033,16 +1039,15 @@ def build_block1_master_df():
     return pd.DataFrame(), [], [], {}
 
 
-# 👇👇👇 執行引擎緊接著工具宣告之後，絕對不會再報錯！ 👇👇👇
 # ==========================================
-# 🛡️ 背景守護程式 (強制維持記憶體熱度，解決歸零與空值問題)
+# 🛡️ 背景守護程式 (強制維持記憶體熱度，解決歸零與 KeyError 問題)
 # ==========================================
 def preload_all_csv_data():
     import os, glob
     import pandas as pd
     DATA_DIR = "./Goodinfo_Rankings"
     
-    # 智慧檔案尋找器 (容錯率高)
+    # 智慧檔案尋找器 (加入終極欄位清洗，解決 KeyError)
     def safe_load(key, kw1, kw2=""):
         if key in st.session_state and not st.session_state[key].empty: return
         files = glob.glob(os.path.join(DATA_DIR, f"*{kw1}*.csv"))
@@ -1052,6 +1057,20 @@ def preload_all_csv_data():
                 try:
                     df = pd.read_csv(sorted(files, reverse=True)[0], encoding=enc)
                     if not df.empty:
+                        # 💡 終極防呆：清洗所有欄位名稱，把亂七八糟的代號統整為「股票代號」
+                        df.columns = [str(c).replace(" ", "").replace("\n", "").replace("\ufeff", "").strip() for c in df.columns]
+                        id_col = next((c for c in df.columns if '代號' in c or 'code' in c.lower()), None)
+                        nm_col = next((c for c in df.columns if '名稱' in c or 'name' in c.lower()), None)
+                        
+                        rename_dict = {}
+                        if id_col and id_col != '股票代號': rename_dict[id_col] = '股票代號'
+                        if nm_col and nm_col != '股票名稱': rename_dict[nm_col] = '股票名稱'
+                        if rename_dict: df = df.rename(columns=rename_dict)
+                        
+                        # 確保股票代號是乾淨的字串
+                        if '股票代號' in df.columns:
+                            df['股票代號'] = df['股票代號'].astype(str).str.replace(r'\.0$', '', regex=True).str.strip()
+                            
                         st.session_state[key] = df
                         return
                 except: continue
@@ -1070,18 +1089,18 @@ def preload_all_csv_data():
     safe_load('df_margin_plus_pct', '融券增加幅度')
     safe_load('df_margin_plus_vol', '融券增加張數')
     safe_load('df_blk5', '400張')
-    if st.session_state['df_blk5'].empty: safe_load('df_blk5', '大股東')
+    if st.session_state.get('df_blk5', pd.DataFrame()).empty: safe_load('df_blk5', '大股東')
     safe_load('df_blk5_1000', '1000張')
-    if st.session_state['df_blk5_1000'].empty: safe_load('df_blk5_1000', '大股東')
+    if st.session_state.get('df_blk5_1000', pd.DataFrame()).empty: safe_load('df_blk5_1000', '大股東')
 
+# 👇 確保下方有呼叫它
 if 'my_final_df' not in st.session_state or st.session_state['my_final_df'].empty or st.session_state.get('force_reload', False):
     with st.spinner("⚡ 背景引擎啟動中，正在載入全市場籌碼數據... (僅需數秒)"):
         json_dfs, latest_all_df = fetch_github_json_all()
         final_df, sorted_dates, date_cols, color_ref = build_block1_master_df()
         st.session_state['my_final_df'] = final_df
-        preload_all_csv_data()  # 💡 啟動預載雷達，確保側邊欄搜得到資料！
-        st.session_state['force_reload'] = False # 重置標記
-# 👆👆👆 ======================================================================👆👆👆
+        preload_all_csv_data()  # 💡 啟動預載雷達
+        st.session_state['force_reload'] = False
 
 # =======================================================
 # 側邊欄：戰情指揮中心 (內建個股快搜 + 大盤總經)
