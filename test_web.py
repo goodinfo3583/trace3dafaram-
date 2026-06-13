@@ -1442,6 +1442,13 @@ with c_btn2:
         admin_pw = st.text_input("請輸入站長密碼以解鎖功能", type="password", key="admin_pw_input")
         if admin_pw == "DDong888": 
             st.success("🔓 驗證成功！請執行快照封存。")
+            
+            # 👇 新增這顆「強制刷新按鈕」在這裡
+            if st.button("🔄 站長專屬：強制抓取 GitHub 最新數據", use_container_width=True):
+                fetch_github_json_all.clear()  # 瞬間清空這個函數的快取
+                st.rerun()                     # 重新整理網頁
+            # 👆 新增結束
+            
             snap_date = st.date_input("選擇這份資料的實際基準日")
             st.write("")
             if st.button("💾 將 GitHub 200名數據封存為 CSV", use_container_width=True):
