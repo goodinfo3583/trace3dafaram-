@@ -749,6 +749,53 @@ with tab3:
             <div style="font-size: 16px; font-weight: 600; color: {fng_color};">{f_rating}</div>
         </div>
         """, unsafe_allow_html=True)
+
+# ==========================================
+# 🌟 觀察名單專屬工具函數區 (放在最上方，確保全域可用！)
+# ==========================================
+import os, glob, re, json, datetime
+import pandas as pd
+import streamlit as st
+
+def get_df_safe(key): return st.session_state.get(key, pd.DataFrame())
+def fmt_d(d_str): return f"{d_str[4:6]}/{d_str[6:]}" if d_str != "00000000" else "--/--"
+
+def check_b2_strict(df, sid, bad_keywords):
+    if df.empty or sid not in df['股票代號'].values: return False
+    dyn = str(df[df['股票代號'] == sid].iloc[0].get('今日短動態', ''))
+    if any(bad in dyn for bad in bad_keywords): return False
+    return True
+
+def get_b3_score(df, sid, type_keyword):
+    if df.empty: return 0, ""
+    match = df[(df['股票代號'] == sid) & (df['連買類型'].str.contains(type_keyword))]
+    if match.empty: return 0, ""
+    days = pd.to_numeric(match.iloc[0].get('連買週期數', 0), errors='coerce')
+    if pd.isna(days) or days == 0: return 0, ""
+    if '日' in type_keyword:
+        if days >= 10: return 1.0, f"✔️({days}日)"
+        elif days >= 5: return 0.8, f"✔️({days}日)"
+        else: return 0.5, f"✔️({days}日)"
+    else:
+        if days >= 10: return 2.0, f"✔️({days}週)"
+        elif days >= 5: return 1.5, f"✔️({days}週)"
+        else: return 1.0, f"✔️({days}週)"
+
+def get_today_ratio(df, stock_id, col_name):
+    if df is not None and not df.empty and stock_id in df['股票代號'].values:
+        try: return float(df.loc[df['股票代號'] == stock_id, col_name].iloc[0])
+        except: return 0.0
+    return 0.0
+
+def robust_read_csv_pool(file_path):
+    for encoding in ['cp950', 'utf-8-sig', 'utf-8']:
+        try:
+            df = pd.read_csv(file_path, encoding=encoding)
+            if not df.empty and len(df.columns) > 1 and '撖' in str(df.iloc[0, 1]): continue
+            return df
+        except: continue
+    return pd.read_csv(file_path, encoding='cp950', errors='ignore')
+
 # ==========================================
 # 🌟 全站命脈：區塊 1 專屬工具函數與背景預載引擎 (必須放在最上方！)
 # ==========================================
