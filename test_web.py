@@ -2586,106 +2586,12 @@ def peek_data_date(keyword):
     return re.search(r'\d{8}', msg).group(0) if re.search(r'\d{8}', msg) else "未知"
 
 # ==========================================
-# 📅 區塊 4-1：融資減少動向
+# 🌟 區塊 4 專屬工具函數 (必須放在 if 鎖外面，確保全域可用)
 # ==========================================
-st.write("---")
-st.markdown("<div id='section-4-1'></div>", unsafe_allow_html=True)
-
-date_41 = peek_data_date("融資減少幅度")
-# 使用 Markdown 語法，並透過 span 標籤嵌入 style
-st.markdown(f"""### 🔄 區塊 4-1：融資減少動向 <span style="font-size: 0.6em; color: #00D2FF;">({date_41})</span>
-""", unsafe_allow_html=True)
-
-f_col1, f_col2, _ = st.columns([1, 1, 2])
-with f_col1: show_etf_41 = st.checkbox("顯示 ETF", value=True, key="margin_show_etf")
-with f_col2: show_bond_41 = st.checkbox("顯示債券/債券ETF", value=True, key="margin_show_bond")
-st.write("") 
-
-c1, c2 = st.columns(2)
-with c1:
-    st.markdown("<h3 style='margin-top: 0; margin-bottom: 10px;'>📉 融資減少比例排名</h3>", unsafe_allow_html=True)
-    df_pct, _ = get_specific_margin_data("融資減少幅度")
-    df_pct_clean = process_margin_df(df_pct, "幅度", show_etf_41, show_bond_41)
-    render_styled_margin_table(df_pct_clean)
-with c2:
-    st.markdown("<h3 style='margin-top: 0; margin-bottom: 10px;'>📉 融資減少張數排名</h3>", unsafe_allow_html=True)
-    df_vol, _ = get_specific_margin_data("融資減少張數")
-    df_vol_clean = process_margin_df(df_vol, "張數", show_etf_41, show_bond_41)
-    render_styled_margin_table(df_vol_clean)
-
-st.session_state['df_margin_pct'] = df_pct_clean
-st.session_state['df_margin_vol'] = df_vol_clean
-
-# ==========================================
-# 📅 區塊 4-2：借券賣出減少動向
-# ==========================================
-st.write("---")
-st.markdown("<div id='section-4-2'></div>", unsafe_allow_html=True)
-
-date_42 = peek_data_date("借券賣出減少幅度")
-# 使用 Markdown 語法，並透過 span 標籤嵌入 style
-st.markdown(f"""### 🔄 區塊 4-2：借券賣出減少動向 <span style="font-size: 0.6em; color: #00D2FF;">({date_42})</span>
-""", unsafe_allow_html=True)
-
-f_col1, f_col2, _ = st.columns([1, 1, 2])
-with f_col1: show_etf_42 = st.checkbox("顯示 ETF", value=True, key="stock_show_etf_42")
-with f_col2: show_bond_42 = st.checkbox("顯示債券/債券ETF", value=True, key="stock_show_bond_42")
-st.write("") 
-
-c1, c2 = st.columns(2)
-with c1:
-    st.markdown("<h3 style='margin-top: 0; margin-bottom: 10px;'>📉 借券賣出減少比例排名</h3>", unsafe_allow_html=True)
-    df_pct, _ = get_specific_margin_data("借券賣出減少幅度")
-    df_pct_clean = process_margin_df(df_pct, "幅度", show_etf_42, show_bond_42)
-    render_styled_margin_table(df_pct_clean)
-with c2:
-    st.markdown("<h3 style='margin-top: 0; margin-bottom: 10px;'>📉 借券賣出減少張數排名</h3>", unsafe_allow_html=True)
-    df_vol, _ = get_specific_margin_data("借券賣出減少張數")
-    df_vol_clean = process_margin_df(df_vol, "張數", show_etf_42, show_bond_42)
-    render_styled_margin_table(df_vol_clean)
-
-st.session_state['df_short_pct'] = df_pct_clean
-st.session_state['df_short_vol'] = df_vol_clean
-
-# ==========================================
-# 📅 區塊 4-3：融券增加動向
-# ==========================================
-st.write("---")
-st.markdown("<div id='section-4-3'></div>", unsafe_allow_html=True)
-
-date_43 = peek_data_date("融券增加幅度")
-st.markdown(f"""### 🔄 區塊 4-3：融券增加動向 <span style="font-size: 0.6em; color: #00D2FF;">({date_43})</span>
-""", unsafe_allow_html=True)
-
-f_col1, f_col2, _ = st.columns([1, 1, 2])
-with f_col1: show_etf_43 = st.checkbox("顯示 ETF", value=True, key="stock_show_etf_43")
-with f_col2: show_bond_43 = st.checkbox("顯示債券/債券ETF", value=True, key="stock_show_bond_43")
-st.write("") 
-
-c1, c2 = st.columns(2)
-with c1:
-    st.markdown("<h3 style='margin-top: 0; margin-bottom: 10px;'>📈 融券增加比例排名</h3>", unsafe_allow_html=True)
-    df_pct, _ = get_specific_margin_data("融券增加幅度")
-    df_pct_clean = process_margin_df(df_pct, "幅度", show_etf_43, show_bond_43)
-    render_styled_margin_table(df_pct_clean)
-with c2:
-    st.markdown("<h3 style='margin-top: 0; margin-bottom: 10px;'>📈 融券增加張數排名</h3>", unsafe_allow_html=True)
-    df_vol, _ = get_specific_margin_data("融券增加張數")
-    df_vol_clean = process_margin_df(df_vol, "張數", show_etf_43, show_bond_43)
-    render_styled_margin_table(df_vol_clean)
-
-st.session_state['df_margin_plus_pct'] = df_pct_clean
-st.session_state['df_margin_plus_vol'] = df_vol_clean
-# ==========================================
-# 🚀 區塊 4-4：短線軋空雷達 (法人點火 + 空軍認錯 + 散戶放空)
-# ==========================================
-import streamlit as st
 import pandas as pd
 import os
 import glob
 import re
-
-st.markdown("<div id='section-4-4'></div>", unsafe_allow_html=True)
 
 def robust_read_csv_local(file_path):
     for encoding in ['cp950', 'utf-8-sig', 'utf-8']:
@@ -2748,22 +2654,11 @@ def build_squeeze_radar():
                 keep_cols.append(matched_cols[0])
                 
         # 過濾出我們需要的欄位
-        keep_cols = list(dict.fromkeys(keep_cols)) # 保持順序且去重
-        # 如果有些欄位檔案裡沒有，就只拿存在的
+        keep_cols = list(dict.fromkeys(keep_cols)) 
         keep_cols = [c for c in keep_cols if c in df_buy.columns]
         df_squeeze = df_buy[keep_cols].copy()
-#===
-        #rename_mapping = {}
-        #for col in df_risk.columns:
-            #if '買賣超佔成交' in col:
-                #new_name = col.replace('買賣超佔成交', '賣佔成交')
-                #if '當日' in new_name:
-                    #new_name = new_name.replace('當日', '▼當日')
-                #rename_mapping[col] = new_name
-        #df_risk = df_risk.rename(columns=rename_mapping)
-#===    
-        # 📝 更改欄位名稱 (買賣超佔成交 -> 買佔成交)
         
+        # 📝 更改欄位名稱 (買賣超佔成交 -> 買佔成交)
         rename_mapping = {}      
         for col in df_squeeze.columns:
             if '買賣超佔成交' in col:
@@ -2824,125 +2719,6 @@ def build_squeeze_radar():
     df_squeeze = df_squeeze.drop(columns=['軋空指數'])
     
     return df_squeeze, "Success", display_date, is_sync
-
-# ==========================================
-# 執行與渲染
-# ==========================================
-with st.spinner("⏳ 正在掃描全市場軋空名單..."):
-    df_squeeze_radar, msg, radar_date, is_radar_sync = build_squeeze_radar()
-
-header_html = "🚀 區塊 4-4：可能軋空雷達 "
-if radar_date:
-    if is_radar_sync:
-        header_html += f"<span style='color: #00D2FF; font-size: 0.7em;'>({radar_date})</span>"
-    else:
-        header_html += f"<span style='color: #00D2FF; font-size: 0.7em;'>({radar_date})</span> <span style='color: #ffa500; font-size: 0.5em;'>⏳籌碼待更新</span>"
-
-st.markdown(f"<h2>{header_html}</h2>", unsafe_allow_html=True)
-st.write("💡 三大法人買超，伴隨融資退場、借券回補或融券逆勢增加的潛在軋空標的。")
-
-if not df_squeeze_radar.empty:
-    show_all = st.checkbox("顯示榜內被法人買超的上漲標的，但籌碼未見軋空特徵", value=False)
-    
-    if not show_all:
-        # 只顯示 2 分以上的標的 (有任何一個軋空特徵)
-        df_squeeze_radar = df_squeeze_radar[df_squeeze_radar['軋空評估'].str.contains("💥|🚀|🔥", regex=True)]
-
-    if df_squeeze_radar.empty:
-        st.success("🎉 目前沒有同時出現法人買超與軋空特徵的強勢名單！")
-    else:
-        # 重設索引
-        df_squeeze_radar = df_squeeze_radar.reset_index(drop=True)
-        df_squeeze_radar.insert(0, '索引', range(1, len(df_squeeze_radar) + 1))
-        
-        def style_table(df):
-            try:
-                styler = df.style.hide(axis='index')
-            except:
-                styler = df.style.hide_index()
-            
-            def highlight_squeeze(row):
-                styles = []
-                for col_name in row.index:
-                    base_style = 'background-color: #262730;'
-                    
-                    # 🔴 數值三雄改成台股的「上漲紅」
-                    if col_name in ['成交', '漲跌價', '漲跌幅']:
-                        styles.append(base_style + ' color: #ff4b4b;')
-                    else:
-                        styles.append(base_style + ' color: #e0e0e0;')
-                return styles
-            
-            styler = styler.apply(highlight_squeeze, axis=1)
-            
-            border_css = '1px solid #808495'
-            styler = styler.set_table_styles([
-                {'selector': 'table', 'props': [('width', '100%'), ('border-collapse', 'collapse'), ('font-family', 'sans-serif'), ('font-size', '13px')]},
-                {'selector': 'th', 'props': [
-                    ('background-color', '#1e1e24'), 
-                    ('color', '#ffffff'), 
-                    ('font-weight', 'normal'),
-                    ('border', border_css),
-                    ('padding', '6px 4px'), 
-                    ('text-align', 'center'),
-                    ('position', 'sticky'),  
-                    ('top', '0'),            
-                    ('z-index', '1')         
-                ]},
-                {'selector': 'td', 'props': [
-                    ('border', border_css),
-                    ('padding', '4px'), 
-                    ('text-align', 'center'),
-                    ('transition', 'all 0.2s ease-in-out') 
-                ]},
-                # 🌟 滑鼠 Hover 動態光暈效果 
-                {'selector': 'tbody tr:hover td', 'props': [
-                    ('background-color', 'rgba(4, 8, 20, 0.85) !important'), 
-                    ('text-shadow', '0 0 8px rgba(255, 255, 255, 0.5) !important') 
-                ]}
-            ])
-            
-            num_cols = df.select_dtypes(include=['number']).columns.tolist()
-            if '索引' in num_cols:
-                num_cols.remove('索引')
-                
-            styler = styler.format({col: "{:.2f}" for col in num_cols})
-            
-            return styler.to_html()
-
-        html_table = style_table(df_squeeze_radar)
-        
-        # 📏 高度控制 (顯示約 10~12 筆)
-        scrollable_div = f"""
-<div style="max-height: 420px; overflow-y: auto; border: 1px solid #808495; border-radius: 5px;">
-{html_table}
-</div>
-"""
-        st.markdown(scrollable_div, unsafe_allow_html=True)
-else:
-    st.warning(f"軋空雷達載入失敗：{msg}")
-
-# ==========================================
-# 🚨 區塊 4-5：短線避險雷達 (法人倒貨 + 融資套牢 + 空軍狙擊)
-# ==========================================
-import streamlit as st
-import pandas as pd
-import os
-import glob
-import re
-
-st.markdown("<div id='section-4-5'></div>", unsafe_allow_html=True)
-
-def robust_read_csv_local(file_path):
-    for encoding in ['cp950', 'utf-8-sig', 'utf-8']:
-        try:
-            df = pd.read_csv(file_path, encoding=encoding)
-            if not df.empty and len(df.columns) > 1 and '撖' in str(df.iloc[0, 1]): 
-                continue
-            return df
-        except:
-            continue
-    return pd.read_csv(file_path, encoding='cp950', errors='ignore')
 
 def build_risk_radar():
     sell_pattern = os.path.join(DATA_DIR, "*三大法人賣超佔成交比*.csv")
@@ -3039,99 +2815,293 @@ def build_risk_radar():
     
     return df_risk, "Success", display_date, is_sync
 
-# 執行與渲染
-with st.spinner("⏳ 正在掃描全市場避險名單..."):
-    df_risk_radar, msg, radar_date, is_radar_sync = build_risk_radar()
 
-header_html = "🚨 區塊 4-5：短線套牢名單 "
-if radar_date:
-    if is_radar_sync:
-        header_html += f"<span style='color: #00D2FF; font-size: 0.7em;'>({radar_date})</span>"
-    else:
-        header_html += f"<span style='color: #00D2FF; font-size: 0.7em;'>({radar_date})</span> <span style='color: #ffa500; font-size: 0.5em;'>⏳融券資待更新</span>"
+# ----------------------------------------------------
+# 🔒 區塊 4 專屬包廂鎖 (4-1 到 4-5 所有畫面渲染包進這裡)
+# ----------------------------------------------------
+if current_page in ["all", "b4"]:
 
-st.markdown(f"<h2>{header_html}</h2>", unsafe_allow_html=True)
-st.write("💡 三大法人賣超,融資套牢或借券增加的籌碼惡化標的,若當日成交轉正有望回溫。")
+    # ==========================================
+    # 📅 區塊 4-1：融資減少動向
+    # ==========================================
+    st.write("---")
+    st.markdown("<div id='section-4-1'></div>", unsafe_allow_html=True)
 
-if not df_risk_radar.empty:
-    show_all = st.checkbox("顯示榜內被法人賣超的下跌/持平標的但融資借券未上榜", value=False)
-    
-    if not show_all:
-        df_risk_radar = df_risk_radar[df_risk_radar['套牢評估'].str.contains("☠️|🚨", regex=True)]
+    date_41 = peek_data_date("融資減少幅度")
+    st.markdown(f"""### 🔄 區塊 4-1：融資減少動向 <span style="font-size: 0.6em; color: #00D2FF;">({date_41})</span>""", unsafe_allow_html=True)
 
-    if df_risk_radar.empty:
-        st.success("🎉 目前沒有同時出現法人賣超與籌碼惡化的危險名單！")
-    else:
-        df_risk_radar = df_risk_radar.reset_index(drop=True)
-        df_risk_radar.insert(0, '索引', range(1, len(df_risk_radar) + 1))
+    f_col1, f_col2, _ = st.columns([1, 1, 2])
+    with f_col1: show_etf_41 = st.checkbox("顯示 ETF", value=True, key="margin_show_etf")
+    with f_col2: show_bond_41 = st.checkbox("顯示債券/債券ETF", value=True, key="margin_show_bond")
+    st.write("") 
+
+    c1, c2 = st.columns(2)
+    with c1:
+        st.markdown("<h3 style='margin-top: 0; margin-bottom: 10px;'>📉 融資減少比例排名</h3>", unsafe_allow_html=True)
+        df_pct, _ = get_specific_margin_data("融資減少幅度")
+        df_pct_clean = process_margin_df(df_pct, "幅度", show_etf_41, show_bond_41)
+        render_styled_margin_table(df_pct_clean)
+    with c2:
+        st.markdown("<h3 style='margin-top: 0; margin-bottom: 10px;'>📉 融資減少張數排名</h3>", unsafe_allow_html=True)
+        df_vol, _ = get_specific_margin_data("融資減少張數")
+        df_vol_clean = process_margin_df(df_vol, "張數", show_etf_41, show_bond_41)
+        render_styled_margin_table(df_vol_clean)
+
+    st.session_state['df_margin_pct'] = df_pct_clean
+    st.session_state['df_margin_vol'] = df_vol_clean
+
+    # ==========================================
+    # 📅 區塊 4-2：借券賣出減少動向
+    # ==========================================
+    st.write("---")
+    st.markdown("<div id='section-4-2'></div>", unsafe_allow_html=True)
+
+    date_42 = peek_data_date("借券賣出減少幅度")
+    st.markdown(f"""### 🔄 區塊 4-2：借券賣出減少動向 <span style="font-size: 0.6em; color: #00D2FF;">({date_42})</span>""", unsafe_allow_html=True)
+
+    f_col1, f_col2, _ = st.columns([1, 1, 2])
+    with f_col1: show_etf_42 = st.checkbox("顯示 ETF", value=True, key="stock_show_etf_42")
+    with f_col2: show_bond_42 = st.checkbox("顯示債券/債券ETF", value=True, key="stock_show_bond_42")
+    st.write("") 
+
+    c1, c2 = st.columns(2)
+    with c1:
+        st.markdown("<h3 style='margin-top: 0; margin-bottom: 10px;'>📉 借券賣出減少比例排名</h3>", unsafe_allow_html=True)
+        df_pct, _ = get_specific_margin_data("借券賣出減少幅度")
+        df_pct_clean = process_margin_df(df_pct, "幅度", show_etf_42, show_bond_42)
+        render_styled_margin_table(df_pct_clean)
+    with c2:
+        st.markdown("<h3 style='margin-top: 0; margin-bottom: 10px;'>📉 借券賣出減少張數排名</h3>", unsafe_allow_html=True)
+        df_vol, _ = get_specific_margin_data("借券賣出減少張數")
+        df_vol_clean = process_margin_df(df_vol, "張數", show_etf_42, show_bond_42)
+        render_styled_margin_table(df_vol_clean)
+
+    st.session_state['df_short_pct'] = df_pct_clean
+    st.session_state['df_short_vol'] = df_vol_clean
+
+    # ==========================================
+    # 📅 區塊 4-3：融券增加動向
+    # ==========================================
+    st.write("---")
+    st.markdown("<div id='section-4-3'></div>", unsafe_allow_html=True)
+
+    date_43 = peek_data_date("融券增加幅度")
+    st.markdown(f"""### 🔄 區塊 4-3：融券增加動向 <span style="font-size: 0.6em; color: #00D2FF;">({date_43})</span>""", unsafe_allow_html=True)
+
+    f_col1, f_col2, _ = st.columns([1, 1, 2])
+    with f_col1: show_etf_43 = st.checkbox("顯示 ETF", value=True, key="stock_show_etf_43")
+    with f_col2: show_bond_43 = st.checkbox("顯示債券/債券ETF", value=True, key="stock_show_bond_43")
+    st.write("") 
+
+    c1, c2 = st.columns(2)
+    with c1:
+        st.markdown("<h3 style='margin-top: 0; margin-bottom: 10px;'>📈 融券增加比例排名</h3>", unsafe_allow_html=True)
+        df_pct, _ = get_specific_margin_data("融券增加幅度")
+        df_pct_clean = process_margin_df(df_pct, "幅度", show_etf_43, show_bond_43)
+        render_styled_margin_table(df_pct_clean)
+    with c2:
+        st.markdown("<h3 style='margin-top: 0; margin-bottom: 10px;'>📈 融券增加張數排名</h3>", unsafe_allow_html=True)
+        df_vol, _ = get_specific_margin_data("融券增加張數")
+        df_vol_clean = process_margin_df(df_vol, "張數", show_etf_43, show_bond_43)
+        render_styled_margin_table(df_vol_clean)
+
+    st.session_state['df_margin_plus_pct'] = df_pct_clean
+    st.session_state['df_margin_plus_vol'] = df_vol_clean
+
+    # ==========================================
+    # 🚀 區塊 4-4：短線軋空雷達 (法人點火 + 空軍認錯 + 散戶放空)
+    # ==========================================
+    st.markdown("<div id='section-4-4'></div>", unsafe_allow_html=True)
+
+    with st.spinner("⏳ 正在掃描全市場軋空名單..."):
+        df_squeeze_radar, msg, radar_date, is_radar_sync = build_squeeze_radar()
+
+    header_html = "🚀 區塊 4-4：可能軋空雷達 "
+    if radar_date:
+        if is_radar_sync:
+            header_html += f"<span style='color: #00D2FF; font-size: 0.7em;'>({radar_date})</span>"
+        else:
+            header_html += f"<span style='color: #00D2FF; font-size: 0.7em;'>({radar_date})</span> <span style='color: #ffa500; font-size: 0.5em;'>⏳籌碼待更新</span>"
+
+    st.markdown(f"<h2>{header_html}</h2>", unsafe_allow_html=True)
+    st.write("💡 三大法人買超，伴隨融資退場、借券回補或融券逆勢增加的潛在軋空標的。")
+
+    if not df_squeeze_radar.empty:
+        show_all = st.checkbox("顯示榜內被法人買超的上漲標的，但籌碼未見軋空特徵", value=False)
         
-        def style_table(df):
-            try:
-                styler = df.style.hide(axis='index')
-            except:
-                styler = df.style.hide_index()
+        if not show_all:
+            # 只顯示 2 分以上的標的 (有任何一個軋空特徵)
+            df_squeeze_radar = df_squeeze_radar[df_squeeze_radar['軋空評估'].str.contains("💥|🚀|🔥", regex=True)]
+
+        if df_squeeze_radar.empty:
+            st.success("🎉 目前沒有同時出現法人買超與軋空特徵的強勢名單！")
+        else:
+            # 重設索引
+            df_squeeze_radar = df_squeeze_radar.reset_index(drop=True)
+            df_squeeze_radar.insert(0, '索引', range(1, len(df_squeeze_radar) + 1))
             
-            def highlight_risk(row):
-                styles = []
-                for col_name in row.index:
-                    base_style = 'background-color: #262730;'
-                    
-                    if col_name in ['成交', '漲跌價', '漲跌幅']:
-                        styles.append(base_style + ' color: #00e676;')
-                    elif col_name == '▼當日賣佔成交' and pd.to_numeric(row[col_name], errors='coerce') > 0:
-                        styles.append(base_style + ' color: #ff4b4b;')
-                    else:
-                        styles.append(base_style + ' color: #e0e0e0;')
-                return styles
-            
-            styler = styler.apply(highlight_risk, axis=1)
-            
-            border_css = '1px solid #808495'
-            styler = styler.set_table_styles([
-                {'selector': 'table', 'props': [('width', '100%'), ('border-collapse', 'collapse'), ('font-family', 'sans-serif'), ('font-size', '13px')]},
-                {'selector': 'th', 'props': [
-                    ('background-color', '#1e1e24'), 
-                    ('color', '#ffffff'), 
-                    ('font-weight', 'normal'),
-                    ('border', border_css),
-                    ('padding', '6px 4px'), 
-                    ('text-align', 'center'),
-                    ('position', 'sticky'),  
-                    ('top', '0'),            
-                    ('z-index', '1')         
-                ]},
-                {'selector': 'td', 'props': [
-                    ('border', border_css),
-                    ('padding', '4px'), 
-                    ('text-align', 'center'),
-                    ('transition', 'all 0.2s ease-in-out') 
-                ]},
-                {'selector': 'tbody tr:hover td', 'props': [
-                    ('background-color', 'rgba(4, 8, 20, 0.85) !important'), 
-                    ('text-shadow', '0 0 8px rgba(255, 255, 255, 0.5) !important') 
-                ]}
-            ])
-            
-            num_cols = df.select_dtypes(include=['number']).columns.tolist()
-            if '索引' in num_cols:
-                num_cols.remove('索引')
+            def style_table(df):
+                try:
+                    styler = df.style.hide(axis='index')
+                except:
+                    styler = df.style.hide_index()
                 
-            styler = styler.format({col: "{:.2f}" for col in num_cols})
-            
-            return styler.to_html()
+                def highlight_squeeze(row):
+                    styles = []
+                    for col_name in row.index:
+                        base_style = 'background-color: #262730;'
+                        
+                        # 🔴 數值三雄改成台股的「上漲紅」
+                        if col_name in ['成交', '漲跌價', '漲跌幅']:
+                            styles.append(base_style + ' color: #ff4b4b;')
+                        else:
+                            styles.append(base_style + ' color: #e0e0e0;')
+                    return styles
+                
+                styler = styler.apply(highlight_squeeze, axis=1)
+                
+                border_css = '1px solid #808495'
+                styler = styler.set_table_styles([
+                    {'selector': 'table', 'props': [('width', '100%'), ('border-collapse', 'collapse'), ('font-family', 'sans-serif'), ('font-size', '13px')]},
+                    {'selector': 'th', 'props': [
+                        ('background-color', '#1e1e24'), 
+                        ('color', '#ffffff'), 
+                        ('font-weight', 'normal'),
+                        ('border', border_css),
+                        ('padding', '6px 4px'), 
+                        ('text-align', 'center'),
+                        ('position', 'sticky'),  
+                        ('top', '0'),            
+                        ('z-index', '1')         
+                    ]},
+                    {'selector': 'td', 'props': [
+                        ('border', border_css),
+                        ('padding', '4px'), 
+                        ('text-align', 'center'),
+                        ('transition', 'all 0.2s ease-in-out') 
+                    ]},
+                    # 🌟 滑鼠 Hover 動態光暈效果 
+                    {'selector': 'tbody tr:hover td', 'props': [
+                        ('background-color', 'rgba(4, 8, 20, 0.85) !important'), 
+                        ('text-shadow', '0 0 8px rgba(255, 255, 255, 0.5) !important') 
+                    ]}
+                ])
+                
+                num_cols = df.select_dtypes(include=['number']).columns.tolist()
+                if '索引' in num_cols:
+                    num_cols.remove('索引')
+                    
+                styler = styler.format({col: "{:.2f}" for col in num_cols})
+                
+                return styler.to_html()
 
-        html_table = style_table(df_risk_radar)
+            html_table = style_table(df_squeeze_radar)
+            
+            # 📏 高度控制 (顯示約 10~12 筆)
+            scrollable_div = f"""
+            <div style="max-height: 420px; overflow-y: auto; border: 1px solid #808495; border-radius: 5px;">
+            {html_table}
+            </div>
+            """
+            st.markdown(scrollable_div, unsafe_allow_html=True)
+    else:
+        st.warning(f"軋空雷達載入失敗：{msg}")
+
+    # ==========================================
+    # 🚨 區塊 4-5：短線避險雷達 (法人倒貨 + 融資套牢 + 空軍狙擊)
+    # ==========================================
+    st.markdown("<div id='section-4-5'></div>", unsafe_allow_html=True)
+
+    with st.spinner("⏳ 正在掃描全市場避險名單..."):
+        df_risk_radar, msg, radar_date, is_radar_sync = build_risk_radar()
+
+    header_html = "🚨 區塊 4-5：短線套牢名單 "
+    if radar_date:
+        if is_radar_sync:
+            header_html += f"<span style='color: #00D2FF; font-size: 0.7em;'>({radar_date})</span>"
+        else:
+            header_html += f"<span style='color: #00D2FF; font-size: 0.7em;'>({radar_date})</span> <span style='color: #ffa500; font-size: 0.5em;'>⏳融券資待更新</span>"
+
+    st.markdown(f"<h2>{header_html}</h2>", unsafe_allow_html=True)
+    st.write("💡 三大法人賣超,融資套牢或借券增加的籌碼惡化標的,若當日成交轉正有望回溫。")
+
+    if not df_risk_radar.empty:
+        show_all = st.checkbox("顯示榜內被法人賣超的下跌/持平標的但融資借券未上榜", value=False)
         
-        # 📏 【修改點】：將 max-height 調整為 420px，大約顯示 10~12 筆
-        scrollable_div = f"""
-<div style="max-height: 420px; overflow-y: auto; border: 1px solid #808495; border-radius: 5px;">
-{html_table}
-</div>
-"""
-        st.markdown(scrollable_div, unsafe_allow_html=True)
-else:
-    st.warning(f"避險雷達載入失敗：{msg}")
-    
+        if not show_all:
+            df_risk_radar = df_risk_radar[df_risk_radar['套牢評估'].str.contains("☠️|🚨", regex=True)]
+
+        if df_risk_radar.empty:
+            st.success("🎉 目前沒有同時出現法人賣超與籌碼惡化的危險名單！")
+        else:
+            df_risk_radar = df_risk_radar.reset_index(drop=True)
+            df_risk_radar.insert(0, '索引', range(1, len(df_risk_radar) + 1))
+            
+            def style_table(df):
+                try:
+                    styler = df.style.hide(axis='index')
+                except:
+                    styler = df.style.hide_index()
+                
+                def highlight_risk(row):
+                    styles = []
+                    for col_name in row.index:
+                        base_style = 'background-color: #262730;'
+                        
+                        if col_name in ['成交', '漲跌價', '漲跌幅']:
+                            styles.append(base_style + ' color: #00e676;')
+                        elif col_name == '▼當日賣佔成交' and pd.to_numeric(row[col_name], errors='coerce') > 0:
+                            styles.append(base_style + ' color: #ff4b4b;')
+                        else:
+                            styles.append(base_style + ' color: #e0e0e0;')
+                        return styles
+                
+                styler = styler.apply(highlight_risk, axis=1)
+                
+                border_css = '1px solid #808495'
+                styler = styler.set_table_styles([
+                    {'selector': 'table', 'props': [('width', '100%'), ('border-collapse', 'collapse'), ('font-family', 'sans-serif'), ('font-size', '13px')]},
+                    {'selector': 'th', 'props': [
+                        ('background-color', '#1e1e24'), 
+                        ('color', '#ffffff'), 
+                        ('font-weight', 'normal'),
+                        ('border', border_css),
+                        ('padding', '6px 4px'), 
+                        ('text-align', 'center'),
+                        ('position', 'sticky'),  
+                        ('top', '0'),            
+                        ('z-index', '1')         
+                    ]},
+                    {'selector': 'td', 'props': [
+                        ('border', border_css),
+                        ('padding', '4px'), 
+                        ('text-align', 'center'),
+                        ('transition', 'all 0.2s ease-in-out') 
+                    ]},
+                    {'selector': 'tbody tr:hover td', 'props': [
+                        ('background-color', 'rgba(4, 8, 20, 0.85) !important'), 
+                        ('text-shadow', '0 0 8px rgba(255, 255, 255, 0.5) !important') 
+                    ]}
+                ])
+                
+                num_cols = df.select_dtypes(include=['number']).columns.tolist()
+                if '索引' in num_cols:
+                    num_cols.remove('索引')
+                    
+                styler = styler.format({col: "{:.2f}" for col in num_cols})
+                
+                return styler.to_html()
+
+            html_table = style_table(df_risk_radar)
+            
+            scrollable_div = f"""
+            <div style="max-height: 420px; overflow-y: auto; border: 1px solid #808495; border-radius: 5px;">
+            {html_table}
+            </div>
+            """
+            st.markdown(scrollable_div, unsafe_allow_html=True)
+    else:
+        st.warning(f"避險雷達載入失敗：{msg}")
 # ==========================================
 # 💰 區塊 5：大股東動向 (四層級對稱系統 + 4碼日期完美排版)
 # ==========================================
