@@ -280,6 +280,476 @@ st.markdown("""
 </style>
 <div class="sticky-header-wrapper"><div class="disclaimer-bar"><div class="disclaimer-item"><span class="disclaimer-title">使用聲明</span><div class="disclaimer-content">本平台僅供教育研究與籌碼觀察，絕不構成任何實質投資建議、勸誘或要約。所有資料源自公開數據，受限於網路技術，可能有延遲或錯誤。<br><br>投資必有風險，依本平台資訊所做之任何決策與損益，均須由使用者自行負責，本平台不負擔任何法律賠償責任。</div></div><div class="disclaimer-item"><span class="disclaimer-title">隱私權政策</span><div class="disclaimer-content"><b>1. 蒐集目的與範圍：</b><br>本平台依個資法蒐集您的識別資料僅供維持系統安全與優化服務使用。<br><b>2. 資料利用：</b><br>您的資料絕不向第三方洩露。<br><b>3. 資料刪除：</b><br>您可透過「聯絡我們」請求刪除資料。<br><b>4. 政策修訂：</b><br>本站保留修改政策之權利，繼續使用即視為同意。</div></div><div class="disclaimer-item"><a href="?page=contact" target="_self" class="disclaimer-title" style="cursor: pointer;">聯絡我們</a></div></div><div class="nav-btn-container"><a href="?page=pool" target="_self" class="nav-text-link">🏆 觀察名單</a><span class="nav-divider">|</span><a href="?page=search" target="_self" class="nav-text-link">🔍 個股快搜</a><span class="nav-divider">|</span><a href="?page=b1" target="_self" class="nav-text-link">👑 法人持股</a><span class="nav-divider">|</span><a href="?page=b2" target="_self" class="nav-text-link">🎯 買超佔比</a><span class="nav-divider">|</span><a href="?page=b3" target="_self" class="nav-text-link">📅 法人連買</a><span class="nav-divider">|</span><a href="?page=b4" target="_self" class="nav-text-link">🔄 資券軋空</a><span class="nav-divider">|</span><a href="?page=b5" target="_self" class="nav-text-link">💰 大股東動向</a><span class="nav-divider">|</span><a href="?page=b6" target="_self" class="nav-text-link">💸 鉅額交易</a></div></div>
 """, unsafe_allow_html=True)
+# ==========================================
+# 🧭 側邊欄導航與共用函數 (極速光速版：零爬蟲、零延遲、讀取本地 CSV)
+# ==========================================
+DATA_DIR = "./Goodinfo_Rankings"
+
+# ==========================================
+# 🌟 核心共用函數 (終極防呆：從此免疫 Excel 吃掉 0 的問題)
+# ==========================================
+def parse_json_history_csv(file_path, date_label):
+    try:
+        df = pd.read_csv(file_path, encoding='utf-8-sig')
+        df['股票代號'] = df['股票代號'].astype(str).str.replace(r'\.0$', '', regex=True).str.strip()
+        df['股票代號'] = df['股票代號'].apply(lambda x: x.zfill(4) if x.isdigit() else x)
+        df['股票名稱'] = df['股票名稱'].astype(str).str.strip()
+        df = df.rename(columns={'法人持股': f"{date_label}持股%"})
+        return df
+    except: 
+        return pd.DataFrame()
+
+def agg_sections_func(x):
+    valid_x = set()
+    for val in x:
+        if pd.notna(val) and str(val).strip() != "":
+            for p in str(val).split(','):
+                valid_x.add(p.strip())
+    return ",".join([s for s in ['5日', '20日', '60日', '120日'] if s in valid_x])
+
+@st.cache_data(ttl=60) 
+def get_latest_csv(keyword):
+    if not os.path.exists(DATA_DIR): return None, "未知"
+    files = glob.glob(os.path.join(DATA_DIR, f"*{keyword}*csv"))
+    if not files: return None, "未知"
+    files.sort(reverse=True)
+    try: 
+        df = pd.read_csv(files[0])
+        for col in ['股票代號', '代號', '證券代號']:
+            if col in df.columns:
+                df[col] = df[col].astype(str).str.replace(r'\.0$', '', regex=True).str.strip()
+                df[col] = df[col].apply(lambda x: x.zfill(4) if x.isdigit() else x)
+        return df, os.path.basename(files[0])[:8]
+    except: return None, "未知"
+
+@st.cache_data(ttl=60)
+def get_prev_csv(keyword, current_date):
+    if not os.path.exists(DATA_DIR): return None
+    files = glob.glob(os.path.join(DATA_DIR, f"*{keyword}*csv"))
+    past_files = [f for f in files if os.path.basename(f)[:8] < current_date]
+    if not past_files: return None
+    past_files.sort(reverse=True)
+    try: 
+        df = pd.read_csv(past_files[0])
+        for col in ['股票代號', '代號', '證券代號']:
+            if col in df.columns:
+                df[col] = df[col].astype(str).str.replace(r'\.0$', '', regex=True).str.strip()
+                df[col] = df[col].apply(lambda x: x.zfill(4) if x.isdigit() else x)
+        return df
+    except: return None
+
+def get_diff_ui(today_val, prev_val):
+    if prev_val is None or pd.isna(prev_val): return ""
+    try:
+        diff = int(today_val) - int(prev_val)
+        if diff == 0: return ""
+        sign = "+" if diff > 0 else ""
+        color = "#FF4B4B" if diff > 0 else "#00E272" 
+        return f"<br><span style='color:{color}; font-size:11px;'>({sign}{diff:,})</span>"
+    except: return ""
+
+# 🔥 修改點 1：將原本的兩個分頁擴增為三個分頁
+tab1, tab2, tab3 = st.sidebar.tabs(["🔹 大盤籌碼", "🔹 選擇權", "🔹 總經導航"])
+
+# ------------------------------------------
+# 1. 大盤籌碼導航總覽 (終極精準融資 + 期貨變化量)
+# ------------------------------------------
+def render_sidebar_market_summary():
+    df_spot, date_spot = get_latest_csv("三大法人買賣超金額")
+    df_fut, _ = get_latest_csv("三大法人期貨多空")
+    df_fut_prev = get_prev_csv("三大法人期貨多空", date_spot)
+    df_margin, margin_csv_name = get_latest_csv("融資融券餘額")
+    
+    if df_spot is None or df_fut is None:
+        st.warning("尚無大盤數據，請確認資料夾中已有今日 CSV。")
+        return "未知"
+
+    net_foreign, net_trust, net_dealer, net_total = 0.0, 0.0, 0.0, 0.0
+    for _, row in df_spot.iterrows():
+        name = str(row.get('單位名稱', ''))
+        try: val = float(str(row.get('買賣差額', '0')).replace(',', '')) / 100000000
+        except: val = 0.0
+        if '外資' in name and '不含' in name: net_foreign += val
+        elif '外資自營商' in name: net_foreign += val
+        elif '投信' in name: net_trust += val
+        elif '自營商' in name: net_dealer += val
+        elif '合計' in name: net_total = val
+
+    oi_foreign, oi_trust, oi_dealer = 0, 0, 0
+    if df_fut is not None:
+        target_oi_col = next((c for c in df_fut.columns if '未平倉' in c and '多空淨額' in c), None)
+        if target_oi_col:
+            for _, row in df_fut.iterrows():
+                row_vals = " ".join([str(x) for x in row.values])
+                if '臺股期貨' in row_vals:
+                    iden = str(row.values[2]) 
+                    try: val = int(str(row[target_oi_col]).replace(',', ''))
+                    except: val = 0
+                    if '外資' in iden: oi_foreign = val
+                    elif '投信' in iden: oi_trust = val
+                    elif '自營商' in iden: oi_dealer = val
+    total_oi = oi_foreign + oi_trust + oi_dealer
+
+    oi_f_prev, oi_t_prev, oi_d_prev = None, None, None
+    if df_fut_prev is not None:
+        t_col_prev = next((c for c in df_fut_prev.columns if '未平倉' in c and '多空淨額' in c), None)
+        if t_col_prev:
+            for _, row in df_fut_prev.iterrows():
+                r_vals = " ".join([str(x) for x in row.values])
+                if '臺股期貨' in r_vals:
+                    iden = str(row.values[2]) 
+                    try: val = int(str(row[t_col_prev]).replace(',', ''))
+                    except: val = 0
+                    if '外資' in iden: oi_f_prev = val
+                    elif '投信' in iden: oi_t_prev = val
+                    elif '自營商' in iden: oi_d_prev = val
+
+    margin_diff_yi, margin_today_yi = 0.0, 0.0
+    if df_margin is not None:
+        for _, row in df_margin.iterrows():
+            row_list = [str(x).replace(',', '').strip() for x in row.values]
+            row_str = "".join(row_list)
+            if '融資金額' in row_str:
+                try:
+                    margin_prev = float(row_list[-2]) 
+                    margin_today = float(row_list[-1])
+                    margin_diff_yi = (margin_today - margin_prev) / 100000
+                    margin_today_yi = margin_today / 100000
+                    break
+                except: pass
+
+    def get_color(val, is_float=True):
+        if val > 0: return "#ff4b4b", f"+{val:,.1f}" if is_float else f"+{val:,}"
+        elif val < 0: return "#00e676", f"{val:,.1f}" if is_float else f"{val:,}"
+        return "#e0e0e0", "0.0" if is_float else "0"
+
+    f_c, f_s = get_color(net_foreign)
+    t_c, t_s = get_color(net_trust)
+    d_c, d_s = get_color(net_dealer)
+    to_c, to_s = get_color(net_total)
+    fo_c, fo_s = get_color(oi_foreign, False)
+    to_oc, to_os = get_color(oi_trust, False)
+    do_c, do_os = get_color(oi_dealer, False)
+    too_c, too_os = get_color(total_oi, False)
+    m_c, m_s = get_color(margin_diff_yi)
+
+    html = f"<div style='font-size: 13px; color: #00D2FF;'>基準日：{date_spot}</div>"
+    html += "<table style='width: 100%; text-align: center; border-collapse: collapse; margin-top: 5px; font-size: 14px;'>"
+    html += "<tr style='border-bottom: 1px solid #555; background-color: #262730;'>"
+    html += "<th style='padding: 5px;'>法人</th><th style='padding: 5px;'>現貨(億)</th><th style='padding: 5px;'>TX未平倉</th></tr>"
+    html += f"<tr><td style='padding: 4px;'>🌐 外資</td><td style='color: {f_c}; vertical-align: middle;'>{f_s}</td><td style='color: {fo_c}; vertical-align: middle; padding-bottom: 6px;'>{fo_s}{get_diff_ui(oi_foreign, oi_f_prev)}</td></tr>"
+    html += f"<tr><td style='padding: 4px;'>🏦 投信</td><td style='color: {t_c}; vertical-align: middle;'>{t_s}</td><td style='color: {to_oc}; vertical-align: middle; padding-bottom: 6px;'>{to_os}{get_diff_ui(oi_trust, oi_t_prev)}</td></tr>"
+    html += f"<tr><td style='padding: 4px;'>🏢 自營商</td><td style='color: {d_c}; vertical-align: middle;'>{d_s}</td><td style='color: {do_c}; vertical-align: middle; padding-bottom: 6px;'>{do_os}{get_diff_ui(oi_dealer, oi_d_prev)}</td></tr>"
+    
+    tot_prev = (oi_f_prev + oi_t_prev + oi_d_prev) if oi_f_prev is not None else None
+    html += f"<tr style='border-top: 1px solid #555; font-weight: bold;'><td style='padding: 4px;'>🔥 合計</td><td style='color: {to_c}; vertical-align: middle;'>{to_s}</td><td style='color: {too_c}; vertical-align: middle; padding-bottom: 6px;'>{too_os}{get_diff_ui(total_oi, tot_prev)}</td></tr>"
+    html += "</table>"
+    
+    if margin_today_yi != 0.0:
+        margin_date = margin_csv_name[:8] if margin_csv_name else "未知"
+        html += "<div style='margin-top: 8px; padding: 6px; background-color: #1e1e24; border: 1px solid #555; border-radius: 5px; font-size: 13px;'>"
+        html += f"<div style='font-weight: bold;'>📉 大盤融資餘額 <span style='font-size: 11px; color: #888; font-weight: normal; margin-left: 5px;'>({margin_date})</span></div>"
+        html += f"<div style='color: #aaa; margin-top: 4px;'>今日增減(億) <span style='color: {m_c}; font-weight: bold; float: right;'>{m_s}</span></div>"
+        html += f"<div style='color: #aaa; margin-top: 2px;'>餘額總計(億) <span style='float: right; color: #fff;'>{margin_today_yi:,.1f}</span></div>"
+        html += "</div>"
+        
+    st.markdown(html, unsafe_allow_html=True)
+    return date_spot
+
+# ------------------------------------------
+# 2. 選擇權關鍵兵力分布 (移至獨立分頁版)
+# ------------------------------------------
+def render_options_dashboard():
+    # 🔥 拿掉原本的 <hr> 分隔線，因為已經是獨立分頁的第一個元素了
+   
+    df_opt, date_opt = get_latest_csv("臺指選擇權行情簡表")
+    df_pcr, _ = get_latest_csv("臺指選擇權PC比")
+    df_opt_prev = get_prev_csv("臺指選擇權行情簡表", date_opt)
+    
+    # 🔥 修改點 2：新增資料來源的 8 碼基準日顯示
+    if date_opt and date_opt != "未知":
+        st.markdown(f"<div style='font-size: 13px; color: #00D2FF; margin-bottom: 12px;'>基準日：{date_opt}</div>", unsafe_allow_html=True)
+    
+    if df_opt is None:
+        st.warning("尚無選擇權資料。")
+        return
+
+    pcr_val = 0.0
+    if df_pcr is not None:
+        pcr_col = next((c for c in df_pcr.columns if '買賣權未平倉量比率' in c), None)
+        if pcr_col:
+            try: pcr_val = float(str(df_pcr[pcr_col].dropna().iloc[-1]).replace('%', ''))
+            except: pass
+    pcr_color = "#FF4B4B" if pcr_val > 100 else "#00E272"
+    st.markdown(f"**PCR:** <span style='color:{pcr_color}; font-size: 16px;'>{pcr_val}%</span>", unsafe_allow_html=True)
+
+    col_strike = next((c for c in df_opt.columns if '履約價' in c), None)
+    col_type = next((c for c in df_opt.columns if '買賣權' in c), None)
+    col_oi = next((c for c in df_opt.columns if '未沖銷' in c or '未平倉' in c), None)
+    col_month = next((c for c in df_opt.columns if '到期' in c or '月份' in c), None)
+    
+    if not all([col_strike, col_type, col_oi, col_month]):
+        st.info("🔄 選擇權格式讀取失敗，請確認是否為 Report 格式。")
+        return
+
+    valid_months = [m for m in df_opt[col_month].dropna().unique() if str(m).startswith('20')]
+    if not valid_months: return
+    front_month = sorted(valid_months)[0]
+    df_opt = df_opt[df_opt[col_month] == front_month].copy()
+
+    df_opt[col_strike] = pd.to_numeric(df_opt[col_strike], errors='coerce')
+    df_opt[col_oi] = pd.to_numeric(df_opt[col_oi].astype(str).str.replace(',', ''), errors='coerce').fillna(0)
+
+    df_call = df_opt[df_opt[col_type].str.contains('Call|買權', case=False, na=False)].copy()
+    df_put = df_opt[df_opt[col_type].str.contains('Put|賣權', case=False, na=False)].copy()
+    
+    top_calls = df_call.nlargest(2, col_oi).reset_index(drop=True)
+    top_puts = df_put.nlargest(2, col_oi).reset_index(drop=True)
+    max_pressure = int(top_calls.loc[0, col_strike]) if not top_calls.empty else 0
+    max_support = int(top_puts.loc[0, col_strike]) if not top_puts.empty else 0
+
+    prev_oi_dict = {}
+    if df_opt_prev is not None and col_strike in df_opt_prev.columns:
+        valid_months_p = [m for m in df_opt_prev[col_month].dropna().unique() if str(m).startswith('20')]
+        if valid_months_p:
+            f_month_p = sorted(valid_months_p)[0]
+            df_opt_prev = df_opt_prev[df_opt_prev[col_month] == f_month_p]
+            df_opt_prev[col_strike] = pd.to_numeric(df_opt_prev[col_strike], errors='coerce')
+            df_opt_prev[col_oi] = pd.to_numeric(df_opt_prev[col_oi].astype(str).str.replace(',', ''), errors='coerce').fillna(0)
+            
+            for _, row in df_opt_prev.iterrows():
+                strike_val = row[col_strike]
+                if pd.isna(strike_val): continue
+                strike_val = int(strike_val)
+                type_val = str(row[col_type])
+                oi_val = int(row[col_oi])
+                
+                if strike_val not in prev_oi_dict: prev_oi_dict[strike_val] = {'c': 0, 'p': 0}
+                if 'Call' in type_val or '買權' in type_val: prev_oi_dict[strike_val]['c'] += oi_val
+                if 'Put' in type_val or '賣權' in type_val: prev_oi_dict[strike_val]['p'] += oi_val
+
+    start_strike = int(max_pressure) + 2000
+    end_strike = int(max_support) - 3000
+    if start_strike >= 36000 and end_strike < 36000: end_strike = 36000
+        
+    display_strikes = list(range(start_strike, end_strike - 1, -1000))
+    
+    html_opt = "<table style='width: 100%; text-align: center; border-collapse: collapse; margin-top: 5px; font-size: 13px;'>"
+    html_opt += "<tr style='border-bottom: 1px solid #555; background-color: #262730;'>"
+    html_opt += "<th style='padding: 5px;'>點位</th><th style='padding: 5px;'>⚔️ Call (口)</th><th style='padding: 5px;'>🛡️ Put (口)</th></tr>"
+    
+    for strike in display_strikes:
+        c_val = df_call[df_call[col_strike] == strike][col_oi].sum()
+        p_val = df_put[df_put[col_strike] == strike][col_oi].sum()
+        if c_val == 0 and p_val == 0: continue
+            
+        strike_label = str(strike)
+        if strike == max_pressure: strike_label += "<br><span style='color:#FF4B4B; font-size:10px;'>(最壓)</span>"
+        elif strike == max_support: strike_label += "<br><span style='color:#00E272; font-size:10px;'>(最撐)</span>"
+
+        prev_c = prev_oi_dict.get(strike, {}).get('c', None)
+        prev_p = prev_oi_dict.get(strike, {}).get('p', None)
+
+        html_opt += f"<tr style='border-bottom: 1px solid #333;'>"
+        html_opt += f"<td style='padding: 6px; font-weight: bold; vertical-align: middle;'>{strike_label}</td>"
+        html_opt += f"<td style='padding: 6px; color: #FF4B4B; vertical-align: middle;'>{int(c_val):,}{get_diff_ui(c_val, prev_c)}</td>"
+        html_opt += f"<td style='padding: 6px; color: #00E272; vertical-align: middle;'>{int(p_val):,}{get_diff_ui(p_val, prev_p)}</td>"
+        html_opt += f"</tr>"
+        
+    html_opt += "</table>"
+    st.markdown(html_opt, unsafe_allow_html=True)
+
+
+# ==========================================
+# 🌐 總經指標抓取引擎 (含快取記憶機制 & 玩股網/期交所多重備援)
+# ==========================================
+@st.cache_data(ttl=2400) 
+def fetch_macro_indicators():
+    data = {
+        "vix": {"value": None, "pct": None},
+        "vixtwn": {"value": None, "pct": None},
+        "fng": {"score": None, "rating": "無法取得"}
+    }
+    
+    # 1. 抓取美股 VIX (^VIX)
+    try:
+        hist_vix = yf.Ticker("^VIX").history(period="2d")
+        if len(hist_vix) >= 2:
+            latest = hist_vix['Close'].iloc[-1]
+            prev = hist_vix['Close'].iloc[-2]
+            data["vix"]["value"] = latest
+            data["vix"]["pct"] = (latest - prev) / prev * 100
+    except: pass
+
+    # 2. 抓取台股 VIX (玩股網 / 期交所雙重備援)
+    try:
+        headers = {"User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36"}
+        
+        # 備援 A: 玩股網 Global 頁面 (解決原本 /index/ 路徑失效的問題)
+        url_wantgoo = "https://www.wantgoo.com/global/vixtwn"
+        res = requests.get(url_wantgoo, headers=headers, timeout=5)
+        if res.status_code == 200:
+            import re
+            # 暴力正則法：直接在網頁原始碼的 JSON 封裝中找尋 price 數值，無視 HTML 改變
+            match = re.search(r'"price":\s*([\d\.]+)', res.text)
+            if not match:
+                # 備用尋找其他標籤
+                match = re.search(r'臺指VIX.*?(\d+\.\d{2})', res.text)
+            if match:
+                data["vixtwn"]["value"] = float(match.group(1))
+                data["vixtwn"]["pct"] = 0.0 
+                
+        # 備援 B: 若玩股網失敗，直接爬期交所首頁的行情表
+        if data["vixtwn"]["value"] is None:
+            url_taifex = "https://www.taifex.com.tw/cht/index"
+            res_t = requests.get(url_taifex, headers=headers, timeout=5)
+            import re
+            match_t = re.search(r'VIX.*?(\d+\.\d{2})', res_t.text, re.IGNORECASE)
+            if match_t:
+                data["vixtwn"]["value"] = float(match_t.group(1))
+                data["vixtwn"]["pct"] = 0.0 
+    except: pass
+
+    # 3. 抓取 CNN 恐懼貪婪指數
+    try:
+        headers = {"User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36"}
+        url = "https://production.dataviz.cnn.io/index/fearandgreed/graphdata"
+        res = requests.get(url, headers=headers, timeout=5)
+        if res.status_code == 200:
+            fg_data = res.json()
+            score = int(fg_data['fear_and_greed']['score'])
+            
+            if score < 15: rating_tw = "🉐 分批加碼"
+            elif score < 25: rating_tw = "🈵 積極買點"
+            elif score > 90: rating_tw = "🈲 提高現金"
+            elif score > 85: rating_tw = "🈹 獲利了結"
+            elif score > 75: rating_tw = "🈴 分批減碼"
+            else: rating_tw = "⚖️ 中立平穩"
+            
+            data["fng"]["score"] = score
+            data["fng"]["rating"] = rating_tw
+    except: pass
+
+    return data
+    # 2. 抓取台股 VIX (玩股網備援)
+    try:
+        headers = {"User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36"}
+        url = "https://www.wantgoo.com/index/vixtwn"
+        res = requests.get(url, headers=headers, timeout=5)
+        if res.status_code == 200:
+            from bs4 import BeautifulSoup
+            soup = BeautifulSoup(res.text, 'html.parser')
+            # 抓取玩股網上的指數數值
+            vix_element = soup.select_one(".index-price") 
+            if vix_element:
+                latest = float(vix_element.text.replace(',', '').strip())
+                data["vixtwn"]["value"] = latest
+                data["vixtwn"]["pct"] = 0.0 # 靜態抓取，暫不計算漲跌幅
+    except: pass
+
+    # 3. 抓取 CNN 恐懼貪婪指數
+    try:
+        headers = {"User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36"}
+        url = "https://production.dataviz.cnn.io/index/fearandgreed/graphdata"
+        res = requests.get(url, headers=headers, timeout=5)
+        if res.status_code == 200:
+            fg_data = res.json()
+            score = int(fg_data['fear_and_greed']['score'])
+            
+            if score < 15: rating_tw = "🉐 分批加碼"
+            elif score < 25: rating_tw = "🈵 積極買點"
+            elif score > 90: rating_tw = "🈲 提高現金"
+            elif score > 85: rating_tw = "🈹 獲利了結"
+            elif score > 75: rating_tw = "🈴 分批減碼"
+            else: rating_tw = "⚖️ 中立平穩"
+            
+            data["fng"]["score"] = score
+            data["fng"]["rating"] = rating_tw
+    except: pass
+
+    return data
+
+
+# ==========================================
+# 🔮 最終整合與渲染 (Tab1 / Tab2 / Tab3 獨立呈現)
+# ==========================================
+with tab1:
+    actual_data_date = render_sidebar_market_summary()
+    
+# 🔥 修改點 3：將兵力分佈搬進獨立的第二分頁
+with tab2:
+    render_options_dashboard()
+    
+with tab3:
+   
+    macro_data = fetch_macro_indicators()
+    
+    # --- 美股 VIX 邏輯 ---
+    vix_val = macro_data["vix"]["value"]
+    vix_color = "#a1a1aa" 
+    if vix_val is not None:
+        if vix_val < 20: vix_color = "#10b981" 
+        elif vix_val < 28.7: vix_color = "#3b82f6" 
+        elif vix_val < 33.5: vix_color = "#f59e0b" 
+        else: vix_color = "#ef4444" 
+    vix_tooltip = f"VIX 市場恐慌指標&#10;目前 VIX： {vix_val if vix_val else '無'}&#10;綠色（VIX < 20）：市場平穩。&#10;藍色（20 ≤ VIX < 28.7）： 1年的投資報酬率較差。&#10;橘色（28.7 ≤ VIX < 33.5）： 🉐1年的報酬可達 15%。&#10;紅色（VIX ≥ 33.5）：🈵1年的報酬可達 25%。"
+
+    # --- 台股 VIX 邏輯 ---
+    vixtwn_val = macro_data["vixtwn"]["value"]
+    vixtwn_color = "#a1a1aa"
+    if vixtwn_val is not None:
+        if vixtwn_val < 20: vixtwn_color = "#3b82f6" 
+        elif vixtwn_val < 30: vixtwn_color = "#10b981" 
+        elif vixtwn_val < 40: vixtwn_color = "#f59e0b" 
+        else: vixtwn_color = "#ef4444" 
+    vixtwn_tooltip = f"VIXTWN 台灣市場恐慌指標&#10;目前 VIXTWN： {vixtwn_val if vixtwn_val else '無'}&#10;藍色（VIXTWN < 20）：市場平穩，多頭常態。&#10;綠色（20 ≤ VIXTWN < 30）：🈹波動加劇，注意風險。&#10;橘色（30 ≤ VIXTWN < 40）：🉐恐慌殺盤，布局機會。(法人避險)&#10;紅色（VIXTWN ≥ 40）：🈵極度恐慌，強力買點。(系統風險、黑天鵝)"
+
+    # --- 恐懼貪婪 邏輯 ---
+    fng_val = macro_data["fng"]["score"]
+    fng_color = "#a1a1aa"
+    if fng_val is not None:
+        if fng_val < 25: fng_color = "#ef4444" 
+        elif fng_val > 75: fng_color = "#10b981" 
+        else: fng_color = "#f59e0b" 
+    fng_tooltip = f"目前 FNG： {fng_val if fng_val else '無'}&#10;恐懼貪婪指數 < 25 🈵積極買點&#10;恐懼貪婪 < 15 🉐分批加碼&#10;恐懼貪婪 > 75 🈴分批減碼不追高&#10;恐懼貪婪 > 85 🈹獲利了結&#10;恐懼貪婪 > 90 🈲提高現金部位"
+
+    # --- 版面渲染：左側上下兩小塊，右側一長塊 ---
+    col_left, col_right = st.columns([1, 1])
+    
+    with col_left:
+        # 美股 VIX 卡片
+        v1_str = f"{vix_val:.2f}" if vix_val else "無資料"
+        p1_str = f"{'+' if macro_data['vix']['pct'] and macro_data['vix']['pct'] > 0 else ''}{macro_data['vix']['pct']:.2f}%" if macro_data['vix']['pct'] is not None else "-"
+        st.markdown(f"""
+        <div title="{vix_tooltip}" style="background-color: rgba(255,255,255,0.03); padding: 12px; border-radius: 10px; border: 1px solid rgba(255,255,255,0.1); text-align: center; cursor: help; margin-bottom: 10px; transition: 0.3s;" onmouseover="this.style.borderColor='{vix_color}'; this.style.backgroundColor='rgba(255,255,255,0.08)';" onmouseout="this.style.borderColor='rgba(255,255,255,0.1)'; this.style.backgroundColor='rgba(255,255,255,0.03)';">
+            <div style="font-size: 13px; color: #a1a1aa; margin-bottom: 4px;">🇺🇸 美股 VIX</div>
+            <div style="font-size: 22px; font-weight: 700; color: {vix_color}; margin-bottom: 2px;">{v1_str}</div>
+            <div style="font-size: 12px; color: #71717a;">{p1_str}</div>
+        </div>
+        """, unsafe_allow_html=True)
+        
+        # 台股 VIX 卡片
+        v2_str = f"{vixtwn_val:.2f}" if vixtwn_val else "無資料"
+        p2_str = "最新數值" if vixtwn_val else "-"
+        st.markdown(f"""
+        <div title="{vixtwn_tooltip}" style="background-color: rgba(255,255,255,0.03); padding: 12px; border-radius: 10px; border: 1px solid rgba(255,255,255,0.1); text-align: center; cursor: help; transition: 0.3s;" onmouseover="this.style.borderColor='{vixtwn_color}'; this.style.backgroundColor='rgba(255,255,255,0.08)';" onmouseout="this.style.borderColor='rgba(255,255,255,0.1)'; this.style.backgroundColor='rgba(255,255,255,0.03)';">
+            <div style="font-size: 13px; color: #a1a1aa; margin-bottom: 4px;">🇹🇼 台股 VIX</div>
+            <div style="font-size: 22px; font-weight: 700; color: {vixtwn_color}; margin-bottom: 2px;">{v2_str}</div>
+            <div style="font-size: 12px; color: #71717a;">{p2_str}</div>
+        </div>
+        """, unsafe_allow_html=True)
+
+    with col_right:
+        # 恐懼貪婪 長卡片
+        f_str = str(fng_val) if fng_val else "無資料"
+        f_rating = macro_data["fng"]["rating"]
+        st.markdown(f"""
+        <div title="{fng_tooltip}" style="background-color: rgba(255,255,255,0.03); padding: 12px; height: calc(100% - 24px); display: flex; flex-direction: column; justify-content: center; align-items: center; border-radius: 10px; border: 1px solid rgba(255,255,255,0.1); text-align: center; cursor: help; transition: 0.3s;" onmouseover="this.style.borderColor='{fng_color}'; this.style.backgroundColor='rgba(255,255,255,0.08)';" onmouseout="this.style.borderColor='rgba(255,255,255,0.1)'; this.style.backgroundColor='rgba(255,255,255,0.03)';">
+            <div style="font-size: 15px; color: #a1a1aa; margin-bottom: 15px;">🧭 恐懼與貪婪指數</div>
+            <div style="font-size: 42px; font-weight: 700; color: {fng_color}; margin-bottom: 10px;">{f_str}</div>
+            <div style="font-size: 16px; font-weight: 600; color: {fng_color};">{f_rating}</div>
+        </div>
+        """, unsafe_allow_html=True)
 
 # ==========================================
 # 🚦 網頁路由控制中心 (極速切換引擎)
@@ -928,485 +1398,6 @@ with st.container(border=True):
         with col_400: scan_and_display("💎 400張以上大戶動向", 'df_blk5', search_query)
         with col_1000: scan_and_display("🐳 1000張以上超級大戶動向", 'df_blk5_1000', search_query)
 ############################################    
-# ==========================================
-# 🧭 側邊欄導航與共用函數 (極速光速版：零爬蟲、零延遲、讀取本地 CSV)
-# ==========================================
-import os
-import glob
-import pandas as pd
-import streamlit as st
-import datetime
-import yfinance as yf
-import requests
-import re
-
-DATA_DIR = "./Goodinfo_Rankings"
-
-# ==========================================
-# 🌟 核心共用函數 (終極防呆：從此免疫 Excel 吃掉 0 的問題)
-# ==========================================
-def parse_json_history_csv(file_path, date_label):
-    try:
-        df = pd.read_csv(file_path, encoding='utf-8-sig')
-        df['股票代號'] = df['股票代號'].astype(str).str.replace(r'\.0$', '', regex=True).str.strip()
-        df['股票代號'] = df['股票代號'].apply(lambda x: x.zfill(4) if x.isdigit() else x)
-        df['股票名稱'] = df['股票名稱'].astype(str).str.strip()
-        df = df.rename(columns={'法人持股': f"{date_label}持股%"})
-        return df
-    except: 
-        return pd.DataFrame()
-
-def agg_sections_func(x):
-    valid_x = set()
-    for val in x:
-        if pd.notna(val) and str(val).strip() != "":
-            for p in str(val).split(','):
-                valid_x.add(p.strip())
-    return ",".join([s for s in ['5日', '20日', '60日', '120日'] if s in valid_x])
-
-@st.cache_data(ttl=60) 
-def get_latest_csv(keyword):
-    if not os.path.exists(DATA_DIR): return None, "未知"
-    files = glob.glob(os.path.join(DATA_DIR, f"*{keyword}*csv"))
-    if not files: return None, "未知"
-    files.sort(reverse=True)
-    try: 
-        df = pd.read_csv(files[0])
-        for col in ['股票代號', '代號', '證券代號']:
-            if col in df.columns:
-                df[col] = df[col].astype(str).str.replace(r'\.0$', '', regex=True).str.strip()
-                df[col] = df[col].apply(lambda x: x.zfill(4) if x.isdigit() else x)
-        return df, os.path.basename(files[0])[:8]
-    except: return None, "未知"
-
-@st.cache_data(ttl=60)
-def get_prev_csv(keyword, current_date):
-    if not os.path.exists(DATA_DIR): return None
-    files = glob.glob(os.path.join(DATA_DIR, f"*{keyword}*csv"))
-    past_files = [f for f in files if os.path.basename(f)[:8] < current_date]
-    if not past_files: return None
-    past_files.sort(reverse=True)
-    try: 
-        df = pd.read_csv(past_files[0])
-        for col in ['股票代號', '代號', '證券代號']:
-            if col in df.columns:
-                df[col] = df[col].astype(str).str.replace(r'\.0$', '', regex=True).str.strip()
-                df[col] = df[col].apply(lambda x: x.zfill(4) if x.isdigit() else x)
-        return df
-    except: return None
-
-def get_diff_ui(today_val, prev_val):
-    if prev_val is None or pd.isna(prev_val): return ""
-    try:
-        diff = int(today_val) - int(prev_val)
-        if diff == 0: return ""
-        sign = "+" if diff > 0 else ""
-        color = "#FF4B4B" if diff > 0 else "#00E272" 
-        return f"<br><span style='color:{color}; font-size:11px;'>({sign}{diff:,})</span>"
-    except: return ""
-
-# 🔥 修改點 1：將原本的兩個分頁擴增為三個分頁
-tab1, tab2, tab3 = st.sidebar.tabs(["🔹 大盤籌碼", "🔹 選擇權", "🔹 總經導航"])
-
-# ------------------------------------------
-# 1. 大盤籌碼導航總覽 (終極精準融資 + 期貨變化量)
-# ------------------------------------------
-def render_sidebar_market_summary():
-    df_spot, date_spot = get_latest_csv("三大法人買賣超金額")
-    df_fut, _ = get_latest_csv("三大法人期貨多空")
-    df_fut_prev = get_prev_csv("三大法人期貨多空", date_spot)
-    df_margin, margin_csv_name = get_latest_csv("融資融券餘額")
-    
-    if df_spot is None or df_fut is None:
-        st.warning("尚無大盤數據，請確認資料夾中已有今日 CSV。")
-        return "未知"
-
-    net_foreign, net_trust, net_dealer, net_total = 0.0, 0.0, 0.0, 0.0
-    for _, row in df_spot.iterrows():
-        name = str(row.get('單位名稱', ''))
-        try: val = float(str(row.get('買賣差額', '0')).replace(',', '')) / 100000000
-        except: val = 0.0
-        if '外資' in name and '不含' in name: net_foreign += val
-        elif '外資自營商' in name: net_foreign += val
-        elif '投信' in name: net_trust += val
-        elif '自營商' in name: net_dealer += val
-        elif '合計' in name: net_total = val
-
-    oi_foreign, oi_trust, oi_dealer = 0, 0, 0
-    if df_fut is not None:
-        target_oi_col = next((c for c in df_fut.columns if '未平倉' in c and '多空淨額' in c), None)
-        if target_oi_col:
-            for _, row in df_fut.iterrows():
-                row_vals = " ".join([str(x) for x in row.values])
-                if '臺股期貨' in row_vals:
-                    iden = str(row.values[2]) 
-                    try: val = int(str(row[target_oi_col]).replace(',', ''))
-                    except: val = 0
-                    if '外資' in iden: oi_foreign = val
-                    elif '投信' in iden: oi_trust = val
-                    elif '自營商' in iden: oi_dealer = val
-    total_oi = oi_foreign + oi_trust + oi_dealer
-
-    oi_f_prev, oi_t_prev, oi_d_prev = None, None, None
-    if df_fut_prev is not None:
-        t_col_prev = next((c for c in df_fut_prev.columns if '未平倉' in c and '多空淨額' in c), None)
-        if t_col_prev:
-            for _, row in df_fut_prev.iterrows():
-                r_vals = " ".join([str(x) for x in row.values])
-                if '臺股期貨' in r_vals:
-                    iden = str(row.values[2]) 
-                    try: val = int(str(row[t_col_prev]).replace(',', ''))
-                    except: val = 0
-                    if '外資' in iden: oi_f_prev = val
-                    elif '投信' in iden: oi_t_prev = val
-                    elif '自營商' in iden: oi_d_prev = val
-
-    margin_diff_yi, margin_today_yi = 0.0, 0.0
-    if df_margin is not None:
-        for _, row in df_margin.iterrows():
-            row_list = [str(x).replace(',', '').strip() for x in row.values]
-            row_str = "".join(row_list)
-            if '融資金額' in row_str:
-                try:
-                    margin_prev = float(row_list[-2]) 
-                    margin_today = float(row_list[-1])
-                    margin_diff_yi = (margin_today - margin_prev) / 100000
-                    margin_today_yi = margin_today / 100000
-                    break
-                except: pass
-
-    def get_color(val, is_float=True):
-        if val > 0: return "#ff4b4b", f"+{val:,.1f}" if is_float else f"+{val:,}"
-        elif val < 0: return "#00e676", f"{val:,.1f}" if is_float else f"{val:,}"
-        return "#e0e0e0", "0.0" if is_float else "0"
-
-    f_c, f_s = get_color(net_foreign)
-    t_c, t_s = get_color(net_trust)
-    d_c, d_s = get_color(net_dealer)
-    to_c, to_s = get_color(net_total)
-    fo_c, fo_s = get_color(oi_foreign, False)
-    to_oc, to_os = get_color(oi_trust, False)
-    do_c, do_os = get_color(oi_dealer, False)
-    too_c, too_os = get_color(total_oi, False)
-    m_c, m_s = get_color(margin_diff_yi)
-
-    html = f"<div style='font-size: 13px; color: #00D2FF;'>基準日：{date_spot}</div>"
-    html += "<table style='width: 100%; text-align: center; border-collapse: collapse; margin-top: 5px; font-size: 14px;'>"
-    html += "<tr style='border-bottom: 1px solid #555; background-color: #262730;'>"
-    html += "<th style='padding: 5px;'>法人</th><th style='padding: 5px;'>現貨(億)</th><th style='padding: 5px;'>TX未平倉</th></tr>"
-    html += f"<tr><td style='padding: 4px;'>🌐 外資</td><td style='color: {f_c}; vertical-align: middle;'>{f_s}</td><td style='color: {fo_c}; vertical-align: middle; padding-bottom: 6px;'>{fo_s}{get_diff_ui(oi_foreign, oi_f_prev)}</td></tr>"
-    html += f"<tr><td style='padding: 4px;'>🏦 投信</td><td style='color: {t_c}; vertical-align: middle;'>{t_s}</td><td style='color: {to_oc}; vertical-align: middle; padding-bottom: 6px;'>{to_os}{get_diff_ui(oi_trust, oi_t_prev)}</td></tr>"
-    html += f"<tr><td style='padding: 4px;'>🏢 自營商</td><td style='color: {d_c}; vertical-align: middle;'>{d_s}</td><td style='color: {do_c}; vertical-align: middle; padding-bottom: 6px;'>{do_os}{get_diff_ui(oi_dealer, oi_d_prev)}</td></tr>"
-    
-    tot_prev = (oi_f_prev + oi_t_prev + oi_d_prev) if oi_f_prev is not None else None
-    html += f"<tr style='border-top: 1px solid #555; font-weight: bold;'><td style='padding: 4px;'>🔥 合計</td><td style='color: {to_c}; vertical-align: middle;'>{to_s}</td><td style='color: {too_c}; vertical-align: middle; padding-bottom: 6px;'>{too_os}{get_diff_ui(total_oi, tot_prev)}</td></tr>"
-    html += "</table>"
-    
-    if margin_today_yi != 0.0:
-        margin_date = margin_csv_name[:8] if margin_csv_name else "未知"
-        html += "<div style='margin-top: 8px; padding: 6px; background-color: #1e1e24; border: 1px solid #555; border-radius: 5px; font-size: 13px;'>"
-        html += f"<div style='font-weight: bold;'>📉 大盤融資餘額 <span style='font-size: 11px; color: #888; font-weight: normal; margin-left: 5px;'>({margin_date})</span></div>"
-        html += f"<div style='color: #aaa; margin-top: 4px;'>今日增減(億) <span style='color: {m_c}; font-weight: bold; float: right;'>{m_s}</span></div>"
-        html += f"<div style='color: #aaa; margin-top: 2px;'>餘額總計(億) <span style='float: right; color: #fff;'>{margin_today_yi:,.1f}</span></div>"
-        html += "</div>"
-        
-    st.markdown(html, unsafe_allow_html=True)
-    return date_spot
-
-# ------------------------------------------
-# 2. 選擇權關鍵兵力分布 (移至獨立分頁版)
-# ------------------------------------------
-def render_options_dashboard():
-    # 🔥 拿掉原本的 <hr> 分隔線，因為已經是獨立分頁的第一個元素了
-   
-    df_opt, date_opt = get_latest_csv("臺指選擇權行情簡表")
-    df_pcr, _ = get_latest_csv("臺指選擇權PC比")
-    df_opt_prev = get_prev_csv("臺指選擇權行情簡表", date_opt)
-    
-    # 🔥 修改點 2：新增資料來源的 8 碼基準日顯示
-    if date_opt and date_opt != "未知":
-        st.markdown(f"<div style='font-size: 13px; color: #00D2FF; margin-bottom: 12px;'>基準日：{date_opt}</div>", unsafe_allow_html=True)
-    
-    if df_opt is None:
-        st.warning("尚無選擇權資料。")
-        return
-
-    pcr_val = 0.0
-    if df_pcr is not None:
-        pcr_col = next((c for c in df_pcr.columns if '買賣權未平倉量比率' in c), None)
-        if pcr_col:
-            try: pcr_val = float(str(df_pcr[pcr_col].dropna().iloc[-1]).replace('%', ''))
-            except: pass
-    pcr_color = "#FF4B4B" if pcr_val > 100 else "#00E272"
-    st.markdown(f"**PCR:** <span style='color:{pcr_color}; font-size: 16px;'>{pcr_val}%</span>", unsafe_allow_html=True)
-
-    col_strike = next((c for c in df_opt.columns if '履約價' in c), None)
-    col_type = next((c for c in df_opt.columns if '買賣權' in c), None)
-    col_oi = next((c for c in df_opt.columns if '未沖銷' in c or '未平倉' in c), None)
-    col_month = next((c for c in df_opt.columns if '到期' in c or '月份' in c), None)
-    
-    if not all([col_strike, col_type, col_oi, col_month]):
-        st.info("🔄 選擇權格式讀取失敗，請確認是否為 Report 格式。")
-        return
-
-    valid_months = [m for m in df_opt[col_month].dropna().unique() if str(m).startswith('20')]
-    if not valid_months: return
-    front_month = sorted(valid_months)[0]
-    df_opt = df_opt[df_opt[col_month] == front_month].copy()
-
-    df_opt[col_strike] = pd.to_numeric(df_opt[col_strike], errors='coerce')
-    df_opt[col_oi] = pd.to_numeric(df_opt[col_oi].astype(str).str.replace(',', ''), errors='coerce').fillna(0)
-
-    df_call = df_opt[df_opt[col_type].str.contains('Call|買權', case=False, na=False)].copy()
-    df_put = df_opt[df_opt[col_type].str.contains('Put|賣權', case=False, na=False)].copy()
-    
-    top_calls = df_call.nlargest(2, col_oi).reset_index(drop=True)
-    top_puts = df_put.nlargest(2, col_oi).reset_index(drop=True)
-    max_pressure = int(top_calls.loc[0, col_strike]) if not top_calls.empty else 0
-    max_support = int(top_puts.loc[0, col_strike]) if not top_puts.empty else 0
-
-    prev_oi_dict = {}
-    if df_opt_prev is not None and col_strike in df_opt_prev.columns:
-        valid_months_p = [m for m in df_opt_prev[col_month].dropna().unique() if str(m).startswith('20')]
-        if valid_months_p:
-            f_month_p = sorted(valid_months_p)[0]
-            df_opt_prev = df_opt_prev[df_opt_prev[col_month] == f_month_p]
-            df_opt_prev[col_strike] = pd.to_numeric(df_opt_prev[col_strike], errors='coerce')
-            df_opt_prev[col_oi] = pd.to_numeric(df_opt_prev[col_oi].astype(str).str.replace(',', ''), errors='coerce').fillna(0)
-            
-            for _, row in df_opt_prev.iterrows():
-                strike_val = row[col_strike]
-                if pd.isna(strike_val): continue
-                strike_val = int(strike_val)
-                type_val = str(row[col_type])
-                oi_val = int(row[col_oi])
-                
-                if strike_val not in prev_oi_dict: prev_oi_dict[strike_val] = {'c': 0, 'p': 0}
-                if 'Call' in type_val or '買權' in type_val: prev_oi_dict[strike_val]['c'] += oi_val
-                if 'Put' in type_val or '賣權' in type_val: prev_oi_dict[strike_val]['p'] += oi_val
-
-    start_strike = int(max_pressure) + 2000
-    end_strike = int(max_support) - 3000
-    if start_strike >= 36000 and end_strike < 36000: end_strike = 36000
-        
-    display_strikes = list(range(start_strike, end_strike - 1, -1000))
-    
-    html_opt = "<table style='width: 100%; text-align: center; border-collapse: collapse; margin-top: 5px; font-size: 13px;'>"
-    html_opt += "<tr style='border-bottom: 1px solid #555; background-color: #262730;'>"
-    html_opt += "<th style='padding: 5px;'>點位</th><th style='padding: 5px;'>⚔️ Call (口)</th><th style='padding: 5px;'>🛡️ Put (口)</th></tr>"
-    
-    for strike in display_strikes:
-        c_val = df_call[df_call[col_strike] == strike][col_oi].sum()
-        p_val = df_put[df_put[col_strike] == strike][col_oi].sum()
-        if c_val == 0 and p_val == 0: continue
-            
-        strike_label = str(strike)
-        if strike == max_pressure: strike_label += "<br><span style='color:#FF4B4B; font-size:10px;'>(最壓)</span>"
-        elif strike == max_support: strike_label += "<br><span style='color:#00E272; font-size:10px;'>(最撐)</span>"
-
-        prev_c = prev_oi_dict.get(strike, {}).get('c', None)
-        prev_p = prev_oi_dict.get(strike, {}).get('p', None)
-
-        html_opt += f"<tr style='border-bottom: 1px solid #333;'>"
-        html_opt += f"<td style='padding: 6px; font-weight: bold; vertical-align: middle;'>{strike_label}</td>"
-        html_opt += f"<td style='padding: 6px; color: #FF4B4B; vertical-align: middle;'>{int(c_val):,}{get_diff_ui(c_val, prev_c)}</td>"
-        html_opt += f"<td style='padding: 6px; color: #00E272; vertical-align: middle;'>{int(p_val):,}{get_diff_ui(p_val, prev_p)}</td>"
-        html_opt += f"</tr>"
-        
-    html_opt += "</table>"
-    st.markdown(html_opt, unsafe_allow_html=True)
-
-
-# ==========================================
-# 🌐 總經指標抓取引擎 (含快取記憶機制 & 玩股網/期交所多重備援)
-# ==========================================
-@st.cache_data(ttl=2400) 
-def fetch_macro_indicators():
-    data = {
-        "vix": {"value": None, "pct": None},
-        "vixtwn": {"value": None, "pct": None},
-        "fng": {"score": None, "rating": "無法取得"}
-    }
-    
-    # 1. 抓取美股 VIX (^VIX)
-    try:
-        hist_vix = yf.Ticker("^VIX").history(period="2d")
-        if len(hist_vix) >= 2:
-            latest = hist_vix['Close'].iloc[-1]
-            prev = hist_vix['Close'].iloc[-2]
-            data["vix"]["value"] = latest
-            data["vix"]["pct"] = (latest - prev) / prev * 100
-    except: pass
-
-    # 2. 抓取台股 VIX (玩股網 / 期交所雙重備援)
-    try:
-        headers = {"User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36"}
-        
-        # 備援 A: 玩股網 Global 頁面 (解決原本 /index/ 路徑失效的問題)
-        url_wantgoo = "https://www.wantgoo.com/global/vixtwn"
-        res = requests.get(url_wantgoo, headers=headers, timeout=5)
-        if res.status_code == 200:
-            import re
-            # 暴力正則法：直接在網頁原始碼的 JSON 封裝中找尋 price 數值，無視 HTML 改變
-            match = re.search(r'"price":\s*([\d\.]+)', res.text)
-            if not match:
-                # 備用尋找其他標籤
-                match = re.search(r'臺指VIX.*?(\d+\.\d{2})', res.text)
-            if match:
-                data["vixtwn"]["value"] = float(match.group(1))
-                data["vixtwn"]["pct"] = 0.0 
-                
-        # 備援 B: 若玩股網失敗，直接爬期交所首頁的行情表
-        if data["vixtwn"]["value"] is None:
-            url_taifex = "https://www.taifex.com.tw/cht/index"
-            res_t = requests.get(url_taifex, headers=headers, timeout=5)
-            import re
-            match_t = re.search(r'VIX.*?(\d+\.\d{2})', res_t.text, re.IGNORECASE)
-            if match_t:
-                data["vixtwn"]["value"] = float(match_t.group(1))
-                data["vixtwn"]["pct"] = 0.0 
-    except: pass
-
-    # 3. 抓取 CNN 恐懼貪婪指數
-    try:
-        headers = {"User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36"}
-        url = "https://production.dataviz.cnn.io/index/fearandgreed/graphdata"
-        res = requests.get(url, headers=headers, timeout=5)
-        if res.status_code == 200:
-            fg_data = res.json()
-            score = int(fg_data['fear_and_greed']['score'])
-            
-            if score < 15: rating_tw = "🉐 分批加碼"
-            elif score < 25: rating_tw = "🈵 積極買點"
-            elif score > 90: rating_tw = "🈲 提高現金"
-            elif score > 85: rating_tw = "🈹 獲利了結"
-            elif score > 75: rating_tw = "🈴 分批減碼"
-            else: rating_tw = "⚖️ 中立平穩"
-            
-            data["fng"]["score"] = score
-            data["fng"]["rating"] = rating_tw
-    except: pass
-
-    return data
-    # 2. 抓取台股 VIX (玩股網備援)
-    try:
-        headers = {"User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36"}
-        url = "https://www.wantgoo.com/index/vixtwn"
-        res = requests.get(url, headers=headers, timeout=5)
-        if res.status_code == 200:
-            from bs4 import BeautifulSoup
-            soup = BeautifulSoup(res.text, 'html.parser')
-            # 抓取玩股網上的指數數值
-            vix_element = soup.select_one(".index-price") 
-            if vix_element:
-                latest = float(vix_element.text.replace(',', '').strip())
-                data["vixtwn"]["value"] = latest
-                data["vixtwn"]["pct"] = 0.0 # 靜態抓取，暫不計算漲跌幅
-    except: pass
-
-    # 3. 抓取 CNN 恐懼貪婪指數
-    try:
-        headers = {"User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36"}
-        url = "https://production.dataviz.cnn.io/index/fearandgreed/graphdata"
-        res = requests.get(url, headers=headers, timeout=5)
-        if res.status_code == 200:
-            fg_data = res.json()
-            score = int(fg_data['fear_and_greed']['score'])
-            
-            if score < 15: rating_tw = "🉐 分批加碼"
-            elif score < 25: rating_tw = "🈵 積極買點"
-            elif score > 90: rating_tw = "🈲 提高現金"
-            elif score > 85: rating_tw = "🈹 獲利了結"
-            elif score > 75: rating_tw = "🈴 分批減碼"
-            else: rating_tw = "⚖️ 中立平穩"
-            
-            data["fng"]["score"] = score
-            data["fng"]["rating"] = rating_tw
-    except: pass
-
-    return data
-
-
-# ==========================================
-# 🔮 最終整合與渲染 (Tab1 / Tab2 / Tab3 獨立呈現)
-# ==========================================
-with tab1:
-    actual_data_date = render_sidebar_market_summary()
-    
-# 🔥 修改點 3：將兵力分佈搬進獨立的第二分頁
-with tab2:
-    render_options_dashboard()
-    
-with tab3:
-   
-    macro_data = fetch_macro_indicators()
-    
-    # --- 美股 VIX 邏輯 ---
-    vix_val = macro_data["vix"]["value"]
-    vix_color = "#a1a1aa" 
-    if vix_val is not None:
-        if vix_val < 20: vix_color = "#10b981" 
-        elif vix_val < 28.7: vix_color = "#3b82f6" 
-        elif vix_val < 33.5: vix_color = "#f59e0b" 
-        else: vix_color = "#ef4444" 
-    vix_tooltip = f"VIX 市場恐慌指標&#10;目前 VIX： {vix_val if vix_val else '無'}&#10;綠色（VIX < 20）：市場平穩。&#10;藍色（20 ≤ VIX < 28.7）： 1年的投資報酬率較差。&#10;橘色（28.7 ≤ VIX < 33.5）： 🉐1年的報酬可達 15%。&#10;紅色（VIX ≥ 33.5）：🈵1年的報酬可達 25%。"
-
-    # --- 台股 VIX 邏輯 ---
-    vixtwn_val = macro_data["vixtwn"]["value"]
-    vixtwn_color = "#a1a1aa"
-    if vixtwn_val is not None:
-        if vixtwn_val < 20: vixtwn_color = "#3b82f6" 
-        elif vixtwn_val < 30: vixtwn_color = "#10b981" 
-        elif vixtwn_val < 40: vixtwn_color = "#f59e0b" 
-        else: vixtwn_color = "#ef4444" 
-    vixtwn_tooltip = f"VIXTWN 台灣市場恐慌指標&#10;目前 VIXTWN： {vixtwn_val if vixtwn_val else '無'}&#10;藍色（VIXTWN < 20）：市場平穩，多頭常態。&#10;綠色（20 ≤ VIXTWN < 30）：🈹波動加劇，注意風險。&#10;橘色（30 ≤ VIXTWN < 40）：🉐恐慌殺盤，布局機會。(法人避險)&#10;紅色（VIXTWN ≥ 40）：🈵極度恐慌，強力買點。(系統風險、黑天鵝)"
-
-    # --- 恐懼貪婪 邏輯 ---
-    fng_val = macro_data["fng"]["score"]
-    fng_color = "#a1a1aa"
-    if fng_val is not None:
-        if fng_val < 25: fng_color = "#ef4444" 
-        elif fng_val > 75: fng_color = "#10b981" 
-        else: fng_color = "#f59e0b" 
-    fng_tooltip = f"目前 FNG： {fng_val if fng_val else '無'}&#10;恐懼貪婪指數 < 25 🈵積極買點&#10;恐懼貪婪 < 15 🉐分批加碼&#10;恐懼貪婪 > 75 🈴分批減碼不追高&#10;恐懼貪婪 > 85 🈹獲利了結&#10;恐懼貪婪 > 90 🈲提高現金部位"
-
-    # --- 版面渲染：左側上下兩小塊，右側一長塊 ---
-    col_left, col_right = st.columns([1, 1])
-    
-    with col_left:
-        # 美股 VIX 卡片
-        v1_str = f"{vix_val:.2f}" if vix_val else "無資料"
-        p1_str = f"{'+' if macro_data['vix']['pct'] and macro_data['vix']['pct'] > 0 else ''}{macro_data['vix']['pct']:.2f}%" if macro_data['vix']['pct'] is not None else "-"
-        st.markdown(f"""
-        <div title="{vix_tooltip}" style="background-color: rgba(255,255,255,0.03); padding: 12px; border-radius: 10px; border: 1px solid rgba(255,255,255,0.1); text-align: center; cursor: help; margin-bottom: 10px; transition: 0.3s;" onmouseover="this.style.borderColor='{vix_color}'; this.style.backgroundColor='rgba(255,255,255,0.08)';" onmouseout="this.style.borderColor='rgba(255,255,255,0.1)'; this.style.backgroundColor='rgba(255,255,255,0.03)';">
-            <div style="font-size: 13px; color: #a1a1aa; margin-bottom: 4px;">🇺🇸 美股 VIX</div>
-            <div style="font-size: 22px; font-weight: 700; color: {vix_color}; margin-bottom: 2px;">{v1_str}</div>
-            <div style="font-size: 12px; color: #71717a;">{p1_str}</div>
-        </div>
-        """, unsafe_allow_html=True)
-        
-        # 台股 VIX 卡片
-        v2_str = f"{vixtwn_val:.2f}" if vixtwn_val else "無資料"
-        p2_str = "最新數值" if vixtwn_val else "-"
-        st.markdown(f"""
-        <div title="{vixtwn_tooltip}" style="background-color: rgba(255,255,255,0.03); padding: 12px; border-radius: 10px; border: 1px solid rgba(255,255,255,0.1); text-align: center; cursor: help; transition: 0.3s;" onmouseover="this.style.borderColor='{vixtwn_color}'; this.style.backgroundColor='rgba(255,255,255,0.08)';" onmouseout="this.style.borderColor='rgba(255,255,255,0.1)'; this.style.backgroundColor='rgba(255,255,255,0.03)';">
-            <div style="font-size: 13px; color: #a1a1aa; margin-bottom: 4px;">🇹🇼 台股 VIX</div>
-            <div style="font-size: 22px; font-weight: 700; color: {vixtwn_color}; margin-bottom: 2px;">{v2_str}</div>
-            <div style="font-size: 12px; color: #71717a;">{p2_str}</div>
-        </div>
-        """, unsafe_allow_html=True)
-
-    with col_right:
-        # 恐懼貪婪 長卡片
-        f_str = str(fng_val) if fng_val else "無資料"
-        f_rating = macro_data["fng"]["rating"]
-        st.markdown(f"""
-        <div title="{fng_tooltip}" style="background-color: rgba(255,255,255,0.03); padding: 12px; height: calc(100% - 24px); display: flex; flex-direction: column; justify-content: center; align-items: center; border-radius: 10px; border: 1px solid rgba(255,255,255,0.1); text-align: center; cursor: help; transition: 0.3s;" onmouseover="this.style.borderColor='{fng_color}'; this.style.backgroundColor='rgba(255,255,255,0.08)';" onmouseout="this.style.borderColor='rgba(255,255,255,0.1)'; this.style.backgroundColor='rgba(255,255,255,0.03)';">
-            <div style="font-size: 15px; color: #a1a1aa; margin-bottom: 15px;">🧭 恐懼與貪婪指數</div>
-            <div style="font-size: 42px; font-weight: 700; color: {fng_color}; margin-bottom: 10px;">{f_str}</div>
-            <div style="font-size: 16px; font-weight: 600; color: {fng_color};">{f_rating}</div>
-        </div>
-        """, unsafe_allow_html=True)
 
 # ==========================================
 # 🏠 核心五大區塊
