@@ -1148,8 +1148,7 @@ def render_sidebar_market_summary():
 # ------------------------------------------
 def render_options_dashboard():
     # 🔥 拿掉原本的 <hr> 分隔線，因為已經是獨立分頁的第一個元素了
-    st.markdown("<h2 style='margin-top: 0; margin-bottom: 5px;'>🏰 選擇權兵力分布</h2>", unsafe_allow_html=True)
-    
+   
     df_opt, date_opt = get_latest_csv("臺指選擇權行情簡表")
     df_pcr, _ = get_latest_csv("臺指選擇權PC比")
     df_opt_prev = get_prev_csv("臺指選擇權行情簡表", date_opt)
@@ -1369,8 +1368,7 @@ with tab2:
     render_options_dashboard()
     
 with tab3:
-    st.subheader("📊 大盤總體經濟指標")
-    
+   
     macro_data = fetch_macro_indicators()
     
     # --- 美股 VIX 邏輯 ---
