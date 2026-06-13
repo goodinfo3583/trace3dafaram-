@@ -1042,7 +1042,6 @@ tab1, tab2, tab3 = st.sidebar.tabs(["🔹 大盤籌碼", "🔹 選擇權", "🔹
 # 1. 大盤籌碼導航總覽 (終極精準融資 + 期貨變化量)
 # ------------------------------------------
 def render_sidebar_market_summary():
-    st.markdown("<h2 style='margin-top: 0; margin-bottom: 5px;'>📊 大盤資金風向球</h2>", unsafe_allow_html=True)
     df_spot, date_spot = get_latest_csv("三大法人買賣超金額")
     df_fut, _ = get_latest_csv("三大法人期貨多空")
     df_fut_prev = get_prev_csv("三大法人期貨多空", date_spot)
