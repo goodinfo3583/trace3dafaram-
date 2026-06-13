@@ -2940,7 +2940,7 @@ if current_page in ["all", "b4"]:
     else:
         st.warning(f"軋空雷達載入失敗：{msg}")
 
-    # ==================== 4-5 ====================
+# ==================== 4-5 ====================
     st.write("---")
     st.markdown("<div id='section-4-5'></div>", unsafe_allow_html=True)
 
@@ -2983,7 +2983,7 @@ if current_page in ["all", "b4"]:
                             styles.append(base_style + ' color: #ff4b4b;')
                         else:
                             styles.append(base_style + ' color: #e0e0e0;')
-                        return styles
+                    return styles  # 🌟 致命 Bug 修復：將這行往左退一格，確保檢查完所有欄位才回傳！
                 
                 styler = styler.apply(highlight_risk, axis=1)
                 
