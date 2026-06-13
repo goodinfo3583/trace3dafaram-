@@ -231,7 +231,7 @@ st.markdown(
 
 # ==========================================
 # ==========================================
-# 📍 頂部：戰情室快速導航 (靠右對齊自適應 + 免責聲明跑馬燈)
+# 📍 頂部：戰情室快速導航 (靠右對齊 + 懸停展開聲明列)
 # ==========================================
 st.markdown("""
 <style>
@@ -243,83 +243,103 @@ st.markdown("""
     width: 100%;
     z-index: 999999;
     box-shadow: 0px 4px 20px rgba(0, 0, 0, 0.6);
-}
-
-/* ⚠️ 微型免責聲明橫幅 */
-.disclaimer-bar {
     background-color: #0A0D14;
-    color: #64748B;
-    font-size: 11px;
-    padding: 4px 15px;
-    text-align: center;
-    border-bottom: 1px dashed #1E293B;
-    white-space: nowrap;      /* 預設單行顯示 */
-    overflow: hidden;
-    text-overflow: ellipsis;  /* 太長會變成 ... */
-    letter-spacing: 0.5px;
-    transition: all 0.3s ease;
-    cursor: help;
-}
-/* 滑鼠移上去時，自動展開顯示完整法律免責內容 */
-.disclaimer-bar:hover {
-    white-space: normal;
-    color: #94A3B8;
-    background-color: #111622;
 }
 
-/* 🌟 導航按鈕容器：設定靠右與自動換行 */
+/* ⚠️ 微型免責聲明橫幅 (預設狀態) */
+.disclaimer-bar {
+    background-color: #111622;
+    padding: 6px 20px;
+    text-align: left;
+    border-bottom: 1px dashed #1E293B;
+    cursor: help;
+    display: flex;
+    flex-direction: column;
+}
+
+/* 頂端標題列 (平時只顯示這個) */
+.disclaimer-header {
+    display: flex;
+    gap: 20px;
+    font-size: 13px;
+    color: #64748B;
+    font-weight: 500;
+}
+
+.disclaimer-item {
+    transition: color 0.2s;
+}
+
+/* 滑鼠移過去字體發亮 */
+.disclaimer-item:hover {
+    color: #00D2FF;
+}
+
+/* 隱藏的完整聲明內容 (高度設為0，透明度為0) */
+.disclaimer-content {
+    max-height: 0;
+    opacity: 0;
+    overflow: hidden;
+    transition: all 0.4s ease-in-out;
+    font-size: 12px;
+    color: #94A3B8;
+    line-height: 1.6;
+}
+
+/* 🖱️ 滑鼠移到整個橫幅上時，抽屜向下拉開！ */
+.disclaimer-bar:hover .disclaimer-content {
+    max-height: 100px;
+    opacity: 1;
+    margin-top: 8px;
+}
+
+/* 🌟 導航按鈕容器：靠右對齊 */
 .nav-btn-container {
     display: flex;
-    flex-wrap: wrap;           /* 允許換行，避免螢幕太小破版 */
-    justify-content: flex-end; /* 按鈕整體靠右對齊 */
+    flex-wrap: wrap;
+    justify-content: flex-end; /* 按鈕群組靠右對齊 */
     align-items: center;
-    padding: 10px 15px;
-    background-color: #0A0D14; /* 實心背景，防止文字穿透 */
+    padding: 8px 15px;
+    background-color: #0A0D14;
     border-bottom: 2px solid #1E293B;
-    gap: 8px;                  /* 按鈕之間的間距 */
+    gap: 6px;
 }
 
 /* 導航文字超連結樣式 */
 .nav-text-link {
     text-decoration: none !important;
     color: #94A3B8 !important;
-    font-size: 18px; 
+    font-size: 16px; 
     font-weight: 600; 
-    padding: 4px 8px;
+    padding: 4px 6px;
     transition: all 0.2s ease-in-out;
     font-family: -apple-system, BlinkMacSystemFont, "Microsoft JhengHei", sans-serif !important;
 }
 
-/* 滑鼠移上去時：發光微幅放大 */
 .nav-text-link:hover {
     color: #00D2FF !important;
     text-shadow: 0 0 12px rgba(0, 210, 255, 0.8);
     transform: scale(1.05); 
 }
 
-/* 項目之間的分隔直線 */
+/* 分隔線 */
 .nav-divider {
     color: #334155;
-    font-size: 18px;
+    font-size: 16px;
     user-select: none;
 }
 
-/* 📱 手機版特化微調 (螢幕寬度小於 768px 時觸發) */
+/* 📱 手機版特化：螢幕縮小時的防跑版機制 */
 @media (max-width: 768px) {
     .nav-btn-container {
         justify-content: flex-end; /* 手機版確實靠右 */
-        padding: 8px 5px;
+        padding: 5px 10px;
     }
-    .nav-divider {
-        display: none; /* 手機上隱藏分隔直線，節省寶貴空間 */
-    }
-    .nav-text-link {
-        font-size: 15px; /* 手機版字體稍微縮小 */
-        margin: 2px;
-    }
+    .nav-divider { display: none; } /* 隱藏直線省空間 */
+    .nav-text-link { font-size: 14px; margin: 2px; }
 }
 
-/* 導航列變高了，把整個 App 內容往下推，避免被遮擋 */
+/* 避免頁面內容被置頂列遮住，往下推 */
 .stApp {
     margin-top: 90px;
 }
@@ -327,7 +347,15 @@ st.markdown("""
 
 <div class="sticky-header-wrapper">
     <div class="disclaimer-bar">
-        ⚠️ 平台免責聲明：本系統各項數據僅供量化學術研究與籌碼探討，絕不構成實質投資建議或勸誘。受限於網路技術，本平台無法擔保數據之絕對精確與即時性。投資決策與盈虧結果均須由使用者自行負責。 (滑鼠懸停查看)
+        <div class="disclaimer-header">
+            <span class="disclaimer-item">⚠️ 使用聲明</span>
+            <span class="disclaimer-item">🔒 隱私權政策 (建置中)</span>
+            <span class="disclaimer-item">📜 網站聲明 (建置中)</span>
+        </div>
+        <div class="disclaimer-content">
+            本平台僅供教育研究與籌碼觀察，絕不構成任何實質投資建議、勸誘或要約。所有資料源自 TWSE / TPEX / 公開資訊觀測站 等公開數據，受限於網路技術，可能有延遲、錯誤或不完整之情形。<br>
+            投資必有風險，使用者依本平台資訊所做之任何投資決策與損益結果，均須由使用者自行負責，本平台不對資料正確性、即時性負擔任何法律賠償責任。
+        </div>
     </div>
     
     <div class="nav-btn-container">
