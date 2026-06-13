@@ -3101,12 +3101,11 @@ st.markdown(f"""
         💰 區塊 5：大股東動向
     </h2>
     <div style='font-size:13px; color:#00D2FF; font-weight:500; margin-top:8px;'>
-        📊 基準日 : {global_latest_date[:2]}/{global_latest_date[2:]} ｜ 四層級多維分析系統
+        基準日 : {global_latest_date[:4]}/{global_latest_date[4:6]}/{global_latest_date[6:8]}
     </div>
 </div>
 """, unsafe_allow_html=True)
 
-st.write("💡 千張與四百張長線千金大戶股權動態週持有張數更新軌跡。")
 
 # 篩選器
 filter_c1, filter_c2, _ = st.columns([2, 3, 5])
@@ -3124,7 +3123,7 @@ def apply_b5_market_filters(df, show_etf, show_bond):
 
 # 擴充為 5 個 Tab
 tab_1000, tab_800, tab_600, tab_400, tab_sync = st.tabs([
-    "🔹 1000張大戶", "🔹 800張大戶", "🔹 600張大戶", "🔹 400張大戶", "🎯 雙引擎共振"
+    "🔹 1000張大戶", "🔹 800張大戶", "🔹 600張大戶", "🔹 400張大戶", "🔹 雙引擎共振"
 ])
 
 filtered_1000_df, filtered_800_df, filtered_600_df, filtered_400_df = pd.DataFrame(), pd.DataFrame(), pd.DataFrame(), pd.DataFrame()
