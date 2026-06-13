@@ -984,16 +984,53 @@ def build_block1_master_df():
 
 # 👇👇👇 執行引擎緊接著工具宣告之後，絕對不會再報錯！ 👇👇👇
 # ==========================================
-# 🛡️ 背景守護程式 (強制維持記憶體熱度，解決歸零問題)
+# 🛡️ 背景守護程式 (強制維持記憶體熱度，解決歸零與空值問題)
 # ==========================================
+def preload_all_csv_data():
+    import os, glob
+    import pandas as pd
+    DATA_DIR = "./Goodinfo_Rankings"
+    
+    # 智慧檔案尋找器 (容錯率高)
+    def safe_load(key, kw1, kw2=""):
+        if key in st.session_state and not st.session_state[key].empty: return
+        files = glob.glob(os.path.join(DATA_DIR, f"*{kw1}*.csv"))
+        if kw2: files = [f for f in files if kw2 in f]
+        if files:
+            for enc in ['cp950', 'utf-8-sig', 'utf-8']:
+                try:
+                    df = pd.read_csv(sorted(files, reverse=True)[0], encoding=enc)
+                    if not df.empty:
+                        st.session_state[key] = df
+                        return
+                except: continue
+        st.session_state[key] = pd.DataFrame()
+
+    # 強制將所有區塊的 CSV 預先載入記憶體
+    safe_load('df_blk2_1', '外資買', '成交')
+    safe_load('df_blk2_2', '投信買', '成交')
+    safe_load('df_blk2_3', '外資買', '發行')
+    safe_load('df_blk2_4', '投信買', '發行')
+    safe_load('df_blk3_main', '連買')
+    safe_load('df_margin_pct', '融資減少幅度')
+    safe_load('df_margin_vol', '融資減少張數')
+    safe_load('df_short_pct', '借券賣出減少幅度')
+    safe_load('df_short_vol', '借券賣出減少張數')
+    safe_load('df_margin_plus_pct', '融券增加幅度')
+    safe_load('df_margin_plus_vol', '融券增加張數')
+    safe_load('df_blk5', '400張')
+    if st.session_state['df_blk5'].empty: safe_load('df_blk5', '大股東')
+    safe_load('df_blk5_1000', '1000張')
+    if st.session_state['df_blk5_1000'].empty: safe_load('df_blk5_1000', '大股東')
+
 if 'my_final_df' not in st.session_state or st.session_state['my_final_df'].empty or st.session_state.get('force_reload', False):
     with st.spinner("⚡ 背景引擎啟動中，正在載入全市場籌碼數據... (僅需數秒)"):
         json_dfs, latest_all_df = fetch_github_json_all()
         final_df, sorted_dates, date_cols, color_ref = build_block1_master_df()
         st.session_state['my_final_df'] = final_df
+        preload_all_csv_data()  # 💡 啟動預載雷達，確保側邊欄搜得到資料！
         st.session_state['force_reload'] = False # 重置標記
 # 👆👆👆 ======================================================================👆👆👆
-# 👇 👇 👇 請確保下方緊接著的就是側邊欄！ 👇 👇 👇
 
 # =======================================================
 # 側邊欄：戰情指揮中心 (內建個股快搜 + 大盤總經)
@@ -1011,14 +1048,35 @@ with st.sidebar:
     </div>
     """, unsafe_allow_html=True)
 
-    # 💡 修復點：加入清空按鈕
+    # =======================================================
+# 側邊欄：戰情指揮中心 (內建個股快搜 + 大盤總經)
+# =======================================================
+with st.sidebar:
+    st.markdown("""
+    <div style="background: linear-gradient(90deg, rgba(15,23,42,1) 0%, rgba(14,165,233,0.3) 50%, rgba(15,23,42,1) 100%); 
+                border-top: 1px solid #38bdf8; border-bottom: 1px solid #38bdf8; 
+                padding: 12px 10px; border-radius: 8px; text-align: center; 
+                box-shadow: 0px 0px 15px rgba(56, 189, 248, 0.2); margin-bottom: 15px;">
+        <h3 style="color: #e0f2fe; margin: 0; letter-spacing: 1px; text-shadow: 0 0 10px rgba(56, 189, 248, 0.8); font-size: 18px;">
+            🔍 側邊欄快搜診斷
+        </h3>
+        <p style="color: #94a3b8; margin-top: 5px; font-size: 12px; margin-bottom: 0;">一鍵聯動 K線 ｜ 法人 ｜ 大戶</p>
+    </div>
+    """, unsafe_allow_html=True)
+
+    # 💡 修復點：定義一個安全的回調函數 (Callback) 來清空搜尋欄
+    def clear_search_cb():
+        st.session_state["sidebar_search_final"] = ""
+
     col_s1, col_s2 = st.columns([5, 1])
     with col_s1:
         search_query = st.text_input("輸入代號或名稱", key="sidebar_search_final", placeholder="例: 3231", label_visibility="collapsed")
     with col_s2:
-        if st.button("↻", help="清空搜尋", use_container_width=True):
-            st.session_state["sidebar_search_final"] = ""
-            st.rerun()
+        # 💡 修復點：利用 on_click 呼叫安全的回調函數，就不會引發 StreamlitAPIException 了！
+        st.button("↻", help="清空搜尋", use_container_width=True, on_click=clear_search_cb)
+
+    if search_query:
+        # ... (以下維持你原本的搜尋判斷與顯示邏輯，不用變動) ...
 
     if search_query:
         pure_stock_id = ""
