@@ -1044,23 +1044,7 @@ with st.sidebar:
         <h3 style="color: #e0f2fe; margin: 0; letter-spacing: 1px; text-shadow: 0 0 10px rgba(56, 189, 248, 0.8); font-size: 18px;">
             🔍 側邊欄快搜診斷
         </h3>
-        <p style="color: #94a3b8; margin-top: 5px; font-size: 12px; margin-bottom: 0;">一鍵聯動 K線 ｜ 法人 ｜ 大戶</p>
-    </div>
-    """, unsafe_allow_html=True)
 
-    # =======================================================
-# 側邊欄：戰情指揮中心 (內建個股快搜 + 大盤總經)
-# =======================================================
-with st.sidebar:
-    st.markdown("""
-    <div style="background: linear-gradient(90deg, rgba(15,23,42,1) 0%, rgba(14,165,233,0.3) 50%, rgba(15,23,42,1) 100%); 
-                border-top: 1px solid #38bdf8; border-bottom: 1px solid #38bdf8; 
-                padding: 12px 10px; border-radius: 8px; text-align: center; 
-                box-shadow: 0px 0px 15px rgba(56, 189, 248, 0.2); margin-bottom: 15px;">
-        <h3 style="color: #e0f2fe; margin: 0; letter-spacing: 1px; text-shadow: 0 0 10px rgba(56, 189, 248, 0.8); font-size: 18px;">
-            🔍 側邊欄快搜診斷
-        </h3>
-        <p style="color: #94a3b8; margin-top: 5px; font-size: 12px; margin-bottom: 0;">一鍵聯動 K線 ｜ 法人 ｜ 大戶</p>
     </div>
     """, unsafe_allow_html=True)
 
