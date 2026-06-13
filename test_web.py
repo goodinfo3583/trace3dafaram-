@@ -996,7 +996,7 @@ def get_diff_ui(today_val, prev_val):
     except: return ""
 
 # 🔥 修改點 1：將原本的兩個分頁擴增為三個分頁
-tab1, tab2, tab3 = st.sidebar.tabs(["🔹 大盤籌碼", "🔹 選擇權兵力", "🔹 總經導航"])
+tab1, tab2, tab3 = st.sidebar.tabs(["🔹 大盤籌碼", "🔹 選擇權", "🔹 總經導航"])
 
 # ------------------------------------------
 # 1. 大盤籌碼導航總覽 (終極精準融資 + 期貨變化量)
