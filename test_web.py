@@ -3836,7 +3836,6 @@ with top_pool_container:
                             if change_val > 3:
                                 score += 0.7; details.append("榜上+漲幅>3%: +0.7")
                                 
-                        # 🔥 已修復 && 為 and
                         short_decrease_val = 0.0
                         if not df_b4_sho_pct.empty and sid in df_b4_sho_pct['股票代號'].values:
                             s_col = next((c for c in df_b4_sho_pct.columns if '當日' in str(c) and ('%' in str(c) or '增減' in str(c))), None)
@@ -3945,22 +3944,38 @@ with top_pool_container:
 
                 st.session_state['top_pool_df'] = res_df
                 
-                # 💾 歷史紀錄存檔機制
-                if res_df is not None and not res_df.empty:
-                    try:
-                        if anchor_date_str != "00000000":
-                            save_df = res_df.copy()
-                            save_df.insert(0, '紀錄日期', anchor_date_str)
-                            try:
-                                old_df = conn.read(spreadsheet=SHEET_URL, worksheet="選股歷史", ttl=0)
-                                old_df = old_df.dropna(how="all")
-                                if '紀錄日期' in old_df.columns:
-                                    old_df['紀錄日期'] = old_df['紀錄日期'].astype(str).str.replace(r'\.0$', '', regex=True).str.zfill(8)
-                                    old_df = old_df[old_df['紀錄日期'] != anchor_date_str]
+                # ==========================================
+                # 💾 歷史紀錄存檔機制 (🔥 修復：加入雙重防呆與附加邏輯)
+                # ==========================================
+                if res_df is not None and not res_df.empty and anchor_date_str != "00000000":
+                    save_df = res_df.copy()
+                    save_df.insert(0, '紀錄日期', anchor_date_str)
+                    
+                    # 🌟 防護 1：使用 session_state 避免網頁重新整理時重複寫入
+                    if st.session_state.get('last_gsheet_save_date') != anchor_date_str:
+                        try:
+                            # 嚴格讀取舊資料，不使用快取以確保抓到最新狀態
+                            old_df = conn.read(spreadsheet=SHEET_URL, worksheet="選股歷史", ttl=0)
+                            old_df = old_df.dropna(how="all")
+                            
+                            if not old_df.empty and '紀錄日期' in old_df.columns:
+                                old_df['紀錄日期'] = old_df['紀錄日期'].astype(str).str.replace(r'\.0$', '', regex=True).str.zfill(8)
+                                # 剔除當天可能殘留的舊紀錄，避免同一天重複疊加
+                                old_df = old_df[old_df['紀錄日期'] != anchor_date_str]
                                 final_save_df = pd.concat([old_df, save_df], ignore_index=True)
-                            except: final_save_df = save_df
+                            else:
+                                final_save_df = save_df
+                            
+                            # 只有「成功合併新舊資料」後，才准許上傳覆蓋雲端！
                             conn.update(spreadsheet=SHEET_URL, worksheet="選股歷史", data=final_save_df)
-                    except: pass 
+                            st.session_state['last_gsheet_save_date'] = anchor_date_str
+                            
+                            # 同步更新前方的 hist_combined 變數，讓下方的 Tab 2 可以立刻顯示最新結果
+                            hist_combined = final_save_df.copy()
+                            
+                        except Exception as e:
+                            # 🌟 防護 2：如果雲端讀取失敗，絕對不要覆蓋！直接跳過寫入並顯示警告
+                            st.warning(f"⚠️ Google Sheets 歷史同步暫緩：為保護雲端舊資料不被覆寫，本次計算結果未存檔。({e})")
 
                 tab1, tab2, tab3 = st.tabs(["🔹 今日最新排行", "🔹 歷史分數追蹤表", "🔹 模型驗證：每週 Top 5 追蹤"])
                 
@@ -3973,10 +3988,10 @@ with top_pool_container:
                             "▼明細": st.column_config.TextColumn("▼明細", help="滑鼠游標停留在這裡，查看完整明細", width="small", max_chars=4)
                         }
                     )
-
                     
                 with tab2:
                     try:
+                        # 這裡的 hist_combined 現在已經是完美接軌的安全歷史檔案
                         if not hist_combined.empty:
                             recent_dates = sorted(hist_combined['紀錄日期'].unique(), reverse=True)[:20]
                             df_h = hist_combined[hist_combined['紀錄日期'].isin(recent_dates)].copy()
@@ -4001,7 +4016,7 @@ with top_pool_container:
                                     hist_pivot = hist_pivot.sort_values(by=latest_day, ascending=False).reset_index(drop=True)
                                 st.dataframe(hist_pivot, use_container_width=True, hide_index=True)
                                 st.info("💡 二篩進榜標的在選股池中的總分變化，觀察籌碼動能的延續性與驗證 ▼變量！")
-                        else: st.warning("尚無足夠的歷史分數紀錄。")
+                        else: st.warning("⚪ 尚無足夠的歷史分數紀錄，或正在初次建立雲端資料。")
                     except: pass
 
                 with tab3:
