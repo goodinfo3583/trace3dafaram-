@@ -231,7 +231,7 @@ st.markdown(
 
 # ==========================================
 # ==========================================
-# 📍 頂部：戰情室快速導航 (極速分頁路由版)
+# 📍 頂部：戰情室快速導航 (金黃發光下拉抽屜 + 全局載入大門版)
 # ==========================================
 st.markdown("""
 <style>
@@ -240,15 +240,13 @@ st.markdown("""
     position: fixed; top: 0; left: 0; width: 100%; z-index: 999999;
     box-shadow: 0px 4px 20px rgba(0, 0, 0, 0.6); background-color: #0A0D14;
 }
-
-/* 微型聲明橫幅 (水平排列) */
+/* 微型聲明橫幅 */
 .disclaimer-bar {
     display: flex; background-color: #111622; padding: 0px 15px; border-bottom: 1px dashed #1E293B;
 }
 .disclaimer-item { position: relative; padding: 6px 15px; cursor: help; }
 .disclaimer-title { color: #64748B; font-size: 13px; font-weight: 500; transition: all 0.2s; text-decoration: none; }
 .disclaimer-item:hover .disclaimer-title { color: #FFD700; text-shadow: 0 0 8px rgba(255, 215, 0, 0.5); }
-
 /* 隱藏的下拉抽屜內容 */
 .disclaimer-content {
     position: absolute; top: 100%; left: 0; width: 350px; max-width: 90vw;
@@ -258,7 +256,6 @@ st.markdown("""
     box-shadow: 0px 8px 20px rgba(0,0,0,0.8);
 }
 .disclaimer-item:hover .disclaimer-content { max-height: 400px; opacity: 1; padding: 12px 15px; }
-
 /* 導航按鈕容器 */
 .nav-btn-container {
     display: flex; flex-wrap: wrap; justify-content: flex-end; align-items: center;
@@ -278,7 +275,7 @@ st.markdown("""
 }
 .stApp { margin-top: 90px; }
 </style>
-<div class="sticky-header-wrapper"><div class="disclaimer-bar"><div class="disclaimer-item"><span class="disclaimer-title">使用聲明</span><div class="disclaimer-content">本平台僅供教育研究與籌碼觀察，絕不構成任何實質投資建議、勸誘或要約。所有資料源自公開數據，受限於網路技術，可能有延遲或錯誤。<br><br>投資必有風險，依本平台資訊所做之任何決策與損益，均須由使用者自行負責，本平台不負擔任何法律賠償責任。</div></div><div class="disclaimer-item"><span class="disclaimer-title">隱私權政策</span><div class="disclaimer-content"><b>1. 蒐集目的與範圍：</b><br>本平台依個資法蒐集您的識別資料僅供維持系統安全與優化服務使用。<br><b>2. 資料利用：</b><br>您的資料絕不向第三方洩露。<br><b>3. 資料刪除：</b><br>您可透過「聯絡我們」請求刪除資料。<br><b>4. 政策修訂：</b><br>本站保留修改政策之權利，繼續使用即視為同意。</div></div><div class="disclaimer-item"><a href="?page=contact" target="_self" class="disclaimer-title" style="cursor: pointer;">聯絡我們</a></div></div><div class="nav-btn-container"><a href="?page=pool" target="_self" class="nav-text-link">🏆 觀察名單</a><span class="nav-divider">|</span><a href="?page=search" target="_self" class="nav-text-link">🔍 個股快搜</a><span class="nav-divider">|</span><a href="?page=b1" target="_self" class="nav-text-link">👑 法人持股</a><span class="nav-divider">|</span><a href="?page=b2" target="_self" class="nav-text-link">🎯 買超佔比</a><span class="nav-divider">|</span><a href="?page=b3" target="_self" class="nav-text-link">📅 法人連買</a><span class="nav-divider">|</span><a href="?page=b4" target="_self" class="nav-text-link">🔄 資券軋空</a><span class="nav-divider">|</span><a href="?page=b5" target="_self" class="nav-text-link">💰 大股東動向</a><span class="nav-divider">|</span><a href="?page=b6" target="_self" class="nav-text-link">💸 鉅額交易</a></div></div>
+<div class="sticky-header-wrapper"><div class="disclaimer-bar"><div class="disclaimer-item"><span class="disclaimer-title">使用聲明</span><div class="disclaimer-content">本平台僅供教育研究與籌碼觀察，絕不構成任何實質投資建議、勸誘或要約。所有資料源自公開數據，受限於網路技術，可能有延遲或錯誤。<br><br>投資必有風險，依本平台資訊所做之任何決策與損益，均須由使用者自行負責，本平台不負擔任何法律賠償責任。</div></div><div class="disclaimer-item"><span class="disclaimer-title">隱私權政策</span><div class="disclaimer-content"><b>1. 蒐集目的與範圍：</b><br>本平台依個資法蒐集您的識別資料僅供維持系統安全與優化服務使用。<br><b>2. 資料利用：</b><br>您的資料絕不向第三方洩露。<br><b>3. 資料刪除：</b><br>您可透過「聯絡我們」請求刪除資料。<br><b>4. 政策修訂：</b><br>本站保留修改政策之權利，繼續使用即視為同意。</div></div><div class="disclaimer-item"><a href="?page=contact" target="_self" class="disclaimer-title" style="cursor: pointer;">聯絡我們</a></div></div><div class="nav-btn-container"><a href="?page=all" target="_self" class="nav-text-link" style="color: #00D2FF !important; text-shadow: 0 0 10px rgba(0,210,255,0.6);">🏠 載入全數據</a><span class="nav-divider">|</span><a href="?page=pool" target="_self" class="nav-text-link">🏆 觀察名單</a><span class="nav-divider">|</span><a href="?page=search" target="_self" class="nav-text-link">🔍 個股快搜</a><span class="nav-divider">|</span><a href="?page=b1" target="_self" class="nav-text-link">👑 法人持股</a><span class="nav-divider">|</span><a href="?page=b2" target="_self" class="nav-text-link">🎯 買超佔比</a><span class="nav-divider">|</span><a href="?page=b3" target="_self" class="nav-text-link">📅 法人連買</a><span class="nav-divider">|</span><a href="?page=b4" target="_self" class="nav-text-link">🔄 資券軋空</a><span class="nav-divider">|</span><a href="?page=b5" target="_self" class="nav-text-link">💰 大股東動向</a><span class="nav-divider">|</span><a href="?page=b6" target="_self" class="nav-text-link">💸 鉅額交易</a></div></div>
 """, unsafe_allow_html=True)
 # ==========================================
 # 🧭 側邊欄導航與共用函數 (極速光速版：零爬蟲、零延遲、讀取本地 CSV)
@@ -756,6 +753,9 @@ with tab3:
 # ==========================================
 # 取得網址列中的 page 參數，若沒有點擊任何按鈕，則預設為 "all" (顯示長條全頁面)
 current_page = st.query_params.get("page", "all")
+json_dfs, latest_all_df = fetch_github_json_all()
+final_df, sorted_dates, date_cols, color_ref = build_block1_master_df()
+st.session_state['my_final_df'] = final_df
 
 # ==========================================
 # ==========================================
