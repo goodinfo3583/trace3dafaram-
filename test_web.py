@@ -755,21 +755,20 @@ def render_technical_chart(stock_id, timeframe="日線", selected_mas=[], show_r
     fig = make_subplots(rows=rows, cols=1, shared_xaxes=True, vertical_spacing=0.03, row_heights=row_heights)
     up_color = 'rgb(240, 90, 90)'; down_color = 'rgb(80, 200, 120)'
 
-    # K線
+    # 💡 修復點：加入 hovertemplate 強制使用中文顯示 開/高/低/收
     fig.add_trace(go.Candlestick(
         x=daily_df.index, open=daily_df['Open'].squeeze(), high=daily_df['High'].squeeze(), 
         low=daily_df['Low'].squeeze(), close=daily_df['Close'].squeeze(), name='K線', 
         increasing=dict(line=dict(color=up_color, width=1), fillcolor=up_color),
-        decreasing=dict(line=dict(color=down_color, width=1), fillcolor=down_color)
+        decreasing=dict(line=dict(color=down_color, width=1), fillcolor=down_color),
+        hovertemplate="<b>日期</b>: %{x|%Y-%m-%d}<br><b>開</b>: %{open:.2f}<br><b>高</b>: %{high:.2f}<br><b>低</b>: %{low:.2f}<br><b>收</b>: %{close:.2f}<extra></extra>"
     ), row=1, col=1)
 
-    # 均線
     ma_colors = {'5MA': '#FFFF37', '10MA': '#00FFFF', '20MA': '#921AFF', '60MA': '#D0D0D0'}
     for ma in selected_mas:
         if ma in daily_df.columns:
             fig.add_trace(go.Scatter(x=daily_df.index, y=daily_df[ma].squeeze(), mode='lines', name=ma, line=dict(color=ma_colors[ma], width=1)), row=1, col=1)
 
-    # 成交量
     vol_colors = [up_color if c >= o else down_color for c, o in zip(daily_df['Close'].squeeze(), daily_df['Open'].squeeze())]
     fig.add_trace(go.Bar(x=daily_df.index, y=daily_df['Volume'].squeeze(), name='成交量', marker_color=vol_colors), row=2, col=1)
 
@@ -782,23 +781,24 @@ def render_technical_chart(stock_id, timeframe="日線", selected_mas=[], show_r
         fig.add_trace(go.Scatter(x=daily_df.index, y=daily_df['RSI'].squeeze(), mode='lines', name='RSI', line=dict(color='#E1BEE7', width=1)), row=current_row, col=1)
         current_row += 1
     if show_macd:
-        fig.add_trace(go.Scatter(x=daily_df.index, y=daily_df['MACD_Hist'].squeeze(), type='bar', name='MACD', marker_color=[up_color if h >= 0 else down_color for h in daily_df['MACD_Hist'].squeeze()]), row=current_row, col=1)
+        # 💡 修復點：將 go.Scatter(type='bar') 正確改寫為 go.Bar 以解決 ValueError
+        fig.add_trace(go.Bar(
+            x=daily_df.index, y=daily_df['MACD_Hist'].squeeze(), name='MACD', 
+            marker_color=[up_color if h >= 0 else down_color for h in daily_df['MACD_Hist'].squeeze()]
+        ), row=current_row, col=1)
 
     fig.update_layout(
         xaxis_rangeslider_visible=False, height=400 + (rows - 2) * 100, 
         template='plotly_dark', paper_bgcolor='rgba(0,0,0,0)', plot_bgcolor='rgba(0,0,0,0)', 
-        margin=dict(l=5, r=40, t=20, b=5), # 側邊欄窄版優化
-        showlegend=False, hovermode='x unified'
+        margin=dict(l=5, r=40, t=20, b=5), showlegend=False, hovermode='x unified'
     )
     
-    # 隱藏非交易日的空白
     if timeframe == "日線":
         all_days = pd.date_range(start=daily_df.index.min().normalize(), end=daily_df.index.max().normalize(), freq='D')
         missing_days = all_days.difference(daily_df.index.normalize()).strftime('%Y-%m-%d').tolist()
         fig.update_xaxes(rangebreaks=[dict(values=missing_days)])
 
     st.plotly_chart(fig, use_container_width=True, config={'displayModeBar': False})
-
 # ==========================================
 # 🌀 局部渲染魔法：K線圖控制台 (主畫面不會閃爍！)
 # ==========================================
@@ -827,9 +827,6 @@ def render_kline_fragment(pure_stock_id):
 # 側邊欄：戰情指揮中心 (內建個股快搜 + 大盤總經)
 # =======================================================
 with st.sidebar:
-    # ------------------------------------------
-    # 🔍 頂部模塊：側邊欄專屬個股快搜
-    # ------------------------------------------
     st.markdown("""
     <div style="background: linear-gradient(90deg, rgba(15,23,42,1) 0%, rgba(14,165,233,0.3) 50%, rgba(15,23,42,1) 100%); 
                 border-top: 1px solid #38bdf8; border-bottom: 1px solid #38bdf8; 
@@ -842,7 +839,14 @@ with st.sidebar:
     </div>
     """, unsafe_allow_html=True)
 
-    search_query = st.text_input("輸入代號或名稱 (例: 3231 或 緯創)", key="sidebar_search_final", placeholder="在此輸入...")
+    # 💡 修復點：加入清空按鈕
+    col_s1, col_s2 = st.columns([5, 1])
+    with col_s1:
+        search_query = st.text_input("輸入代號或名稱", key="sidebar_search_final", placeholder="例: 3231", label_visibility="collapsed")
+    with col_s2:
+        if st.button("↻", help="清空搜尋", use_container_width=True):
+            st.session_state["sidebar_search_final"] = ""
+            st.rerun()
 
     if search_query:
         pure_stock_id = ""
@@ -891,7 +895,6 @@ with st.sidebar:
             st.markdown("**綜合評分：** <span style='color:#64748B;'>未達進榜標準 (0分)</span>", unsafe_allow_html=True)
 
         # ------------------ K 線圖控制 ------------------
-        # 呼叫局部渲染魔法，這裡面的任何點擊都不會干擾主畫面！
         render_kline_fragment(pure_stock_id)
 
         # ------------------ 籌碼大數據 ------------------
@@ -926,426 +929,92 @@ with st.sidebar:
                     else: display_list.append({'連買類型': b_type, '股票代號': display_id, '股票名稱': display_name, '狀態動態': '⚪ 未進榜', '連買週期數': '-'})
                 st.dataframe(pd.DataFrame(display_list)[['連買類型','狀態動態','連買週期數']], use_container_width=True, hide_index=True)
 
+        # 💡 修復點：補回區塊 4
+        with st.expander("🔄 區塊4：券資軋空診斷", expanded=False):
+            scan_and_display("📉 融資減少(幅)", 'df_margin_pct', search_query)
+            scan_and_display("📉 借券減少(幅)", 'df_short_pct', search_query)
+            scan_and_display("📈 融券增加(幅)", 'df_margin_plus_pct', search_query)
+
         with st.expander("💰 區塊5：大戶動向診斷", expanded=False):
             scan_and_display("💎 400張大戶", 'df_blk5', search_query)
             scan_and_display("🐳 1000張大戶", 'df_blk5_1000', search_query)
 
-    st.write("---") # 側邊欄快搜與三大導航 Tab 的分隔線
-
-    # ------------------------------------------
-    # 📊 下半部：原本的三大導航 Tab (大盤/選擇權/總經)
-    # ------------------------------------------
-    tab1, tab2, tab3 = st.tabs(["🔹 大盤籌碼", "🔹 選擇權", "🔹 總經導航"])
-    
-    with tab1:
-        actual_data_date = render_sidebar_market_summary()
+    # 💡 修復點：當搜尋列「有內容」時，不顯示大盤總經 (隱藏下方 Tabs)
+    if not search_query:
+        st.write("---") # 側邊欄快搜與三大導航 Tab 的分隔線
+        # ------------------------------------------
+        # 📊 下半部：原本的三大導航 Tab (大盤/選擇權/總經)
+        # ------------------------------------------
+        tab1, tab2, tab3 = st.tabs(["🔹 大盤籌碼", "🔹 選擇權", "🔹 總經導航"])
         
-    with tab2:
-        render_options_dashboard()
-        
-    with tab3:
-        macro_data = fetch_macro_indicators()
-        
-        vix_val = macro_data["vix"]["value"]
-        vix_color = "#a1a1aa" 
-        if vix_val is not None:
-            if vix_val < 20: vix_color = "#10b981" 
-            elif vix_val < 28.7: vix_color = "#3b82f6" 
-            elif vix_val < 33.5: vix_color = "#f59e0b" 
-            else: vix_color = "#ef4444" 
-        vix_tooltip = f"VIX 市場恐慌指標\n目前 VIX： {vix_val if vix_val else '無'}\n綠色：市場平穩。\n藍色：報酬較差。\n橘色：報酬達 15%。\n紅色：報酬達 25%。"
-
-        vixtwn_val = macro_data["vixtwn"]["value"]
-        vixtwn_color = "#a1a1aa"
-        if vixtwn_val is not None:
-            if vixtwn_val < 20: vixtwn_color = "#3b82f6" 
-            elif vixtwn_val < 30: vixtwn_color = "#10b981" 
-            elif vixtwn_val < 40: vixtwn_color = "#f59e0b" 
-            else: vixtwn_color = "#ef4444" 
-        vixtwn_tooltip = f"VIXTWN 台灣恐慌指標\n目前： {vixtwn_val if vixtwn_val else '無'}\n藍：多頭常態。\n綠：波動加劇。\n橘：恐慌殺盤布局。\n紅：極度恐慌買點。"
-
-        fng_val = macro_data["fng"]["score"]
-        fng_color = "#a1a1aa"
-        if fng_val is not None:
-            if fng_val < 25: fng_color = "#ef4444" 
-            elif fng_val > 75: fng_color = "#10b981" 
-            else: fng_color = "#f59e0b" 
-        fng_tooltip = f"FNG 恐懼貪婪指數\n目前： {fng_val if fng_val else '無'}\n<25 積極買點\n<15 分批加碼\n>75 分批減碼\n>85 獲利了結\n>90 提高現金"
-
-        col_left, col_right = st.columns([1, 1])
-        
-        with col_left:
-            v1_str = f"{vix_val:.2f}" if vix_val else "無資料"
-            p1_str = f"{'+' if macro_data['vix']['pct'] and macro_data['vix']['pct'] > 0 else ''}{macro_data['vix']['pct']:.2f}%" if macro_data['vix']['pct'] is not None else "-"
-            st.markdown(f"""
-            <div title="{vix_tooltip}" style="background-color: rgba(255,255,255,0.03); padding: 12px; border-radius: 10px; border: 1px solid rgba(255,255,255,0.1); text-align: center; cursor: help; margin-bottom: 10px;">
-                <div style="font-size: 13px; color: #a1a1aa; margin-bottom: 4px;">🇺🇸 美股 VIX</div>
-                <div style="font-size: 22px; font-weight: 700; color: {vix_color}; margin-bottom: 2px;">{v1_str}</div>
-                <div style="font-size: 12px; color: #71717a;">{p1_str}</div>
-            </div>
-            """, unsafe_allow_html=True)
+        with tab1:
+            actual_data_date = render_sidebar_market_summary()
             
-            v2_str = f"{vixtwn_val:.2f}" if vixtwn_val else "無資料"
-            p2_str = "最新數值" if vixtwn_val else "-"
-            st.markdown(f"""
-            <div title="{vixtwn_tooltip}" style="background-color: rgba(255,255,255,0.03); padding: 12px; border-radius: 10px; border: 1px solid rgba(255,255,255,0.1); text-align: center; cursor: help;">
-                <div style="font-size: 13px; color: #a1a1aa; margin-bottom: 4px;">🇹🇼 台股 VIX</div>
-                <div style="font-size: 22px; font-weight: 700; color: {vixtwn_color}; margin-bottom: 2px;">{v2_str}</div>
-                <div style="font-size: 12px; color: #71717a;">{p2_str}</div>
-            </div>
-            """, unsafe_allow_html=True)
-
-        with col_right:
-            f_str = str(fng_val) if fng_val else "無資料"
-            f_rating = macro_data["fng"]["rating"]
-            st.markdown(f"""
-            <div title="{fng_tooltip}" style="background-color: rgba(255,255,255,0.03); padding: 12px; height: calc(100% - 24px); display: flex; flex-direction: column; justify-content: center; align-items: center; border-radius: 10px; border: 1px solid rgba(255,255,255,0.1); text-align: center; cursor: help;">
-                <div style="font-size: 15px; color: #a1a1aa; margin-bottom: 15px;">🧭 恐懼與貪婪</div>
-                <div style="font-size: 36px; font-weight: 700; color: {fng_color}; margin-bottom: 10px;">{f_str}</div>
-                <div style="font-size: 14px; font-weight: 600; color: {fng_color};">{f_rating}</div>
-            </div>
-            """, unsafe_allow_html=True)
-# ==========================================
-#  數據分析觀察名單專屬工具函數區 
-# ==========================================
-import os, glob, re, json, datetime
-import pandas as pd
-import streamlit as st
-# ==========================================
-# 📈 繪製 K 線圖與技術分析引擎 (加入快取與側邊欄窄版優化)
-# ==========================================
-@st.cache_data(ttl=900)
-def fetch_yfinance_data(ticker, period="3y"):
-    import yfinance as yf
-    try:
-        df = yf.download(ticker, period=period, progress=False)
-        return df
-    except:
-        return pd.DataFrame()
-
-def render_technical_chart(stock_id, timeframe="日線", selected_mas=[], show_rsi=False, show_macd=False, show_kd=False):
-    import plotly.graph_objects as go
-    from plotly.subplots import make_subplots
-    import pandas as pd
-
-    ticker_tw = f"{stock_id}.TW"
-    ticker_two = f"{stock_id}.TWO"
-    
-    df = fetch_yfinance_data(ticker_tw)
-    if df is None or df.empty:
-        df = fetch_yfinance_data(ticker_two)
-        
-    if df is None or df.empty:
-        st.warning(f"⚠️ 無法取得 {stock_id} 的即時報價。")
-        return
-
-    if isinstance(df.columns, pd.MultiIndex):
-        df.columns = df.columns.get_level_values(0)
-    df = df.loc[:, ~df.columns.duplicated()]
-
-    if df.index.tz is not None: df.index = df.index.tz_convert('Asia/Taipei')
-    else: df.index = df.index.tz_localize('UTC').tz_convert('Asia/Taipei')
-
-    daily_df = df.copy()
-
-    if timeframe == "週線":
-        daily_df = daily_df.resample('W-FRI').agg({'Open': 'first', 'High': 'max', 'Low': 'min', 'Close': 'last', 'Volume': 'sum'}).dropna()
-    elif timeframe == "月線":
-        daily_df = daily_df.resample('ME').agg({'Open': 'first', 'High': 'max', 'Low': 'min', 'Close': 'last', 'Volume': 'sum'}).dropna()
-
-    for ma in [5, 10, 20, 60]:
-        daily_df[f'{ma}MA'] = daily_df['Close'].rolling(window=ma).mean()
-
-    close_series = daily_df['Close'].squeeze()
-    
-    if show_rsi:
-        delta = close_series.diff()
-        gain = delta.clip(lower=0); loss = -delta.clip(upper=0)
-        ema_gain = gain.ewm(com=13, adjust=False).mean(); ema_loss = loss.ewm(com=13, adjust=False).mean()
-        rs = ema_gain / ema_loss.replace(0, 1e-9)
-        daily_df['RSI'] = 100 - (100 / (1 + rs))
-
-    if show_macd:
-        ema12 = close_series.ewm(span=12, adjust=False).mean(); ema26 = close_series.ewm(span=26, adjust=False).mean()
-        daily_df['DIF'] = ema12 - ema26
-        daily_df['MACD_Sign'] = daily_df['DIF'].ewm(span=9, adjust=False).mean()
-        daily_df['MACD_Hist'] = daily_df['DIF'] - daily_df['MACD_Sign']
-        
-    if show_kd:
-        low_9 = daily_df['Low'].rolling(window=9).min(); high_9 = daily_df['High'].rolling(window=9).max()
-        rsv = (close_series - low_9) / (high_9 - low_9).replace(0, 1e-9) * 100
-        daily_df['K'] = rsv.ewm(com=2, adjust=False).mean()
-        daily_df['D'] = daily_df['K'].ewm(com=2, adjust=False).mean()
-
-    rows = 2
-    row_heights = [0.5, 0.15]
-    if show_rsi: rows += 1; row_heights.append(0.15)
-    if show_macd: rows += 1; row_heights.append(0.15)
-    if show_kd: rows += 1; row_heights.append(0.15)
-
-    fig = make_subplots(rows=rows, cols=1, shared_xaxes=True, vertical_spacing=0.03, row_heights=row_heights)
-    up_color = 'rgb(240, 90, 90)'; down_color = 'rgb(80, 200, 120)'
-
-    # K線
-    fig.add_trace(go.Candlestick(
-        x=daily_df.index, open=daily_df['Open'].squeeze(), high=daily_df['High'].squeeze(), 
-        low=daily_df['Low'].squeeze(), close=daily_df['Close'].squeeze(), name='K線', 
-        increasing=dict(line=dict(color=up_color, width=1), fillcolor=up_color),
-        decreasing=dict(line=dict(color=down_color, width=1), fillcolor=down_color)
-    ), row=1, col=1)
-
-    # 均線
-    ma_colors = {'5MA': '#FFFF37', '10MA': '#00FFFF', '20MA': '#921AFF', '60MA': '#D0D0D0'}
-    for ma in selected_mas:
-        if ma in daily_df.columns:
-            fig.add_trace(go.Scatter(x=daily_df.index, y=daily_df[ma].squeeze(), mode='lines', name=ma, line=dict(color=ma_colors[ma], width=1)), row=1, col=1)
-
-    # 成交量
-    vol_colors = [up_color if c >= o else down_color for c, o in zip(daily_df['Close'].squeeze(), daily_df['Open'].squeeze())]
-    fig.add_trace(go.Bar(x=daily_df.index, y=daily_df['Volume'].squeeze(), name='成交量', marker_color=vol_colors), row=2, col=1)
-
-    current_row = 3
-    if show_kd:
-        fig.add_trace(go.Scatter(x=daily_df.index, y=daily_df['K'].squeeze(), mode='lines', name='K', line=dict(color='#00CCFF', width=1)), row=current_row, col=1)
-        fig.add_trace(go.Scatter(x=daily_df.index, y=daily_df['D'].squeeze(), mode='lines', name='D', line=dict(color='#FFCC00', width=1)), row=current_row, col=1)
-        current_row += 1
-    if show_rsi:
-        fig.add_trace(go.Scatter(x=daily_df.index, y=daily_df['RSI'].squeeze(), mode='lines', name='RSI', line=dict(color='#E1BEE7', width=1)), row=current_row, col=1)
-        current_row += 1
-    if show_macd:
-        fig.add_trace(go.Scatter(x=daily_df.index, y=daily_df['MACD_Hist'].squeeze(), type='bar', name='MACD', marker_color=[up_color if h >= 0 else down_color for h in daily_df['MACD_Hist'].squeeze()]), row=current_row, col=1)
-
-    fig.update_layout(
-        xaxis_rangeslider_visible=False, height=400 + (rows - 2) * 100, 
-        template='plotly_dark', paper_bgcolor='rgba(0,0,0,0)', plot_bgcolor='rgba(0,0,0,0)', 
-        margin=dict(l=5, r=40, t=20, b=5), # 側邊欄窄版優化
-        showlegend=False, hovermode='x unified'
-    )
-    
-    # 隱藏非交易日的空白
-    if timeframe == "日線":
-        all_days = pd.date_range(start=daily_df.index.min().normalize(), end=daily_df.index.max().normalize(), freq='D')
-        missing_days = all_days.difference(daily_df.index.normalize()).strftime('%Y-%m-%d').tolist()
-        fig.update_xaxes(rangebreaks=[dict(values=missing_days)])
-
-    st.plotly_chart(fig, use_container_width=True, config={'displayModeBar': False})
-
-# ==========================================
-# 🌀 局部渲染魔法：K線圖控制台 (主畫面不會閃爍！)
-# ==========================================
-@st.fragment
-def render_kline_fragment(pure_stock_id):
-    # 改用優雅的切換按鈕，取代需要 rerun 的 button
-    show_kline = st.toggle("📊 展開技術 K 線圖", value=False)
-    
-    if show_kline and pure_stock_id != "":
-        # 改用 radio button 切換週期，自然連動無須 rerun
-        kline_period = st.radio("選擇週期", ["日線", "週線", "月線"], horizontal=True, label_visibility="collapsed")
-        
-        ind_c1, ind_c2, ind_c3 = st.columns(3)
-        chk_kd = ind_c1.checkbox("KD", value=False)
-        chk_macd = ind_c2.checkbox("MACD", value=False)
-        chk_rsi = ind_c3.checkbox("RSI", value=False)
-        
-        with st.spinner("載入線圖中..."):
-            all_mas = ["5MA", "10MA", "20MA", "60MA"]
-            render_technical_chart(pure_stock_id, kline_period, all_mas, chk_rsi, chk_macd, chk_kd)
-def get_df_safe(key): return st.session_state.get(key, pd.DataFrame())
-def fmt_d(d_str): return f"{d_str[4:6]}/{d_str[6:]}" if d_str != "00000000" else "--/--"
-
-def check_b2_strict(df, sid, bad_keywords):
-    if df.empty or sid not in df['股票代號'].values: return False
-    dyn = str(df[df['股票代號'] == sid].iloc[0].get('今日短動態', ''))
-    if any(bad in dyn for bad in bad_keywords): return False
-    return True
-
-def get_b3_score(df, sid, type_keyword):
-    if df.empty: return 0, ""
-    match = df[(df['股票代號'] == sid) & (df['連買類型'].str.contains(type_keyword))]
-    if match.empty: return 0, ""
-    days = pd.to_numeric(match.iloc[0].get('連買週期數', 0), errors='coerce')
-    if pd.isna(days) or days == 0: return 0, ""
-    if '日' in type_keyword:
-        if days >= 10: return 1.0, f"✔️({days}日)"
-        elif days >= 5: return 0.8, f"✔️({days}日)"
-        else: return 0.5, f"✔️({days}日)"
-    else:
-        if days >= 10: return 2.0, f"✔️({days}週)"
-        elif days >= 5: return 1.5, f"✔️({days}週)"
-        else: return 1.0, f"✔️({days}週)"
-
-def get_today_ratio(df, stock_id, col_name):
-    if df is not None and not df.empty and stock_id in df['股票代號'].values:
-        try: return float(df.loc[df['股票代號'] == stock_id, col_name].iloc[0])
-        except: return 0.0
-    return 0.0
-
-def robust_read_csv_pool(file_path):
-    for encoding in ['cp950', 'utf-8-sig', 'utf-8']:
-        try:
-            df = pd.read_csv(file_path, encoding=encoding)
-            if not df.empty and len(df.columns) > 1 and '撖' in str(df.iloc[0, 1]): continue
-            return df
-        except: continue
-    return pd.read_csv(file_path, encoding='cp950', errors='ignore')
-
-# ==========================================
-# 🌟 全站命脈：區塊 1 專屬工具函數與背景預載引擎 (必須放在最上方！)
-# ==========================================
-from collections import defaultdict
-
-@st.cache_data(ttl=3600)
-def fetch_github_json_all():
-    days_list = [5, 20, 60, 120]
-    json_dfs = {}
-    account, repo, branch = "goodinfo3583", "DDong_tw-institutional-stocker", "main"
-    
-    for d in days_list:
-        url = f"https://raw.githubusercontent.com/{account}/{repo}/{branch}/docs/data/top_three_inst_change_{d}_up.json"
-        try:
-            res = requests.get(url, timeout=5)
-            if res.status_code == 200:
-                df = pd.DataFrame(res.json())
-                df['股票代號'] = df['code'].astype(str).str.replace(r'\.0$', '', regex=True).str.strip()
-                df['股票代號'] = df['股票代號'].apply(lambda x: x.zfill(4) if x.isdigit() else x)
-                df['股票名稱'] = df['name'].astype(str).str.strip()
-                df = df.rename(columns={'three_inst_ratio': '法人持股', 'change': f'{d}日ΔChange'})
-                df[f'{d}日排名'] = (df.index + 1).astype(int) 
-                json_dfs[d] = df[['股票代號', '股票名稱', '法人持股', f'{d}日ΔChange', f'{d}日排名']]
-            else: json_dfs[d] = pd.DataFrame()
-        except Exception: json_dfs[d] = pd.DataFrame()
-        
-    latest_all_df = pd.DataFrame()
-    try:
-        url_all = f"https://raw.githubusercontent.com/{account}/{repo}/{branch}/docs/data/stock_three_inst_latest.json"
-        res_all = requests.get(url_all, timeout=5)
-        if res_all.status_code == 200:
-            temp_df = pd.DataFrame(res_all.json())
-            if not temp_df.empty and 'code' in temp_df.columns and 'change' in temp_df.columns:
-                temp_df['股票代號'] = temp_df['code'].astype(str).str.replace(r'\.0$', '', regex=True).str.strip()
-                temp_df['股票代號'] = temp_df['股票代號'].apply(lambda x: x.zfill(4) if x.isdigit() else x)
-                latest_all_df = temp_df[['股票代號', 'change']].rename(columns={'change': '精準單日△'})
-    except Exception: pass
-    return json_dfs, latest_all_df
-
-def extract_date_from_filename(filename):
-    m8 = re.search(r'(202\d{5})', filename)
-    if m8: return m8.group(1)
-    return None
-
-@st.cache_data(ttl=300)
-def build_block1_master_df():
-    DATA_DIR = "./Goodinfo_Rankings"
-    date_files = defaultdict(lambda: {'txt': [], 'csv': []})
-    all_csv_files = glob.glob(os.path.join(DATA_DIR, "*JSON*.csv"))
-    
-    for f in all_csv_files:
-        d_label = extract_date_from_filename(os.path.basename(f))
-        if d_label: date_files[d_label]['csv'].append(f)
-
-    sorted_dates = sorted(date_files.keys(), reverse=True)
-    f_df = pd.DataFrame()
-    
-    j_dfs, l_all_df = fetch_github_json_all()
-
-    if sorted_dates:
-        for i, date_label in enumerate(sorted_dates[:30]): 
-            day_dfs = []
-            if date_files[date_label]['csv']:
-                df = pd.read_csv(date_files[date_label]['csv'][0], encoding='utf-8-sig')
-                if '股票代號' in df.columns:
-                    df['股票代號'] = df['股票代號'].astype(str).str.replace(r'\.0$', '', regex=True).str.strip()
-                    df['股票代號'] = df['股票代號'].apply(lambda x: x.zfill(4) if x.isdigit() else x)
-                    df['股票名稱'] = df['股票名稱'].astype(str).str.strip()
-                    df = df.rename(columns={'法人持股': f"{date_label}持股%"})
-                    day_dfs.append(df)
-                
-            day_dfs = [df for df in day_dfs if not df.empty]
-            if not day_dfs: continue
-                
-            df_day_raw = pd.concat(day_dfs, ignore_index=True)
-            def agg_sections_func(x):
-                valid_x = set()
-                for val in x:
-                    if pd.notna(val) and str(val).strip() != "":
-                        for p in str(val).split(','): valid_x.add(p.strip())
-                return ",".join([s for s in ['5日', '20日', '60日', '120日'] if s in valid_x])
-                
-            agg_dict = {f"{date_label}持股%": 'max', '上榜區塊': agg_sections_func}
-            df_day = df_day_raw.groupby(['股票代號', '股票名稱']).agg(agg_dict).reset_index().rename(columns={'上榜區塊': f"{date_label}_區塊"})
-                
-            if f_df is None or f_df.empty: f_df = df_day
-            else: f_df = pd.merge(f_df, df_day, on=['股票代號', '股票名稱'], how='outer')
-                
-        if f_df is not None and not f_df.empty:
-            d_cols = sorted([c for c in f_df.columns if '持股%' in c], reverse=True)
-            for c in d_cols: f_df[c] = pd.to_numeric(f_df[c], errors='coerce').fillna(0)
-                
-            def generate_tags(sections):
-                if pd.isna(sections) or not sections: return ""
-                sec_list = str(sections).split(',')
-                tags = [tag for tag, key in [('🔴5日', '5日'), ('🟡20日', '20日'), ('🟢60日', '60日'), ('🔵120日', '120日')] if key in sec_list]
-                return " ".join(tags)
-                
-            latest_sect_col = f"{sorted_dates[0]}_區塊"
-            if latest_sect_col not in f_df.columns: f_df[latest_sect_col] = ""
+        with tab2:
+            render_options_dashboard()
             
-            f_df['今日上榜'] = f_df[latest_sect_col].apply(generate_tags)
-            f_df['上榜數量'] = f_df['今日上榜'].apply(lambda x: str(x).count('日'))
-                
-            def evaluate_trend(row):
-                if len(d_cols) < 2: return "⚪ 資料不足"
-                dynamics, v0, v1 = [], row[d_cols[0]], row[d_cols[1]]
-                diff1 = v0 - v1  
-                if diff1 > 0:
-                    is_slowing = False
-                    if len(d_cols) >= 3:
-                        v2 = row[d_cols[2]]
-                        if v0 > v1 > v2 > 0: dynamics.append("🪜 階梯吸籌")
-                        elif len(d_cols) >= 4 and v0 >= v1 >= v2 >= row[d_cols[3]] > 0 and v0 > row[d_cols[3]]: dynamics.append("🛡️ 穩健吸籌")
-                        if v1 != 0 and v2 != 0 and diff1 < (v1 - v2): dynamics.append("⚠️ 趨緩"); is_slowing = True
-                    if not is_slowing: dynamics.append("📈 上升")
-                elif diff1 < 0: dynamics.append("📉 下降")
-                else: dynamics.append("🔄 持平")
-                    
-                today_list = [s for s in str(row.get(f"{sorted_dates[0]}_區塊", "")).split(',') if s]
-                yest_list = [s for s in str(row.get(f"{sorted_dates[1]}_區塊", "")).split(',') if s]
-                
-                if v0 > 0 and v1 == 0 and any(row[c] > 0 for c in d_cols[2:]): dynamics.append("🔄 洗盤回歸")
-                if 1 <= len(yest_list) <= 3 and len(today_list) > len(yest_list):
-                    new_entries = [i for i in today_list if i not in yest_list]
-                    tags = [tag for tag, key in [('🔴5日', '5日'), ('🟡20日', '20日'), ('🟢60日', '60日'), ('🔵120日', '120日')] if any(key in item for item in new_entries)]
-                    if tags: dynamics.append(f"🚀 衝進{'、'.join(tags)}榜單")
-                return " | ".join(dynamics)
-                    
-            f_df['最新動態'] = f_df.apply(evaluate_trend, axis=1)
-            f_df['法人持股'] = f_df[d_cols[0]]
+        with tab3:
+            macro_data = fetch_macro_indicators()
             
-            if not l_all_df.empty and '股票代號' in l_all_df.columns:
-                f_df = pd.merge(f_df, l_all_df, on='股票代號', how='left')
-                f_df['△'] = f_df['精準單日△'].fillna(0.0)
-            else:
-                if len(d_cols) >= 2:
-                    f_df['△'] = f_df.apply(lambda row: row[d_cols[0]] - row[d_cols[1]] if row[d_cols[1]] > 0.001 else 0.0, axis=1)
-                else: f_df['△'] = 0.0
-                
-            f_df['法人金額'] = 0.0 
+            vix_val = macro_data["vix"]["value"]
+            vix_color = "#a1a1aa" 
+            if vix_val is not None:
+                if vix_val < 20: vix_color = "#10b981" 
+                elif vix_val < 28.7: vix_color = "#3b82f6" 
+                elif vix_val < 33.5: vix_color = "#f59e0b" 
+                else: vix_color = "#ef4444" 
+            vix_tooltip = f"VIX 市場恐慌指標\n目前 VIX： {vix_val if vix_val else '無'}\n綠色：市場平穩。\n藍色：報酬較差。\n橘色：報酬達 15%。\n紅色：報酬達 25%。"
 
-            for d in [5, 20, 60, 120]:
-                if d in j_dfs and not j_dfs[d].empty:
-                    temp_json = j_dfs[d][['股票代號', f'{d}日ΔChange', f'{d}日排名']]
-                    f_df = pd.merge(f_df, temp_json, on='股票代號', how='left')
+            vixtwn_val = macro_data["vixtwn"]["value"]
+            vixtwn_color = "#a1a1aa"
+            if vixtwn_val is not None:
+                if vixtwn_val < 20: vixtwn_color = "#3b82f6" 
+                elif vixtwn_val < 30: vixtwn_color = "#10b981" 
+                elif vixtwn_val < 40: vixtwn_color = "#f59e0b" 
+                else: vixtwn_color = "#ef4444" 
+            vixtwn_tooltip = f"VIXTWN 台灣恐慌指標\n目前： {vixtwn_val if vixtwn_val else '無'}\n藍：多頭常態。\n綠：波動加劇。\n橘：恐慌殺盤布局。\n紅：極度恐慌買點。"
 
-            col_ref = f_df.set_index('股票代號')['上榜數量'].to_dict()
-            for col in d_cols: f_df[col] = f_df[col].apply(lambda x: "未進榜" if pd.isna(x) or abs(x) < 0.0001 else f"{x:.2f}")
+            fng_val = macro_data["fng"]["score"]
+            fng_color = "#a1a1aa"
+            if fng_val is not None:
+                if fng_val < 25: fng_color = "#ef4444" 
+                elif fng_val > 75: fng_color = "#10b981" 
+                else: fng_color = "#f59e0b" 
+            fng_tooltip = f"FNG 恐懼貪婪指數\n目前： {fng_val if fng_val else '無'}\n<25 積極買點\n<15 分批加碼\n>75 分批減碼\n>85 獲利了結\n>90 提高現金"
 
-            f_df['今日有上榜_排序'] = f_df['今日上榜'] != ""
-            if d_cols:
-                f_df = f_df.sort_values(by=['今日有上榜_排序', '上榜數量', d_cols[0]], ascending=[False, False, False])
+            col_left, col_right = st.columns([1, 1])
             
-            return f_df, sorted_dates, d_cols, col_ref
-    
-    return pd.DataFrame(), [], [], {}
+            with col_left:
+                v1_str = f"{vix_val:.2f}" if vix_val else "無資料"
+                p1_str = f"{'+' if macro_data['vix']['pct'] and macro_data['vix']['pct'] > 0 else ''}{macro_data['vix']['pct']:.2f}%" if macro_data['vix']['pct'] is not None else "-"
+                st.markdown(f"""
+                <div title="{vix_tooltip}" style="background-color: rgba(255,255,255,0.03); padding: 12px; border-radius: 10px; border: 1px solid rgba(255,255,255,0.1); text-align: center; cursor: help; margin-bottom: 10px;">
+                    <div style="font-size: 13px; color: #a1a1aa; margin-bottom: 4px;">🇺🇸 美股 VIX</div>
+                    <div style="font-size: 22px; font-weight: 700; color: {vix_color}; margin-bottom: 2px;">{v1_str}</div>
+                    <div style="font-size: 12px; color: #71717a;">{p1_str}</div>
+                </div>
+                """, unsafe_allow_html=True)
+                
+                v2_str = f"{vixtwn_val:.2f}" if vixtwn_val else "無資料"
+                p2_str = "最新數值" if vixtwn_val else "-"
+                st.markdown(f"""
+                <div title="{vixtwn_tooltip}" style="background-color: rgba(255,255,255,0.03); padding: 12px; border-radius: 10px; border: 1px solid rgba(255,255,255,0.1); text-align: center; cursor: help;">
+                    <div style="font-size: 13px; color: #a1a1aa; margin-bottom: 4px;">🇹🇼 台股 VIX</div>
+                    <div style="font-size: 22px; font-weight: 700; color: {vixtwn_color}; margin-bottom: 2px;">{v2_str}</div>
+                    <div style="font-size: 12px; color: #71717a;">{p2_str}</div>
+                </div>
+                """, unsafe_allow_html=True)
+
+            with col_right:
+                f_str = str(fng_val) if fng_val else "無資料"
+                f_rating = macro_data["fng"]["rating"]
+                st.markdown(f"""
+                <div title="{fng_tooltip}" style="background-color: rgba(255,255,255,0.03); padding: 12px; height: calc(100% - 24px); display: flex; flex-direction: column; justify-content: center; align-items: center; border-radius: 10px; border: 1px solid rgba(255,255,255,0.1); text-align: center; cursor: help;">
+                    <div style="font-size: 15px; color: #a1a1aa; margin-bottom: 15px;">🧭 恐懼與貪婪</div>
+                    <div style="font-size: 36px; font-weight: 700; color: {fng_color}; margin-bottom: 10px;">{f_str}</div>
+                    <div style="font-size: 14px; font-weight: 600; color: {fng_color};">{f_rating}</div>
+                </div>
+                """, unsafe_allow_html=True)
 # ==========================================
 # 🛡️ 背景守護程式 (強制維持記憶體熱度，解決歸零問題)
 # ==========================================
