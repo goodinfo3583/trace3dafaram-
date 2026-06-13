@@ -20,6 +20,7 @@ SHEET_URL = "https://docs.google.com/spreadsheets/d/1TxHDahg8ul6lmUtDN-7X75cBXbk
 
 # 👉 步驟 1：先集中宣告所有的路徑變數
 DATA_DIR = "./Goodinfo_Rankings"
+
 SCORE_HISTORY_DIR = os.path.join(DATA_DIR, "ScoreHistory")
 MARKET_HISTORY_DIR = os.path.join(DATA_DIR, "MarketHistory")
 BLOCK_HISTORY_DIR = os.path.join(DATA_DIR, "BlockHistory")
@@ -232,12 +233,13 @@ st.markdown(
     unsafe_allow_html=True
 )
 
+# ==========================================
+# 🚦 網頁路由控制中心 (極速切換引擎)
+# ==========================================
+current_page = st.query_params.get("page", "all")
 
-# 👇👇👇 請在導航列下方，新增這行「置頂外殼卡位槽」（完全靠左不縮排） 
-top_pool_slot = st.container()
 # ==========================================
-# ==========================================
-# 📍 頂部：戰情室快速導航 (已移除載入全數據)
+# 📍 頂部：戰情室快速導航 (已移除載入全數據，保持純淨)
 # ==========================================
 st.markdown("""
 <style>
@@ -246,14 +248,10 @@ st.markdown("""
     position: fixed; top: 0; left: 0; width: 100%; z-index: 999999;
     box-shadow: 0px 4px 20px rgba(0, 0, 0, 0.6); background-color: #0A0D14;
 }
-/* 微型聲明橫幅 */
-.disclaimer-bar {
-    display: flex; background-color: #111622; padding: 0px 15px; border-bottom: 1px dashed #1E293B;
-}
+.disclaimer-bar { display: flex; background-color: #111622; padding: 0px 15px; border-bottom: 1px dashed #1E293B; }
 .disclaimer-item { position: relative; padding: 6px 15px; cursor: help; }
 .disclaimer-title { color: #64748B; font-size: 13px; font-weight: 500; transition: all 0.2s; text-decoration: none; }
 .disclaimer-item:hover .disclaimer-title { color: #FFD700; text-shadow: 0 0 8px rgba(255, 215, 0, 0.5); }
-/* 隱藏的下拉抽屜內容 */
 .disclaimer-content {
     position: absolute; top: 100%; left: 0; width: 350px; max-width: 90vw;
     background-color: #111622; border: 1px solid #1E293B; border-top: none;
@@ -262,7 +260,6 @@ st.markdown("""
     box-shadow: 0px 8px 20px rgba(0,0,0,0.8);
 }
 .disclaimer-item:hover .disclaimer-content { max-height: 400px; opacity: 1; padding: 12px 15px; }
-/* 導航按鈕容器 */
 .nav-btn-container {
     display: flex; flex-wrap: wrap; justify-content: flex-end; align-items: center;
     padding: 8px 15px; background-color: #0A0D14; border-bottom: 2px solid #1E293B; gap: 6px;
@@ -273,7 +270,6 @@ st.markdown("""
 }
 .nav-text-link:hover { color: #FFD700 !important; text-shadow: 0 0 12px rgba(255, 215, 0, 0.8); transform: scale(1.08); }
 .nav-divider { color: #334155; font-size: 16px; user-select: none; }
-
 @media (max-width: 768px) {
     .nav-btn-container { justify-content: flex-end; padding: 5px 10px; }
     .nav-divider { display: none; }
@@ -283,10 +279,10 @@ st.markdown("""
 </style>
 <div class="sticky-header-wrapper"><div class="disclaimer-bar"><div class="disclaimer-item"><span class="disclaimer-title">使用聲明</span><div class="disclaimer-content">本平台僅供教育研究與籌碼觀察，絕不構成任何實質投資建議、勸誘或要約。所有資料源自公開數據，受限於網路技術，可能有延遲或錯誤。<br><br>投資必有風險，依本平台資訊所做之任何決策與損益，均須由使用者自行負責，本平台不負擔任何法律賠償責任。</div></div><div class="disclaimer-item"><span class="disclaimer-title">隱私權政策</span><div class="disclaimer-content"><b>1. 蒐集目的與範圍：</b><br>本平台依個資法蒐集您的識別資料僅供維持系統安全與優化服務使用。<br><b>2. 資料利用：</b><br>您的資料絕不向第三方洩露。<br><b>3. 資料刪除：</b><br>您可透過「聯絡我們」請求刪除資料。<br><b>4. 政策修訂：</b><br>本站保留修改政策之權利，繼續使用即視為同意。</div></div><div class="disclaimer-item"><a href="?page=contact" target="_self" class="disclaimer-title" style="cursor: pointer;">聯絡我們</a></div></div><div class="nav-btn-container"><a href="?page=pool" target="_self" class="nav-text-link">🏆 觀察名單</a><span class="nav-divider">|</span><a href="?page=search" target="_self" class="nav-text-link">🔍 個股快搜</a><span class="nav-divider">|</span><a href="?page=b1" target="_self" class="nav-text-link">👑 法人持股</a><span class="nav-divider">|</span><a href="?page=b2" target="_self" class="nav-text-link">🎯 買超佔比</a><span class="nav-divider">|</span><a href="?page=b3" target="_self" class="nav-text-link">📅 法人連買</a><span class="nav-divider">|</span><a href="?page=b4" target="_self" class="nav-text-link">🔄 資券軋空</a><span class="nav-divider">|</span><a href="?page=b5" target="_self" class="nav-text-link">💰 大股東動向</a><span class="nav-divider">|</span><a href="?page=b6" target="_self" class="nav-text-link">💸 鉅額交易</a></div></div>
 """, unsafe_allow_html=True)
-# ==========================================
-# 🧭 側邊欄導航與共用函數 (極速光速版：零爬蟲、零延遲、讀取本地 CSV)
-# ==========================================
-DATA_DIR = "./Goodinfo_Rankings"
+
+# 👇👇👇 魔法傳送門接收點 (必須在導航列下方，完全靠左不縮排) 👇👇👇
+top_pool_slot = st.container()
+# 👆👆👆 ========================================================== 👆👆👆
 
 # ==========================================
 # 🌟 核心共用函數 (終極防呆：從此免疫 Excel 吃掉 0 的問題)
@@ -921,13 +917,6 @@ if 'my_final_df' not in st.session_state or st.session_state['my_final_df'].empt
         st.session_state['my_final_df'] = final_df
         st.session_state['force_reload'] = False # 重置標記
 
-        
-# ==========================================
-# 🚦 網頁路由控制中心 (極速切換引擎)
-# ==========================================
-# 取得網址列中的 page 參數，若沒有點擊任何按鈕，則預設為 "all" (顯示長條全頁面)
-current_page = st.query_params.get("page", "all")
-
 # ==========================================
 # ✉️ 獨立分頁：聯絡我們 (完美黑夜派對版)
 # ==========================================
@@ -970,9 +959,6 @@ if current_page == "contact":
                         
     # 🛑 最核心的魔法：渲染完聯絡表單後，直接強制停止後續程式！完全不讀取底下的大數據！
     st.stop()
-
-
-
 # ==========================================
 # 🏠 核心五大區塊
 # ==========================================
@@ -3048,119 +3034,80 @@ if current_page in ["all", "b6"]:
             st.info("📂 資料夾內尚無足夠的歷史交易紀錄，請確認檔名包含「鉅額」字樣。")       
 # ==========================================以上網頁核心區塊
 # ==========================================
-# 🌟 觀察名單專屬工具函數區 (放在 if 鎖外面)
-# ==========================================
-import os, glob, re, json, datetime
-import pandas as pd
-import streamlit as st
-
-def get_df_safe(key): return st.session_state.get(key, pd.DataFrame())
-def fmt_d(d_str): return f"{d_str[4:6]}/{d_str[6:]}" if d_str != "00000000" else "--/--"
-def check_b2_strict(df, sid, bad_keywords):
-    if df.empty or sid not in df['股票代號'].values: return False
-    dyn = str(df[df['股票代號'] == sid].iloc[0].get('今日短動態', ''))
-    if any(bad in dyn for bad in bad_keywords): return False
-    return True
-def get_b3_score(df, sid, type_keyword):
-    if df.empty: return 0, ""
-    match = df[(df['股票代號'] == sid) & (df['連買類型'].str.contains(type_keyword))]
-    if match.empty: return 0, ""
-    days = pd.to_numeric(match.iloc[0].get('連買週期數', 0), errors='coerce')
-    if pd.isna(days) or days == 0: return 0, ""
-    if '日' in type_keyword:
-        if days >= 10: return 1.0, f"✔️({days}日)"
-        elif days >= 5: return 0.8, f"✔️({days}日)"
-        else: return 0.5, f"✔️({days}日)"
-    else:
-        if days >= 10: return 2.0, f"✔️({days}週)"
-        elif days >= 5: return 1.5, f"✔️({days}週)"
-        else: return 1.0, f"✔️({days}週)"
-def get_today_ratio(df, stock_id, col_name):
-    if df is not None and not df.empty and stock_id in df['股票代號'].values:
-        try: return float(df.loc[df['股票代號'] == stock_id, col_name].iloc[0])
-        except: return 0.0
-    return 0.0
-def robust_read_csv_pool(file_path):
-    for encoding in ['cp950', 'utf-8-sig', 'utf-8']:
-        try:
-            df = pd.read_csv(file_path, encoding=encoding)
-            if not df.empty and len(df.columns) > 1 and '撖' in str(df.iloc[0, 1]): continue
-            return df
-        except: continue
-    return pd.read_csv(file_path, encoding='cp950', errors='ignore')
-
-# ==========================================
-# 🔒 觀察名單專屬包廂鎖 (🚨 現在搬到最前面了！)
+# 🔒 觀察名單專屬包廂鎖 (🚨 必須放在整份檔案最下方，區塊 6 之後！)
 # ==========================================
 if current_page in ["all", "pool"]:
-    st.write("---")
-    st.markdown("<div id='section-top-pool'></div>", unsafe_allow_html=True)
     
-    # 🌟 專屬強制刷新引擎按鈕 (改用原生按鈕，避免跳轉 Bug)
-    with st.container(border=True):
-        st.markdown("<p style='color: #94A3B8; text-align: center; margin-bottom: 5px; font-weight: 500;'>⚡ 若下方數據有遺漏，請點擊啟動引擎強制重算：</p>", unsafe_allow_html=True)
-        c_btn1, c_btn2, c_btn3 = st.columns([1, 2, 1])
-        with c_btn2:
-            if st.button("🚀 強制載入全市場數據並計算總分", type="primary", use_container_width=True):
-                st.session_state['force_reload'] = True
-                st.rerun()
+    # 🧙‍♂️ 魔法開啟：強制將這個區塊的畫面傳送回網頁最頂端的卡位槽顯示！
+    with top_pool_slot:
+        st.write("---")
+        st.markdown("<div id='section-top-pool'></div>", unsafe_allow_html=True)
 
-    df_b5_1000 = get_df_safe('df_blk5_1000')
-    df_b5_400 = get_df_safe('df_blk5')
-    
-    all_files = glob.glob(os.path.join(DATA_DIR, "*"))
-    anchor_date_str = "00000000"
-    d_b1_inst, d_b23_chip, d_b4_margin, d_b5_share = "00000000", "00000000", "00000000", "00000000"
-    
-    for f in all_files:
-        filename = os.path.basename(f)
-        match = re.search(r'(202\d{5})', filename)
-        if match:
-            file_date = match.group(1)
-            if file_date > anchor_date_str: anchor_date_str = file_date
-            if "持股排名變化" in filename or "JSON_History" in filename:
-                if file_date > d_b1_inst: d_b1_inst = file_date
-            elif "佔成交比" in filename or "連買" in filename or "買賣超" in filename:
-                if file_date > d_b23_chip: d_b23_chip = file_date
-            elif "融資" in filename or "融券" in filename or "借券" in filename or "資券" in filename:
-                if file_date > d_b4_margin: d_b4_margin = file_date
+        df_b5_1000 = get_df_safe('df_blk5_1000')
+        df_b5_400 = get_df_safe('df_blk5')
+        
+        # 自動掃描最新資料日期
+        all_files = glob.glob(os.path.join(DATA_DIR, "*"))
+        anchor_date_str = "00000000"
+        d_b1_inst, d_b23_chip, d_b4_margin, d_b5_share = "00000000", "00000000", "00000000", "00000000"
+        
+        for f in all_files:
+            filename = os.path.basename(f)
+            match = re.search(r'(202\d{5})', filename)
+            if match:
+                file_date = match.group(1)
+                if file_date > anchor_date_str: anchor_date_str = file_date
+                if "持股排名變化" in filename or "JSON_History" in filename:
+                    if file_date > d_b1_inst: d_b1_inst = file_date
+                elif "佔成交比" in filename or "連買" in filename or "買賣超" in filename:
+                    if file_date > d_b23_chip: d_b23_chip = file_date
+                elif "融資" in filename or "融券" in filename or "借券" in filename or "資券" in filename:
+                    if file_date > d_b4_margin: d_b4_margin = file_date
 
-    b5_files = glob.glob(os.path.join(DATA_DIR, "*大股東*")) + glob.glob(os.path.join(DATA_DIR, "*神秘金字塔*")) + glob.glob(os.path.join(DATA_DIR, "*集保*"))
-    if b5_files:
-        latest_b5_file = sorted(b5_files, reverse=True)[0]
-        try:
-            with open(latest_b5_file, 'r', encoding='utf-8-sig', errors='ignore') as f:
-                head_content = f.read(4000)
-                d_match = re.search(r'(\d{4})週動態', head_content)
-                if d_match: d_b5_share = f"2026{d_match.group(1)}"
-                else:
-                    d_match2 = re.search(r'更新\s*日期[^\d]*(\d{4})', head_content)
-                    if d_match2: d_b5_share = f"2026{d_match2.group(1)}"
+        b5_files = glob.glob(os.path.join(DATA_DIR, "*大股東*")) + glob.glob(os.path.join(DATA_DIR, "*神秘金字塔*")) + glob.glob(os.path.join(DATA_DIR, "*集保*"))
+        if b5_files:
+            latest_b5_file = sorted(b5_files, reverse=True)[0]
+            try:
+                with open(latest_b5_file, 'r', encoding='utf-8-sig', errors='ignore') as f:
+                    head_content = f.read(4000)
+                    d_match = re.search(r'(\d{4})週動態', head_content)
+                    if d_match: d_b5_share = f"2026{d_match.group(1)}"
                     else:
-                        f_match = re.search(r'(202\d{5})', os.path.basename(latest_b5_file))
-                        if f_match: d_b5_share = f_match.group(1)
-        except: pass
+                        d_match2 = re.search(r'更新\s*日期[^\d]*(\d{4})', head_content)
+                        if d_match2: d_b5_share = f"2026{d_match2.group(1)}"
+                        else:
+                            f_match = re.search(r'(202\d{5})', os.path.basename(latest_b5_file))
+                            if f_match: d_b5_share = f_match.group(1)
+            except: pass
 
-    st.markdown(f"""
-    <div style="background: linear-gradient(90deg, rgba(15,23,42,1) 0%, rgba(14,165,233,0.3) 50%, rgba(15,23,42,1) 100%); 
-                border-top: 1px solid #38bdf8; border-bottom: 1px solid #38bdf8; padding: 15px 20px; border-radius: 10px;
-                text-align: center; box-shadow: 0px 0px 20px rgba(56, 189, 248, 0.2); margin-bottom: 20px;">
-        <h2 style="color: #e0f2fe; margin: 0; letter-spacing: 2px; text-shadow: 0 0 15px rgba(56, 189, 248, 0.8);">
-            🏆 數據分析觀察名單
-        </h2>
-        <div style='font-size:13px; color:#00D2FF; font-weight:500; margin-top:8px;'>
-             基準日 : 📍區塊1(法人): {fmt_d(d_b1_inst)} ｜ 📍區塊2&3(籌碼): {fmt_d(d_b23_chip)} ｜ 📍區塊4(資券): {fmt_d(d_b4_margin)} ｜ 📍區塊5(大戶): {fmt_d(d_b5_share)}
+        st.markdown(f"""
+        <div style="background: linear-gradient(90deg, rgba(15,23,42,1) 0%, rgba(14,165,233,0.3) 50%, rgba(15,23,42,1) 100%); 
+                    border-top: 1px solid #38bdf8; border-bottom: 1px solid #38bdf8; padding: 15px 20px; border-radius: 10px;
+                    text-align: center; box-shadow: 0px 0px 20px rgba(56, 189, 248, 0.2); margin-bottom: 20px;">
+            <h2 style="color: #e0f2fe; margin: 0; letter-spacing: 2px; text-shadow: 0 0 15px rgba(56, 189, 248, 0.8);">
+                🏆 數據分析觀察名單
+            </h2>
+            <div style='font-size:13px; color:#00D2FF; font-weight:500; margin-top:8px;'>
+                 基準日 : 📍區塊1(法人): {fmt_d(d_b1_inst)} ｜ 📍區塊2&3(籌碼): {fmt_d(d_b23_chip)} ｜ 📍區塊4(資券): {fmt_d(d_b4_margin)} ｜ 📍區塊5(大戶): {fmt_d(d_b5_share)}
+            </div>
         </div>
-    </div>
-    """, unsafe_allow_html=True)
+        """, unsafe_allow_html=True)
 
-    with st.container(border=True):
-        st.info("💡 **評分方式**：法人籌碼上榜為底，搭配「千張大戶權重加乘」與其他數據積分。(請參考▼明細)")
+        with st.container(border=True):
+            st.info("💡 **評分方式**：法人籌碼上榜為底，搭配「千張大戶權重加乘」與其他數據積分。(請參考▼明細)")
 
-        if 'my_final_df' not in st.session_state or st.session_state['my_final_df'].empty:
-            st.warning("⚠️ 記憶體中尚無各區塊數據。請點擊上方按鈕「🚀 強制載入全市場數據並計算總分」。")
-        else:
-            df_b1 = st.session_state['my_final_df'].copy()
+            # 🚨 關鍵阻斷器：如果沒載入區塊 2 的籌碼，直接亮出按鈕要求運算並「停止」往下跑 0 分！
+            if 'df_blk2_1' not in st.session_state or st.session_state['df_blk2_1'].empty:
+                st.warning("⚠️ 記憶體中尚無各區塊大數據，請點擊下方按鈕啟動全市場掃描引擎。")
+                c_btn1, c_btn2, c_btn3 = st.columns([1, 2, 1])
+                with c_btn2:
+                    if st.button("🚀 啟動全市場掃描 (計算總分)", type="primary", use_container_width=True):
+                        st.query_params["page"] = "all"
+                        st.rerun()
+                st.stop() # 🛑 絕對停止！不准用 0 分往下算！
+
+            # ---------------- 開始正式運算 ----------------
+            df_b1 = st.session_state.get('my_final_df', pd.DataFrame()).copy()
             dyn_col = next((c for c in df_b1.columns if '動態' in c or '動能' in c), None)
             rank_col = next((c for c in df_b1.columns if '今日上榜' in c or '上榜' in c), None)
             
@@ -3320,6 +3267,9 @@ if current_page in ["all", "pool"]:
                     
                 res_df = pd.DataFrame(results).sort_values(by='總分', ascending=False).drop_duplicates(subset=['代號']).reset_index(drop=True)
                 
+                # ==========================================
+                # 🔥 Delta (▼變量) 計算引擎與存檔防禦網
+                # ==========================================
                 prev_scores_dict = {}
                 hist_combined = pd.DataFrame() 
                 try:
@@ -3360,13 +3310,17 @@ if current_page in ["all", "pool"]:
                 res_df = res_df[cols]
                 st.session_state['top_pool_df'] = res_df
                 
-                if res_df is not None and not res_df.empty and anchor_date_str != "00000000":
+                # 🛑 終極防呆鎖死機制：絕對不准存 0 分進去！
+                valid_calc = False
+                if not res_df.empty and '總分' in res_df.columns:
+                    valid_calc = (res_df['總分'] > 0).sum() >= 5 # 至少要有 5 檔股票總分大於 0 才算合法運算
+                    
+                if valid_calc and anchor_date_str != "00000000":
                     save_df = res_df.copy()
                     save_df.insert(0, '紀錄日期', anchor_date_str)
                     if st.session_state.get('last_gsheet_save_date') != anchor_date_str:
                         try:
-                            old_df = conn.read(spreadsheet=SHEET_URL, worksheet="選股歷史", ttl=0)
-                            old_df = old_df.dropna(how="all")
+                            old_df = conn.read(spreadsheet=SHEET_URL, worksheet="選股歷史", ttl=0).dropna(how="all")
                             if not old_df.empty and '紀錄日期' in old_df.columns:
                                 old_df['紀錄日期'] = old_df['紀錄日期'].astype(str).str.replace(r'\.0$', '', regex=True).str.zfill(8)
                                 final_save_df = pd.concat([old_df[old_df['紀錄日期'] != anchor_date_str], save_df], ignore_index=True)
@@ -3375,6 +3329,8 @@ if current_page in ["all", "pool"]:
                             st.session_state['last_gsheet_save_date'] = anchor_date_str
                             hist_combined = final_save_df.copy()
                         except Exception as e: st.warning(f"⚠️ 歷史同步暫緩({e})")
+                elif not valid_calc:
+                    st.warning("⚠️ 本次計算總分多數為 0，已啟動防呆攔截機制：暫不覆寫 Google Sheets 歷史紀錄。請點擊上方按鈕載入最新籌碼大數據。")
 
                 tab1, tab2, tab3 = st.tabs(["🔹 今日最新排行", "🔹 歷史分數追蹤表", "🔹 模型驗證：每週 Top 5 追蹤"])
                 
@@ -3471,7 +3427,7 @@ if current_page in ["all", "pool"]:
                                     st.dataframe(week_df[[c for c in show_cols if c in week_df.columns]], use_container_width=True, hide_index=True)
                                     st.info("💡 **驗證方法**：觀察這些鎖定的股票在未來一週的『模型分數變化』是否持續上升？如果分數持續上升且股價也上漲，代表我們的【大股東+集中度】指標非常精準！")
                         except: st.warning("讀取追蹤檔案失敗。")
-                    else: st.write("⚪ 尚無歷史追蹤紀錄，請點擊上方按鈕建立第一筆！")
+                    else: st.write("⚪ 尚無歷史追蹤紀錄，請點擊按鈕建立第一筆！")
 # ==========================================
 # 🧪 測試區：Google Sheets 連線測試
 # ==========================================
