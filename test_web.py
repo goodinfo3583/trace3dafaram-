@@ -761,18 +761,18 @@ current_page = st.query_params.get("page", "all")
 # ✉️ 獨立分頁：聯絡我們 (完美黑夜派對版)
 # ==========================================
 if current_page == "contact":
-    st.markdown("<h2 style='color: #FFD700; text-align: center; margin-top: 30px;'>✉️ 聯絡黑夜派對管家</h2>", unsafe_allow_html=True)
+    st.markdown("<h2 style='color: #FFD700; text-align: center; margin-top: 30px;'>✉️ 聯絡管家</h2>", unsafe_allow_html=True)
     
     with st.container(border=True):
         st.write("如果您發現任何系統異常，或是對本平台有任何建議，歡迎填寫紙條傳送至後台！")
         
         with st.form("contact_us_form", clear_on_submit=True):
             c1, c2 = st.columns(2)
-            with c1: sender_name = st.text_input("您的稱呼 (選填)", placeholder="例如：夜行者")
+            with c1: sender_name = st.text_input("您的稱呼 (選填)", placeholder="例如：股市冒險家")
             with c2: sender_email = st.text_input("電子信箱 (選填)", placeholder="若需回覆請務必留下 Email")
                 
-            message_body = st.text_area("回報內容 / 建議事項*", placeholder="請描述您遇到的問題，或對派對的建議...", height=120)
-            submit_btn = st.form_submit_button("🦇 傳送訊息", use_container_width=True)
+            message_body = st.text_area("回報內容 / 建議事項*", placeholder="請描述您遇到的問題或建議...", height=120)
+            submit_btn = st.form_submit_button("傳送訊息", use_container_width=True)
             
             if submit_btn:
                 if not message_body.strip():
@@ -793,7 +793,7 @@ if current_page == "contact":
                         conn.update(spreadsheet=SHEET_URL, worksheet="聯絡我們", data=final_contact_df)
                         
                         st.toast("您的訊息已悄悄送達派對後台...", icon="🦇")
-                        st.success("✨ 感謝回報！您的建議是這場黑夜派對最棒的點綴。")
+                        st.success("✨ 感謝回報！您的建議是盛宴最棒的點綴。")
                     except Exception as e:
                         st.error(f"❌ 傳送失敗，後台連線異常：{str(e)}")
                         
