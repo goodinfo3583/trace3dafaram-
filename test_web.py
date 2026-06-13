@@ -1075,8 +1075,7 @@ with st.sidebar:
         # 💡 修復點：利用 on_click 呼叫安全的回調函數，就不會引發 StreamlitAPIException 了！
         st.button("↻", help="清空搜尋", use_container_width=True, on_click=clear_search_cb)
 
-    if search_query:
-        # ... (以下維持你原本的搜尋判斷與顯示邏輯，不用變動) ...
+
 
     if search_query:
         pure_stock_id = ""
