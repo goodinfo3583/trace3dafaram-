@@ -338,12 +338,25 @@ def check_b2_strict(df, sid, bad_keywords):
     if any(bad in dyn for bad in bad_keywords): return False
     return True
 
+# 💡 防呆升級版：支援欄位模糊比對，找不到欄位也絕對不准當機！
 def get_b3_score(df, sid, type_keyword):
-    if df.empty or '股票代號' not in df.columns: return 0, ""
-    match = df[(df['股票代號'] == sid) & (df['連買類型'].str.contains(type_keyword))]
+    if df is None or df.empty or '股票代號' not in df.columns: 
+        return 0, ""
+    
+    # 模糊比對尋找「類型」與「天數」欄位
+    type_col = next((c for c in df.columns if '類型' in str(c) or '連買' in str(c)), None)
+    days_col = next((c for c in df.columns if '週期' in str(c) or '天數' in str(c) or '日' in str(c)), None)
+    
+    # 如果真的找不到對應欄位，直接回傳 0 分，跳過計算
+    if not type_col or not days_col or type_col not in df.columns:
+        return 0, ""
+
+    match = df[(df['股票代號'] == sid) & (df[type_col].astype(str).str.contains(type_keyword, na=False))]
     if match.empty: return 0, ""
-    days = pd.to_numeric(match.iloc[0].get('連買週期數', 0), errors='coerce')
+    
+    days = pd.to_numeric(match.iloc[0].get(days_col, 0), errors='coerce')
     if pd.isna(days) or days == 0: return 0, ""
+    
     if '日' in type_keyword:
         if days >= 10: return 1.0, f"✔️({days}日)"
         elif days >= 5: return 0.8, f"✔️({days}日)"
@@ -1112,7 +1125,7 @@ with st.sidebar:
                 padding: 12px 10px; border-radius: 8px; text-align: center; 
                 box-shadow: 0px 0px 15px rgba(56, 189, 248, 0.2); margin-bottom: 15px;">
         <h3 style="color: #e0f2fe; margin: 0; letter-spacing: 1px; text-shadow: 0 0 10px rgba(56, 189, 248, 0.8); font-size: 18px;">
-            🔍 搜詢診斷
+            🔍 搜尋診斷
         </h3>
 
     </div>
