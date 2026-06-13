@@ -1070,27 +1070,31 @@ with st.sidebar:
         render_kline_fragment(pure_stock_id)
 
         # ------------------ 籌碼大數據 ------------------
+        # 💡 修復點：將搜尋目標統一轉換為「純代號」，確保資料庫能精準比對！
+        search_target = pure_stock_id if pure_stock_id != "" else query_clean
+
         with st.expander("👑 區塊1：三大法人持股變化", expanded=False):
             if 'my_final_df' in st.session_state:
                 df_b1 = st.session_state['my_final_df']
-                res_b1 = robust_search_engine(df_b1, search_query)
+                res_b1 = robust_search_engine(df_b1, search_target)
                 if not res_b1.empty:
                     date_cols = [c for c in res_b1.columns if '持股%' in c or c.isdigit()]
                     clean_cols = [c for c in res_b1.columns if not any(k in c for k in ['_區塊', '排序', '上榜數量', '原始上榜', '精準單日'])]
                     st.dataframe(res_b1[clean_cols], use_container_width=True, hide_index=True)
                 else: st.write("⚪ 未進榜")
+            else: st.write("⚪ 尚未載入資料")
 
         with st.expander("🎯 區塊2：法人買佔比診斷", expanded=False):
-            scan_and_display("外資佔成交", 'df_blk2_1', search_query)
-            scan_and_display("投信佔成交", 'df_blk2_2', search_query)
-            scan_and_display("外資佔發行", 'df_blk2_3', search_query)
-            scan_and_display("投信佔發行", 'df_blk2_4', search_query)
+            scan_and_display("外資佔成交", 'df_blk2_1', search_target)
+            scan_and_display("投信佔成交", 'df_blk2_2', search_target)
+            scan_and_display("外資佔發行", 'df_blk2_3', search_target)
+            scan_and_display("投信佔發行", 'df_blk2_4', search_target)
 
         with st.expander("📅 區塊3：法人連買診斷", expanded=False):
             if 'df_blk3_main' in st.session_state:
                 df_b3 = st.session_state['df_blk3_main']
-                res_b3 = robust_search_engine(df_b3, search_query)
-                display_id = res_b3.iloc[0]['股票代號'] if not res_b3.empty else pure_stock_id
+                res_b3 = robust_search_engine(df_b3, search_target)
+                display_id = res_b3.iloc[0]['股票代號'] if not res_b3.empty else search_target
                 display_name = res_b3.iloc[0]['股票名稱'] if not res_b3.empty else "-"
                 
                 base_types = ['🌐 外資日連買', '🌐 外資週連買', '🏦 投信日連買', '🏦 投信週連買']
@@ -1100,16 +1104,16 @@ with st.sidebar:
                     if not match.empty: display_list.append(match.iloc[0].to_dict())
                     else: display_list.append({'連買類型': b_type, '股票代號': display_id, '股票名稱': display_name, '狀態動態': '⚪ 未進榜', '連買週期數': '-'})
                 st.dataframe(pd.DataFrame(display_list)[['連買類型','狀態動態','連買週期數']], use_container_width=True, hide_index=True)
+            else: st.write("⚪ 尚未載入資料")
 
-        # 💡 修復點：補回區塊 4
         with st.expander("🔄 區塊4：券資軋空診斷", expanded=False):
-            scan_and_display("📉 融資減少(幅)", 'df_margin_pct', search_query)
-            scan_and_display("📉 借券減少(幅)", 'df_short_pct', search_query)
-            scan_and_display("📈 融券增加(幅)", 'df_margin_plus_pct', search_query)
+            scan_and_display("📉 融資減少(幅)", 'df_margin_pct', search_target)
+            scan_and_display("📉 借券減少(幅)", 'df_short_pct', search_target)
+            scan_and_display("📈 融券增加(幅)", 'df_margin_plus_pct', search_target)
 
         with st.expander("💰 區塊5：大戶動向診斷", expanded=False):
-            scan_and_display("💎 400張大戶", 'df_blk5', search_query)
-            scan_and_display("🐳 1000張大戶", 'df_blk5_1000', search_query)
+            scan_and_display("💎 400張大戶", 'df_blk5', search_target)
+            scan_and_display("🐳 1000張大戶", 'df_blk5_1000', search_target)
 
     # 💡 修復點：當搜尋列「有內容」時，不顯示大盤總經 (隱藏下方 Tabs)
     if not search_query:
