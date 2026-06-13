@@ -231,7 +231,7 @@ st.markdown(
 
 # ==========================================
 # ==========================================
-# 📍 頂部：戰情室快速導航 (靠右對齊 + 懸停下拉抽屜 + 金黃發光版)
+# 📍 頂部：戰情室快速導航 (金黃發光下拉抽屜 + 終極防 Markdown 跑版壓縮版)
 # ==========================================
 st.markdown("""
 <style>
@@ -270,13 +270,13 @@ st.markdown("""
     text-decoration: none;
 }
 
-/* 滑鼠移過去字體變成金黃色並發亮 */
+/* 🌟 滑鼠移過去字體變成金黃色並發亮 */
 .disclaimer-item:hover .disclaimer-title {
     color: #FFD700;
     text-shadow: 0 0 8px rgba(255, 215, 0, 0.5);
 }
 
-/* 隱藏的下拉抽屜內容 (絕對定位，不影響下方按鈕列) */
+/* 隱藏的下拉抽屜內容 (絕對定位) */
 .disclaimer-content {
     position: absolute;
     top: 100%;
@@ -305,7 +305,7 @@ st.markdown("""
     padding: 12px 15px;
 }
 
-/* 🌟 導航按鈕容器：靠右對齊 */
+/* 導航按鈕容器：靠右對齊 */
 .nav-btn-container {
     display: flex;
     flex-wrap: wrap;
@@ -357,52 +357,7 @@ st.markdown("""
     margin-top: 90px;
 }
 </style>
-
-<div class="sticky-header-wrapper">
-    <div class="disclaimer-bar">
-        <!-- 項目 1：使用聲明 -->
-        <div class="disclaimer-item">
-            <span class="disclaimer-title">使用聲明</span>
-            <div class="disclaimer-content">
-                本平台僅供教育研究與籌碼觀察，絕不構成任何實質投資建議、勸誘或要約。所有資料源自公開數據，受限於網路技術，可能有延遲或錯誤。<br>
-                <br>
-                投資必有風險，依本平台資訊所做之任何決策與損益，均須由使用者自行負責，本平台不負擔任何法律賠償責任。
-            </div>
-        </div>
-        <!-- 項目 2：隱私權政策 (精簡改寫版) -->
-        <div class="disclaimer-item">
-            <span class="disclaimer-title">隱私權政策</span>
-            <div class="disclaimer-content">
-                <b>1. 蒐集目的與範圍：</b><br>本平台依個資法蒐集您的識別資料(如IP、使用紀錄)僅供維持系統安全與優化服務使用。<br>
-                <b>2. 資料保護與利用：</b><br>您的資料僅於本平台與合作範圍內合法使用，除司法或法規要求外，絕不向第三方洩露。<br>
-                <b>3. 資料請求與刪除：</b><br>您可透過「聯絡我們」請求查詢、更正或刪除資料。申請刪除註冊帳號視同終止服務。<br>
-                <b>4. 政策修訂與同意：</b><br>本站保留隨時修改政策之權利，繼續使用即視為同意最新規範。
-            </div>
-        </div>
-        <!-- 項目 3：聯絡我們 (點擊滑動至表單區塊) -->
-        <div class="disclaimer-item">
-            <a href="#section-contact" class="disclaimer-title" style="cursor: pointer;">聯絡我們</a>
-        </div>
-    </div>
-    
-    <div class="nav-btn-container">
-        <a href="#section-top-pool" target="_self" class="nav-text-link">🏆 觀察名單</a>
-        <span class="nav-divider">|</span>
-        <a href="#section-search" target="_self" class="nav-text-link">🔍 個股快搜</a>
-        <span class="nav-divider">|</span>
-        <a href="#section-1" target="_self" class="nav-text-link">👑 法人持股</a>
-        <span class="nav-divider">|</span>
-        <a href="#section-2-1" target="_self" class="nav-text-link">🎯 買超佔比</a>
-        <span class="nav-divider">|</span>
-        <a href="#section-3" target="_self" class="nav-text-link">📅 法人連買</a>
-        <span class="nav-divider">|</span>
-        <a href="#section-4-1" target="_self" class="nav-text-link">🔄 資券軋空</a>
-        <span class="nav-divider">|</span>
-        <a href="#section-5" target="_self" class="nav-text-link">💰 大股東動向</a>
-        <span class="nav-divider">|</span>
-        <a href="#section-6" target="_self" class="nav-text-link">💸 鉅額交易</a>
-    </div>
-</div>
+<div class="sticky-header-wrapper"><div class="disclaimer-bar"><div class="disclaimer-item"><span class="disclaimer-title">使用聲明</span><div class="disclaimer-content">本平台僅供教育研究與籌碼觀察，絕不構成任何實質投資建議、勸誘或要約。所有資料源自公開數據，受限於網路技術，可能有延遲或錯誤。<br><br>投資必有風險，依本平台資訊所做之任何決策與損益，均須由使用者自行負責，本平台不負擔任何法律賠償責任。</div></div><div class="disclaimer-item"><span class="disclaimer-title">隱私權政策</span><div class="disclaimer-content"><b>1. 蒐集目的與範圍：</b><br>本平台依個資法蒐集您的識別資料(如IP、使用紀錄)僅供維持系統安全與優化服務使用。<br><b>2. 資料保護與利用：</b><br>您的資料僅於本平台與合作範圍內合法使用，除司法或法規要求外，絕不向第三方洩露。<br><b>3. 資料請求與刪除：</b><br>您可透過「聯絡我們」請求查詢、更正或刪除資料。申請刪除註冊帳號視同終止服務。<br><b>4. 政策修訂與同意：</b><br>本站保留隨時修改政策之權利，繼續使用即視為同意最新規範。</div></div><div class="disclaimer-item"><a href="#section-contact" class="disclaimer-title" style="cursor: pointer;">聯絡我們</a></div></div><div class="nav-btn-container"><a href="#section-top-pool" target="_self" class="nav-text-link">🏆 觀察名單</a><span class="nav-divider">|</span><a href="#section-search" target="_self" class="nav-text-link">🔍 個股快搜</a><span class="nav-divider">|</span><a href="#section-1" target="_self" class="nav-text-link">👑 法人持股</a><span class="nav-divider">|</span><a href="#section-2-1" target="_self" class="nav-text-link">🎯 買超佔比</a><span class="nav-divider">|</span><a href="#section-3" target="_self" class="nav-text-link">📅 法人連買</a><span class="nav-divider">|</span><a href="#section-4-1" target="_self" class="nav-text-link">🔄 資券軋空</a><span class="nav-divider">|</span><a href="#section-5" target="_self" class="nav-text-link">💰 大股東動向</a><span class="nav-divider">|</span><a href="#section-6" target="_self" class="nav-text-link">💸 鉅額交易</a></div></div>
 """, unsafe_allow_html=True)
 # ==========================================
 # 🏆 預留置頂空間：頂級選股池容器
