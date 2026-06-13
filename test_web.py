@@ -357,7 +357,7 @@ st.markdown("""
     margin-top: 90px;
 }
 </style>
-<div class="sticky-header-wrapper"><div class="disclaimer-bar"><div class="disclaimer-item"><span class="disclaimer-title">使用聲明</span><div class="disclaimer-content">本平台僅供教育研究與籌碼觀察，絕不構成任何實質投資建議、勸誘或要約。所有資料源自公開數據，受限於網路技術，可能有延遲或錯誤。<br><br>投資必有風險，依本平台資訊所做之任何決策與損益，均須由使用者自行負責，本平台不負擔任何法律賠償責任。</div></div><div class="disclaimer-item"><span class="disclaimer-title">隱私權政策</span><div class="disclaimer-content"><b>1. 蒐集目的與範圍：</b><br>本平台依個資法蒐集您的識別資料(如IP、使用紀錄)僅供維持系統安全與優化服務使用。<br><b>2. 資料保護與利用：</b><br>您的資料僅於本平台與合作範圍內合法使用，除司法或法規要求外，絕不向第三方洩露。<br><b>3. 資料請求與刪除：</b><br>您可透過「聯絡我們」請求查詢、更正或刪除資料。申請刪除註冊帳號視同終止服務。<br><b>4. 政策修訂與同意：</b><br>本站保留隨時修改政策之權利，繼續使用即視為同意最新規範。</div></div><div class="disclaimer-item"><a href="#section-contact" class="disclaimer-title" style="cursor: pointer;">聯絡我們</a></div></div><div class="nav-btn-container"><a href="#section-top-pool" target="_self" class="nav-text-link">🏆 觀察名單</a><span class="nav-divider">|</span><a href="#section-search" target="_self" class="nav-text-link">🔍 個股快搜</a><span class="nav-divider">|</span><a href="#section-1" target="_self" class="nav-text-link">👑 法人持股</a><span class="nav-divider">|</span><a href="#section-2-1" target="_self" class="nav-text-link">🎯 買超佔比</a><span class="nav-divider">|</span><a href="#section-3" target="_self" class="nav-text-link">📅 法人連買</a><span class="nav-divider">|</span><a href="#section-4-1" target="_self" class="nav-text-link">🔄 資券軋空</a><span class="nav-divider">|</span><a href="#section-5" target="_self" class="nav-text-link">💰 大股東動向</a><span class="nav-divider">|</span><a href="#section-6" target="_self" class="nav-text-link">💸 鉅額交易</a></div></div>
+<div class="sticky-header-wrapper"><div class="disclaimer-bar"><div class="disclaimer-item"><span class="disclaimer-title">使用聲明</span><div class="disclaimer-content">本平台僅供教育研究與籌碼觀察，絕不構成任何實質投資建議、勸誘或要約。所有資料源自公開數據，受限於網路技術，可能有延遲或錯誤。<br><br>投資必有風險，依本平台資訊所做之任何決策與損益，均須由使用者自行負責，本平台不負擔任何法律賠償責任。</div></div><div class="disclaimer-item"><span class="disclaimer-title">隱私權政策</span><div class="disclaimer-content"><b>1. 蒐集目的與範圍：</b><br>本平台依個資法蒐集您的識別資料(如IP、使用紀錄)僅供維持系統安全與優化服務使用。<br><b>2. 資料保護與利用：</b><br>您的資料僅於本平台與合作範圍內合法使用，除司法或法規要求外，絕不向第三方洩露。<br><b>3. 資料請求與刪除：</b><br>您可透過「聯絡我們」請求查詢、更正或刪除資料。申請刪除註冊帳號視同終止服務。<br><b>4. 政策修訂與同意：</b><br>本站保留隨時修改政策之權利，繼續使用即視為同意最新規範。</div></div><div class="disclaimer-item"><a href="#contact-modal-target" class="disclaimer-title" style="cursor: pointer;">聯絡我們</a></div></div><div class="nav-btn-container"><a href="#section-top-pool" target="_self" class="nav-text-link">🏆 觀察名單</a><span class="nav-divider">|</span><a href="#section-search" target="_self" class="nav-text-link">🔍 個股快搜</a><span class="nav-divider">|</span><a href="#section-1" target="_self" class="nav-text-link">👑 法人持股</a><span class="nav-divider">|</span><a href="#section-2-1" target="_self" class="nav-text-link">🎯 買超佔比</a><span class="nav-divider">|</span><a href="#section-3" target="_self" class="nav-text-link">📅 法人連買</a><span class="nav-divider">|</span><a href="#section-4-1" target="_self" class="nav-text-link">🔄 資券軋空</a><span class="nav-divider">|</span><a href="#section-5" target="_self" class="nav-text-link">💰 大股東動向</a><span class="nav-divider">|</span><a href="#section-6" target="_self" class="nav-text-link">💸 鉅額交易</a></div></div>
 """, unsafe_allow_html=True)
 # ==========================================
 # 🏆 預留置頂空間：頂級選股池容器
@@ -4198,42 +4198,92 @@ with top_pool_container:
 # 🧪 測試區：Google Sheets 連線測試
 # ==========================================
 # ==========================================
-# ✉️ 聯絡我們 (回報系統 - 高級黑夜萬聖派對版)
+# ✉️ 聯絡我們 (全螢幕覆蓋魔術 + 黑夜萬聖派對版)
 # ==========================================
-st.write("---")
-st.markdown("<div id='section-contact'></div>", unsafe_allow_html=True)
+# 1. 注入 CSS 魔法
+st.markdown("""
+<style>
+/* 隱藏表單容器，並設定為全螢幕暗黑色毛玻璃覆蓋 */
+div[data-testid="element-container"]:has(#contact-modal-target) + div[data-testid="stVerticalBlock"] {
+    display: none; 
+    position: fixed;
+    top: 0; left: 0; width: 100vw; height: 100vh;
+    z-index: 9999999;
+    background: rgba(0, 0, 0, 0.85);
+    backdrop-filter: blur(8px);
+}
 
-with st.container(border=True):
-    st.markdown("<h3 style='color: #FFD700; margin-top: 0;'>✉️ 聯絡站長</h3>", unsafe_allow_html=True)
-    st.write("如果您發現任何系統 Bug、數據異常，或是對本平台有任何建議及意見交流，歡迎填寫表單回報！")
+/* 點擊「聯絡我們」時，啟動魔法將全螢幕視窗顯示出來 */
+div[data-testid="element-container"]:has(#contact-modal-target:target) + div[data-testid="stVerticalBlock"] {
+    display: flex !important;
+    justify-content: center;
+    align-items: center;
+}
+
+/* 設定內部實體表單的黑色奢華樣式 */
+div[data-testid="element-container"]:has(#contact-modal-target) + div[data-testid="stVerticalBlock"] > div {
+    background: #0A0D14;
+    padding: 25px 30px;
+    border-radius: 15px;
+    border: 1px solid #FFD700;
+    box-shadow: 0 0 60px rgba(0,0,0,0.9), 0 0 20px rgba(255,215,0,0.2);
+    width: 550px;
+    max-width: 90%;
+    max-height: 90vh;
+    overflow-y: auto;
+}
+
+/* 關閉按鈕樣式 */
+.close-modal-btn {
+    color: #94A3B8;
+    text-decoration: none;
+    font-size: 22px;
+    font-weight: bold;
+    transition: 0.2s;
+}
+.close-modal-btn:hover {
+    color: #FF4B4B;
+}
+</style>
+""", unsafe_allow_html=True)
+
+# 2. 放置隱形觸發錨點
+st.markdown("<div id='contact-modal-target'></div>", unsafe_allow_html=True)
+
+# 3. 實體表單容器 (平時完全隱形不佔空間)
+with st.container():
+    st.markdown("""
+    <div style='display: flex; justify-content: space-between; align-items: center; margin-bottom: 15px;'>
+        <h2 style='color: #FFD700; margin: 0; font-size: 24px;'>✉️ 聯絡站長</h2>
+        <a href='#' class='close-modal-btn' title='關閉視窗'>✖</a>
+    </div>
+    """, unsafe_allow_html=True)
     
-    # 建立回報表單
+    st.write("如果您發現任何系統異常，或是對本平台有任何建議，歡迎填寫紙條傳送至後台！")
+    
     with st.form("contact_us_form", clear_on_submit=True):
         c1, c2 = st.columns(2)
         with c1:
-            sender_name = st.text_input("您的稱呼 (選填)", placeholder="例如：股市小白")
+            sender_name = st.text_input("您的稱呼 (選填)", placeholder="例如：夜行者")
         with c2:
-            sender_email = st.text_input("電子信箱 (選填)", placeholder="若需站長回覆請務必留下 Email")
+            sender_email = st.text_input("電子信箱 (選填)", placeholder="若需回覆請務必留下 Email")
             
-        message_body = st.text_area("回報內容 / 建議事項*", placeholder="請描述您遇到的問題、發生時間或建議...", height=120)
+        message_body = st.text_area("回報內容 / 建議事項*", placeholder="請描述您遇到的問題，或對派對的建議...", height=120)
         
-        # 將按鈕設計成金色系
-        submit_btn = st.form_submit_button("傳送訊息給站長", use_container_width=True)
+        # 配合主題的低調金黃色按鈕
+        submit_btn = st.form_submit_button(" 傳送訊息", use_container_width=True)
         
         if submit_btn:
             if not message_body.strip():
-                st.error("⚠️ 傳送失敗：請務必填寫回報內容喔！")
+                st.error("⚠️ 傳送失敗：紙條上似乎空無一字喔！")
             else:
                 try:
-                    # 嘗試讀取 Google Sheets 中名為「聯絡我們」的工作表
                     try:
                         old_contact_df = conn.read(spreadsheet=SHEET_URL, worksheet="聯絡我們", ttl=0)
                         old_contact_df = old_contact_df.dropna(how="all")
                     except Exception:
-                        # 如果是第一次讀取或是工作表剛建好沒資料，就建一個空的 DataFrame
                         old_contact_df = pd.DataFrame(columns=["時間", "稱呼", "信箱", "內容"])
                     
-                    # 建立當下時間與回報資料
                     now_str = datetime.datetime.now().strftime("%Y-%m-%d %H:%M:%S")
                     new_data = pd.DataFrame([{
                         "時間": now_str, 
@@ -4242,17 +4292,14 @@ with st.container(border=True):
                         "內容": message_body.strip()
                     }])
                     
-                    # 合併資料並寫回 Google Sheets
                     final_contact_df = pd.concat([old_contact_df, new_data], ignore_index=True)
                     conn.update(spreadsheet=SHEET_URL, worksheet="聯絡我們", data=final_contact_df)
                     
-                    # 🦇 移除俗氣的氣球，改用優雅低調的角落 Toast 彈出視窗與主題文字
+                    # 🦇 移除俗氣氣球，改用優雅的角落 Toast 滑出提示！
                     st.toast("您的訊息已悄悄送達派對後台...", icon="🦇")
-                    st.success("✨ 感謝回報！您的建議是這場黑夜派對最棒的點綴，我們會盡快處理。")
-                    
+                    st.success("✨ 感謝回報！您的建議是這場黑夜派對最棒的點綴。")
                 except Exception as e:
-                    st.error(f"❌ 傳送失敗，請確認 Google Sheets 連線狀態：{str(e)}")
-
+                    st.error(f"❌ 傳送失敗，後台連線異常：{str(e)}")
 # ==========================================
 # 📊 【蜂蜜計數器】本站累計觀測人次統計
 # ==========================================
