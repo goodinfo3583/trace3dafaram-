@@ -4201,14 +4201,14 @@ with top_pool_container:
 # 🧪 測試區：Google Sheets 連線測試
 # ==========================================
 # ==========================================
-# ✉️ 聯絡我們 (回報系統)
+# ✉️ 聯絡我們 (回報系統 - 高級黑夜萬聖派對版)
 # ==========================================
 st.write("---")
 st.markdown("<div id='section-contact'></div>", unsafe_allow_html=True)
 
 with st.container(border=True):
     st.markdown("<h3 style='color: #FFD700; margin-top: 0;'>✉️ 聯絡站長</h3>", unsafe_allow_html=True)
-    st.write("如果您發現任何系統 Bug、數據異常，或是對本平台有任何建議，歡迎填寫表單回報！")
+    st.write("如果您發現任何系統 Bug、數據異常，或是對本平台有任何建議及意見交流，歡迎填寫表單回報！")
     
     # 建立回報表單
     with st.form("contact_us_form", clear_on_submit=True):
@@ -4221,7 +4221,7 @@ with st.container(border=True):
         message_body = st.text_area("回報內容 / 建議事項*", placeholder="請描述您遇到的問題、發生時間或建議...", height=120)
         
         # 將按鈕設計成金色系
-        submit_btn = st.form_submit_button("🚀 傳送訊息給站長", use_container_width=True)
+        submit_btn = st.form_submit_button("傳送訊息給站長", use_container_width=True)
         
         if submit_btn:
             if not message_body.strip():
@@ -4249,8 +4249,10 @@ with st.container(border=True):
                     final_contact_df = pd.concat([old_contact_df, new_data], ignore_index=True)
                     conn.update(spreadsheet=SHEET_URL, worksheet="聯絡我們", data=final_contact_df)
                     
-                    st.success("✅ 感謝您的回報！訊息已成功傳送，我們會盡快處理。")
-                    st.balloons() # 增加一點互動儀式感
+                    # 🦇 移除俗氣的氣球，改用優雅低調的角落 Toast 彈出視窗與主題文字
+                    st.toast("您的訊息已悄悄送達派對後台...", icon="🦇")
+                    st.success("✨ 感謝回報！您的建議是這場黑夜派對最棒的點綴，我們會盡快處理。")
+                    
                 except Exception as e:
                     st.error(f"❌ 傳送失敗，請確認 Google Sheets 連線狀態：{str(e)}")
 
