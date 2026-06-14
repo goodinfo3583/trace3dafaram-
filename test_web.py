@@ -372,7 +372,7 @@ st.markdown("""
         <a href="?page=b3" target="_self" class="nav-text-link">📅 法人連買</a><span class="nav-divider">|</span>
         <a href="?page=b4" target="_self" class="nav-text-link">🔄 資券軋空</a><span class="nav-divider">|</span>
         <a href="?page=b5" target="_self" class="nav-text-link">💰 大腿動向</a><span class="nav-divider">|</span>
-        <a href="?page=b6" target="_self" class="nav-text-link">💸 鉅額交易</a>
+        <a href="?page=b6" target="_self" class="nav-text-link">🎣 鉅額交易</a>
     </div>
 </div>
 """, unsafe_allow_html=True)
@@ -4008,7 +4008,7 @@ if current_page in ["all", "b6"]:
     formatted_date = f"{block_date[:4]}/{block_date[4:6]}/{block_date[6:8]}" if block_date != "未知" else "未知"
     status_icon = "🟢" if df_block is not None else "🌕"
 
-    st.markdown(f"### 💸 區塊 6：鉅額交易動向 <span style='font-size: 0.6em; color: #00D2FF;'>({formatted_date} {status_icon})</span>", unsafe_allow_html=True)
+    st.markdown(f"### 🎣 區塊 6：鉅額交易動向 <span style='font-size: 0.6em; color: #00D2FF;'>({formatted_date} {status_icon})</span>", unsafe_allow_html=True)
     st.write("💡 鉅額交易常為大戶私下換手籌碼，成交價可視為「支撐/壓力」防守線；短線跌破建議嚴設停損。")
 
     tab_today, tab_hist = st.tabs(["🔹 今日最新鉅額交易", "🔹 歷史防守價追蹤表"])
@@ -4258,7 +4258,7 @@ if current_page in ["all", "pool"]:
                         b1_delta = "0.00" if abs(delta_val) < 0.005 else (f"+{delta_val:.2f}" if delta_val > 0 else f"{delta_val:.2f}")
                     except: b1_delta = "0.00"
                     
-                    if sid in block_sids: b1_dyn = f"{b1_dyn} | 💸 鉅額交易"
+                    if sid in block_sids: b1_dyn = f"{b1_dyn} | 🎣 鉅額交易"
                     b1_rank = str(row.get(rank_col, '-')) if rank_col else '-'
                     score, details = 0.0, [] 
                     
