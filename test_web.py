@@ -930,9 +930,6 @@ def render_kline_fragment(pure_stock_id):
 # ==========================================
 # 🌟 全站命脈：區塊 1 專屬工具函數與背景預載引擎 (一體成型版)
 # ==========================================
-import re, os, glob, requests, datetime
-import pandas as pd
-import streamlit as st
 from collections import defaultdict
 
 @st.cache_data(ttl=3600)
