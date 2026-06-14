@@ -364,6 +364,86 @@ st.markdown("""
 # 👇👇👇 魔法傳送門接收點 (必須在導航列下方，完全靠左不縮排) 👇👇👇
 top_pool_slot = st.container()
 # 👆👆👆 ========================================================== 👆👆👆
+def show_news_page():
+    st.title("市場消息")
+    
+    # 1. 透過 GitHub Raw URL 抓取你另一個 Repo 的資料
+    # 請確保 tw_news_stocker_Dong 這個 Repo 是 Public 的
+    url = "https://raw.githubusercontent.com/goodinfo3583/tw_news_stocker_Dong/main/docs/data/today.json"
+    
+    try:
+        # 使用 Python 的 requests 去下載 JSON
+        response = requests.get(url)
+        response.raise_for_status() # 檢查連線是否成功
+        news_data = response.json()
+    except Exception as e:
+        st.error(f"無法取得新聞資料，請檢查網址或權限。錯誤訊息: {e}")
+        return
+
+    st.success(f"成功載入 {len(news_data)} 則今日新聞！")
+    
+    # 加入簡單的搜尋功能 (模仿原本 JS 的功能)
+    search_query = st.text_input("🔍 搜尋標題或股票代號...")
+    
+    st.markdown("---")
+    
+    # 2. 用 Streamlit 的排版引擎把新聞列出來
+    count = 0
+    for news in news_data:
+        # 搜尋過濾邏輯
+        title = news.get("title", "")
+        codes = news.get("codes", [])
+        if search_query:
+            if search_query.lower() not in title.lower() and search_query not in codes:
+                continue # 如果不符合搜尋條件，就跳過這筆
+                
+        count += 1
+        if count > 50: # 避免網頁卡頓，預設最多顯示 50 筆
+            break
+            
+        # 決定情緒分數的顏色
+        score = news.get("sent_score", 0)
+        if score > 0:
+            score_color = "#059669" # 綠色 (正向)
+            bg_color = "#d1fae5"
+        elif score < 0:
+            score_color = "#dc2626" # 紅色 (負向)
+            bg_color = "#fee2e2"
+        else:
+            score_color = "#4b5563" # 灰色 (中性)
+            bg_color = "#f3f4f6"
+            
+        # 格式化標籤
+        codes_str = " ".join([f"`{c}`" for c in codes]) if codes else "無特定標的"
+        
+        # 使用 st.container() 創造卡片感
+        with st.container():
+            col1, col2 = st.columns([4, 1])
+            with col1:
+                # 新聞標題附帶超連結
+                st.markdown(f"#### [{title}]({news.get('link', '#')})")
+                st.caption(f"來源: {news.get('source_host', '未知')} | 時間: {news.get('ts', '')[:16].replace('T', ' ')}")
+            with col2:
+                # 顯示情緒分數和股票代號
+                st.markdown(
+                    f"<div style='background-color:{bg_color}; color:{score_color}; padding:5px 10px; border-radius:15px; text-align:center; font-weight:bold; margin-bottom:5px;'>"
+                    f"情緒分數: {score}"
+                    f"</div>", 
+                    unsafe_allow_html=True
+                )
+                st.markdown(codes_str)
+        st.divider()
+
+# ==========================================
+# 接下來在你的主程式路由中呼叫這個函數
+# 例如：
+# if menu_selection == "最新消息":
+#     show_news_page()
+# ==========================================
+
+
+
+
 # ==========================================
 # 🌟 觀察名單專屬工具函數區 (補回遺失的計分工具)
 # ==========================================
