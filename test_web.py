@@ -522,14 +522,187 @@ def show_news_page():
         </div>
         """
         st.markdown(card_html, unsafe_allow_html=True)
+
+# ========================================================== 
+# 🧠 背景快取引擎：負責去 GitHub 搬運多天份的資料，並暫存在記憶體中
+# (設定 ttl=600 代表每 10 分鐘才會真正重新下載一次，保證搜尋時網頁不卡頓)
+# ========================================================== 
+@st.cache_data(ttl=600, show_spinner=False)
+def fetch_historical_news(days_to_load=3):
+    base_url = "https://raw.githubusercontent.com/voidful/tw_news_stocker/main/docs/data"
+    cache_buster = int(time.time() / 600) # 10分鐘變更一次快取戳記
+    index_url = f"{base_url}/news_index.json?t={cache_buster}"
+    
+    all_news = []
+    
+    try:
+        # 1. 取得所有可用的日期目錄
+        index_res = requests.get(index_url)
+        index_res.raise_for_status()
+        news_dates = index_res.json()
+        
+        # 確保日期由新到舊排序
+        news_dates.sort(reverse=True)
+        
+        # 2. 決定要抓幾天的資料
+        target_dates = news_dates[:days_to_load]
+        
+        # 3. 迴圈將這幾天的 JSON 全部下載並拼湊起來
+        for date in target_dates:
+            data_url = f"{base_url}/news/{date}.json?t={cache_buster}"
+            res = requests.get(data_url)
+            if res.status_code == 200:
+                day_data = res.json()
+                all_news.extend(day_data)
+                
+        return all_news, target_dates
+    except Exception as e:
+        return [], []
+
+# ========================================================== 
+# 📰 定義：市場消息主畫面分頁
+# ========================================================== 
+def show_news_page():
+    st.title("📰 全域市場消息戰情室")
+    
+    # 建立頂部控制面板
+    col1, col2 = st.columns([1, 2])
+    with col1:
+        # 讓你可以自由選擇要回溯幾天的新聞
+        days_option = st.selectbox("📅 載入歷史天數", [1, 7, 30, 120, 365], index=1)
+    with col2:
+        search_query = st.text_input("🔍 搜尋標題、關鍵字或股票代號 (支援全域歷史搜尋)...")
+        
+    st.markdown("---")
+    
+    # 呼叫快取引擎取得資料
+    with st.spinner(f"正在從資料庫撈取近 {days_option} 天的新聞..."):
+        news_data, loaded_dates = fetch_historical_news(days_option)
+        
+    if not news_data:
+        st.error("無法取得新聞資料，請檢查網路連線。")
+        return
+
+    # 顯示成功載入資訊
+    date_range_str = f"{loaded_dates[-1]} ~ {loaded_dates[0]}" if len(loaded_dates) > 1 else loaded_dates[0]
+    st.success(f"成功載入 {len(loaded_dates)} 天的資料 ({date_range_str})，共計 {len(news_data)} 則新聞備用！")
+    
+    # ==========================================
+    # 🎨 注入 CSS 樣式：黑底玻璃質感卡片
+    # ==========================================
+    glass_css = """
+    <style>
+    .glass-card {
+        background: rgba(255, 255, 255, 0.05); 
+        backdrop-filter: blur(10px);          
+        -webkit-backdrop-filter: blur(10px);
+        border: 1px solid rgba(255, 255, 255, 0.08); 
+        border-radius: 12px;
+        padding: 16px 20px;
+        margin-bottom: 12px;
+        box-shadow: 0 4px 15px rgba(0, 0, 0, 0.2);   
+        transition: all 0.2s ease-in-out;
+    }
+    .glass-card:hover {
+        background: rgba(255, 255, 255, 0.09);     
+        transform: translateY(-2px);
+    }
+    .news-title {
+        font-size: 16px; 
+        font-weight: 600;
+        color: #F1F5F9;  
+        text-decoration: none;
+        line-height: 1.4;
+        display: block;
+        margin-bottom: 8px;
+    }
+    .news-title:hover {
+        color: #3B82F6;  
+    }
+    .news-info {
+        font-size: 13px;
+        color: #94A3B8;
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+    }
+    .code-tag {
+        background: rgba(59, 130, 246, 0.15); 
+        color: #60A5FA;
+        padding: 3px 8px;
+        border-radius: 6px;
+        font-size: 12px;
+        margin-left: 5px;
+        font-weight: 600;
+        border: 1px solid rgba(59, 130, 246, 0.3);
+    }
+    </style>
+    """
+    st.markdown(glass_css, unsafe_allow_html=True)
+    
+    # ==========================================
+    # 📰 渲染新聞列表 (全域過濾與排序)
+    # ==========================================
+    # 確保所有合併進來的新聞，按照時間由新到舊嚴格排序
+    try:
+        sorted_news = sorted(news_data, key=lambda x: x.get("ts", ""), reverse=True)
+    except:
+        sorted_news = news_data
+
+    display_count = 0
+    max_display = 200 # 放寬顯示上限至 200 則
+    
+    for news in sorted_news:
+        title = news.get("title", "")
+        codes = news.get("codes", [])
+        
+        # 搜尋過濾邏輯 (支援大小寫與代號)
+        if search_query:
+            q = search_query.lower()
+            match_title = q in title.lower()
+            match_code = any(q in str(c).lower() for c in codes)
+            if not (match_title or match_code):
+                continue 
+                
+        display_count += 1
+        if display_count > max_display: 
+            break
+        
+        # 處理股票標籤
+        codes_html = ""
+        if codes:
+            codes_html = "".join([f"<span class='code-tag'>{c}</span>" for c in codes])
+        
+        link = news.get('link', '#')
+        host = news.get('source_host', '未知')
+        
+        # 處理時間格式
+        ts = news.get('ts', '')
+        if "T" in ts:
+            ts = ts.split("T")[0] + " " + ts.split("T")[1][:5]
+        
+        # 玻璃卡片輸出
+        card_html = f"""
+        <div class="glass-card">
+            <a href="{link}" target="_blank" class="news-title">{title}</a>
+            <div class="news-info">
+                <span>來源: {host} &nbsp;|&nbsp; 時間: {ts}</span>
+                <div>{codes_html}</div>
+            </div>
+        </div>
+        """
+        st.markdown(card_html, unsafe_allow_html=True)
+        
+    if display_count == 0:
+        st.warning(f"找不到包含「{search_query}」的新聞，建議增加上方的「載入歷史天數」再試一次！")
+    elif display_count == max_display:
+        st.info(f"為了維持網頁流暢度，僅顯示最新符合條件的 {max_display} 則新聞。")        
 # ==========================================
 # 🚦 執行路由：判斷要顯示哪個畫面 (這裡才是讓畫面出現的關鍵)
 # ==========================================
 if current_page == "news":
     # 【修改 3】：如果使用者點擊了新聞按鈕，或者剛進站 (預設為news)，就執行這個函數
     show_news_page()
-    
-
 # ==========================================
 # 🌟 觀察名單專屬工具函數區 (補回遺失的計分工具)
 # ==========================================
