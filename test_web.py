@@ -415,7 +415,7 @@ def fetch_historical_news(days_to_load=3):
 # 📰 定義：市場消息主畫面分頁 (極速分頁版)
 # ========================================================== 
 def show_news_page():
-    st.title("☕ 市場消息")
+    st.title("☕  市場消息")
     
     # 頂部控制面板 (預設選項加入了 90, 180, 365 天)
     col1, col2 = st.columns([1, 2])
