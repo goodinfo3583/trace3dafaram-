@@ -1281,7 +1281,7 @@ with st.sidebar:
             scan_and_display("💎 400張大戶", 'df_blk5', search_target)
             scan_and_display("🐳 1000張大戶", 'df_blk5_1000', search_target)
 
-    # 💡 修復點：當搜尋列「有內容」時，不顯示大盤總經 (隱藏下方 Tabs)
+    # 💡 當搜尋列「有內容」時，不顯示大盤總經 (隱藏下方 Tabs)
     if not search_query:
         st.write("---") # 側邊欄快搜與三大導航 Tab 的分隔線
         # ------------------------------------------
