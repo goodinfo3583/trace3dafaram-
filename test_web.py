@@ -1161,10 +1161,7 @@ if 'my_final_df' not in st.session_state or st.session_state['my_final_df'].empt
 # 側邊欄：戰情指揮中心 (內建個股快搜 + 大盤總經)
 # =======================================================
 with st.sidebar:
-# ==========================================
-# 🔍 個股籌碼快搜 "標題" (保證生效：電競風科技橫幅版)
-# ==========================================
-st.write("---")
+
     st.markdown("<div id='section-search'></div>", unsafe_allow_html=True)
 
     # 🌟 使用 100% 絕對生效的 Inline HTML 設計超高質感橫幅
