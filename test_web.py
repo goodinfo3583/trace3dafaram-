@@ -443,7 +443,7 @@ def show_news_page():
     glass_css = """
     <style>
     .glass-card {
-        background: rgba(255, 255, 255, 0.55); 
+        background: rgba(255, 255, 255, 0.15); 
         backdrop-filter: blur(10px);          
         -webkit-backdrop-filter: blur(10px);
         border: 1px solid rgba(255, 255, 255, 0.08); 
