@@ -34,13 +34,12 @@ def set_background(image_path):
         with open(image_path, "rb") as file:
             encoded_string = base64.b64encode(file.read()).decode()
             
-        # 這裡的 rgba(15, 23, 42, 0.88) 是黑色遮罩的透明度 (0.88 = 88%黑)
-        # 如果覺得背景太明顯干擾文字，可以把 0.88 改成 0.92 或 0.95
+        # rgba(15, 23, 42, 0.88) 為深色科技藍遮罩，可依清晰度需求調整 0.88 這個數值
         css = f"""
         <style>
         .stApp {{
             background-image: 
-                linear-gradient(rgba(15, 23, 42, 0.75), rgba(15, 23, 42, 0.88)), 
+                linear-gradient(rgba(15, 23, 42, 0.88), rgba(15, 23, 42, 0.88)), 
                 url(data:image/png;base64,{encoded_string});
             background-size: cover;
             background-position: center center;
@@ -58,9 +57,18 @@ def set_background(image_path):
     except FileNotFoundError:
         st.warning(f"⚠️ 找不到背景圖片檔：{image_path}，請確認檔名與路徑是否完全正確。")
 
-# 👉 自動組合路徑：./Goodinfo_Rankings/派對盛宴邀請.png
-# (確保這段程式碼放在 DATA_DIR 宣告的下方)
-bg_path = os.path.join(DATA_DIR, "派對盛宴邀請.png")
+# ==========================================
+# 🖼️ 圖片資料夾路徑初始化
+# ==========================================
+# 👉 宣告專門存放網頁圖片素材的資料夾
+IMAGE_DIR = "./image"
+
+# 🌟 新增防護罩：如果資料夾不存在，就自動建立一個，避免程式報錯
+if not os.path.exists(IMAGE_DIR):
+    os.makedirs(IMAGE_DIR)
+
+# 👉 自動組合新路徑：./image/派對盛宴邀請.png
+bg_path = os.path.join(IMAGE_DIR, "派對盛宴邀請.png")
 set_background(bg_path)
 # ==========================================
 # 🛑 隱形急救引擎 (請置於程式最頂端，絕對不要刪除！)
