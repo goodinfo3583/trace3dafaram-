@@ -9,6 +9,10 @@ from selenium import webdriver
 from selenium.webdriver.chrome.options import Options
 from selenium.webdriver.common.by import By
 
+# 🔑 新增：用來關閉因為跳過 SSL 驗證而產生的紅色警告
+import urllib3
+urllib3.disable_warnings(urllib3.exceptions.InsecureRequestWarning)
+
 # ==========================================
 # 1. 基本設定區塊
 # ==========================================
@@ -26,13 +30,9 @@ print(f"啟動爬蟲系統，目標日期：{today}\n" + "="*40)
 # ==========================================
 print(">> [階段一] 執行證交所與櫃買中心 API 擷取...")
 
-# 🔑 引入 urllib3 來關閉因跳過 SSL 驗證而產生的警告訊息
-import urllib3
-urllib3.disable_warnings(urllib3.exceptions.InsecureRequestWarning)
-
-# 準備給櫃買中心的「民國日期」格式 (例如 20260614 -> 115/06/14)
+# 🔑 準備給櫃買中心的「民國年月」格式 (例如 20260614 -> 115/06)
 roc_year = int(today[:4]) - 1911
-roc_date = f"{roc_year}/{today[4:6]}/{today[6:]}"
+roc_month = f"{roc_year}/{today[4:6]}" 
 
 # 拆分 API 字典：上市與上櫃的 JSON 格式不同，需分開處理！
 TWSE_APIS = {
@@ -42,7 +42,7 @@ TWSE_APIS = {
 }
 
 TPEX_APIS = {
-    "大盤上櫃成交量": f"https://www.tpex.org.tw/web/stock/aftertrading/daily_trading_index/st41_result.php?l=zh-tw&o=json&d={roc_date}", 
+    "大盤上櫃成交量": f"https://www.tpex.org.tw/web/stock/aftertrading/daily_trading_index/st41_result.php?l=zh-tw&o=json&d={roc_month}", 
 }
 
 # --- 1. 處理 TWSE (上市) ---
@@ -50,14 +50,14 @@ for name, url in TWSE_APIS.items():
     file_path = os.path.join(SAVE_DIR, f"{today}-{name}.csv")
     print(f" └─ 📡 正在直連抓取: {name}...")
     try:
-        # 💡 安全起見，上市也可以一併加上 verify=False
+        # 加上 verify=False 避免 SSL 阻擋
         res = requests.get(url, headers={'User-Agent': 'Mozilla/5.0'}, timeout=10, verify=False).json()
         if res.get("stat") == "OK" and "data" in res:
             df = pd.DataFrame(res["data"], columns=res.get("fields", []))
             df.to_csv(file_path, index=False, encoding='utf-8-sig')
             print(f"    ✅ 成功存檔！共 {len(df)} 筆資料。")
         else:
-            print(f"    ❌ 伺服器回傳無資料 (可能尚未結算)。")
+            print(f"    ❌ 伺服器回傳無資料 (可能尚未結算或假日)。")
     except Exception as e:
         print(f"    ⚠️ 發生錯誤: {e}")
     time.sleep(1)
@@ -67,7 +67,7 @@ for name, url in TPEX_APIS.items():
     file_path = os.path.join(SAVE_DIR, f"{today}-{name}.csv")
     print(f" └─ 📡 正在直連抓取: {name}...")
     try:
-        # 💡 關鍵修復：加上 verify=False 跳過櫃買中心的 SSL 憑證檢查
+        # 加上 verify=False 避免 SSL 阻擋
         res = requests.get(url, headers={'User-Agent': 'Mozilla/5.0'}, timeout=10, verify=False).json()
         if "aaData" in res and len(res["aaData"]) > 0:
             columns = ["日期", "成交千股", "成交金額(千元)", "成交筆數", "櫃買指數", "漲跌點數"]
@@ -75,7 +75,7 @@ for name, url in TPEX_APIS.items():
             df.to_csv(file_path, index=False, encoding='utf-8-sig')
             print(f"    ✅ 成功存檔！共 {len(df)} 筆資料。")
         else:
-            print(f"    ❌ 伺服器回傳無資料 (可能尚未結算)。")
+            print(f"    ❌ 伺服器回傳無資料 (可能尚未結算或假日)。")
     except Exception as e:
         print(f"    ⚠️ 發生錯誤: {e}")
     time.sleep(1)
@@ -90,7 +90,7 @@ headers = {'User-Agent': 'Mozilla/5.0'}
 # 1. 臺指選擇權PC比
 print(" └─ 📡 正在抓取: 臺指選擇權PC比...")
 try:
-    res = requests.post("https://www.taifex.com.tw/cht/3/pcRatio", data={"queryStartDate": taifex_date, "queryEndDate": taifex_date}, headers=headers)
+    res = requests.post("https://www.taifex.com.tw/cht/3/pcRatio", data={"queryStartDate": taifex_date, "queryEndDate": taifex_date}, headers=headers, verify=False)
     dfs = pd.read_html(StringIO(res.text))
     for df in dfs:
         if '買賣權未平倉量比率%' in df.columns or (isinstance(df.columns, pd.MultiIndex) and '買賣權未平倉量比率%' in [c[-1] for c in df.columns]):
@@ -104,7 +104,7 @@ except Exception as e: print(f"    ⚠️ 失敗: {e}")
 # 2. 三大法人期貨多空 (TX)
 print(" └─ 📡 正在抓取: 三大法人期貨多空單...")
 try:
-    res = requests.post("https://www.taifex.com.tw/cht/3/futContractsDate", data={"queryDate": taifex_date}, headers=headers)
+    res = requests.post("https://www.taifex.com.tw/cht/3/futContractsDate", data={"queryDate": taifex_date}, headers=headers, verify=False)
     dfs = pd.read_html(StringIO(res.text))
     for df in dfs:
         if isinstance(df.columns, pd.MultiIndex):
@@ -116,21 +116,19 @@ try:
             break
 except Exception as e: print(f"    ⚠️ 失敗: {e}")
 
-# 3. 臺指選擇權行情簡表 (⭐ 終極暴力找表法 + 精準導彈版 ⭐)
+# 3. 臺指選擇權行情簡表
 print(" └─ 📡 正在抓取: 臺指選擇權行情簡表...")
 try:
-    # 🔑 關鍵修復：補上 "commodity_id": "TXO"，明確告訴期交所我們要抓「臺指選擇權」！
     payload = {
         "queryDate": taifex_date, 
         "MarketCode": "0", 
         "commodity_id": "TXO" 
     }
-    res = requests.post("https://www.taifex.com.tw/cht/3/optDailyMarketReport", data=payload, headers=headers)
+    res = requests.post("https://www.taifex.com.tw/cht/3/optDailyMarketReport", data=payload, headers=headers, verify=False)
     
     from bs4 import BeautifulSoup
     soup = BeautifulSoup(res.text, 'html.parser')
     
-    # 暴力破解：找出網頁中所有的 table，只要裡面有「履約價」三個字，就是我們要的！
     tables = soup.find_all('table')
     target_table = None
     for tb in tables:
@@ -141,7 +139,6 @@ try:
     if target_table:
         df = pd.read_html(StringIO(target_table))[0]
         
-        # 🔑 智慧合併多層表頭 (過濾 Unnamed 與重複字眼)
         if isinstance(df.columns, pd.MultiIndex):
             new_cols = []
             for c in df.columns:
@@ -153,14 +150,13 @@ try:
                 new_cols.append("_".join(valid_parts))
             df.columns = new_cols
         
-        # 🔑 過濾掉網頁中的「小計」列，只保留真正的數字資料
         strike_col = next((col for col in df.columns if '履約價' in col), None)
         if strike_col:
             df[strike_col] = pd.to_numeric(df[strike_col], errors='coerce')
             df = df.dropna(subset=[strike_col])
             
         if not df.empty:
-            df.to_csv(os.path.join(SAVE_DIR, f"{today}臺指選擇權行情簡表.csv"), index=False, encoding='utf-8-sig')
+            df.to_csv(os.path.join(SAVE_DIR, f"{today}-臺指選擇權行情簡表.csv"), index=False, encoding='utf-8-sig')
             print(f"    ✅ 成功存檔！共抓取 {len(df)} 筆精準選擇權資料。")
         else:
             print(f"    ❌ 表格內容為空，可能今日尚未結算。")
@@ -226,7 +222,7 @@ driver.execute_cdp_cmd("Page.addScriptToEvaluateOnNewDocument", {
 print(f"開始執行 Goodinfo 下載任務，共計 {len(GOODINFO_TARGETS)} 個檔案。\n" + "-"*40)
 
 for index, (name_suffix, url) in enumerate(GOODINFO_TARGETS.items()):
-    file_name = f"{today}{name_suffix}.csv"
+    file_name = f"{today}-{name_suffix}.csv"
     file_path = os.path.join(SAVE_DIR, file_name)
     
     print(f"[{index+1}/{len(GOODINFO_TARGETS)}] 正在擷取: {file_name}")
