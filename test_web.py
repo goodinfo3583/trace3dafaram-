@@ -415,10 +415,10 @@ def show_news_page():
         news_data = response.json()
         
     except Exception as e:
-        st.error(f"無法取得原作者的新聞資料，請檢查網路連線。錯誤訊息: {e}")
+        st.error(f"無法取得新聞資料，請檢查網路連線。錯誤訊息: {e}")
         return
 
-    st.success(f"🚀 成功對接原作者數據庫！目前已動態同步載入 {latest_date} 的 {len(news_data)} 則即時新聞！")
+    st.success(f"目前已動態同步載入 {latest_date} 的 {len(news_data)} 則即時新聞！")
     
     search_query = st.text_input("🔍 搜尋標題或股票代號...")
     st.markdown("---")
@@ -445,15 +445,15 @@ def show_news_page():
     }
     .news-title {
         font-size: 16px; /* 標題文字縮小一半 */
-        font-weight: 600;
+        font-weight: 300;
         color: #F1F5F9;  
         text-decoration: none;
-        line-height: 1.4;
+        line-height: 1.0;
         display: block;
         margin-bottom: 8px;
     }
     .news-title:hover {
-        color: 	#FFD306;  
+        color: 	#D0D0D0;  
     }
     .news-info {
         font-size: 13px;
