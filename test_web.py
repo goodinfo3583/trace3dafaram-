@@ -1174,7 +1174,7 @@ with st.sidebar:
                 box-shadow: 0px 0px 20px rgba(56, 189, 248, 0.2);
                 margin-bottom: 25px;">
         <h2 style="color: #e0f2fe; margin: 0; letter-spacing: 2px; text-shadow: 0 0 15px rgba(56, 189, 248, 0.8);">
-            🔍 個股籌碼快搜 (戰情診斷室)
+            🔍 個股籌碼快搜
         </h2>
         <p style="color: #94a3b8; margin-top: 8px; font-size: 14px; margin-bottom: 0;">
             輸入代號聯動
