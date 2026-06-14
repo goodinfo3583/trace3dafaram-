@@ -27,7 +27,8 @@ print(f"啟動爬蟲系統，目標日期：{today}\n" + "="*40)
 print(">> [階段一] 執行證交所 API 擷取 (TWSE)...")
 TWSE_APIS = {
     "三大法人買賣超金額": f"https://www.twse.com.tw/rwd/zh/fund/BFI82U?date={today}&response=json",
-    "鉅額交易": f"https://www.twse.com.tw/rwd/zh/block/BFIAUU?date={today}&selectType=S&response=json"
+    "鉅額交易": f"https://www.twse.com.tw/rwd/zh/block/BFIAUU?date={today}&selectType=S&response=json",
+    "大盤成交量":"https://www.twse.com.tw/zh/trading/historical/mi-index.html",
 }
 
 for name, url in TWSE_APIS.items():
