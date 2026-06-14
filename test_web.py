@@ -387,25 +387,98 @@ top_pool_slot = st.container()
 def show_news_page():
     st.title("📰 市場消息")
     
-    url = "https://raw.githubusercontent.com/goodinfo3583/tw_news_stocker_Dong/main/docs/data/today.json"
+    # 1. 改為先抓取 news_index.json 取得「最新有更新的日期」
+    index_url = "https://raw.githubusercontent.com/goodinfo3583/tw_news_stocker_Dong/main/docs/data/news_index.json"
     
     try:
-        response = requests.get(url)
-        response.raise_for_status() 
+        # 取得日期清單
+        index_response = requests.get(index_url)
+        index_response.raise_for_status()
+        news_dates = index_response.json()
+        
+        if not news_dates:
+            st.warning("找不到新聞索引資料。")
+            return
+            
+        # news_dates 預設是降冪排列，第一個 [0] 就是最新的一天 (例如 '2026-06-14')
+        latest_date = news_dates[0]
+        
+        # 2. 根據最新日期，去抓取該日的專屬新聞檔案 (解決 today.json 未更新的問題)
+        data_url = f"https://raw.githubusercontent.com/goodinfo3583/tw_news_stocker_Dong/main/docs/data/news/{latest_date}.json"
+        response = requests.get(data_url)
+        response.raise_for_status()
         news_data = response.json()
+        
     except Exception as e:
         st.error(f"無法取得新聞資料，請檢查網址或權限。錯誤訊息: {e}")
         return
 
-    st.success(f"成功載入 {len(news_data)} 則今日新聞！")
+    st.success(f"成功載入 {latest_date} 的 {len(news_data)} 則新聞！")
     
     search_query = st.text_input("🔍 搜尋標題或股票代號...")
     st.markdown("---")
     
+    # ==========================================
+    # 🎨 注入 CSS 樣式：玻璃質感卡片、文字縮小
+    # ==========================================
+    glass_css = """
+    <style>
+    .glass-card {
+        background: rgba(255, 255, 255, 0.04); /* 非常輕微的白底透明度，營造玻璃感 */
+        backdrop-filter: blur(8px);          /* 背景模糊 */
+        -webkit-backdrop-filter: blur(8px);
+        border: 1px solid rgba(255, 255, 255, 0.08); /* 淡淡的邊框 */
+        border-radius: 12px;                  /* 圓角 */
+        padding: 16px 20px;
+        margin-bottom: 12px;
+        box-shadow: 0 4px 10px rgba(0, 0, 0, 0.15);
+        transition: all 0.2s ease-in-out;
+    }
+    .glass-card:hover {
+        background: rgba(255, 255, 255, 0.08);
+        transform: translateY(-2px);
+    }
+    .news-title {
+        font-size: 16px; /* 字體大幅縮小 (原本約 24px~32px) */
+        font-weight: 600;
+        color: #E2E8F0;  /* 乾淨的亮灰色 */
+        text-decoration: none;
+        line-height: 1.4;
+        display: block;
+        margin-bottom: 8px;
+    }
+    .news-title:hover {
+        color: #60A5FA;  /* 游標移上去變淺藍色 */
+    }
+    .news-info {
+        font-size: 13px;
+        color: #94A3B8;
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+    }
+    .code-tag {
+        background: rgba(96, 165, 250, 0.15); /* 淡淡的藍底 */
+        color: #93C5FD;
+        padding: 3px 8px;
+        border-radius: 6px;
+        font-size: 12px;
+        margin-left: 5px;
+        font-weight: 500;
+    }
+    </style>
+    """
+    st.markdown(glass_css, unsafe_allow_html=True)
+    
+    # ==========================================
+    # 📰 渲染新聞列表
+    # ==========================================
     count = 0
     for news in news_data:
         title = news.get("title", "")
         codes = news.get("codes", [])
+        
+        # 搜尋過濾
         if search_query:
             if search_query.lower() not in title.lower() and search_query not in codes:
                 continue 
@@ -413,35 +486,28 @@ def show_news_page():
         count += 1
         if count > 50: 
             break
-            
-        score = news.get("sent_score", 0)
-        if score > 0:
-            score_color = "#059669" 
-            bg_color = "#d1fae5"
-        elif score < 0:
-            score_color = "#dc2626" 
-            bg_color = "#fee2e2"
-        else:
-            score_color = "#4b5563" 
-            bg_color = "#f3f4f6"
-            
-        codes_str = " ".join([f"`{c}`" for c in codes]) if codes else "無特定標的"
         
-        with st.container():
-            col1, col2 = st.columns([4, 1])
-            with col1:
-                st.markdown(f"#### [{title}]({news.get('link', '#')})")
-                st.caption(f"來源: {news.get('source_host', '未知')} | 時間: {news.get('ts', '')[:16].replace('T', ' ')}")
-            with col2:
-                st.markdown(
-                    f"<div style='background-color:{bg_color}; color:{score_color}; padding:5px 10px; border-radius:15px; text-align:center; font-weight:bold; margin-bottom:5px;'>"
-                    f"情緒分數: {score}"
-                    f"</div>", 
-                    unsafe_allow_html=True
-                )
-                st.markdown(codes_str)
-        st.divider()
-
+        # 處理股票標籤：刪除"無特定標的"，只有當 codes 裡面有代號時，才生成標籤 HTML
+        codes_html = ""
+        if codes:
+            codes_html = "".join([f"<span class='code-tag'>{c}</span>" for c in codes])
+        
+        # 組合卡片內的參數
+        link = news.get('link', '#')
+        host = news.get('source_host', '未知')
+        ts = news.get('ts', '')[:16].replace('T', ' ')
+        
+        # 將卡片輸出至畫面 (刪除了右側原本顯示情緒分數的邏輯，全面改用 CSS HTML 渲染)
+        card_html = f"""
+        <div class="glass-card">
+            <a href="{link}" target="_blank" class="news-title">{title}</a>
+            <div class="news-info">
+                <span>來源: {host} &nbsp;|&nbsp; 時間: {ts}</span>
+                <div>{codes_html}</div>
+            </div>
+        </div>
+        """
+        st.markdown(card_html, unsafe_allow_html=True)
 # ==========================================
 # 🚦 執行路由：判斷要顯示哪個畫面 (這裡才是讓畫面出現的關鍵)
 # ==========================================
