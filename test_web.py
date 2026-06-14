@@ -422,7 +422,7 @@ def show_news_page():
     with col1:
         days_option = st.selectbox("載入歷史天數", [1, 3, 7, 14, 30, 90, 180, 365], index=0)
     with col2:
-        search_query = st.text_input("🔍 搜尋標題、關鍵字或股票代號...")
+        search_query = st.text_input("🔍 🔦搜尋標題、關鍵字或股票代號...")
         
     st.markdown("---")
     
