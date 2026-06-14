@@ -320,37 +320,62 @@ st.markdown(
 current_page = st.query_params.get("page", "news")
 
 # ==========================================
-# 📍 頂部：戰情室快速導航 (已移除載入全數據，保持純淨)
+# 📍 頂部：戰情室快速導航 (全透明背景版)
 # ==========================================
 st.markdown("""
 <style>
-/* 強制釘在瀏覽器最頂端的外框 */
+/* 強制釘在瀏覽器最頂端的外框 - 改為全透明，移除原本的黑色陰影 */
 .sticky-header-wrapper {
     position: fixed; top: 0; left: 0; width: 100%; z-index: 999999;
-    box-shadow: 0px 4px 20px rgba(0, 0, 0, 0); background-color: #0A0D14;
+    background-color: transparent; 
 }
-.disclaimer-bar { display: flex; background-color: #111622; padding: 0px 15px; border-bottom: 1px dashed #1E293B; }
+
+/* 頂部聲明列 - 改為全透明，底線改為淡淡的半透明白線 */
+.disclaimer-bar { 
+    display: flex; 
+    background-color: transparent; 
+    padding: 0px 15px; 
+    border-bottom: 1px dashed rgba(255, 255, 255, 0.2); 
+}
 .disclaimer-item { position: relative; padding: 6px 15px; cursor: help; }
-.disclaimer-title { color: #64748B; font-size: 13px; font-weight: 500; transition: all 0.2s; text-decoration: none; }
-.disclaimer-item:hover .disclaimer-title { color: #FFD700; text-shadow: 0 0 8px rgba(255, 215, 0, 0.5); }
+
+/* 聲明列文字 - 加上文字陰影，確保在透明背景上依然清晰 */
+.disclaimer-title { 
+    color: #cbd5e1; font-size: 13px; font-weight: 500; transition: all 0.2s; text-decoration: none; 
+    text-shadow: 1px 1px 3px rgba(0,0,0,0.8); 
+}
+.disclaimer-item:hover .disclaimer-title { color: #FFD700; text-shadow: 0 0 8px rgba(255, 215, 0, 0.8); }
+
+/* 下拉選單內容 - 這裡保留了深色半透明底，不然展開時文字會和背景圖混在一起看不見 */
 .disclaimer-content {
     position: absolute; top: 100%; left: 0; width: 350px; max-width: 90vw;
-    background-color: #111622; border: 1px solid #1E293B; border-top: none;
+    background-color: rgba(17, 22, 34, 0.9); border: 1px solid rgba(255, 255, 255, 0.1); border-top: none;
     border-radius: 0 0 8px 8px; padding: 0px 15px; max-height: 0; opacity: 0;
     overflow: hidden; transition: all 0.3s ease-in-out; font-size: 12px; color: #94A3B8; line-height: 1.6;
     box-shadow: 0px 8px 20px rgba(0,0,0,0.8);
 }
 .disclaimer-item:hover .disclaimer-content { max-height: 400px; opacity: 1; padding: 12px 15px; }
+
+/* 導航按鈕列 - 改為全透明，底線改為微弱的白線 */
 .nav-btn-container {
     display: flex; flex-wrap: wrap; justify-content: flex-end; align-items: center;
-    padding: 8px 15px; background-color: #0A0D14; border-bottom: 2px solid #1E293B; gap: 6px;
+    padding: 8px 15px; 
+    background-color: transparent; 
+    border-bottom: 1px solid rgba(255, 255, 255, 0.1); 
+    gap: 6px;
 }
+
+/* 導航按鈕文字 - 加上文字陰影與調亮基礎顏色 */
 .nav-text-link {
-    text-decoration: none !important; color: #94A3B8 !important; font-size: 16px; font-weight: 600; 
+    text-decoration: none !important; color: #E2E8F0 !important; font-size: 16px; font-weight: 600; 
     padding: 4px 6px; transition: all 0.2s ease-in-out; font-family: -apple-system, BlinkMacSystemFont, "Microsoft JhengHei", sans-serif !important;
+    text-shadow: 1px 1px 4px rgba(0,0,0,0.8);
 }
-.nav-text-link:hover { color: #FFD700 !important; text-shadow: 0 0 12px rgba(255, 215, 0, 0.8); transform: scale(1.08); }
-.nav-divider { color: #334155; font-size: 16px; user-select: none; }
+.nav-text-link:hover { color: #FFD700 !important; text-shadow: 0 0 12px rgba(255, 215, 0, 0.9); transform: scale(1.08); }
+
+/* 分隔線 - 調淡一點以免干擾視覺 */
+.nav-divider { color: rgba(255, 255, 255, 0.3); font-size: 16px; user-select: none; }
+
 @media (max-width: 768px) {
     .nav-btn-container { justify-content: flex-end; padding: 5px 10px; }
     .nav-divider { display: none; }
@@ -358,6 +383,7 @@ st.markdown("""
 }
 .stApp { margin-top: 90px; }
 </style>
+
 <div class="sticky-header-wrapper">
     <div class="disclaimer-bar">
         <div class="disclaimer-item"><span class="disclaimer-title">使用聲明</span><div class="disclaimer-content">本平台僅供教育研究與籌碼觀察，絕不構成任何實質投資建議、勸誘或要約。所有資料源自公開數據，受限於網路技術，可能有延遲或錯誤。<br><br>投資必有風險，依本平台資訊所做之任何決策與損益，均須由使用者自行負責，本平台不負擔任何法律賠償責任。</div></div>
