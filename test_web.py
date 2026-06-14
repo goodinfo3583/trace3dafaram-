@@ -1161,7 +1161,6 @@ if 'my_final_df' not in st.session_state or st.session_state['my_final_df'].empt
 # 側邊欄：戰情指揮中心 (內建個股快搜 + 大盤總經)
 # =======================================================
 with st.sidebar:
-
     st.markdown("<div id='section-search'></div>", unsafe_allow_html=True)
 
     # 🌟 使用 100% 絕對生效的 Inline HTML 設計超高質感橫幅
@@ -1178,7 +1177,7 @@ with st.sidebar:
             🔍 個股籌碼快搜 (戰情診斷室)
         </h2>
         <p style="color: #94a3b8; margin-top: 8px; font-size: 14px; margin-bottom: 0;">
-            輸入代號一鍵聯動：AI 型態掃描 ｜ 法人動向 ｜ 1000張大戶追蹤
+            輸入代號聯動
         </p>
     </div>
     """, unsafe_allow_html=True)
@@ -1710,7 +1709,84 @@ with st.sidebar:
             col_400, col_1000 = st.columns(2)
             with col_400: scan_and_display("💎 400張以上大戶動向", 'df_blk5', search_query)
             with col_1000: scan_and_display("🐳 1000張以上超級大戶動向", 'df_blk5_1000', search_query)
-    
+
+
+    # 💡 當搜尋列「有內容」時，不顯示大盤總經 (隱藏下方 Tabs)
+    if not search_query:
+        st.write("---") # 側邊欄快搜與三大導航 Tab 的分隔線
+        # ------------------------------------------
+        # 📊 下半部：原本的三大導航 Tab (大盤/選擇權/總經)
+        # ------------------------------------------
+        tab1, tab2, tab3 = st.tabs(["🔹 大盤籌碼", "🔹 選擇權", "🔹 總經導航"])
+        
+        with tab1:
+            actual_data_date = render_sidebar_market_summary()
+            
+        with tab2:
+            render_options_dashboard()
+            
+        with tab3:
+            macro_data = fetch_macro_indicators()
+            
+            vix_val = macro_data["vix"]["value"]
+            vix_color = "#a1a1aa" 
+            if vix_val is not None:
+                if vix_val < 20: vix_color = "#10b981" 
+                elif vix_val < 28.7: vix_color = "#3b82f6" 
+                elif vix_val < 33.5: vix_color = "#f59e0b" 
+                else: vix_color = "#ef4444" 
+            vix_tooltip = f"VIX 市場恐慌指標\n目前 VIX： {vix_val if vix_val else '無'}\n綠色：市場平穩。\n藍色：報酬較差。\n橘色：報酬達 15%。\n紅色：報酬達 25%。"
+
+            vixtwn_val = macro_data["vixtwn"]["value"]
+            vixtwn_color = "#a1a1aa"
+            if vixtwn_val is not None:
+                if vixtwn_val < 20: vixtwn_color = "#3b82f6" 
+                elif vixtwn_val < 30: vixtwn_color = "#10b981" 
+                elif vixtwn_val < 40: vixtwn_color = "#f59e0b" 
+                else: vixtwn_color = "#ef4444" 
+            vixtwn_tooltip = f"VIXTWN 台灣恐慌指標\n目前： {vixtwn_val if vixtwn_val else '無'}\n藍：多頭常態。\n綠：波動加劇。\n橘：恐慌殺盤布局。\n紅：極度恐慌買點。"
+
+            fng_val = macro_data["fng"]["score"]
+            fng_color = "#a1a1aa"
+            if fng_val is not None:
+                if fng_val < 25: fng_color = "#ef4444" 
+                elif fng_val > 75: fng_color = "#10b981" 
+                else: fng_color = "#f59e0b" 
+            fng_tooltip = f"FNG 恐懼貪婪指數\n目前： {fng_val if fng_val else '無'}\n<25 積極買點\n<15 分批加碼\n>75 分批減碼\n>85 獲利了結\n>90 提高現金"
+
+            col_left, col_right = st.columns([1, 1])
+            
+            with col_left:
+                v1_str = f"{vix_val:.2f}" if vix_val else "無資料"
+                p1_str = f"{'+' if macro_data['vix']['pct'] and macro_data['vix']['pct'] > 0 else ''}{macro_data['vix']['pct']:.2f}%" if macro_data['vix']['pct'] is not None else "-"
+                st.markdown(f"""
+                <div title="{vix_tooltip}" style="background-color: rgba(255,255,255,0.03); padding: 12px; border-radius: 10px; border: 1px solid rgba(255,255,255,0.1); text-align: center; cursor: help; margin-bottom: 10px;">
+                    <div style="font-size: 13px; color: #a1a1aa; margin-bottom: 4px;">🇺🇸 美股 VIX</div>
+                    <div style="font-size: 22px; font-weight: 700; color: {vix_color}; margin-bottom: 2px;">{v1_str}</div>
+                    <div style="font-size: 12px; color: #71717a;">{p1_str}</div>
+                </div>
+                """, unsafe_allow_html=True)
+                
+                v2_str = f"{vixtwn_val:.2f}" if vixtwn_val else "無資料"
+                p2_str = "最新數值" if vixtwn_val else "-"
+                st.markdown(f"""
+                <div title="{vixtwn_tooltip}" style="background-color: rgba(255,255,255,0.03); padding: 12px; border-radius: 10px; border: 1px solid rgba(255,255,255,0.1); text-align: center; cursor: help;">
+                    <div style="font-size: 13px; color: #a1a1aa; margin-bottom: 4px;">🇹🇼 台股 VIX</div>
+                    <div style="font-size: 22px; font-weight: 700; color: {vixtwn_color}; margin-bottom: 2px;">{v2_str}</div>
+                    <div style="font-size: 12px; color: #71717a;">{p2_str}</div>
+                </div>
+                """, unsafe_allow_html=True)
+
+            with col_right:
+                f_str = str(fng_val) if fng_val else "無資料"
+                f_rating = macro_data["fng"]["rating"]
+                st.markdown(f"""
+                <div title="{fng_tooltip}" style="background-color: rgba(255,255,255,0.03); padding: 12px; height: calc(100% - 24px); display: flex; flex-direction: column; justify-content: center; align-items: center; border-radius: 10px; border: 1px solid rgba(255,255,255,0.1); text-align: center; cursor: help;">
+                    <div style="font-size: 15px; color: #a1a1aa; margin-bottom: 15px;">恐懼與貪婪</div>
+                    <div style="font-size: 36px; font-weight: 700; color: {fng_color}; margin-bottom: 10px;">{f_str}</div>
+                    <div style="font-size: 14px; font-weight: 600; color: {fng_color};">{f_rating}</div>
+                </div>
+                """, unsafe_allow_html=True)
 
 
 # ==========================================
