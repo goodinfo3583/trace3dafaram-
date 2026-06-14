@@ -718,43 +718,16 @@ def generate_stock_commentary(row):
     elif score >= 3: return "📈 【偏多佈局】主力籌碼持續進駐，法人買盤給予一定支撐。具備穩健的波段潛力。"
     elif score >= 1: return "🔄 【中性觀望】籌碼表現較為平淡，雖有零星買盤但缺乏明確連續性。建議多看少做。"
     else: return "❄️ 【弱勢整理】籌碼處於流失或無主力認養狀態。建議暫不考量。"
-
-# --- 2. 大盤與總經專屬工具 ---
-def get_latest_csv(keyword):
-    import os, glob, re
-    files = glob.glob(os.path.join(DATA_DIR, f"*{keyword}*.csv"))
-    if not files: return None, "未知"
-    latest_file = sorted(files, reverse=True)[0]
-    date_str = "未知"
-    match = re.search(r'(202\d{5})', os.path.basename(latest_file))
-    if match: date_str = match.group(1)
-    try: return pd.read_csv(latest_file, encoding='utf-8-sig'), date_str
-    except: return None, date_str
-
-def get_prev_csv(keyword, current_date):
-    import os, glob, re
-    files = glob.glob(os.path.join(DATA_DIR, f"*{keyword}*.csv"))
-    if not files: return None
-    sorted_files = sorted(files, reverse=True)
-    for f in sorted_files:
-        match = re.search(r'(202\d{5})', os.path.basename(f))
-        if match and match.group(1) < current_date:
-            try: return pd.read_csv(f, encoding='utf-8-sig')
-            except: return None
-    return None
-
-def get_diff_ui(current, prev):
-    if prev is None: return ""
-    diff = current - prev
-    if diff > 0: return f"<br><span style='color:#FF4B4B; font-size:10px;'>▲ {diff:,}</span>"
-    elif diff < 0: return f"<br><span style='color:#00E272; font-size:10px;'>▼ {abs(diff):,}</span>"
-    return "<br><span style='color:#94A3B8; font-size:10px;'>-</span>"
-
+#大盤總體經濟
 def render_sidebar_market_summary():
     df_spot, date_spot = get_latest_csv("三大法人買賣超金額")
     df_fut, _ = get_latest_csv("三大法人期貨多空")
     df_fut_prev = get_prev_csv("三大法人期貨多空", date_spot)
     df_margin, margin_csv_name = get_latest_csv("融資融券餘額")
+    
+    # 📥 新增：讀取上市與上櫃成交量資料
+    df_twse, _ = get_latest_csv("大盤上市成交量")
+    df_tpex, _ = get_latest_csv("大盤上櫃成交量")
     
     if df_spot is None or df_fut is None:
         st.warning("尚無大盤數據，請確認資料夾中已有今日 CSV。")
@@ -814,6 +787,30 @@ def render_sidebar_market_summary():
                     break
                 except: pass
 
+    # 📊 新增：計算成交量 (單位轉為億)
+    twse_vol_today, twse_diff = 0.0, 0.0
+    if df_twse is not None and len(df_twse) >= 2:
+        try:
+            # 上市單位是「元」，除以 100,000,000 變成億
+            v_today = float(str(df_twse.iloc[-1]['成交金額']).replace(',', '')) / 100000000
+            v_yest = float(str(df_twse.iloc[-2]['成交金額']).replace(',', '')) / 100000000
+            twse_vol_today = v_today
+            twse_diff = v_today - v_yest
+        except: pass
+
+    tpex_vol_today, tpex_diff = 0.0, 0.0
+    if df_tpex is not None and len(df_tpex) >= 2:
+        try:
+            # 上櫃單位是「千元」，只要除以 100,000 就變成億
+            v_today = float(str(df_tpex.iloc[-1]['成交金額(千元)']).replace(',', '')) / 100000
+            v_yest = float(str(df_tpex.iloc[-2]['成交金額(千元)']).replace(',', '')) / 100000
+            tpex_vol_today = v_today
+            tpex_diff = v_today - v_yest
+        except: pass
+
+    total_vol_today = twse_vol_today + tpex_vol_today
+    total_diff = twse_diff + tpex_diff
+
     def get_color(val, is_float=True):
         if val > 0: return "#ff4b4b", f"+{val:,.1f}" if is_float else f"+{val:,}"
         elif val < 0: return "#00e676", f"{val:,.1f}" if is_float else f"{val:,}"
@@ -828,8 +825,16 @@ def render_sidebar_market_summary():
     do_c, do_os = get_color(oi_dealer, False)
     too_c, too_os = get_color(total_oi, False)
     m_c, m_s = get_color(margin_diff_yi)
+    
+    # 成交量增減顏色
+    tw_c, tw_s = get_color(twse_diff)
+    tp_c, tp_s = get_color(tpex_diff)
+    tot_c, tot_s = get_color(total_diff)
 
+    # === 開始組裝 HTML ===
     html = f"<div style='font-size: 13px; color: #00D2FF;'>基準日：{date_spot}</div>"
+    
+    # 區塊 1: 法人現貨與未平倉
     html += "<table style='width: 100%; text-align: center; border-collapse: collapse; margin-top: 5px; font-size: 14px;'>"
     html += "<tr style='border-bottom: 1px solid #555; background-color: #262730;'>"
     html += "<th style='padding: 5px;'>法人</th><th style='padding: 5px;'>現貨(億)</th><th style='padding: 5px;'>TX未平倉</th></tr>"
@@ -841,10 +846,21 @@ def render_sidebar_market_summary():
     html += f"<tr style='border-top: 1px solid #555; font-weight: bold;'><td style='padding: 4px;'>🔥 合計</td><td style='color: {to_c}; vertical-align: middle;'>{to_s}</td><td style='color: {too_c}; vertical-align: middle; padding-bottom: 6px;'>{too_os}{get_diff_ui(total_oi, tot_prev)}</td></tr>"
     html += "</table>"
     
+    # 🌟 區塊 2 (新增): 市場成交量 (完美安插在中間)
+    if total_vol_today > 0:
+        html += "<div style='margin-top: 8px; padding: 6px; background-color: #1e1e24; border: 1px solid #555; border-radius: 5px; font-size: 13px;'>"
+        html += "<div style='font-weight: bold; margin-bottom: 4px;'>📊 市場成交量 (億)</div>"
+        html += f"<div style='color: #aaa; margin-top: 2px;'>🏢 上市 <span style='float: right; color: #fff;'>{twse_vol_today:,.1f} <span style='color: {tw_c}; font-size: 11px; margin-left: 2px;'>({tw_s})</span></span></div>"
+        html += f"<div style='color: #aaa; margin-top: 2px;'>🏪 上櫃 <span style='float: right; color: #fff;'>{tpex_vol_today:,.1f} <span style='color: {tp_c}; font-size: 11px; margin-left: 2px;'>({tp_s})</span></span></div>"
+        html += "<div style='border-top: 1px dashed #555; margin: 4px 0;'></div>"
+        html += f"<div style='color: #fbbf24; font-weight: bold; margin-top: 2px;'>🔥 總量 <span style='float: right;'>{total_vol_today:,.1f} <span style='color: {tot_c}; font-size: 11px; margin-left: 2px;'>({tot_s})</span></span></div>"
+        html += "</div>"
+    
+    # 區塊 3: 融資餘額
     if margin_today_yi != 0.0:
         margin_date = margin_csv_name[:8] if margin_csv_name else "未知"
         html += "<div style='margin-top: 8px; padding: 6px; background-color: #1e1e24; border: 1px solid #555; border-radius: 5px; font-size: 13px;'>"
-        html += f"<div style='font-weight: bold;'>📉 大盤融資餘額 <span style='font-size: 13px; color: 00D2FF; font-weight: normal; margin-left: 5px;'>({margin_date})</span></div>"
+        html += f"<div style='font-weight: bold;'>📉 大盤融資餘額 <span style='font-size: 13px; color: #00D2FF; font-weight: normal; margin-left: 5px;'>({margin_date})</span></div>"
         html += f"<div style='color: #aaa; margin-top: 4px;'>今日增減(億) <span style='color: {m_c}; font-weight: bold; float: right;'>{m_s}</span></div>"
         html += f"<div style='color: #aaa; margin-top: 2px;'>餘額總計(億) <span style='float: right; color: #fff;'>{margin_today_yi:,.1f}</span></div>"
         html += "</div>"
