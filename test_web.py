@@ -365,7 +365,7 @@ st.markdown("""
         <div class="disclaimer-item"><a href="?page=contact" target="_self" class="disclaimer-title" style="cursor: pointer;">聯絡我們</a></div>
     </div>
     <div class="nav-btn-container">
-        <a href="?page=news" target="_self" class="nav-text-link">📰 市場消息</a><span class="nav-divider">|</span>
+        <a href="?page=news" target="_self" class="nav-text-link">☕ 市場消息</a><span class="nav-divider">|</span>
         <a href="?page=pool" target="_self" class="nav-text-link">🏆 觀察名單</a><span class="nav-divider">|</span>
         <a href="?page=b1" target="_self" class="nav-text-link">👑 法人持股</a><span class="nav-divider">|</span>
         <a href="?page=b2" target="_self" class="nav-text-link">🎯 買超佔比</a><span class="nav-divider">|</span>
@@ -415,14 +415,14 @@ def fetch_historical_news(days_to_load=3):
 # 📰 定義：市場消息主畫面分頁 (極速分頁版)
 # ========================================================== 
 def show_news_page():
-    st.title("📰 全域市場消息戰情室")
+    st.title("☕ 市場消息")
     
     # 頂部控制面板 (預設選項加入了 90, 180, 365 天)
     col1, col2 = st.columns([1, 2])
     with col1:
-        days_option = st.selectbox("📅 載入歷史天數", [1, 3, 7, 14, 30, 90, 180, 365], index=2)
+        days_option = st.selectbox("載入歷史天數", [1, 3, 7, 14, 30, 90, 180, 365], index=2)
     with col2:
-        search_query = st.text_input("🔍 搜尋標題、關鍵字或股票代號 (支援全域歷史搜尋)...")
+        search_query = st.text_input("🔍 搜尋標題、關鍵字或股票代號...")
         
     st.markdown("---")
     
@@ -435,7 +435,7 @@ def show_news_page():
         return
 
     date_range_str = f"{loaded_dates[-1]} ~ {loaded_dates[0]}" if len(loaded_dates) > 1 else loaded_dates[0]
-    st.success(f"🚀 成功載入 {len(loaded_dates)} 天的資料 ({date_range_str})，資料庫共備妥 {len(news_data)} 則新聞！")
+    st.success(f"成功載入 {len(loaded_dates)} 天的資料 ({date_range_str})，資料庫共備妥 {len(news_data)} 則新聞！")
     
     # ==========================================
     # 🎨 注入 CSS 樣式
