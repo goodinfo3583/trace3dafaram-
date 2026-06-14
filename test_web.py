@@ -422,7 +422,7 @@ def show_news_page():
     with col1:
         days_option = st.selectbox("載入歷史天數", [1, 3, 7, 14, 30, 90, 180, 365], index=0)
     with col2:
-        search_query = st.text_input("🔍 搜尋標題、關鍵字或股票代號...")
+        search_query = st.text_input("🔍 🔦搜尋標題、關鍵字或股票代號...")
         
     st.markdown("---")
     
@@ -840,69 +840,7 @@ def render_sidebar_market_summary():
     tot_prev = (oi_f_prev + oi_t_prev + oi_d_prev) if oi_f_prev is not None else None
     html += f"<tr style='border-top: 1px solid #555; font-weight: bold;'><td style='padding: 4px;'>🔥 合計</td><td style='color: {to_c}; vertical-align: middle;'>{to_s}</td><td style='color: {too_c}; vertical-align: middle; padding-bottom: 6px;'>{too_os}{get_diff_ui(total_oi, tot_prev)}</td></tr>"
     html += "</table>"
-    # ==========================================
-        # 📊 新增區塊：大盤上市櫃成交量 (億)
-        # ==========================================
-        try:
-            # 1. 讀取上市與上櫃資料 (請確保檔名/路徑與你實際的變數一致)
-            twse_df = pd.read_csv(os.path.join(SAVE_DIR, f"{actual_data_date}-大盤上市成交量.csv"))
-            tpex_df = pd.read_csv(os.path.join(SAVE_DIR, f"{actual_data_date}-大盤上櫃成交量.csv"))
-            
-            # 2. 上市成交金額 (單位：元 -> 轉成 億)
-            twse_vol_today = float(str(twse_df.iloc[-1]['成交金額']).replace(',', '')) / 100000000
-            twse_vol_yest = float(str(twse_df.iloc[-2]['成交金額']).replace(',', '')) / 100000000
-            twse_diff = twse_vol_today - twse_vol_yest
-            
-            # 3. 上櫃成交金額 (單位：千元 -> 轉成 億)
-            tpex_vol_today = float(str(tpex_df.iloc[-1]['成交金額(千元)']).replace(',', '')) / 100000
-            tpex_vol_yest = float(str(tpex_df.iloc[-2]['成交金額(千元)']).replace(',', '')) / 100000
-            tpex_diff = tpex_vol_today - tpex_vol_yest
-            
-            # 4. 加總計算
-            total_vol_today = twse_vol_today + tpex_vol_today
-            total_diff = twse_diff + tpex_diff
-            
-            # 5. 定義台股專用顏色 (紅漲綠跌)
-            def get_tw_color(val):
-                if val > 0: return "#ef4444"      # 紅色 (增加)
-                elif val < 0: return "#10b981"    # 綠色 (量縮)
-                else: return "#a1a1aa"            # 灰色 (持平)
-                
-            # 6. 渲染 Streamlit HTML 區塊 (維持你的深色 UI 風格)
-            st.markdown(f"""
-            <div style="background-color: rgba(255,255,255,0.03); padding: 12px; border-radius: 10px; border: 1px solid rgba(255,255,255,0.1); margin-bottom: 15px;">
-                <div style="font-size: 14px; color: #a1a1aa; margin-bottom: 8px; font-weight: 600;">📊 市場成交量 (億)</div>
-                
-                <div style="display: flex; justify-content: space-between; font-size: 13.5px; margin-bottom: 5px;">
-                    <span style="color: #d4d4d8;">🏢 上市</span>
-                    <span style="color: #f4f4f5; font-weight: 600;">
-                        {twse_vol_today:,.1f} 
-                        <span style="color: {get_tw_color(twse_diff)}; font-size: 12px; margin-left: 4px;">({twse_diff:+,.1f})</span>
-                    </span>
-                </div>
-                
-                <div style="display: flex; justify-content: space-between; font-size: 13.5px; margin-bottom: 5px;">
-                    <span style="color: #d4d4d8;">🏪 上櫃</span>
-                    <span style="color: #f4f4f5; font-weight: 600;">
-                        {tpex_vol_today:,.1f} 
-                        <span style="color: {get_tw_color(tpex_diff)}; font-size: 12px; margin-left: 4px;">({tpex_diff:+,.1f})</span>
-                    </span>
-                </div>
-                
-                <div style="border-top: 1px dashed rgba(255,255,255,0.15); margin: 8px 0;"></div>
-                
-                <div style="display: flex; justify-content: space-between; font-size: 14.5px;">
-                    <span style="color: #fbbf24; font-weight: 700;">🔥 總成交量</span>
-                    <span style="color: #fbbf24; font-weight: 700;">
-                        {total_vol_today:,.1f} 
-                        <span style="color: {get_tw_color(total_diff)}; font-size: 12.5px; margin-left: 4px;">({total_diff:+,.1f})</span>
-                    </span>
-                </div>
-            </div>
-            """, unsafe_allow_html=True)
-            
-        except Exception as e:
-            st.error(f"⚠️ 讀取成交量失敗: {e}")
+    
     if margin_today_yi != 0.0:
         margin_date = margin_csv_name[:8] if margin_csv_name else "未知"
         html += "<div style='margin-top: 8px; padding: 6px; background-color: #1e1e24; border: 1px solid #555; border-radius: 5px; font-size: 13px;'>"
