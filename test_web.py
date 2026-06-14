@@ -8,7 +8,7 @@ import re
 import datetime
 import requests  
 import pytz  
-
+import math
 # ==========================================
 # 1. 網頁基本設定 & 目錄路徑初始化
 # ==========================================
@@ -382,172 +382,24 @@ top_pool_slot = st.container()
 # 👆👆👆 ========================================================== 👆👆👆
 import time  # 引入時間模組來做快取破壞器
 # ========================================================== 
-# 定義：市場消息分頁函數 (直連原作者 voidful 最新數據版)
-# ========================================================== 
-def show_news_page():
-    st.title("📰 市場消息")
-    
-    # 建立時間戳記防快取
-    cache_buster = int(time.time())
-    
-    # 🌟 關鍵路徑修正：直接鎖定原作者 voidful 正常運作的 main 分支路徑
-    base_url = "https://raw.githubusercontent.com/voidful/tw_news_stocker/main/docs/data"
-    index_url = f"{base_url}/news_index.json?t={cache_buster}"
-    
-    try:
-        # 1. 抓取原作者那邊最新的新聞日期目錄
-        index_response = requests.get(index_url)
-        index_response.raise_for_status()
-        news_dates = index_response.json()
-        
-        if not news_dates:
-            st.warning("找不到新聞索引資料。")
-            return
-            
-        # 強制最新日期排在最前面
-        news_dates.sort(reverse=True)
-        latest_date = news_dates[0]
-        
-        # 2. 抓取最新日期（例如 2026-06-14）的專屬新聞檔案
-        data_url = f"{base_url}/news/{latest_date}.json?t={cache_buster}"
-        response = requests.get(data_url)
-        response.raise_for_status()
-        news_data = response.json()
-        
-    except Exception as e:
-        st.error(f"無法取得新聞資料，請檢查網路連線。錯誤訊息: {e}")
-        return
-
-    st.success(f"目前已動態同步載入 {latest_date} 的 {len(news_data)} 則即時新聞！")
-    
-    search_query = st.text_input("🔍 搜尋標題或股票代號...")
-    st.markdown("---")
-    
-    # ==========================================
-    # 🎨 注入 CSS 樣式：黑底玻璃質感卡片
-    # ==========================================
-    glass_css = """
-    <style>
-    .glass-card {
-        background: rgba(255, 255, 255, 0.05); 
-        backdrop-filter: blur(10px);          
-        -webkit-backdrop-filter: blur(10px);
-        border: 1px solid rgba(255, 255, 255, 0.08); 
-        border-radius: 12px;
-        padding: 16px 20px;
-        margin-bottom: 12px;
-        box-shadow: 0 4px 15px rgba(0, 0, 0, 0.2);   
-        transition: all 0.2s ease-in-out;
-    }
-    .glass-card:hover {
-        background: rgba(255, 255, 255, 0.09);     
-        transform: translateY(-2px);
-    }
-    .news-title {
-        font-size: 16px; /* 標題文字縮小一半 */
-        font-weight: 300;
-        color: #F1F5F9;  
-        text-decoration: none;
-        line-height: 1.0;
-        display: block;
-        margin-bottom: 8px;
-    }
-    .news-title:hover {
-        color: 	#D0D0D0;  
-    }
-    .news-info {
-        font-size: 13px;
-        color: #94A3B8;
-        display: flex;
-        justify-content: space-between;
-        align-items: center;
-    }
-    .code-tag {
-        background: rgba(59, 130, 246, 0.15); 
-        color: #60A5FA;
-        padding: 3px 8px;
-        border-radius: 6px;
-        font-size: 12px;
-        margin-left: 5px;
-        font-weight: 600;
-        border: 1px solid rgba(59, 130, 246, 0.3);
-    }
-    </style>
-    """
-    st.markdown(glass_css, unsafe_allow_html=True)
-    
-    # ==========================================
-    # 📰 渲染新聞列表 (最新時間在最上層)
-    # ==========================================
-    try:
-        sorted_news = sorted(news_data, key=lambda x: x.get("ts", ""), reverse=True)
-    except:
-        sorted_news = news_data
-
-    count = 0
-    for news in sorted_news:
-        title = news.get("title", "")
-        codes = news.get("codes", [])
-        
-        # 搜尋過濾
-        if search_query:
-            if search_query.lower() not in title.lower() and search_query not in codes:
-                continue 
-                
-        count += 1
-        if count > 50: 
-            break
-        
-        # 徹底移除「無特定標的」字眼，只有真有股票代號時才渲染標籤
-        codes_html = ""
-        if codes:
-            codes_html = "".join([f"<span class='code-tag'>{c}</span>" for c in codes])
-        
-        link = news.get('link', '#')
-        host = news.get('source_host', '未知')
-        
-        # 處理時間顯示格式
-        ts = news.get('ts', '')
-        if "T" in ts:
-            ts = ts.split("T")[0] + " " + ts.split("T")[1][:5]
-        
-        # 玻璃卡片輸出 (不包含任何情緒分數指標)
-        card_html = f"""
-        <div class="glass-card">
-            <a href="{link}" target="_blank" class="news-title">{title}</a>
-            <div class="news-info">
-                <span>來源: {host} &nbsp;|&nbsp; 時間: {ts}</span>
-                <div>{codes_html}</div>
-            </div>
-        </div>
-        """
-        st.markdown(card_html, unsafe_allow_html=True)
-
-# ========================================================== 
-# 🧠 背景快取引擎：負責去 GitHub 搬運多天份的資料，並暫存在記憶體中
-# (設定 ttl=600 代表每 10 分鐘才會真正重新下載一次，保證搜尋時網頁不卡頓)
+# 🧠 背景快取引擎：負責去 GitHub 搬運多天份的資料
 # ========================================================== 
 @st.cache_data(ttl=600, show_spinner=False)
 def fetch_historical_news(days_to_load=3):
     base_url = "https://raw.githubusercontent.com/voidful/tw_news_stocker/main/docs/data"
-    cache_buster = int(time.time() / 600) # 10分鐘變更一次快取戳記
+    cache_buster = int(time.time() / 600) 
     index_url = f"{base_url}/news_index.json?t={cache_buster}"
     
     all_news = []
     
     try:
-        # 1. 取得所有可用的日期目錄
         index_res = requests.get(index_url)
         index_res.raise_for_status()
         news_dates = index_res.json()
         
-        # 確保日期由新到舊排序
         news_dates.sort(reverse=True)
-        
-        # 2. 決定要抓幾天的資料
         target_dates = news_dates[:days_to_load]
         
-        # 3. 迴圈將這幾天的 JSON 全部下載並拼湊起來
         for date in target_dates:
             data_url = f"{base_url}/news/{date}.json?t={cache_buster}"
             res = requests.get(data_url)
@@ -560,35 +412,33 @@ def fetch_historical_news(days_to_load=3):
         return [], []
 
 # ========================================================== 
-# 📰 定義：市場消息主畫面分頁
+# 📰 定義：市場消息主畫面分頁 (極速分頁版)
 # ========================================================== 
 def show_news_page():
     st.title("📰 全域市場消息戰情室")
     
-    # 建立頂部控制面板
+    # 頂部控制面板 (預設選項加入了 90, 180, 365 天)
     col1, col2 = st.columns([1, 2])
     with col1:
-        # 讓你可以自由選擇要回溯幾天的新聞
-        days_option = st.selectbox("📅 載入歷史天數", [1, 7, 30, 120, 365], index=1)
+        days_option = st.selectbox("📅 載入歷史天數", [1, 3, 7, 14, 30, 90, 180, 365], index=2)
     with col2:
         search_query = st.text_input("🔍 搜尋標題、關鍵字或股票代號 (支援全域歷史搜尋)...")
         
     st.markdown("---")
     
     # 呼叫快取引擎取得資料
-    with st.spinner(f"正在從資料庫撈取近 {days_option} 天的新聞..."):
+    with st.spinner(f"正在從資料庫撈取近 {days_option} 天的新聞 (若選擇 365 天，首次載入約需 30 秒，請稍候)..."):
         news_data, loaded_dates = fetch_historical_news(days_option)
         
     if not news_data:
         st.error("無法取得新聞資料，請檢查網路連線。")
         return
 
-    # 顯示成功載入資訊
     date_range_str = f"{loaded_dates[-1]} ~ {loaded_dates[0]}" if len(loaded_dates) > 1 else loaded_dates[0]
-    st.success(f"成功載入 {len(loaded_dates)} 天的資料 ({date_range_str})，共計 {len(news_data)} 則新聞備用！")
+    st.success(f"🚀 成功載入 {len(loaded_dates)} 天的資料 ({date_range_str})，資料庫共備妥 {len(news_data)} 則新聞！")
     
     # ==========================================
-    # 🎨 注入 CSS 樣式：黑底玻璃質感卡片
+    # 🎨 注入 CSS 樣式
     # ==========================================
     glass_css = """
     <style>
@@ -641,22 +491,19 @@ def show_news_page():
     st.markdown(glass_css, unsafe_allow_html=True)
     
     # ==========================================
-    # 📰 渲染新聞列表 (全域過濾與排序)
+    # 🔍 步驟一：先執行全域過濾與排序 (不急著顯示)
     # ==========================================
-    # 確保所有合併進來的新聞，按照時間由新到舊嚴格排序
     try:
         sorted_news = sorted(news_data, key=lambda x: x.get("ts", ""), reverse=True)
     except:
         sorted_news = news_data
 
-    display_count = 0
-    max_display = 200 # 放寬顯示上限至 200 則
-    
+    # 把符合條件的新聞全部裝進 filtered_news 陣列中
+    filtered_news = []
     for news in sorted_news:
         title = news.get("title", "")
         codes = news.get("codes", [])
         
-        # 搜尋過濾邏輯 (支援大小寫與代號)
         if search_query:
             q = search_query.lower()
             match_title = q in title.lower()
@@ -664,11 +511,47 @@ def show_news_page():
             if not (match_title or match_code):
                 continue 
                 
-        display_count += 1
-        if display_count > max_display: 
-            break
+        filtered_news.append(news)
+
+    total_items = len(filtered_news)
+    
+    if total_items == 0:
+        st.warning(f"找不到包含「{search_query}」的新聞，建議增加上方的「載入歷史天數」再試一次！")
+        return
+
+    # ==========================================
+    # 📑 步驟二：分頁系統 (Pagination)
+    # ==========================================
+    ITEMS_PER_PAGE = 50 # 為了不卡頓，每頁嚴格限制顯示 50 則
+    total_pages = math.ceil(total_items / ITEMS_PER_PAGE) # 計算總共需要幾頁
+    
+    # 建立分頁控制器 UI
+    col_p1, col_p2, col_p3 = st.columns([1, 2, 1])
+    with col_p2:
+        current_page = st.number_input(
+            f"📄 選擇頁數 (共 {total_pages} 頁)", 
+            min_value=1, 
+            max_value=total_pages, 
+            value=1, 
+            step=1
+        )
         
-        # 處理股票標籤
+    # 顯示目前觀看的區間提示
+    start_item = (current_page - 1) * ITEMS_PER_PAGE + 1
+    end_item = min(current_page * ITEMS_PER_PAGE, total_items)
+    st.caption(f"<div style='text-align: center; color: #94A3B8; margin-bottom: 20px;'>共過濾出 {total_items} 則新聞，目前顯示第 {start_item} 到 {end_item} 則</div>", unsafe_allow_html=True)
+
+    # ==========================================
+    # 📰 步驟三：根據選擇的頁數，裁切陣列並渲染卡片
+    # ==========================================
+    start_idx = (current_page - 1) * ITEMS_PER_PAGE
+    end_idx = start_idx + ITEMS_PER_PAGE
+    display_news = filtered_news[start_idx:end_idx] # 只取出這一頁該顯示的 50 筆
+
+    for news in display_news:
+        title = news.get("title", "")
+        codes = news.get("codes", [])
+        
         codes_html = ""
         if codes:
             codes_html = "".join([f"<span class='code-tag'>{c}</span>" for c in codes])
@@ -676,12 +559,10 @@ def show_news_page():
         link = news.get('link', '#')
         host = news.get('source_host', '未知')
         
-        # 處理時間格式
         ts = news.get('ts', '')
         if "T" in ts:
             ts = ts.split("T")[0] + " " + ts.split("T")[1][:5]
         
-        # 玻璃卡片輸出
         card_html = f"""
         <div class="glass-card">
             <a href="{link}" target="_blank" class="news-title">{title}</a>
@@ -691,12 +572,7 @@ def show_news_page():
             </div>
         </div>
         """
-        st.markdown(card_html, unsafe_allow_html=True)
-        
-    if display_count == 0:
-        st.warning(f"找不到包含「{search_query}」的新聞，建議增加上方的「載入歷史天數」再試一次！")
-    elif display_count == max_display:
-        st.info(f"為了維持網頁流暢度，僅顯示最新符合條件的 {max_display} 則新聞。")        
+        st.markdown(card_html, unsafe_allow_html=True)        
 # ==========================================
 # 🚦 執行路由：判斷要顯示哪個畫面 (這裡才是讓畫面出現的關鍵)
 # ==========================================

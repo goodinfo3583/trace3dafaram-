@@ -28,7 +28,8 @@ print(">> [階段一] 執行證交所 API 擷取 (TWSE)...")
 TWSE_APIS = {
     "三大法人買賣超金額": f"https://www.twse.com.tw/rwd/zh/fund/BFI82U?date={today}&response=json",
     "鉅額交易": f"https://www.twse.com.tw/rwd/zh/block/BFIAUU?date={today}&selectType=S&response=json",
-    "大盤成交量":"https://www.twse.com.tw/zh/trading/historical/mi-index.html",
+    "大盤上市成交量":"https://www.twse.com.tw/zh/trading/historical/mi-index.html",
+    "大盤上櫃成交量":"https://www.tpex.org.tw/zh-tw/mainboard/trading/info/daily-indices.html",
 }
 
 for name, url in TWSE_APIS.items():
