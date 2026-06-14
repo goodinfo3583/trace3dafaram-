@@ -26,19 +26,23 @@ print(f"啟動爬蟲系統，目標日期：{today}\n" + "="*40)
 # ==========================================
 print(">> [階段一] 執行證交所與櫃買中心 API 擷取...")
 
-# 🔑 準備給櫃買中心的「民國日期」格式 (例如 20260614 -> 115/06/14)
+# 🔑 引入 urllib3 來關閉因跳過 SSL 驗證而產生的警告訊息
+import urllib3
+urllib3.disable_warnings(urllib3.exceptions.InsecureRequestWarning)
+
+# 準備給櫃買中心的「民國日期」格式 (例如 20260614 -> 115/06/14)
 roc_year = int(today[:4]) - 1911
 roc_date = f"{roc_year}/{today[4:6]}/{today[6:]}"
 
-# 🔑 拆分 API 字典：上市與上櫃的 JSON 格式不同，需分開處理！
+# 拆分 API 字典：上市與上櫃的 JSON 格式不同，需分開處理！
 TWSE_APIS = {
     "三大法人買賣超金額": f"https://www.twse.com.tw/rwd/zh/fund/BFI82U?date={today}&response=json",
     "鉅額交易": f"https://www.twse.com.tw/rwd/zh/block/BFIAUU?date={today}&selectType=S&response=json",
-    "大盤上市成交量": f"https://www.twse.com.tw/rwd/zh/afterTrading/FMTQIK?date={today}&response=json", # 後台 JSON API
+    "大盤上市成交量": f"https://www.twse.com.tw/rwd/zh/afterTrading/FMTQIK?date={today}&response=json", 
 }
 
 TPEX_APIS = {
-    "大盤上櫃成交量": f"https://www.tpex.org.tw/web/stock/aftertrading/daily_trading_index/st41_result.php?l=zh-tw&o=json&d={roc_date}", # 櫃買專屬 JSON API
+    "大盤上櫃成交量": f"https://www.tpex.org.tw/web/stock/aftertrading/daily_trading_index/st41_result.php?l=zh-tw&o=json&d={roc_date}", 
 }
 
 # --- 1. 處理 TWSE (上市) ---
@@ -46,8 +50,8 @@ for name, url in TWSE_APIS.items():
     file_path = os.path.join(SAVE_DIR, f"{today}-{name}.csv")
     print(f" └─ 📡 正在直連抓取: {name}...")
     try:
-        res = requests.get(url, headers={'User-Agent': 'Mozilla/5.0'}, timeout=10).json()
-        # TWSE 的成功判斷為 "stat": "OK"，資料在 "data"
+        # 💡 安全起見，上市也可以一併加上 verify=False
+        res = requests.get(url, headers={'User-Agent': 'Mozilla/5.0'}, timeout=10, verify=False).json()
         if res.get("stat") == "OK" and "data" in res:
             df = pd.DataFrame(res["data"], columns=res.get("fields", []))
             df.to_csv(file_path, index=False, encoding='utf-8-sig')
@@ -63,10 +67,9 @@ for name, url in TPEX_APIS.items():
     file_path = os.path.join(SAVE_DIR, f"{today}-{name}.csv")
     print(f" └─ 📡 正在直連抓取: {name}...")
     try:
-        res = requests.get(url, headers={'User-Agent': 'Mozilla/5.0'}, timeout=10).json()
-        # 櫃買的判斷條件不同，資料習慣放在 "aaData" 裡面
+        # 💡 關鍵修復：加上 verify=False 跳過櫃買中心的 SSL 憑證檢查
+        res = requests.get(url, headers={'User-Agent': 'Mozilla/5.0'}, timeout=10, verify=False).json()
         if "aaData" in res and len(res["aaData"]) > 0:
-            # 櫃買 API 不會好心回傳欄位名稱，我們得手動給予
             columns = ["日期", "成交千股", "成交金額(千元)", "成交筆數", "櫃買指數", "漲跌點數"]
             df = pd.DataFrame(res["aaData"], columns=columns)
             df.to_csv(file_path, index=False, encoding='utf-8-sig')
