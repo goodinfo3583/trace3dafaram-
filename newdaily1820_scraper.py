@@ -9,10 +9,6 @@ from selenium import webdriver
 from selenium.webdriver.chrome.options import Options
 from selenium.webdriver.common.by import By
 
-# 🔑 新增：用來關閉因為跳過 SSL 驗證而產生的紅色警告
-import urllib3
-urllib3.disable_warnings(urllib3.exceptions.InsecureRequestWarning)
-
 # ==========================================
 # 1. 基本設定區塊
 # ==========================================
@@ -26,59 +22,89 @@ taifex_date = datetime.now().strftime("%Y/%m/%d") # 期交所需要的日期格�
 print(f"啟動爬蟲系統，目標日期：{today}\n" + "="*40)
 
 # ==========================================
-# 🚀 階段一：TWSE 證交所 & TPEx 櫃買中心 API (極速版)
+# 🚀 階段一：TWSE 證交所 & TPEx 櫃買中心 API (精準狙擊版)
 # ==========================================
 print(">> [階段一] 執行證交所與櫃買中心 API 擷取...")
 
-# 🔑 準備給櫃買中心的「民國年月」格式 (例如 20260614 -> 115/06)
-roc_year = int(today[:4]) - 1911
-roc_month = f"{roc_year}/{today[4:6]}" 
+import urllib3
+urllib3.disable_warnings(urllib3.exceptions.InsecureRequestWarning)
 
-# 拆分 API 字典：上市與上櫃的 JSON 格式不同，需分開處理！
+# 為了防止被櫃買中心阻擋，給予完整的假瀏覽器頭
+headers = {'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36'}
+
+# 🎯 步驟 1：先透過上市大盤，找出「真正的最後交易日」
+print(f" └─ 🔍 正在向證交所校準「最新交易日」...")
+url_cal = f"https://www.twse.com.tw/rwd/zh/afterTrading/FMTQIK?date={today}&response=json"
+real_date_str = today # 預設為今天
+roc_month = f"{int(today[:4]) - 1911}/{today[4:6]}" # 預設民國年月
+res_cal_data = None 
+
+try:
+    res_cal = requests.get(url_cal, headers=headers, timeout=10, verify=False).json()
+    if res_cal.get("stat") == "OK" and "data" in res_cal and len(res_cal["data"]) > 0:
+        res_cal_data = res_cal # 先把資料存起來，等等直接用，省一次請求
+        
+        # 從最後一筆資料抓取日期 (例如 "115/06/12")
+        latest_roc_date = res_cal["data"][-1][0]
+        parts = latest_roc_date.split('/')
+        real_year = int(parts[0]) + 1911
+        
+        # 組裝成通關密碼
+        real_date_str = f"{real_year}{parts[1]}{parts[2]}" # 西元年月日 "20260612"
+        roc_month = f"{parts[0]}/{parts[1]}"               # 民國年月 "115/06" (專門給櫃買用)
+        print(f"    🎯 校準成功！避開假日，真實最後交易日為: {real_date_str}")
+except Exception as e:
+    print(f"    ⚠️ 校準失敗，將使用預設今日日期: {e}")
+
+
+# 🎯 步驟 2：拿著正確的日期 (real_date_str)，準備一擊必殺
 TWSE_APIS = {
-    "三大法人買賣超金額": f"https://www.twse.com.tw/rwd/zh/fund/BFI82U?date={today}&response=json",
-    "鉅額交易": f"https://www.twse.com.tw/rwd/zh/block/BFIAUU?date={today}&selectType=S&response=json",
-    "大盤上市成交量": f"https://www.twse.com.tw/rwd/zh/afterTrading/FMTQIK?date={today}&response=json", 
+    "大盤上市成交量": url_cal, # 網址一樣，但我們等等直接拿剛抓好的資料
+    "三大法人買賣超金額": f"https://www.twse.com.tw/rwd/zh/fund/BFI82U?date={real_date_str}&response=json",
+    "鉅額交易": f"https://www.twse.com.tw/rwd/zh/block/BFIAUU?date={real_date_str}&selectType=S&response=json",
 }
 
 TPEX_APIS = {
+    # 櫃買中心只吃「民國年月」最穩定，我們就給它 115/06
     "大盤上櫃成交量": f"https://www.tpex.org.tw/web/stock/aftertrading/daily_trading_index/st41_result.php?l=zh-tw&o=json&d={roc_month}", 
 }
 
-# --- 1. 處理 TWSE (上市) ---
+# --- 處理 TWSE (上市) ---
 for name, url in TWSE_APIS.items():
-    file_path = os.path.join(SAVE_DIR, f"{today}-{name}.csv")
+    file_path = os.path.join(SAVE_DIR, f"{real_date_str}-{name}.csv")
     print(f" └─ 📡 正在直連抓取: {name}...")
     try:
-        # 加上 verify=False 避免 SSL 阻擋
-        res = requests.get(url, headers={'User-Agent': 'Mozilla/5.0'}, timeout=10, verify=False).json()
-        if res.get("stat") == "OK" and "data" in res:
+        # 如果是大盤資料，剛剛校準時已經抓過了，直接轉換
+        if name == "大盤上市成交量" and res_cal_data:
+            res = res_cal_data
+        else:
+            res = requests.get(url, headers=headers, timeout=10, verify=False).json()
+            time.sleep(1.5) # 乖寶寶防封鎖延遲
+            
+        if res.get("stat") == "OK" and "data" in res and len(res["data"]) > 0:
             df = pd.DataFrame(res["data"], columns=res.get("fields", []))
             df.to_csv(file_path, index=False, encoding='utf-8-sig')
             print(f"    ✅ 成功存檔！共 {len(df)} 筆資料。")
         else:
-            print(f"    ❌ 伺服器回傳無資料 (可能尚未結算或假日)。")
+            print(f"    ❌ 伺服器回傳無資料。")
     except Exception as e:
         print(f"    ⚠️ 發生錯誤: {e}")
-    time.sleep(1)
 
-# --- 2. 處理 TPEx (上櫃) ---
+# --- 處理 TPEX (上櫃) ---
 for name, url in TPEX_APIS.items():
-    file_path = os.path.join(SAVE_DIR, f"{today}-{name}.csv")
+    file_path = os.path.join(SAVE_DIR, f"{real_date_str}-{name}.csv")
     print(f" └─ 📡 正在直連抓取: {name}...")
     try:
-        # 加上 verify=False 避免 SSL 阻擋
-        res = requests.get(url, headers={'User-Agent': 'Mozilla/5.0'}, timeout=10, verify=False).json()
+        res = requests.get(url, headers=headers, timeout=10, verify=False).json()
         if "aaData" in res and len(res["aaData"]) > 0:
             columns = ["日期", "成交千股", "成交金額(千元)", "成交筆數", "櫃買指數", "漲跌點數"]
             df = pd.DataFrame(res["aaData"], columns=columns)
             df.to_csv(file_path, index=False, encoding='utf-8-sig')
             print(f"    ✅ 成功存檔！共 {len(df)} 筆資料。")
         else:
-            print(f"    ❌ 伺服器回傳無資料 (可能尚未結算或假日)。")
+            print(f"    ❌ 伺服器回傳無資料。")
     except Exception as e:
         print(f"    ⚠️ 發生錯誤: {e}")
-    time.sleep(1)
 
 
 # ==========================================
@@ -90,7 +116,7 @@ headers = {'User-Agent': 'Mozilla/5.0'}
 # 1. 臺指選擇權PC比
 print(" └─ 📡 正在抓取: 臺指選擇權PC比...")
 try:
-    res = requests.post("https://www.taifex.com.tw/cht/3/pcRatio", data={"queryStartDate": taifex_date, "queryEndDate": taifex_date}, headers=headers, verify=False)
+    res = requests.post("https://www.taifex.com.tw/cht/3/pcRatio", data={"queryStartDate": taifex_date, "queryEndDate": taifex_date}, headers=headers)
     dfs = pd.read_html(StringIO(res.text))
     for df in dfs:
         if '買賣權未平倉量比率%' in df.columns or (isinstance(df.columns, pd.MultiIndex) and '買賣權未平倉量比率%' in [c[-1] for c in df.columns]):
@@ -104,7 +130,7 @@ except Exception as e: print(f"    ⚠️ 失敗: {e}")
 # 2. 三大法人期貨多空 (TX)
 print(" └─ 📡 正在抓取: 三大法人期貨多空單...")
 try:
-    res = requests.post("https://www.taifex.com.tw/cht/3/futContractsDate", data={"queryDate": taifex_date}, headers=headers, verify=False)
+    res = requests.post("https://www.taifex.com.tw/cht/3/futContractsDate", data={"queryDate": taifex_date}, headers=headers)
     dfs = pd.read_html(StringIO(res.text))
     for df in dfs:
         if isinstance(df.columns, pd.MultiIndex):
@@ -116,19 +142,21 @@ try:
             break
 except Exception as e: print(f"    ⚠️ 失敗: {e}")
 
-# 3. 臺指選擇權行情簡表
+# 3. 臺指選擇權行情簡表 (⭐ 終極暴力找表法 + 精準導彈版 ⭐)
 print(" └─ 📡 正在抓取: 臺指選擇權行情簡表...")
 try:
+    # 🔑 關鍵修復：補上 "commodity_id": "TXO"，明確告訴期交所我們要抓「臺指選擇權」！
     payload = {
         "queryDate": taifex_date, 
         "MarketCode": "0", 
         "commodity_id": "TXO" 
     }
-    res = requests.post("https://www.taifex.com.tw/cht/3/optDailyMarketReport", data=payload, headers=headers, verify=False)
+    res = requests.post("https://www.taifex.com.tw/cht/3/optDailyMarketReport", data=payload, headers=headers)
     
     from bs4 import BeautifulSoup
     soup = BeautifulSoup(res.text, 'html.parser')
     
+    # 暴力破解：找出網頁中所有的 table，只要裡面有「履約價」三個字，就是我們要的！
     tables = soup.find_all('table')
     target_table = None
     for tb in tables:
@@ -139,6 +167,7 @@ try:
     if target_table:
         df = pd.read_html(StringIO(target_table))[0]
         
+        # 🔑 智慧合併多層表頭 (過濾 Unnamed 與重複字眼)
         if isinstance(df.columns, pd.MultiIndex):
             new_cols = []
             for c in df.columns:
@@ -150,13 +179,14 @@ try:
                 new_cols.append("_".join(valid_parts))
             df.columns = new_cols
         
+        # 🔑 過濾掉網頁中的「小計」列，只保留真正的數字資料
         strike_col = next((col for col in df.columns if '履約價' in col), None)
         if strike_col:
             df[strike_col] = pd.to_numeric(df[strike_col], errors='coerce')
             df = df.dropna(subset=[strike_col])
             
         if not df.empty:
-            df.to_csv(os.path.join(SAVE_DIR, f"{today}-臺指選擇權行情簡表.csv"), index=False, encoding='utf-8-sig')
+            df.to_csv(os.path.join(SAVE_DIR, f"{today}臺指選擇權行情簡表.csv"), index=False, encoding='utf-8-sig')
             print(f"    ✅ 成功存檔！共抓取 {len(df)} 筆精準選擇權資料。")
         else:
             print(f"    ❌ 表格內容為空，可能今日尚未結算。")
@@ -222,7 +252,7 @@ driver.execute_cdp_cmd("Page.addScriptToEvaluateOnNewDocument", {
 print(f"開始執行 Goodinfo 下載任務，共計 {len(GOODINFO_TARGETS)} 個檔案。\n" + "-"*40)
 
 for index, (name_suffix, url) in enumerate(GOODINFO_TARGETS.items()):
-    file_name = f"{today}-{name_suffix}.csv"
+    file_name = f"{today}{name_suffix}.csv"
     file_path = os.path.join(SAVE_DIR, file_name)
     
     print(f"[{index+1}/{len(GOODINFO_TARGETS)}] 正在擷取: {file_name}")
