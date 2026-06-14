@@ -2,6 +2,7 @@ import streamlit as st
 import pandas as pd
 import numpy as np
 import os
+import base64
 import glob
 import re
 import datetime
@@ -24,7 +25,43 @@ DATA_DIR = "./Goodinfo_Rankings"
 SCORE_HISTORY_DIR = os.path.join(DATA_DIR, "ScoreHistory")
 MARKET_HISTORY_DIR = os.path.join(DATA_DIR, "MarketHistory")
 BLOCK_HISTORY_DIR = os.path.join(DATA_DIR, "BlockHistory")
+# ==========================================
+# 🌌 網站主視覺背景設定引擎
+# ==========================================
+def set_background(image_path):
+    try:
+        # 使用傳入的完整路徑來開啟圖片
+        with open(image_path, "rb") as file:
+            encoded_string = base64.b64encode(file.read()).decode()
+            
+        # 這裡的 rgba(15, 23, 42, 0.88) 是黑色遮罩的透明度 (0.88 = 88%黑)
+        # 如果覺得背景太明顯干擾文字，可以把 0.88 改成 0.92 或 0.95
+        css = f"""
+        <style>
+        .stApp {{
+            background-image: 
+                linear-gradient(rgba(15, 23, 42, 0.88), rgba(15, 23, 42, 0.88)), 
+                url(data:image/png;base64,{encoded_string});
+            background-size: cover;
+            background-position: center center;
+            background-attachment: fixed;
+        }}
+        
+        /* 讓區塊卡片帶有微微的透明玻璃質感 */
+        div[data-testid="stVerticalBlock"] > div[style*="border"] {{
+            background-color: rgba(15, 23, 42, 0.6) !important;
+            backdrop-filter: blur(4px); 
+        }}
+        </style>
+        """
+        st.markdown(css, unsafe_allow_html=True)
+    except FileNotFoundError:
+        st.warning(f"⚠️ 找不到背景圖片檔：{image_path}，請確認檔名與路徑是否完全正確。")
 
+# 👉 自動組合路徑：./Goodinfo_Rankings/派對盛宴邀請.png
+# (確保這段程式碼放在 DATA_DIR 宣告的下方)
+bg_path = os.path.join(DATA_DIR, "派對盛宴邀請.png")
+set_background(bg_path)
 # ==========================================
 # 🛑 隱形急救引擎 (請置於程式最頂端，絕對不要刪除！)
 # ==========================================
