@@ -382,20 +382,20 @@ top_pool_slot = st.container()
 # 👆👆👆 ========================================================== 👆👆👆
 import time  # 引入時間模組來做快取破壞器
 # ========================================================== 
-# 定義：市場消息分頁函數 (直連 GitHub Pages 實體伺服器版)
+# 定義：市場消息分頁函數 (直連原作者 voidful 最新數據版)
 # ========================================================== 
 def show_news_page():
     st.title("📰 市場消息")
     
+    # 建立時間戳記防快取
     cache_buster = int(time.time())
     
-    # 🌟 關鍵修正：不再去 main 分支的原始碼資料夾抓，而是直接去 GitHub Pages 網站抓
-    # 這是自動更新機器人真正存放最新 JSON 的地方
-    base_url = "https://goodinfo3583.github.io/tw_news_stocker_Dong/data"
+    # 🌟 關鍵路徑修正：直接鎖定原作者 voidful 正常運作的 main 分支路徑
+    base_url = "https://raw.githubusercontent.com/voidful/tw_news_stocker/main/docs/data"
     index_url = f"{base_url}/news_index.json?t={cache_buster}"
     
     try:
-        # 嘗試從正式網站讀取
+        # 1. 抓取原作者那邊最新的新聞日期目錄
         index_response = requests.get(index_url)
         index_response.raise_for_status()
         news_dates = index_response.json()
@@ -404,42 +404,27 @@ def show_news_page():
             st.warning("找不到新聞索引資料。")
             return
             
+        # 強制最新日期排在最前面
         news_dates.sort(reverse=True)
         latest_date = news_dates[0]
         
+        # 2. 抓取最新日期（例如 2026-06-14）的專屬新聞檔案
         data_url = f"{base_url}/news/{latest_date}.json?t={cache_buster}"
         response = requests.get(data_url)
         response.raise_for_status()
         news_data = response.json()
         
     except Exception as e:
-        # 如果正式網站抓不到，啟動備用方案：去隱藏的 gh-pages 分支抓
-        st.warning("嘗試從正式網站讀取失敗，正在切換至備用分支 (gh-pages) 讀取...")
-        backup_idx_url = f"https://raw.githubusercontent.com/goodinfo3583/tw_news_stocker_Dong/gh-pages/data/news_index.json?t={cache_buster}"
-        
-        try:
-            bk_idx_res = requests.get(backup_idx_url)
-            bk_idx_res.raise_for_status()
-            news_dates = bk_idx_res.json()
-            news_dates.sort(reverse=True)
-            latest_date = news_dates[0]
-            
-            bk_data_url = f"https://raw.githubusercontent.com/goodinfo3583/tw_news_stocker_Dong/gh-pages/data/news/{latest_date}.json?t={cache_buster}"
-            bk_res = requests.get(bk_data_url)
-            bk_res.raise_for_status()
-            news_data = bk_res.json()
-        except Exception as e2:
-            st.error("無法取得最新新聞！")
-            st.info("💡 終極解法：請確認你 fork 過來的專案中，GitHub Actions 自動排程是否有成功執行？如果你的 fork 沒有在更新，請將程式碼中的 `goodinfo3583` 替換為【原始作者的 GitHub 帳號】，直接去借用原作者網站的資料流！")
-            return
+        st.error(f"無法取得原作者的新聞資料，請檢查網路連線。錯誤訊息: {e}")
+        return
 
-    st.success(f"成功動態同步！目前載入 {latest_date} 的 {len(news_data)} 則最新新聞！")
+    st.success(f"🚀 成功對接原作者數據庫！目前已動態同步載入 {latest_date} 的 {len(news_data)} 則即時新聞！")
     
     search_query = st.text_input("🔍 搜尋標題或股票代號...")
     st.markdown("---")
     
     # ==========================================
-    # 🎨 注入 CSS 樣式：玻璃質感卡片
+    # 🎨 注入 CSS 樣式：黑底玻璃質感卡片
     # ==========================================
     glass_css = """
     <style>
@@ -459,7 +444,7 @@ def show_news_page():
         transform: translateY(-2px);
     }
     .news-title {
-        font-size: 16px; 
+        font-size: 16px; /* 標題文字縮小一半 */
         font-weight: 600;
         color: #F1F5F9;  
         text-decoration: none;
@@ -492,7 +477,7 @@ def show_news_page():
     st.markdown(glass_css, unsafe_allow_html=True)
     
     # ==========================================
-    # 📰 渲染新聞列表
+    # 📰 渲染新聞列表 (最新時間在最上層)
     # ==========================================
     try:
         sorted_news = sorted(news_data, key=lambda x: x.get("ts", ""), reverse=True)
@@ -504,6 +489,7 @@ def show_news_page():
         title = news.get("title", "")
         codes = news.get("codes", [])
         
+        # 搜尋過濾
         if search_query:
             if search_query.lower() not in title.lower() and search_query not in codes:
                 continue 
@@ -512,6 +498,7 @@ def show_news_page():
         if count > 50: 
             break
         
+        # 徹底移除「無特定標的」字眼，只有真有股票代號時才渲染標籤
         codes_html = ""
         if codes:
             codes_html = "".join([f"<span class='code-tag'>{c}</span>" for c in codes])
@@ -519,10 +506,12 @@ def show_news_page():
         link = news.get('link', '#')
         host = news.get('source_host', '未知')
         
+        # 處理時間顯示格式
         ts = news.get('ts', '')
         if "T" in ts:
             ts = ts.split("T")[0] + " " + ts.split("T")[1][:5]
         
+        # 玻璃卡片輸出 (不包含任何情緒分數指標)
         card_html = f"""
         <div class="glass-card">
             <a href="{link}" target="_blank" class="news-title">{title}</a>
