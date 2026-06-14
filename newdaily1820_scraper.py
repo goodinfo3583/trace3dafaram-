@@ -29,44 +29,44 @@ print(">> [階段一] 執行證交所與櫃買中心 API 擷取...")
 import urllib3
 urllib3.disable_warnings(urllib3.exceptions.InsecureRequestWarning)
 
-# 為了防止被櫃買中心阻擋，給予完整的假瀏覽器頭
-headers = {'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36'}
+# 加強防封鎖：加上完整的 User-Agent 與 Referer 偽裝
+headers = {
+    'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/125.0.0.0 Safari/537.36',
+    'Referer': 'https://www.tpex.org.tw/',
+    'X-Requested-With': 'XMLHttpRequest'
+}
 
 # 🎯 步驟 1：先透過上市大盤，找出「真正的最後交易日」
 print(f" └─ 🔍 正在向證交所校準「最新交易日」...")
 url_cal = f"https://www.twse.com.tw/rwd/zh/afterTrading/FMTQIK?date={today}&response=json"
 real_date_str = today # 預設為今天
-roc_month = f"{int(today[:4]) - 1911}/{today[4:6]}" # 預設民國年月
+roc_full_date = f"{int(today[:4]) - 1911}/{today[4:6]}/{today[6:]}" # 預設如 115/06/14
+roc_month = f"{int(today[:4]) - 1911}/{today[4:6]}" # 預設如 115/06
 res_cal_data = None 
 
 try:
     res_cal = requests.get(url_cal, headers=headers, timeout=10, verify=False).json()
     if res_cal.get("stat") == "OK" and "data" in res_cal and len(res_cal["data"]) > 0:
-        res_cal_data = res_cal # 先把資料存起來，等等直接用，省一次請求
+        res_cal_data = res_cal # 暫存資料，等等直接存檔用
         
-        # 從最後一筆資料抓取日期 (例如 "115/06/12")
+        # 🔑 從上市資料最後一筆取出真實的最後交易日 (例如 "115/06/12")
         latest_roc_date = res_cal["data"][-1][0]
         parts = latest_roc_date.split('/')
         real_year = int(parts[0]) + 1911
         
-        # 組裝成通關密碼
-        real_date_str = f"{real_year}{parts[1]}{parts[2]}" # 西元年月日 "20260612"
-        roc_month = f"{parts[0]}/{parts[1]}"               # 民國年月 "115/06" (專門給櫃買用)
-        print(f"    🎯 校準成功！避開假日，真實最後交易日為: {real_date_str}")
+        # 完美同步三種日期格式
+        real_date_str = f"{real_year}{parts[1].zfill(2)}{parts[2].zfill(2)}" # 給檔名與 TWSE 用的西元格式 (20260612)
+        roc_full_date = latest_roc_date                                      # 給 TPEx 用的完整民國格式 (115/06/12)
+        roc_month = f"{parts[0]}/{parts[1].zfill(2)}"                        # 給 TPEx 用的民國年月格式 (115/06)
+        print(f"    🎯 校準成功！真實最新交易日為: {real_date_str}")
 except Exception as e:
-    print(f"    ⚠️ 校準失敗，將使用預設今日日期: {e}")
+    print(f"    ⚠️ 校準失敗，將使用系統今日日期: {e}")
 
-
-# 🎯 步驟 2：拿著正確的日期 (real_date_str)，準備一擊必殺
+# 🎯 步驟 2：拿著確認有交易的日期 (real_date_str)，準備精準抓取
 TWSE_APIS = {
-    "大盤上市成交量": url_cal, # 網址一樣，但我們等等直接拿剛抓好的資料
+    "大盤上市成交量": url_cal,
     "三大法人買賣超金額": f"https://www.twse.com.tw/rwd/zh/fund/BFI82U?date={real_date_str}&response=json",
     "鉅額交易": f"https://www.twse.com.tw/rwd/zh/block/BFIAUU?date={real_date_str}&selectType=S&response=json",
-}
-
-TPEX_APIS = {
-    # 櫃買中心只吃「民國年月」最穩定，我們就給它 115/06
-    "大盤上櫃成交量": f"https://www.tpex.org.tw/web/stock/aftertrading/daily_trading_index/st41_result.php?l=zh-tw&o=json&d={roc_month}", 
 }
 
 # --- 處理 TWSE (上市) ---
@@ -74,12 +74,11 @@ for name, url in TWSE_APIS.items():
     file_path = os.path.join(SAVE_DIR, f"{real_date_str}-{name}.csv")
     print(f" └─ 📡 正在直連抓取: {name}...")
     try:
-        # 如果是大盤資料，剛剛校準時已經抓過了，直接轉換
         if name == "大盤上市成交量" and res_cal_data:
-            res = res_cal_data
+            res = res_cal_data # 直接利用校準時抓到的資料，少發送一次請求
         else:
+            time.sleep(1.5) # 防封鎖延遲
             res = requests.get(url, headers=headers, timeout=10, verify=False).json()
-            time.sleep(1.5) # 乖寶寶防封鎖延遲
             
         if res.get("stat") == "OK" and "data" in res and len(res["data"]) > 0:
             df = pd.DataFrame(res["data"], columns=res.get("fields", []))
@@ -91,9 +90,20 @@ for name, url in TWSE_APIS.items():
         print(f"    ⚠️ 發生錯誤: {e}")
 
 # --- 處理 TPEX (上櫃) ---
-for name, url in TPEX_APIS.items():
-    file_path = os.path.join(SAVE_DIR, f"{real_date_str}-{name}.csv")
-    print(f" └─ 📡 正在直連抓取: {name}...")
+name = "大盤上櫃成交量"
+file_path = os.path.join(SAVE_DIR, f"{real_date_str}-{name}.csv")
+print(f" └─ 📡 正在直連抓取: {name}...")
+
+# 💡 終極對策：因為櫃買中心的 API 非常敏感且常改版，我們準備三個不同參數的網址輪流撞擊
+tpex_urls = [
+    f"https://www.tpex.org.tw/web/stock/aftertrading/daily_trading_index/st41_result.php?l=zh-tw&o=json&d={roc_full_date}", # 完整民國年月日
+    f"https://www.tpex.org.tw/web/stock/aftertrading/daily_trading_index/st41_result.php?l=zh-tw&o=json&d={roc_month}",     # 民國年月
+    f"https://www.tpex.org.tw/web/stock/aftertrading/daily_trading_index/st41_result.php?l=zh-tw&o=json&d={real_date_str}"  # 西元年月日
+]
+
+tpex_success = False
+for url in tpex_urls:
+    time.sleep(1.5) # 存取前先休息，避免被櫃買中心當成惡意攻擊
     try:
         res = requests.get(url, headers=headers, timeout=10, verify=False).json()
         if "aaData" in res and len(res["aaData"]) > 0:
@@ -101,12 +111,13 @@ for name, url in TPEX_APIS.items():
             df = pd.DataFrame(res["aaData"], columns=columns)
             df.to_csv(file_path, index=False, encoding='utf-8-sig')
             print(f"    ✅ 成功存檔！共 {len(df)} 筆資料。")
-        else:
-            print(f"    ❌ 伺服器回傳無資料。")
-    except Exception as e:
-        print(f"    ⚠️ 發生錯誤: {e}")
+            tpex_success = True
+            break
+    except Exception:
+        pass # 報錯就默默吞下，換下一個網址繼續試
 
-
+if not tpex_success:
+    print(f"    ❌ 伺服器回傳無資料 (櫃買中心 API 防護較嚴，可能暫時阻擋連線)。")
 # ==========================================
 # 🚀 階段二：TAIFEX 期交所 HTML 扒表術
 # ==========================================
