@@ -327,7 +327,7 @@ st.markdown("""
 /* 強制釘在瀏覽器最頂端的外框 */
 .sticky-header-wrapper {
     position: fixed; top: 0; left: 0; width: 100%; z-index: 999999;
-    box-shadow: 0px 4px 20px rgba(0, 0, 0, 0.6); background-color: #0A0D14;
+    box-shadow: 0px 4px 20px rgba(0, 0, 0, 0); background-color: #0A0D14;
 }
 .disclaimer-bar { display: flex; background-color: #111622; padding: 0px 15px; border-bottom: 1px dashed #1E293B; }
 .disclaimer-item { position: relative; padding: 6px 15px; cursor: help; }
