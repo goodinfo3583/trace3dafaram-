@@ -313,11 +313,11 @@ st.markdown(
     """,
     unsafe_allow_html=True
 )
-
 # ==========================================
 # 🚦 網頁路由控制中心 (極速切換引擎)
 # ==========================================
-current_page = st.query_params.get("page", "all")
+# 【修改 1】：把預設值改成 "news"，這樣一進網站就會是最新消息！
+current_page = st.query_params.get("page", "news")
 
 # ==========================================
 # 📍 頂部：戰情室快速導航 (已移除載入全數據，保持純淨)
@@ -358,23 +358,40 @@ st.markdown("""
 }
 .stApp { margin-top: 90px; }
 </style>
-<div class="sticky-header-wrapper"><div class="disclaimer-bar"><div class="disclaimer-item"><span class="disclaimer-title">使用聲明</span><div class="disclaimer-content">本平台僅供教育研究與籌碼觀察，絕不構成任何實質投資建議、勸誘或要約。所有資料源自公開數據，受限於網路技術，可能有延遲或錯誤。<br><br>投資必有風險，依本平台資訊所做之任何決策與損益，均須由使用者自行負責，本平台不負擔任何法律賠償責任。</div></div><div class="disclaimer-item"><span class="disclaimer-title">隱私權政策</span><div class="disclaimer-content"><b>1. 蒐集目的與範圍：</b><br>本平台依個資法蒐集您的識別資料僅供維持系統安全與優化服務使用。<br><b>2. 資料利用：</b><br>您的資料絕不向第三方洩露。<br><b>3. 資料刪除：</b><br>您可透過「聯絡我們」請求刪除資料。<br><b>4. 政策修訂：</b><br>本站保留修改政策之權利，繼續使用即視為同意。</div></div><div class="disclaimer-item"><a href="?page=contact" target="_self" class="disclaimer-title" style="cursor: pointer;">聯絡我們</a></div></div><div class="nav-btn-container"><a href="?page=pool" target="_self" class="nav-text-link">🏆 觀察名單</a><span class="nav-divider">|</span><a href="?page=b1" target="_self" class="nav-text-link">👑 法人持股</a><span class="nav-divider">|</span><a href="?page=b2" target="_self" class="nav-text-link">🎯 買超佔比</a><span class="nav-divider">|</span><a href="?page=b3" target="_self" class="nav-text-link">📅 法人連買</a><span class="nav-divider">|</span><a href="?page=b4" target="_self" class="nav-text-link">🔄 資券軋空</a><span class="nav-divider">|</span><a href="?page=b5" target="_self" class="nav-text-link">💰 大腿動向</a><span class="nav-divider">|</span><a href="?page=b6" target="_self" class="nav-text-link">💸 鉅額交易</a></div></div>
+<div class="sticky-header-wrapper">
+    <div class="disclaimer-bar">
+        <div class="disclaimer-item"><span class="disclaimer-title">使用聲明</span><div class="disclaimer-content">本平台僅供教育研究與籌碼觀察，絕不構成任何實質投資建議、勸誘或要約。所有資料源自公開數據，受限於網路技術，可能有延遲或錯誤。<br><br>投資必有風險，依本平台資訊所做之任何決策與損益，均須由使用者自行負責，本平台不負擔任何法律賠償責任。</div></div>
+        <div class="disclaimer-item"><span class="disclaimer-title">隱私權政策</span><div class="disclaimer-content"><b>1. 蒐集目的與範圍：</b><br>本平台依個資法蒐集您的識別資料僅供維持系統安全與優化服務使用。<br><b>2. 資料利用：</b><br>您的資料絕不向第三方洩露。<br><b>3. 資料刪除：</b><br>您可透過「聯絡我們」請求刪除資料。<br><b>4. 政策修訂：</b><br>本站保留修改政策之權利，繼續使用即視為同意。</div></div>
+        <div class="disclaimer-item"><a href="?page=contact" target="_self" class="disclaimer-title" style="cursor: pointer;">聯絡我們</a></div>
+    </div>
+    <div class="nav-btn-container">
+        <a href="?page=news" target="_self" class="nav-text-link">📰 市場消息</a><span class="nav-divider">|</span>
+        <a href="?page=pool" target="_self" class="nav-text-link">🏆 觀察名單</a><span class="nav-divider">|</span>
+        <a href="?page=b1" target="_self" class="nav-text-link">👑 法人持股</a><span class="nav-divider">|</span>
+        <a href="?page=b2" target="_self" class="nav-text-link">🎯 買超佔比</a><span class="nav-divider">|</span>
+        <a href="?page=b3" target="_self" class="nav-text-link">📅 法人連買</a><span class="nav-divider">|</span>
+        <a href="?page=b4" target="_self" class="nav-text-link">🔄 資券軋空</a><span class="nav-divider">|</span>
+        <a href="?page=b5" target="_self" class="nav-text-link">💰 大腿動向</a><span class="nav-divider">|</span>
+        <a href="?page=b6" target="_self" class="nav-text-link">💸 鉅額交易</a>
+    </div>
+</div>
 """, unsafe_allow_html=True)
 
 # 👇👇👇 魔法傳送門接收點 (必須在導航列下方，完全靠左不縮排) 👇👇👇
 top_pool_slot = st.container()
 # 👆👆👆 ========================================================== 👆👆👆
+
+# ========================================================== 
+# 定義：市場消息分頁函數
+# ========================================================== 
 def show_news_page():
-    st.title("市場消息")
+    st.title("📰 市場消息")
     
-    # 1. 透過 GitHub Raw URL 抓取你另一個 Repo 的資料
-    # 請確保 tw_news_stocker_Dong 這個 Repo 是 Public 的
     url = "https://raw.githubusercontent.com/goodinfo3583/tw_news_stocker_Dong/main/docs/data/today.json"
     
     try:
-        # 使用 Python 的 requests 去下載 JSON
         response = requests.get(url)
-        response.raise_for_status() # 檢查連線是否成功
+        response.raise_for_status() 
         news_data = response.json()
     except Exception as e:
         st.error(f"無法取得新聞資料，請檢查網址或權限。錯誤訊息: {e}")
@@ -382,49 +399,40 @@ def show_news_page():
 
     st.success(f"成功載入 {len(news_data)} 則今日新聞！")
     
-    # 加入簡單的搜尋功能 (模仿原本 JS 的功能)
     search_query = st.text_input("🔍 搜尋標題或股票代號...")
-    
     st.markdown("---")
     
-    # 2. 用 Streamlit 的排版引擎把新聞列出來
     count = 0
     for news in news_data:
-        # 搜尋過濾邏輯
         title = news.get("title", "")
         codes = news.get("codes", [])
         if search_query:
             if search_query.lower() not in title.lower() and search_query not in codes:
-                continue # 如果不符合搜尋條件，就跳過這筆
+                continue 
                 
         count += 1
-        if count > 50: # 避免網頁卡頓，預設最多顯示 50 筆
+        if count > 50: 
             break
             
-        # 決定情緒分數的顏色
         score = news.get("sent_score", 0)
         if score > 0:
-            score_color = "#059669" # 綠色 (正向)
+            score_color = "#059669" 
             bg_color = "#d1fae5"
         elif score < 0:
-            score_color = "#dc2626" # 紅色 (負向)
+            score_color = "#dc2626" 
             bg_color = "#fee2e2"
         else:
-            score_color = "#4b5563" # 灰色 (中性)
+            score_color = "#4b5563" 
             bg_color = "#f3f4f6"
             
-        # 格式化標籤
         codes_str = " ".join([f"`{c}`" for c in codes]) if codes else "無特定標的"
         
-        # 使用 st.container() 創造卡片感
         with st.container():
             col1, col2 = st.columns([4, 1])
             with col1:
-                # 新聞標題附帶超連結
                 st.markdown(f"#### [{title}]({news.get('link', '#')})")
                 st.caption(f"來源: {news.get('source_host', '未知')} | 時間: {news.get('ts', '')[:16].replace('T', ' ')}")
             with col2:
-                # 顯示情緒分數和股票代號
                 st.markdown(
                     f"<div style='background-color:{bg_color}; color:{score_color}; padding:5px 10px; border-radius:15px; text-align:center; font-weight:bold; margin-bottom:5px;'>"
                     f"情緒分數: {score}"
@@ -435,14 +443,12 @@ def show_news_page():
         st.divider()
 
 # ==========================================
-# 接下來在你的主程式路由中呼叫這個函數
-# 例如：
-# if menu_selection == "最新消息":
-#     show_news_page()
+# 🚦 執行路由：判斷要顯示哪個畫面 (這裡才是讓畫面出現的關鍵)
 # ==========================================
-
-
-
+if current_page == "news":
+    # 【修改 3】：如果使用者點擊了新聞按鈕，或者剛進站 (預設為news)，就執行這個函數
+    show_news_page()
+    
 
 # ==========================================
 # 🌟 觀察名單專屬工具函數區 (補回遺失的計分工具)
