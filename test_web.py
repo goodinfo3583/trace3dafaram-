@@ -381,14 +381,19 @@ st.markdown("""
 top_pool_slot = st.container()
 # 👆👆👆 ========================================================== 👆👆👆
 
+import time  # 引入時間模組來做快取破壞器
+
 # ========================================================== 
-# 定義：市場消息分頁函數
+# 定義：市場消息分頁函數 (強效防止快取更新版)
 # ========================================================== 
 def show_news_page():
     st.title("📰 市場消息")
     
-    # 1. 改為先抓取 news_index.json 取得「最新有更新的日期」
-    index_url = "https://raw.githubusercontent.com/goodinfo3583/tw_news_stocker_Dong/main/docs/data/news_index.json"
+    # 建立一個時間戳記，確保每次連線都是獨立的，強制 GitHub 吐出最新資料
+    cache_buster = int(time.time())
+    
+    # 1. 抓取新聞索引目錄
+    index_url = f"https://raw.githubusercontent.com/goodinfo3583/tw_news_stocker_Dong/main/docs/data/news_index.json?t={cache_buster}"
     
     try:
         # 取得日期清單
@@ -400,11 +405,12 @@ def show_news_page():
             st.warning("找不到新聞索引資料。")
             return
             
-        # news_dates 預設是降冪排列，第一個 [0] 就是最新的一天 (例如 '2026-06-14')
+        # 保險起見，強制將日期由新到舊重新排序一次
+        news_dates.sort(reverse=True)
         latest_date = news_dates[0]
         
-        # 2. 根據最新日期，去抓取該日的專屬新聞檔案 (解決 today.json 未更新的問題)
-        data_url = f"https://raw.githubusercontent.com/goodinfo3583/tw_news_stocker_Dong/main/docs/data/news/{latest_date}.json"
+        # 2. 根據最新日期，精準抓取該日的新聞檔案 (同樣加上快取破壞器)
+        data_url = f"https://raw.githubusercontent.com/goodinfo3583/tw_news_stocker_Dong/main/docs/data/news/{latest_date}.json?t={cache_buster}"
         response = requests.get(data_url)
         response.raise_for_status()
         news_data = response.json()
@@ -413,7 +419,7 @@ def show_news_page():
         st.error(f"無法取得新聞資料，請檢查網址或權限。錯誤訊息: {e}")
         return
 
-    st.success(f"成功載入 {latest_date} 的 {len(news_data)} 則新聞！")
+    st.success(f"成功動態同步！目前載入 {latest_date} 的 {len(news_data)} 則最新新聞！")
     
     search_query = st.text_input("🔍 搜尋標題或股票代號...")
     st.markdown("---")
@@ -424,31 +430,31 @@ def show_news_page():
     glass_css = """
     <style>
     .glass-card {
-        background: rgba(255, 255, 255, 0.04); /* 非常輕微的白底透明度，營造玻璃感 */
-        backdrop-filter: blur(8px);          /* 背景模糊 */
-        -webkit-backdrop-filter: blur(8px);
-        border: 1px solid rgba(255, 255, 255, 0.08); /* 淡淡的邊框 */
-        border-radius: 12px;                  /* 圓角 */
+        background: rgba(255, 255, 255, 0.05); /* 輕微的透明度白底 */
+        backdrop-filter: blur(10px);          /* 玻璃模糊效果 */
+        -webkit-backdrop-filter: blur(10px);
+        border: 1px solid rgba(255, 255, 255, 0.08); /* 細緻的邊框線 */
+        border-radius: 12px;
         padding: 16px 20px;
         margin-bottom: 12px;
-        box-shadow: 0 4px 10px rgba(0, 0, 0, 0.15);
+        box-shadow: 0 4px 15px rgba(0, 0, 0, 0.2);   /* 立體陰影 */
         transition: all 0.2s ease-in-out;
     }
     .glass-card:hover {
-        background: rgba(255, 255, 255, 0.08);
+        background: rgba(255, 255, 255, 0.09);     /* 滑鼠移上去稍微變亮 */
         transform: translateY(-2px);
     }
     .news-title {
-        font-size: 16px; /* 字體大幅縮小 (原本約 24px~32px) */
+        font-size: 16px; /* 標題文字縮小一半 */
         font-weight: 600;
-        color: #E2E8F0;  /* 乾淨的亮灰色 */
+        color: #F1F5F9;  /* 亮色系文字，適合深色背景 */
         text-decoration: none;
         line-height: 1.4;
         display: block;
         margin-bottom: 8px;
     }
     .news-title:hover {
-        color: #60A5FA;  /* 游標移上去變淺藍色 */
+        color: #3B82F6;  /* 懸停時變藍色超連結 */
     }
     .news-info {
         font-size: 13px;
@@ -458,23 +464,30 @@ def show_news_page():
         align-items: center;
     }
     .code-tag {
-        background: rgba(96, 165, 250, 0.15); /* 淡淡的藍底 */
-        color: #93C5FD;
+        background: rgba(59, 130, 246, 0.15); /* 股票標籤外框 */
+        color: #60A5FA;
         padding: 3px 8px;
         border-radius: 6px;
         font-size: 12px;
         margin-left: 5px;
-        font-weight: 500;
+        font-weight: 600;
+        border: 1px solid rgba(59, 130, 246, 0.3);
     }
     </style>
     """
     st.markdown(glass_css, unsafe_allow_html=True)
     
     # ==========================================
-    # 📰 渲染新聞列表
+    # 📰 渲染新聞列表 (依照時間由新到舊降冪排序)
     # ==========================================
+    try:
+        # 將今日新聞按照時間 (ts) 由新到舊排序
+        sorted_news = sorted(news_data, key=lambda x: x.get("ts", ""), reverse=True)
+    except:
+        sorted_news = news_data
+
     count = 0
-    for news in news_data:
+    for news in sorted_news:
         title = news.get("title", "")
         codes = news.get("codes", [])
         
@@ -487,17 +500,21 @@ def show_news_page():
         if count > 50: 
             break
         
-        # 處理股票標籤：刪除"無特定標的"，只有當 codes 裡面有代號時，才生成標籤 HTML
+        # 處理股票標籤：徹底拔除「無特定標的」字眼，只有當確實有代號時才渲染
         codes_html = ""
         if codes:
             codes_html = "".join([f"<span class='code-tag'>{c}</span>" for c in codes])
         
-        # 組合卡片內的參數
+        # 擷取基礎資料 (已徹底移除情緒分數欄位)
         link = news.get('link', '#')
         host = news.get('source_host', '未知')
-        ts = news.get('ts', '')[:16].replace('T', ' ')
         
-        # 將卡片輸出至畫面 (刪除了右側原本顯示情緒分數的邏輯，全面改用 CSS HTML 渲染)
+        # 格式化時間顯示
+        ts = news.get('ts', '')
+        if "T" in ts:
+            ts = ts.split("T")[0] + " " + ts.split("T")[1][:5]
+        
+        # 玻璃卡片 HTML 結構輸出
         card_html = f"""
         <div class="glass-card">
             <a href="{link}" target="_blank" class="news-title">{title}</a>
