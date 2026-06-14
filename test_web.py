@@ -366,7 +366,7 @@ st.markdown("""
     </div>
     <div class="nav-btn-container">
         <a href="?page=news" target="_self" class="nav-text-link">☕ 市場消息</a><span class="nav-divider">|</span>
-        <a href="?page=pool" target="_self" class="nav-text-link">🏆 觀察名單</a><span class="nav-divider">|</span>
+        <a href="?page=pool" target="_self" class="nav-text-link">⛲ 觀察名單</a><span class="nav-divider">|</span>
         <a href="?page=b1" target="_self" class="nav-text-link">👑 法人持股</a><span class="nav-divider">|</span>
         <a href="?page=b2" target="_self" class="nav-text-link">🎯 買超佔比</a><span class="nav-divider">|</span>
         <a href="?page=b3" target="_self" class="nav-text-link">📅 法人連買</a><span class="nav-divider">|</span>
@@ -380,7 +380,7 @@ st.markdown("""
 # 👇👇👇 魔法傳送門接收點 (必須在導航列下方，完全靠左不縮排) 👇👇👇
 top_pool_slot = st.container()
 # 👆👆👆 ========================================================== 👆👆👆
-import time  # 引入時間模組來做快取破壞器
+import time  # 引入時間模組來做快取破壞器開始市場消息
 # ========================================================== 
 # 🧠 背景快取引擎：負責去 GitHub 搬運多天份的資料
 # ========================================================== 
@@ -420,7 +420,7 @@ def show_news_page():
     # 頂部控制面板 (預設選項加入了 90, 180, 365 天)
     col1, col2 = st.columns([1, 2])
     with col1:
-        days_option = st.selectbox("載入歷史天數", [1, 3, 7, 14, 30, 90, 180, 365], index=2)
+        days_option = st.selectbox("載入歷史天數", [1, 3, 7, 14, 30, 90, 180, 365], index=0)
     with col2:
         search_query = st.text_input("🔍 搜尋標題、關鍵字或股票代號...")
         
@@ -459,15 +459,15 @@ def show_news_page():
     }
     .news-title {
         font-size: 16px; 
-        font-weight: 600;
-        color: #F1F5F9;  
+        font-weight: 400;
+        color: #E0E0E0;  
         text-decoration: none;
         line-height: 1.4;
         display: block;
         margin-bottom: 8px;
     }
     .news-title:hover {
-        color: #3B82F6;  
+        color: 	#FFE153;  
     }
     .news-info {
         font-size: 13px;
@@ -4172,7 +4172,7 @@ if current_page in ["all", "pool"]:
                     border-top: 1px solid #38bdf8; border-bottom: 1px solid #38bdf8; padding: 15px 20px; border-radius: 10px;
                     text-align: center; box-shadow: 0px 0px 20px rgba(56, 189, 248, 0.2); margin-bottom: 20px;">
             <h2 style="color: #e0f2fe; margin: 0; letter-spacing: 2px; text-shadow: 0 0 15px rgba(56, 189, 248, 0.8);">
-                🏆 數據分析觀察名單
+                ⛲ 觀察名單
             </h2>
             <div style='font-size:13px; color:#00D2FF; font-weight:500; margin-top:8px;'>
                  基準日 : 📍區塊1(法人): {fmt_d(d_b1_inst)} ｜ 📍區塊2&3(籌碼): {fmt_d(d_b23_chip)} ｜ 📍區塊4(資券): {fmt_d(d_b4_margin)} ｜ 📍區塊5(大戶): {fmt_d(d_b5_share)}
