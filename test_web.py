@@ -126,7 +126,7 @@ def get_image_base64(image_path):
 # 2. 圖片檔名列表與資料夾設定
 # 🚨 剛剛您把圖片放進了 static 資料夾，所以這裡路徑指向 static
 image_folder = "static" 
-image_files = ["跑馬燈1.PNG", "跑馬燈2.PNG", "跑馬燈3.PNG"]
+image_files = ["跑馬燈1.PNG", "跑馬燈2.PNG", "跑馬燈3.PNG", "花朵的樣子.gif"]
 
 # 3. 生成圖片標籤的 HTML (改成輪播專用格式)
 image_tags = ""
