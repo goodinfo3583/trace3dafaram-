@@ -140,7 +140,7 @@ for i, img_name in enumerate(image_files):
     else:
         st.error(f"系統找不到這張圖片：{img_path}")
 
-# 4. 輪播圖 (Slideshow) HTML/CSS (4張圖專用優化版)
+# 4. 輪播圖 (Slideshow) HTML/CSS (5張圖專用優化版)
 marquee_code = f"""
 <style>
     .slideshow-container {{
@@ -161,7 +161,7 @@ marquee_code = f"""
         object-fit: contain;
         visibility: hidden; 
         opacity: 0;
-        animation: fade 20s infinite; /* 💡 4張圖 × 5秒 = 總共 20 秒 */
+        animation: fade 25s infinite; /* 💡 5張圖 × 5秒 = 總共 25 秒 */
     }}
 
     /* 💡 精確分配每張圖的出場時間，每 5 秒交棒一次 */
