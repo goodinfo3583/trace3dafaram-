@@ -128,48 +128,65 @@ def get_image_base64(image_path):
 image_folder = "static" 
 image_files = ["跑馬燈1.PNG", "跑馬燈2.PNG", "跑馬燈3.PNG"]
 
-# 3. 生成圖片標籤的 HTML
+# 3. 生成圖片標籤的 HTML (改成輪播專用格式)
 image_tags = ""
-for img_name in image_files:
-    # 組合出檔案的真實路徑 (例如：static/跑馬燈1.PNG)
+for i, img_name in enumerate(image_files):
     img_path = os.path.join(image_folder, img_name)
-    
     if os.path.exists(img_path):
-        # 如果 Python 有找到這個檔案，就轉成 Base64 塞入網頁
         b64 = get_image_base64(img_path)
-        image_tags += f'<img src="{b64}" style="height: 50px; margin: 0 20px;">'
+        # 給每張圖片加上獨立的 class (slide-0, slide-1, slide-2)，用來控制出場順序
+        image_tags += f'<img class="slide slide-{i}" src="{b64}">'
     else:
-        # 🐛 除錯小幫手：如果真的連 Python 都看不到檔案，它會在網頁最上面印出警告
-        st.error(f"系統找不到這張圖片：{img_path}，請檢查檔名或大小寫！")
+        st.error(f"系統找不到這張圖片：{img_path}")
 
-# 4. 跑馬燈 HTML/CSS
-marquee_code = f"""
+# 4. 輪播圖 (Slideshow) HTML/CSS
+# 設定：總共 3 張圖，每張圖分配 5 秒，總共一輪 15 秒
+slideshow_code = f"""
 <style>
-    .marquee {{
+    /* 輪播圖的外部容器 */
+    .slideshow-container {{
+        position: relative;
         width: 100%;
+        height: 70px; /* 💡 可以在這裡調整圖片顯示的高度 */
+        background-color: #0A0D14; /* 配合您的深色背景 */
+        display: flex;
+        justify-content: center; /* 讓圖片置中對齊 */
+        align-items: center;
         overflow: hidden;
-        white-space: nowrap;
-        background-color: #0A0D14;
-        padding: 5px 0;
+        margin-bottom: 10px;
     }}
-    .marquee-inner {{
-        display: inline-block;
-        animation: scroll 20s linear infinite;
+    
+    /* 每張圖片的預設狀態 */
+    .slide {{
+        position: absolute;
+        height: 100%; /* 讓圖片高度填滿容器 */
+        object-fit: contain; /* 保持圖片比例，不變形 */
+        opacity: 0; /* 預設全部透明隱藏 */
+        animation: fade 15s infinite; /* 總動畫長度 15 秒，無限循環 */
     }}
-    @keyframes scroll {{
-        0% {{ transform: translateX(100%); }}
-        100% {{ transform: translateX(-100%); }}
+
+    /* 控制每張圖片的出場時間 (延遲播放) */
+    .slide-0 {{ animation-delay: 0s; }}   /* 第 1 張馬上出現 */
+    .slide-1 {{ animation-delay: 5s; }}   /* 第 2 張等 5 秒後出現 */
+    .slide-2 {{ animation-delay: 10s; }}  /* 第 3 張等 10 秒後出現 */
+
+    /* 淡入淡出的動畫腳本 (佔總長度 15 秒的百分比) */
+    @keyframes fade {{
+        0%   {{ opacity: 0; }}
+        5%   {{ opacity: 1; }}   /* 快速淡入 */
+        28%  {{ opacity: 1; }}   /* 保持顯示狀態 */
+        33%  {{ opacity: 0; }}   /* 淡出隱藏，交棒給下一張 */
+        100% {{ opacity: 0; }}   /* 剩下的時間保持隱藏 */
     }}
 </style>
 
-<div class="marquee">
-    <div class="marquee-inner">
-        {image_tags}
-    </div>
+<div class="slideshow-container">
+    {image_tags}
 </div>
 """
 
-st.markdown(marquee_code, unsafe_allow_html=True)
+# 渲染到網頁上
+st.markdown(slideshow_code, unsafe_allow_html=True)
 #
 # ==========================================
 # 🛑 隱形急救引擎 (請置於程式最頂端，絕對不要刪除！)
