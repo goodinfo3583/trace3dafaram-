@@ -20,23 +20,40 @@ hide_streamlit_style = """
             </style>
             """
 st.markdown(hide_streamlit_style, unsafe_allow_html=True)
+import streamlit as st
+import streamlit.components.v1 as components
+
 # ==========================================
-# 📍 頂部按鈕 (全域凍結版 - 點擊絕對不閃爍)
+# 📍 頂部按鈕 (全域凍結版 - 點擊絕對不閃爍 + 側邊欄按鈕修復)
 # ==========================================
 inject_js = """
 <script>
 const parentDoc = window.parent.document;
 
-// 【關鍵機制】檢查是否已經建立過外框，如果有了就不再重新渲染，達成「凍結」效果
 if (!parentDoc.getElementById('custom-sticky-header')) {
     
     // 1. 注入 CSS 樣式
     const style = parentDoc.createElement('style');
     style.innerHTML = `
-        /* 隱藏 Streamlit 預設頂部選單 */
-        [data-testid="stHeader"] { display: none !important; }
+        /* 【關鍵修正】不要完全隱藏 stHeader，改為全透明，以保留側邊欄展開按鈕 */
+        [data-testid="stHeader"] { 
+            background: transparent !important; 
+            background-color: transparent !important;
+            box-shadow: none !important; 
+        }
         
-        /* 最外層框架：完全透明、滑鼠穿透、並強制移除可能繼承的背景底色 */
+        /* 隱藏右上角的三個點和 Deploy 按鈕 */
+        [data-testid="stToolbar"] { display: none !important; }
+        
+        /* 【關鍵修正】把側邊欄的「>」展開按鈕往下推，避免被你的頂部選單蓋住 */
+        [data-testid="collapsedControl"] {
+            top: 70px !important; 
+            z-index: 1000000 !important;
+            background-color: rgba(10, 13, 20, 0.8) !important; /* 加一點微透底色讓按鈕清楚 */
+            border-radius: 50%;
+        }
+
+        /* 最外層框架：完全透明、滑鼠穿透 */
         #custom-sticky-header {
             position: fixed; top: 0; left: 0; width: 100%; z-index: 999999;
             background: transparent !important;
@@ -48,7 +65,7 @@ if (!parentDoc.getElementById('custom-sticky-header')) {
         /* 恢復區塊的滑鼠點擊功能 */
         .disclaimer-bar, .nav-btn-container { pointer-events: auto; }
         
-        /* 【關鍵修正】上排聲明區塊：強制使用 background: transparent 並拔除任何可能渲染的黑底線、框線 */
+        /* 上排聲明區塊：強制透明、拔除底線 */
         .disclaimer-bar { 
             display: flex; 
             background: transparent !important;
@@ -60,14 +77,12 @@ if (!parentDoc.getElementById('custom-sticky-header')) {
         }
         .disclaimer-item { position: relative; padding: 6px 15px; cursor: help; background: transparent !important; }
         
-        /* 提升標題文字在透明背景下的辨識度，加重陰影避免跟背景城堡圖融合 */
         .disclaimer-title { 
             color: #64748B; font-size: 13px; font-weight: 500; transition: all 0.2s; text-decoration: none; 
             text-shadow: 1px 1px 4px rgba(0, 0, 0, 1), -1px -1px 4px rgba(0, 0, 0, 1); 
         }
         .disclaimer-item:hover .disclaimer-title { color: #FFD700; text-shadow: 0 0 8px rgba(255, 215, 0, 0.8); }
         
-        /* ⚠️ 下拉內容框：維持深色微透 (若全透明會與下方圖表文字重疊導致無法閱讀) */
         .disclaimer-content {
             position: absolute; top: 100%; left: 0; width: 350px; max-width: 90vw;
             background-color: rgba(17, 22, 34, 0.95); 
@@ -102,7 +117,6 @@ if (!parentDoc.getElementById('custom-sticky-header')) {
             .nav-text-link { font-size: 14px; margin: 2px; }
         }
         
-        /* 把 Streamlit 原本的內容往下推，避免被按鈕擋住 */
         .stApp { margin-top: 50px !important; }
     `;
     parentDoc.head.appendChild(style);
@@ -127,14 +141,11 @@ if (!parentDoc.getElementById('custom-sticky-header')) {
             <a href="?page=b6" target="_self" class="nav-text-link">🎣 鉅額交易</a>
         </div>
     `;
-    
-    // 將選單強制掛載到瀏覽器最外層 body 的最前面
     parentDoc.body.insertBefore(headerDiv, parentDoc.body.firstChild);
 }
 </script>
 """
 
-# 透過隱藏的 iframe 執行上述的 JavaScript 注入
 components.html(inject_js, height=0, width=0)
 # ==========================================
 #置頂預留縮排
@@ -761,8 +772,6 @@ if current_page == "news":
 # ==========================================
 # 🌟 觀察名單專屬工具函數區 (補回遺失的計分工具)
 # ==========================================
-import pandas as pd
-import streamlit as st
 
 def get_df_safe(key): 
     return st.session_state.get(key, pd.DataFrame())
