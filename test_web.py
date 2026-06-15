@@ -2276,7 +2276,7 @@ if current_page in ["all", "b1"]:
     c_btn1, c_btn2 = st.columns(2)
 
     with c_btn1: 
-        st.link_button("📊 DDong 台股法人籌碼數據儀表板", "https://goodinfo3583.github.io/DDong_tw-institutional-stocker/", use_container_width=True)
+        st.link_button("📊 台股法人籌碼追蹤(50名)", "https://goodinfo3583.github.io/DDong_tw-institutional-stocker/", use_container_width=True)
 
     with c_btn2:
         try: exp_container = st.popover(f"🛠 站長快照 ({status_text})", use_container_width=True)
