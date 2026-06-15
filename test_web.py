@@ -128,7 +128,7 @@ def get_image_base64(image_path):
 
 # 2. 圖片檔名列表與資料夾設定
 image_folder = "static" 
-image_files = ["籌碼盛宴.png", "跑馬燈1.PNG", "跑馬燈2.PNG", "跑馬燈3.PNG", "花朵的樣子.gif"]
+image_files = ["主城.png", "畫家.PNG", "萬聖節.PNG", "實驗家.PNG", "燈籠財源.png"]
 
 # 💡 核心升級：自動計算時間，防呆防錯！
 total_images = len(image_files)
