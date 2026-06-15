@@ -23,130 +23,7 @@ st.markdown(hide_streamlit_style, unsafe_allow_html=True)
 import streamlit as st
 import streamlit.components.v1 as components
 
-# ==========================================
-# 📍 頂部按鈕 (全域凍結版 - 點擊絕對不閃爍 + 側邊欄按鈕修復)
-# ==========================================
-inject_js = """
-<script>
-const parentDoc = window.parent.document;
 
-if (!parentDoc.getElementById('custom-sticky-header')) {
-    
-    // 1. 注入 CSS 樣式
-    const style = parentDoc.createElement('style');
-    style.innerHTML = `
-        /* 【關鍵修正】不要完全隱藏 stHeader，改為全透明，以保留側邊欄展開按鈕 */
-        [data-testid="stHeader"] { 
-            background: transparent !important; 
-            background-color: transparent !important;
-            box-shadow: none !important; 
-        }
-        
-        /* 隱藏右上角的三個點和 Deploy 按鈕 */
-        [data-testid="stToolbar"] { display: none !important; }
-        
-        /* 【關鍵修正】把側邊欄的「>」展開按鈕往下推，避免被你的頂部選單蓋住 */
-        [data-testid="collapsedControl"] {
-            top: 70px !important; 
-            z-index: 1000000 !important;
-            background-color: rgba(10, 13, 20, 0.8) !important; /* 加一點微透底色讓按鈕清楚 */
-            border-radius: 50%;
-        }
-
-        /* 最外層框架：完全透明、滑鼠穿透 */
-        #custom-sticky-header {
-            position: fixed; top: 0; left: 0; width: 100%; z-index: 999999;
-            background: transparent !important;
-            background-color: transparent !important;
-            box-shadow: none !important;
-            pointer-events: none;
-        }
-        
-        /* 恢復區塊的滑鼠點擊功能 */
-        .disclaimer-bar, .nav-btn-container { pointer-events: auto; }
-        
-        /* 上排聲明區塊：強制透明、拔除底線 */
-        .disclaimer-bar { 
-            display: flex; 
-            background: transparent !important;
-            background-color: transparent !important; 
-            padding: 0px 15px; 
-            border: none !important;
-            border-bottom: none !important;
-            box-shadow: none !important;
-        }
-        .disclaimer-item { position: relative; padding: 6px 15px; cursor: help; background: transparent !important; }
-        
-        .disclaimer-title { 
-            color: #64748B; font-size: 13px; font-weight: 500; transition: all 0.2s; text-decoration: none; 
-            text-shadow: 1px 1px 4px rgba(0, 0, 0, 1), -1px -1px 4px rgba(0, 0, 0, 1); 
-        }
-        .disclaimer-item:hover .disclaimer-title { color: #FFD700; text-shadow: 0 0 8px rgba(255, 215, 0, 0.8); }
-        
-        .disclaimer-content {
-            position: absolute; top: 100%; left: 0; width: 350px; max-width: 90vw;
-            background-color: rgba(17, 22, 34, 0.95); 
-            border: 1px solid #1E293B; border-top: none;
-            border-radius: 0 0 8px 8px; padding: 0px 15px; max-height: 0; opacity: 0;
-            overflow: hidden; transition: all 0.3s ease-in-out; font-size: 12px; color: #94A3B8; line-height: 1.6;
-            box-shadow: 0px 8px 20px rgba(0,0,0,0.8);
-        }
-        .disclaimer-item:hover .disclaimer-content { max-height: 400px; opacity: 1; padding: 12px 15px; }
-        
-        /* 下排導覽按鈕：全透明、無底線 */
-        .nav-btn-container {
-            display: flex; flex-wrap: wrap; justify-content: flex-end; align-items: center;
-            padding: 8px 15px; 
-            background: transparent !important;
-            background-color: transparent !important; 
-            gap: 6px; 
-            border: none !important;
-            border-bottom: none !important;
-        }
-        .nav-text-link {
-            text-decoration: none !important; color: #94A3B8 !important; font-size: 16px; font-weight: 600; 
-            padding: 4px 6px; transition: all 0.2s ease-in-out; font-family: -apple-system, BlinkMacSystemFont, "Microsoft JhengHei", sans-serif !important;
-            text-shadow: 1px 1px 4px rgba(0, 0, 0, 1), -1px -1px 4px rgba(0, 0, 0, 1);
-        }
-        .nav-text-link:hover { color: #FFD700 !important; text-shadow: 0 0 12px rgba(255, 215, 0, 0.8); transform: scale(1.08); }
-        .nav-divider { color: #334155; font-size: 16px; user-select: none; }
-        
-        @media (max-width: 768px) {
-            .nav-btn-container { justify-content: flex-end; padding: 5px 10px; }
-            .nav-divider { display: none; }
-            .nav-text-link { font-size: 14px; margin: 2px; }
-        }
-        
-        .stApp { margin-top: 50px !important; }
-    `;
-    parentDoc.head.appendChild(style);
-
-    // 2. 注入 HTML 結構
-    const headerDiv = parentDoc.createElement('div');
-    headerDiv.id = 'custom-sticky-header';
-    headerDiv.innerHTML = `
-        <div class="disclaimer-bar">
-            <div class="disclaimer-item"><span class="disclaimer-title">使用聲明</span><div class="disclaimer-content">本平台僅供教育研究與籌碼觀察，絕不構成任何實質投資建議、勸誘或要約。所有資料源自公開數據，受限於網路技術，可能有延遲或錯誤。<br><br>投資必有風險，依本平台資訊所做之任何決策與損益，均須由使用者自行負責，本平台不負擔任何法律賠償責任.</div></div>
-            <div class="disclaimer-item"><span class="disclaimer-title">隱私權政策</span><div class="disclaimer-content"><b>1. 蒐集目的與範圍：</b><br>本平台依個資法蒐集您的識別資料僅供維持系統安全與優化服務使用。<br><b>2. 資料利用：</b><br>您的資料絕不向第三方洩露。<br><b>3. 資料刪除：</b><br>您可透過「聯絡我們」請求刪除資料。<br><b>4. 政策修訂：</b><br>本站保留修改政策之權利，繼續使用即視為同意。</div></div>
-            <div class="disclaimer-item"><a href="?page=contact" target="_self" class="disclaimer-title" style="cursor: pointer;">聯絡我們</a></div>
-        </div>
-        <div class="nav-btn-container">
-            <a href="?page=news" target="_self" class="nav-text-link">☕ 市場消息</a><span class="nav-divider">|</span>
-            <a href="?page=pool" target="_self" class="nav-text-link">⛲ 觀察名單</a><span class="nav-divider">|</span>
-            <a href="?page=b1" target="_self" class="nav-text-link">👑 法人持股</a><span class="nav-divider">|</span>
-            <a href="?page=b2" target="_self" class="nav-text-link">🎯 法人掃貨</a><span class="nav-divider">|</span>
-            <a href="?page=b3" target="_self" class="nav-text-link">📅 法人連買</a><span class="nav-divider">|</span>
-            <a href="?page=b4" target="_self" class="nav-text-link">🔄 資券軋空</a><span class="nav-divider">|</span>
-            <a href="?page=b5" target="_self" class="nav-text-link">💰 大腿動向</a><span class="nav-divider">|</span>
-            <a href="?page=b6" target="_self" class="nav-text-link">🎣 鉅額交易</a>
-        </div>
-    `;
-    parentDoc.body.insertBefore(headerDiv, parentDoc.body.firstChild);
-}
-</script>
-"""
-
-components.html(inject_js, height=0, width=0)
 # ==========================================
 #置頂預留縮排
 st.markdown("""
@@ -601,174 +478,133 @@ def fetch_historical_news(days_to_load=3):
     except Exception as e:
         return [], []
 
-# ========================================================== 
-# 📰 定義：市場消息主畫面分頁 (極速分頁版)
-# ========================================================== 
-def show_news_page():
-    st.title("☕  市場消息")
-    
-    # 頂部控制面板 (預設選項加入了 90, 180, 365 天)
-    col1, col2 = st.columns([1, 2])
-    with col1:
-        days_option = st.selectbox("載入歷史天數", [1, 3, 7, 14, 30, 90, 180, 365], index=0)
-    with col2:
-        search_query = st.text_input("🔍 搜尋標題、關鍵字或股票代號...")
-        
-    st.markdown("---")
-    
-    # 呼叫快取引擎取得資料
-    with st.spinner(f"正在從資料庫撈取近 {days_option} 天的新聞 (若選擇 365 天，首次載入約需 30 秒，請稍候)..."):
-        news_data, loaded_dates = fetch_historical_news(days_option)
-        
-    if not news_data:
-        st.error("無法取得新聞資料，請檢查網路連線。")
-        return
+# ==========================================
+# 📍 頂部按鈕 (全域凍結版 - 點擊絕對不閃爍 + 側邊欄按鈕修復)
+# ==========================================
+inject_js = """
+<script>
+const parentDoc = window.parent.document;
 
-    date_range_str = f"{loaded_dates[-1]} ~ {loaded_dates[0]}" if len(loaded_dates) > 1 else loaded_dates[0]
+if (!parentDoc.getElementById('custom-sticky-header')) {
     
-    
-    # ==========================================
-    # 🎨 注入 CSS 樣式
-    # ==========================================
-    glass_css = """
-    <style>
-    .glass-card {
-        background: rgba(255, 255, 255, 0.15); 
-        backdrop-filter: blur(10px);          
-        -webkit-backdrop-filter: blur(10px);
-        border: 1px solid rgba(255, 255, 255, 0.08); 
-        border-radius: 12px;
-        padding: 16px 20px;
-        margin-bottom: 12px;
-        box-shadow: 0 4px 15px rgba(0, 0, 0, 0.2);   
-        transition: all 0.2s ease-in-out;
-    }
-    .glass-card:hover {
-        background: rgba(255, 255, 255, 0.09);     
-        transform: translateY(-2px);
-    }
-    .news-title {
-        font-size: 16px; 
-        font-weight: 400;
-        color: #E0E0E0;  
-        text-decoration: none;
-        line-height: 1.4;
-        display: block;
-        margin-bottom: 8px;
-    }
-    .news-title:hover {
-        color: 	#FFE153;  
-    }
-    .news-info {
-        font-size: 13px;
-        color: #94A3B8;
-        display: flex;
-        justify-content: space-between;
-        align-items: center;
-    }
-    .code-tag {
-        background: rgba(59, 130, 246, 0.15); 
-        color: #60A5FA;
-        padding: 3px 8px;
-        border-radius: 6px;
-        font-size: 12px;
-        margin-left: 5px;
-        font-weight: 600;
-        border: 1px solid rgba(59, 130, 246, 0.3);
-    }
-    </style>
-    """
-    st.markdown(glass_css, unsafe_allow_html=True)
-    
-    # ==========================================
-    # 🔍 步驟一：先執行全域過濾與排序 (不急著顯示)
-    # ==========================================
-    try:
-        sorted_news = sorted(news_data, key=lambda x: x.get("ts", ""), reverse=True)
-    except:
-        sorted_news = news_data
+    // 1. 注入 CSS 樣式
+    const style = parentDoc.createElement('style');
+    style.innerHTML = `
+        /* 【關鍵修正】不要完全隱藏 stHeader，改為全透明，以保留側邊欄展開按鈕 */
+        [data-testid="stHeader"] { 
+            background: transparent !important; 
+            background-color: transparent !important;
+            box-shadow: none !important; 
+        }
+        
+        /* 隱藏右上角的三個點和 Deploy 按鈕 */
+        [data-testid="stToolbar"] { display: none !important; }
+        
+        /* 【關鍵修正】把側邊欄的「>」展開按鈕往下推，避免被你的頂部選單蓋住 */
+        [data-testid="collapsedControl"] {
+            top: 70px !important; 
+            z-index: 1000000 !important;
+            background-color: rgba(10, 13, 20, 0.8) !important; /* 加一點微透底色讓按鈕清楚 */
+            border-radius: 50%;
+        }
 
-    # 把符合條件的新聞全部裝進 filtered_news 陣列中
-    filtered_news = []
-    for news in sorted_news:
-        title = news.get("title", "")
-        codes = news.get("codes", [])
+        /* 最外層框架：完全透明、滑鼠穿透 */
+        #custom-sticky-header {
+            position: fixed; top: 0; left: 0; width: 100%; z-index: 999999;
+            background: transparent !important;
+            background-color: transparent !important;
+            box-shadow: none !important;
+            pointer-events: none;
+        }
         
-        if search_query:
-            q = search_query.lower()
-            match_title = q in title.lower()
-            match_code = any(q in str(c).lower() for c in codes)
-            if not (match_title or match_code):
-                continue 
-                
-        filtered_news.append(news)
+        /* 恢復區塊的滑鼠點擊功能 */
+        .disclaimer-bar, .nav-btn-container { pointer-events: auto; }
+        
+        /* 上排聲明區塊：強制透明、拔除底線 */
+        .disclaimer-bar { 
+            display: flex; 
+            background: transparent !important;
+            background-color: transparent !important; 
+            padding: 0px 15px; 
+            border: none !important;
+            border-bottom: none !important;
+            box-shadow: none !important;
+        }
+        .disclaimer-item { position: relative; padding: 6px 15px; cursor: help; background: transparent !important; }
+        
+        .disclaimer-title { 
+            color: #64748B; font-size: 13px; font-weight: 500; transition: all 0.2s; text-decoration: none; 
+            text-shadow: 1px 1px 4px rgba(0, 0, 0, 1), -1px -1px 4px rgba(0, 0, 0, 1); 
+        }
+        .disclaimer-item:hover .disclaimer-title { color: #FFD700; text-shadow: 0 0 8px rgba(255, 215, 0, 0.8); }
+        
+        .disclaimer-content {
+            position: absolute; top: 100%; left: 0; width: 350px; max-width: 90vw;
+            background-color: rgba(17, 22, 34, 0.95); 
+            border: 1px solid #1E293B; border-top: none;
+            border-radius: 0 0 8px 8px; padding: 0px 15px; max-height: 0; opacity: 0;
+            overflow: hidden; transition: all 0.3s ease-in-out; font-size: 12px; color: #94A3B8; line-height: 1.6;
+            box-shadow: 0px 8px 20px rgba(0,0,0,0.8);
+        }
+        .disclaimer-item:hover .disclaimer-content { max-height: 400px; opacity: 1; padding: 12px 15px; }
+        
+        /* 下排導覽按鈕：全透明、無底線 */
+        .nav-btn-container {
+            display: flex; flex-wrap: wrap; justify-content: flex-end; align-items: center;
+            padding: 8px 15px; 
+            background: transparent !important;
+            background-color: transparent !important; 
+            gap: 6px; 
+            border: none !important;
+            border-bottom: none !important;
+        }
+        .nav-text-link {
+            text-decoration: none !important; color: #94A3B8 !important; font-size: 16px; font-weight: 600; 
+            padding: 4px 6px; transition: all 0.2s ease-in-out; font-family: -apple-system, BlinkMacSystemFont, "Microsoft JhengHei", sans-serif !important;
+            text-shadow: 1px 1px 4px rgba(0, 0, 0, 1), -1px -1px 4px rgba(0, 0, 0, 1);
+        }
+        .nav-text-link:hover { color: #FFD700 !important; text-shadow: 0 0 12px rgba(255, 215, 0, 0.8); transform: scale(1.08); }
+        .nav-divider { color: #334155; font-size: 16px; user-select: none; }
+        
+        @media (max-width: 768px) {
+            .nav-btn-container { justify-content: flex-end; padding: 5px 10px; }
+            .nav-divider { display: none; }
+            .nav-text-link { font-size: 14px; margin: 2px; }
+        }
+        
+        .stApp { margin-top: 50px !important; }
+    `;
+    parentDoc.head.appendChild(style);
 
-    total_items = len(filtered_news)
-    
-    if total_items == 0:
-        st.warning(f"找不到包含「{search_query}」的新聞，建議增加上方的「載入歷史天數」再試一次！")
-        return
-
-    # ==========================================
-    # 📑 步驟二：分頁系統 (Pagination)
-    # ==========================================
-    ITEMS_PER_PAGE = 50 # 為了不卡頓，每頁嚴格限制顯示 50 則
-    total_pages = math.ceil(total_items / ITEMS_PER_PAGE) # 計算總共需要幾頁
-    
-    # 建立分頁控制器 UI
-    col_p1, col_p2, col_p3 = st.columns([1, 2, 1])
-    with col_p2:
-        current_page = st.number_input(
-            f"📄 選擇頁數 (共 {total_pages} 頁)", 
-            min_value=1, 
-            max_value=total_pages, 
-            value=1, 
-            step=1
-        )
-        
-    # 顯示目前觀看的區間提示
-    start_item = (current_page - 1) * ITEMS_PER_PAGE + 1
-    end_item = min(current_page * ITEMS_PER_PAGE, total_items)
-    st.caption(f"<div style='text-align: center; color: #94A3B8; margin-bottom: 20px;'>共過濾出 {total_items} 則新聞，目前顯示第 {start_item} 到 {end_item} 則</div>", unsafe_allow_html=True)
-
-    # ==========================================
-    # 📰 步驟三：根據選擇的頁數，裁切陣列並渲染卡片
-    # ==========================================
-    start_idx = (current_page - 1) * ITEMS_PER_PAGE
-    end_idx = start_idx + ITEMS_PER_PAGE
-    display_news = filtered_news[start_idx:end_idx] # 只取出這一頁該顯示的 50 筆
-
-    for news in display_news:
-        title = news.get("title", "")
-        codes = news.get("codes", [])
-        
-        codes_html = ""
-        if codes:
-            codes_html = "".join([f"<span class='code-tag'>{c}</span>" for c in codes])
-        
-        link = news.get('link', '#')
-        host = news.get('source_host', '未知')
-        
-        ts = news.get('ts', '')
-        if "T" in ts:
-            ts = ts.split("T")[0] + " " + ts.split("T")[1][:5]
-        
-        card_html = f"""
-        <div class="glass-card">
-            <a href="{link}" target="_blank" class="news-title">{title}</a>
-            <div class="news-info">
-                <span>來源: {host} &nbsp;|&nbsp; 時間: {ts}</span>
-                <div>{codes_html}</div>
-            </div>
+    // 2. 注入 HTML 結構
+    const headerDiv = parentDoc.createElement('div');
+    headerDiv.id = 'custom-sticky-header';
+    headerDiv.innerHTML = `
+        <div class="disclaimer-bar">
+            <div class="disclaimer-item"><span class="disclaimer-title">使用聲明</span><div class="disclaimer-content">本平台僅供教育研究與籌碼觀察，絕不構成任何實質投資建議、勸誘或要約。所有資料源自公開數據，受限於網路技術，可能有延遲或錯誤。<br><br>投資必有風險，依本平台資訊所做之任何決策與損益，均須由使用者自行負責，本平台不負擔任何法律賠償責任.</div></div>
+            <div class="disclaimer-item"><span class="disclaimer-title">隱私權政策</span><div class="disclaimer-content"><b>1. 蒐集目的與範圍：</b><br>本平台依個資法蒐集您的識別資料僅供維持系統安全與優化服務使用。<br><b>2. 資料利用：</b><br>您的資料絕不向第三方洩露。<br><b>3. 資料刪除：</b><br>您可透過「聯絡我們」請求刪除資料。<br><b>4. 政策修訂：</b><br>本站保留修改政策之權利，繼續使用即視為同意。</div></div>
+            <div class="disclaimer-item"><a href="?page=contact" target="_self" class="disclaimer-title" style="cursor: pointer;">聯絡我們</a></div>
         </div>
-        """
-        st.markdown(card_html, unsafe_allow_html=True)        
-# ==========================================
-# 🚦 執行路由：判斷要顯示哪個畫面 (這裡才是讓畫面出現的關鍵)
-# ==========================================
-if current_page == "news":
-    # 【修改 3】：如果使用者點擊了新聞按鈕，或者剛進站 (預設為news)，就執行這個函數
-    show_news_page()
+        <div class="nav-btn-container">
+            <a href="?page=news" target="_self" class="nav-text-link">☕ 市場消息</a><span class="nav-divider">|</span>
+            <a href="?page=pool" target="_self" class="nav-text-link">⛲ 觀察名單</a><span class="nav-divider">|</span>
+            <a href="?page=b1" target="_self" class="nav-text-link">👑 法人持股</a><span class="nav-divider">|</span>
+            <a href="?page=b2" target="_self" class="nav-text-link">🎯 法人掃貨</a><span class="nav-divider">|</span>
+            <a href="?page=b3" target="_self" class="nav-text-link">📅 法人連買</a><span class="nav-divider">|</span>
+            <a href="?page=b4" target="_self" class="nav-text-link">🔄 資券軋空</a><span class="nav-divider">|</span>
+            <a href="?page=b5" target="_self" class="nav-text-link">💰 大腿動向</a><span class="nav-divider">|</span>
+            <a href="?page=b6" target="_self" class="nav-text-link">🎣 鉅額交易</a>
+        </div>
+    `;
+    parentDoc.body.insertBefore(headerDiv, parentDoc.body.firstChild);
+}
+</script>
+"""
+
+components.html(inject_js, height=0, width=0)
+
+
+
 # ==========================================
 # 🌟 觀察名單專屬工具函數區 (補回遺失的計分工具)
 # ==========================================
@@ -4722,7 +4558,174 @@ if current_page in ["all", "pool"]:
 # ==========================================
 # 🧪 測試區：Google Sheets 連線測試
 # ==========================================
+# ========================================================== 
+# 📰 定義：市場消息主畫面分頁 (極速分頁版)
+# ========================================================== 
+def show_news_page():
+    st.title("☕  市場消息")
+    
+    # 頂部控制面板 (預設選項加入了 90, 180, 365 天)
+    col1, col2 = st.columns([1, 2])
+    with col1:
+        days_option = st.selectbox("載入歷史天數", [1, 3, 7, 14, 30, 90, 180, 365], index=0)
+    with col2:
+        search_query = st.text_input("🔍 搜尋標題、關鍵字或股票代號...")
+        
+    st.markdown("---")
+    
+    # 呼叫快取引擎取得資料
+    with st.spinner(f"正在從資料庫撈取近 {days_option} 天的新聞 (若選擇 365 天，首次載入約需 30 秒，請稍候)..."):
+        news_data, loaded_dates = fetch_historical_news(days_option)
+        
+    if not news_data:
+        st.error("無法取得新聞資料，請檢查網路連線。")
+        return
 
+    date_range_str = f"{loaded_dates[-1]} ~ {loaded_dates[0]}" if len(loaded_dates) > 1 else loaded_dates[0]
+    
+    
+    # ==========================================
+    # 🎨 注入 CSS 樣式
+    # ==========================================
+    glass_css = """
+    <style>
+    .glass-card {
+        background: rgba(255, 255, 255, 0.15); 
+        backdrop-filter: blur(10px);          
+        -webkit-backdrop-filter: blur(10px);
+        border: 1px solid rgba(255, 255, 255, 0.08); 
+        border-radius: 12px;
+        padding: 16px 20px;
+        margin-bottom: 12px;
+        box-shadow: 0 4px 15px rgba(0, 0, 0, 0.2);   
+        transition: all 0.2s ease-in-out;
+    }
+    .glass-card:hover {
+        background: rgba(255, 255, 255, 0.09);     
+        transform: translateY(-2px);
+    }
+    .news-title {
+        font-size: 16px; 
+        font-weight: 400;
+        color: #E0E0E0;  
+        text-decoration: none;
+        line-height: 1.4;
+        display: block;
+        margin-bottom: 8px;
+    }
+    .news-title:hover {
+        color: 	#FFE153;  
+    }
+    .news-info {
+        font-size: 13px;
+        color: #94A3B8;
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+    }
+    .code-tag {
+        background: rgba(59, 130, 246, 0.15); 
+        color: #60A5FA;
+        padding: 3px 8px;
+        border-radius: 6px;
+        font-size: 12px;
+        margin-left: 5px;
+        font-weight: 600;
+        border: 1px solid rgba(59, 130, 246, 0.3);
+    }
+    </style>
+    """
+    st.markdown(glass_css, unsafe_allow_html=True)
+    
+    # ==========================================
+    # 🔍 步驟一：先執行全域過濾與排序 (不急著顯示)
+    # ==========================================
+    try:
+        sorted_news = sorted(news_data, key=lambda x: x.get("ts", ""), reverse=True)
+    except:
+        sorted_news = news_data
+
+    # 把符合條件的新聞全部裝進 filtered_news 陣列中
+    filtered_news = []
+    for news in sorted_news:
+        title = news.get("title", "")
+        codes = news.get("codes", [])
+        
+        if search_query:
+            q = search_query.lower()
+            match_title = q in title.lower()
+            match_code = any(q in str(c).lower() for c in codes)
+            if not (match_title or match_code):
+                continue 
+                
+        filtered_news.append(news)
+
+    total_items = len(filtered_news)
+    
+    if total_items == 0:
+        st.warning(f"找不到包含「{search_query}」的新聞，建議增加上方的「載入歷史天數」再試一次！")
+        return
+
+    # ==========================================
+    # 📑 步驟二：分頁系統 (Pagination)
+    # ==========================================
+    ITEMS_PER_PAGE = 50 # 為了不卡頓，每頁嚴格限制顯示 50 則
+    total_pages = math.ceil(total_items / ITEMS_PER_PAGE) # 計算總共需要幾頁
+    
+    # 建立分頁控制器 UI
+    col_p1, col_p2, col_p3 = st.columns([1, 2, 1])
+    with col_p2:
+        current_page = st.number_input(
+            f"📄 選擇頁數 (共 {total_pages} 頁)", 
+            min_value=1, 
+            max_value=total_pages, 
+            value=1, 
+            step=1
+        )
+        
+    # 顯示目前觀看的區間提示
+    start_item = (current_page - 1) * ITEMS_PER_PAGE + 1
+    end_item = min(current_page * ITEMS_PER_PAGE, total_items)
+    st.caption(f"<div style='text-align: center; color: #94A3B8; margin-bottom: 20px;'>共過濾出 {total_items} 則新聞，目前顯示第 {start_item} 到 {end_item} 則</div>", unsafe_allow_html=True)
+
+    # ==========================================
+    # 📰 步驟三：根據選擇的頁數，裁切陣列並渲染卡片
+    # ==========================================
+    start_idx = (current_page - 1) * ITEMS_PER_PAGE
+    end_idx = start_idx + ITEMS_PER_PAGE
+    display_news = filtered_news[start_idx:end_idx] # 只取出這一頁該顯示的 50 筆
+
+    for news in display_news:
+        title = news.get("title", "")
+        codes = news.get("codes", [])
+        
+        codes_html = ""
+        if codes:
+            codes_html = "".join([f"<span class='code-tag'>{c}</span>" for c in codes])
+        
+        link = news.get('link', '#')
+        host = news.get('source_host', '未知')
+        
+        ts = news.get('ts', '')
+        if "T" in ts:
+            ts = ts.split("T")[0] + " " + ts.split("T")[1][:5]
+        
+        card_html = f"""
+        <div class="glass-card">
+            <a href="{link}" target="_blank" class="news-title">{title}</a>
+            <div class="news-info">
+                <span>來源: {host} &nbsp;|&nbsp; 時間: {ts}</span>
+                <div>{codes_html}</div>
+            </div>
+        </div>
+        """
+        st.markdown(card_html, unsafe_allow_html=True)        
+# ==========================================
+# 🚦 執行路由：判斷要顯示哪個畫面 (這裡才是讓畫面出現的關鍵)
+# ==========================================
+if current_page == "news":
+    # 【修改 3】：如果使用者點擊了新聞按鈕，或者剛進站 (預設為news)，就執行這個函數
+    show_news_page()
 
 
 # ==========================================
