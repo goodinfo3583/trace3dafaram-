@@ -3822,15 +3822,17 @@ def apply_b5_market_filters(df, show_etf, show_bond):
 
 def process_major_shareholders(target_level):
     """
-    通用大戶資料產生器
+    通用大戶資料產生器 (支援分批檔案合併與精準欄位對接)
     target_level: '1千', '800', '600'
     """
     import os, glob, re
     import pandas as pd
     
-    files = glob.glob(os.path.join(DATA_DIR, "*大股東*數週增加*.csv"))
+    # 抓取所有大股東檔案
+    files = glob.glob(os.path.join(DATA_DIR, "*大股東*.csv"))
     if not files: return pd.DataFrame()
     
+    # 依照檔名中的 8 碼日期分組 (把同為 20260613 的分批檔案歸類在一起)
     groups = {}
     for f in files:
         m = re.search(r'(\d{8})', os.path.basename(f))
@@ -3838,30 +3840,37 @@ def process_major_shareholders(target_level):
         groups.setdefault(key, []).append(f)
     
     merged, all_dates_4 = [], []
+    
+    # 動態產生要尋找的精準欄位名稱 (例如：'持股超過1千張(%)')
     col_abs_name = f'持股超過{target_level}張(%)'
     col_delta_name = f'超過{target_level}張增減'
 
+    # 從最新日期開始處理
     for prefix, fs in sorted(groups.items(), reverse=True):
         chunks = []
         detected_date = None
+        
         for f in fs:
             try:
                 df = pd.read_csv(f, encoding='utf-8-sig')
-                df.columns = [str(c).strip() for c in df.columns]
+                # 清洗所有欄位名稱，避免隱形空白干擾
+                df.columns = [str(c).strip().replace('\n', '') for c in df.columns]
                 
                 c_code = next((c for c in df.columns if '代號' in c), None)
                 c_name = next((c for c in df.columns if '名稱' in c), None)
                 c_abs = next((c for c in df.columns if col_abs_name in c), None)
                 c_delta = next((c for c in df.columns if col_delta_name in c), None)
-                c_date = next((c for c in df.columns if '更新 日期' in c or '更新日期' in c), None)
+                c_date = next((c for c in df.columns if '更新日期' in c or '更新 日期' in c), None)
                 
                 if not all([c_code, c_name, c_abs, c_delta]): continue
                 
-                df['股票代號'] = df[c_code].astype(str).str.extract(r'(\d+)', expand=False)# ✅ 修正觀察名單讀取不到
+                # ✅ 關鍵修正：確保代號轉為乾淨的一維字串陣列
+                df['股票代號'] = df[c_code].astype(str).str.extract(r'(\d+)', expand=False)
                 df['股票名稱'] = df[c_name].astype(str).str.strip()
                 df['持股%'] = pd.to_numeric(df[c_abs].astype(str).str.replace('%', ''), errors='coerce')
                 df['增減%'] = pd.to_numeric(df[c_delta].astype(str).str.replace('+', '').str.replace('%', ''), errors='coerce')
                 
+                # 抓取實際檔案內的更新日期 (例如：檔名是0613，但裡面寫0612)
                 if detected_date is None and c_date and not df[c_date].dropna().empty:
                     raw_date = str(df[c_date].dropna().iloc[0]).replace('/', '').strip()
                     detected_date = raw_date[-4:] if len(raw_date) in [4, 8] else prefix[-4:]
@@ -3869,17 +3878,24 @@ def process_major_shareholders(target_level):
                 chunks.append(df[['股票代號', '股票名稱', '持股%', '增減%']].dropna(subset=['股票代號']))
             except: continue
         
+        # 將同一個日期 (例如0613) 的所有分批檔案 (1-300, 301-600...) 組合起來
         if chunks:
-            comb = pd.concat(chunks).groupby(['股票代號', '股票名稱']).max().reset_index()
+            comb = pd.concat(chunks, ignore_index=True)
+            # 如果有重複的代號，取最大值 (保險機制)
+            comb = comb.groupby(['股票代號', '股票名稱']).max().reset_index()
+            
             date_4 = detected_date if detected_date else prefix[-4:]
             if date_4 not in all_dates_4: all_dates_4.append(date_4)
-            # 建立暫時名稱，以便後續依照最新/歷史決定是否加 ▼
+            
+            # 建立暫時名稱，以便後續合併
             comb = comb.rename(columns={'持股%': f"{date_4}持有%", '增減%': f"DELTA_{date_4}"})
             merged.append(comb)
             
     if merged:
         master = merged[0]
+        # 將不同週別的歷史資料進行 Outer Join 合併
         for m in merged[1:]: master = pd.merge(master, m, on=['股票代號', '股票名稱'], how='outer')
+        
         sorted_dates_4 = sorted(all_dates_4, reverse=True)
         latest_date_4 = sorted_dates_4[0]
         
@@ -3902,24 +3918,22 @@ def process_major_shareholders(target_level):
         rename_dict = {}
         cols_order = ['股票代號', '股票名稱', '週動態', '▼6周增減']
         
-        # 最新持有%
         if f"{latest_date_4}持有%" in master.columns:
             cols_order.append(f"{latest_date_4}持有%")
             
         for i, d in enumerate(sorted_dates_4):
             original_delta_col = f"DELTA_{d}"
             if original_delta_col in master.columns:
-                if i == 0:
-                    new_delta_name = f"▼{d}" # 最新增減加上 ▼
-                else:
-                    new_delta_name = f"{d}" # 歷史增減不加 ▼
+                new_delta_name = f"▼{d}" if i == 0 else f"{d}" # 最新增減加上 ▼
                 rename_dict[original_delta_col] = new_delta_name
                 cols_order.append(new_delta_name)
                 
         master = master.rename(columns=rename_dict)
         final_df = master[[c for c in cols_order if c in master.columns]]
+        # 依照最新日期的增減幅度進行降冪排序
         final_df = final_df.sort_values(by=f"▼{latest_date_4}", ascending=False)
         return final_df
+        
     return pd.DataFrame()
 
 
