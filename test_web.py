@@ -3936,50 +3936,7 @@ def process_major_shareholders(target_level):
 # ----------------------------------------------------
 if current_page in ["all", "b5"]:
     st.write("---")
-    
-    # ==========================================
-    # 🕵️‍♂️ 新版智慧抓蟲雷達：精準鎖定最新日期檔案進行體檢
-    # ==========================================
-    import glob, os, re
-    import pandas as pd
-    st.error("🕵️‍♂️ **系統抓蟲雷達：正在診斷最新大股東檔案...**")
-    
-    all_b5 = []
-    for ext in ('*.csv', '*.CSV'):
-        all_b5.extend(glob.glob(os.path.join(DATA_DIR, f"*大股東{ext}")))
-    
-    if all_b5:
-        # 強制依據檔名日期進行降冪排序，確保雷達抓到的是 0613，而不是 0529
-        all_b5_sorted = sorted(all_b5, key=lambda x: re.search(r'(\d{8})', x).group(1) if re.search(r'(\d{8})', x) else "00", reverse=True)
-        newest_file = all_b5_sorted[0]
-        st.write(f"📂 系統判定最新檔案為： `{os.path.basename(newest_file)}`")
-        
-        df_test = None
-        for enc in ['utf-8-sig', 'big5', 'cp950', 'utf-8']:
-            try:
-                df_test = pd.read_csv(newest_file, encoding=enc)
-                st.write(f"✅ 成功以 `{enc}` 編碼讀取檔案！(如果不是 utf-8-sig，代表檔案編碼已改變)")
-                break
-            except: pass
-        
-        if df_test is not None:
-            cleaned_cols = [re.sub(r'\s+', '', str(c)).replace('\ufeff', '') for c in df_test.columns]
-            st.write("🏷️ 檔案內的真實欄位名稱 (已清除隱形空白)：", cleaned_cols)
-            
-            c_c = next((c for c in cleaned_cols if '代號' in c or '代碼' in c), None)
-            c_a = next((c for c in cleaned_cols if ('1千' in c or '1000' in c) and ('%' in c or '比例' in c) and '增減' not in c and '差' not in c), None)
-            c_d = next((c for c in cleaned_cols if ('1千' in c or '1000' in c) and ('增減' in c or '差' in c)), None)
-            st.write(f"⚙️ 內部對接測試： 代號=[{c_c}], 持股比例=[{c_a}], 增減=[{c_d}]")
-            
-            if not all([c_c, c_a, c_d]):
-                st.warning("⚠️ 警告：系統無法對接這些欄位！(請比對上方標籤與內部對接的文字是否有落差)")
-            else:
-                st.success("✅ 欄位對接測試完美通過！請點擊『🚀 啟動全市場掃描』按鈕，讓它重新寫入記憶體生效。")
-        else:
-            st.warning("⚠️ 警告：系統完全無法解析該 CSV，請確認檔案是否損壞或被 Excel 鎖定。")
-    else:
-        st.warning("⚠️ 警告：資料夾內沒有大股東 CSV。")
-    # ==========================================
+
 
     st.markdown("<div id='section-5'></div>", unsafe_allow_html=True)
     
