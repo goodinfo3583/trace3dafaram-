@@ -112,7 +112,7 @@ bg_path = os.path.join(IMAGE_DIR, "派對盛宴邀請.png")
 set_background(bg_path)
 #跑馬燈
 # ==========================================
-# 跑馬燈區塊 (使用無敵的 Base64 直接讀取法)
+# 跑馬燈區塊 (5張圖專用輪播系統)
 # ==========================================
 import base64
 import os
@@ -126,9 +126,9 @@ def get_image_base64(image_path):
         encoded_string = base64.b64encode(data).decode()
     return f"data:{mime_type};base64,{encoded_string}"
 
-# 2. 圖片檔名列表與資料夾設定 (目前共 4 張圖)
+# 2. 圖片檔名列表與資料夾設定 (💡 目前共 5 張圖，順序可隨意對調)
 image_folder = "static" 
-image_files = ["籌碼盛宴.png","跑馬燈1.PNG", "跑馬燈2.PNG", "跑馬燈3.PNG", "花朵的樣子.gif"]
+image_files = ["籌碼盛宴.png", "跑馬燈1.PNG", "跑馬燈2.PNG", "跑馬燈3.PNG", "花朵的樣子.gif"]
 
 # 3. 生成圖片標籤的 HTML
 image_tags = ""
@@ -138,9 +138,9 @@ for i, img_name in enumerate(image_files):
         b64 = get_image_base64(img_path)
         image_tags += f'<img class="slide slide-{i}" src="{b64}">'
     else:
-        st.error(f"系統找不到這張圖片：{img_path}")
+        st.error(f"系統找不到這張圖片：{img_path}，請檢查檔名或大小寫！")
 
-# 4. 輪播圖 (Slideshow) HTML/CSS (5張圖專用優化版)
+# 4. 輪播圖 (Slideshow) HTML/CSS (5張圖完美配時版)
 marquee_code = f"""
 <style>
     .slideshow-container {{
@@ -164,18 +164,19 @@ marquee_code = f"""
         animation: fade 25s infinite; /* 💡 5張圖 × 5秒 = 總共 25 秒 */
     }}
 
-    /* 💡 精確分配每張圖的出場時間，每 5 秒交棒一次 */
+    /* 💡 每個標籤依序遞增 5 秒延遲，未來對調 list 順序時這裡完全不需修改 */
     .slide-0 {{ animation-delay: 0s; }}
     .slide-1 {{ animation-delay: 5s; }}
     .slide-2 {{ animation-delay: 10s; }}
-    .slide-3 {{ animation-delay: 15s; }} /* 補上關鍵的第 4 張圖延遲 */
+    .slide-3 {{ animation-delay: 15s; }}
+    .slide-4 {{ animation-delay: 20s; }} /* 補上關鍵的第 5 張圖延遲 */
 
-    /* 💡 重新計算 4 張圖的百分比 (每張佔 25%) */
+    /* 💡 重新計算 5 張圖的百分比 (每張佔 20%) */
     @keyframes fade {{
         0%   {{ visibility: hidden; opacity: 0; }}
         1%   {{ visibility: visible; opacity: 1; }} /* 瞬間亮起 */
-        24%  {{ visibility: visible; opacity: 1; }} /* 保持顯示到接近第 5 秒 */
-        25%  {{ visibility: hidden; opacity: 0; }}  /* 第 5 秒準時隱形 */
+        19%  {{ visibility: visible; opacity: 1; }} /* 保持顯示到接近第 5 秒 */
+        20%  {{ visibility: hidden; opacity: 0; }}  /* 第 5 秒準時隱形 */
         100% {{ visibility: hidden; opacity: 0; }}  /* 剩餘時間保持隱形 */
     }}
 </style>
