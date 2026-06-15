@@ -4511,21 +4511,7 @@ if current_page in ["all", "pool"]:
                             dict_400 = {ultra_clean_id(k): raw_delta_to_trend(v) for k, v in zip(df_b5_400['股票代號'], df_b5_400[delta_col])}
 
 
-                # ==========================================
-                # 🕵️‍♂️ [觀察名單專屬] 大戶對接抓蟲雷達 (修復後確認用)
-                # ==========================================
-                st.success("🕵️‍♂️ **[抓蟲雷達] 智慧對接引擎已啟動！**")
-                c_test1, c_test2 = st.columns(2)
-                with c_test1:
-                    st.write(f"📌 **1. 字典 1000 張轉換結果**")
-                    st.write(f"- 成功配對筆數: `{len(dict_1000)}`")
-                    if dict_1000: st.write(f"- 抽樣預覽: `{list(dict_1000.items())[:3]}`")
-                
-                with c_test2:
-                    st.write(f"📌 **2. 字典 400 張轉換結果**")
-                    st.write(f"- 成功配對筆數: `{len(dict_400)}`")
-                    if dict_400: st.write(f"- 抽樣預覽: `{list(dict_400.items())[:3]}`")
-                st.write("---")
+
                 # ==========================================
 ###########
                 results = []
