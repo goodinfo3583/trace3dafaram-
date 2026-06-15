@@ -2528,7 +2528,7 @@ if current_page in ["all", "b2"]:
     # ==========================================
     st.write("---")
     st.markdown("<div id='section-2-1'></div>", unsafe_allow_html=True)
-    st.header("🎯 區塊2-1：外資 5 日 買超佔標的成交量")
+    st.header("🎯 法人掃貨：外資 5 日 買超佔標的成交量")
 
     csv_pattern = os.path.join(DATA_DIR, "*外資買超佔成交比*.csv")
     all_csv_files = glob.glob(csv_pattern)
@@ -2626,7 +2626,7 @@ if current_page in ["all", "b2"]:
     # ==========================================
     st.write("---")
     st.markdown("<div id='section-2-2'></div>", unsafe_allow_html=True)
-    st.header("🎯 區塊2-2：投信 5 日 買超佔標的成交量")
+    st.header("🎯 法人掃貨：投信 5 日 買超佔標的成交量")
 
     csv_pattern_sitc = os.path.join(DATA_DIR, "*投信買超佔成交比*.csv")
     all_files_sitc = glob.glob(csv_pattern_sitc)
@@ -2721,7 +2721,7 @@ if current_page in ["all", "b2"]:
     # ==========================================
     st.write("---")
     st.markdown("<div id='section-2-3'></div>", unsafe_allow_html=True)
-    st.header("🎯 區塊2-3：外資 5 日 買超佔公司發行張數")
+    st.header("🎯 法人掃貨：外資 5 日 買超佔公司發行張數")
 
     csv_pattern_fo = os.path.join(DATA_DIR, "*外資買超佔發行張數*.csv")
     all_files_fo = glob.glob(csv_pattern_fo)
@@ -2811,7 +2811,7 @@ if current_page in ["all", "b2"]:
     # ==========================================
     st.write("---")
     st.markdown("<div id='section-2-4'></div>", unsafe_allow_html=True)
-    st.header("🎯 區塊2-4：投信 5 日 買超佔公司發行張數")
+    st.header("🎯 法人掃貨：投信 5 日 買超佔公司發行張數")
 
     csv_pattern_sitc2 = os.path.join(DATA_DIR, "*投信買超佔發行張數*.csv")
     all_files_sitc2 = glob.glob(csv_pattern_sitc2)
@@ -2898,12 +2898,6 @@ if current_page in ["all", "b2"]:
 # ==========================================
 # 🌟 區塊 3 專屬工具函數區 (必須放在 if 鎖外面)
 # ==========================================
-import os
-import glob
-import re
-import pandas as pd
-import streamlit as st
-
 # 🛠️ 輔助函數：從檔名提取 8 碼日期
 def extract_date_from_name(filename):
     match = re.search(r'(\d{8})', os.path.basename(filename))
@@ -2997,7 +2991,7 @@ def read_live_ln_report(file_keyword, strict_type, exact_field_name, prefix_keyw
 if current_page in ["all", "b3"]:
     st.write("---")
     st.markdown("<div id='section-3'></div>", unsafe_allow_html=True)
-    st.header("📅 區塊3：法人連續買超")
+    st.header("📅 法人連續買超")
 
     # ========================================================
     # 🚀 執行排程與備份邏輯
