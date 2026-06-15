@@ -3927,7 +3927,19 @@ def process_major_shareholders(target_level):
 # 🔒 區塊 5 專屬包廂鎖 (這以下才是 UI 渲染，包進 if 裡面)
 # ----------------------------------------------------
 if current_page in ["all", "b5"]:
+    
     st.write("---")
+          
+        # 🕵️‍♂️ 系統抓蟲雷達：放在這裡，幫你直接看透 CSV 檔案結構！
+    st.error("🕵️‍♂️ **系統抓蟲雷達 (測試用，確認沒問題後可刪除)**")
+    b5_test_files = glob.glob(os.path.join(DATA_DIR, "*大股東*.csv")) + glob.glob(os.path.join(DATA_DIR, "*神秘金字塔*.csv"))
+    if b5_test_files:
+        test_df = pd.read_csv(b5_test_files[0], encoding='utf-8-sig')
+        st.write(f"📂 找到最新檔案： `{os.path.basename(b5_test_files[0])}`")
+        st.write(f"🏷️ 實際的欄位名稱有這些：", test_df.columns.tolist())
+    else:
+        st.warning("⚠️ 警告：在 DATA_DIR 資料夾內，完全找不到檔名包含『大股東』或『神秘金字塔』的 CSV 檔案！請檢查檔名。")
+    
     st.markdown("<div id='section-5'></div>", unsafe_allow_html=True)
     
     # 0. 預先掃描最新檔案日期以供標題基準日顯示
