@@ -4527,7 +4527,6 @@ if current_page in ["all", "pool"]:
                     if dict_400: st.write(f"- 抽樣預覽: `{list(dict_400.items())[:3]}`")
                 st.write("---")
                 # ==========================================
-..
 ###########
                 results = []
                 for _, row in pool_df.iterrows():
