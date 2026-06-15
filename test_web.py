@@ -378,7 +378,7 @@ st.markdown("""
         <a href="?page=news" target="_self" class="nav-text-link">☕ 市場消息</a><span class="nav-divider">|</span>
         <a href="?page=pool" target="_self" class="nav-text-link">⛲ 觀察名單</a><span class="nav-divider">|</span>
         <a href="?page=b1" target="_self" class="nav-text-link">👑 法人持股</a><span class="nav-divider">|</span>
-        <a href="?page=b2" target="_self" class="nav-text-link">🎯 買超佔比</a><span class="nav-divider">|</span>
+        <a href="?page=b2" target="_self" class="nav-text-link">🎯 法人掃貨</a><span class="nav-divider">|</span>
         <a href="?page=b3" target="_self" class="nav-text-link">📅 法人連買</a><span class="nav-divider">|</span>
         <a href="?page=b4" target="_self" class="nav-text-link">🔄 資券軋空</a><span class="nav-divider">|</span>
         <a href="?page=b5" target="_self" class="nav-text-link">💰 大腿動向</a><span class="nav-divider">|</span>
