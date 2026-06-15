@@ -426,7 +426,6 @@ st.markdown(
     unsafe_allow_html=True
 )
 
-
 import streamlit as st
 
 # ==========================================
@@ -434,6 +433,10 @@ import streamlit as st
 # ==========================================
 st.markdown("""
 <style>
+/* 1. 隱藏 Streamlit 預設頂部選單，避免重新整理時往下擠壓干擾 */
+[data-testid="stHeader"] {
+    display: none;
+}
 
 /* 2. 強制釘在瀏覽器最頂端的外框 */
 .sticky-header-wrapper {
@@ -519,12 +522,16 @@ st.markdown("""
     </div>
 </div>
 """, unsafe_allow_html=True)
+
+
 # ==========================================
 # 🚦 網頁路由控制中心 (極速切換引擎)
 # ==========================================
 # 【修改 1】：把預設值改成 "news"，這樣一進網站就會是最新消息！
 current_page = st.query_params.get("page", "news")
 
+# 👇👇👇 魔法傳送門接收點 (必須在導航列下方，完全靠左不縮排) 👇👇👇
+top_pool_slot = st.container()
 # 👆👆👆 ========================================================== 👆👆👆
 import time  # 引入時間模組來做快取破壞器開始市場消息
 # ========================================================== 
