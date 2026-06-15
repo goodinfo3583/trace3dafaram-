@@ -4763,29 +4763,24 @@ if current_page in ["all", "pool"]:
                             st.dataframe(top5_df[['代號', '名稱', '總分', '▼變量', '△', '最新動態', '▼明細']], use_container_width=True, hide_index=True)
                             
                             # ==========================================
-                            # 🔧 站長儲存區：改為 Google Sheets 永久存檔 + 抓取當下價格
+                            # 🔧 站長儲存區：寫入 Google Sheets + 當下收盤價存檔
                             # ==========================================
                             st.write("---")
-                            c_space, c_main = st.columns([3, 2]) # 讓密碼與按鈕靠右且變小
+                            c_space, c_main = st.columns([3, 2]) # 讓密碼與按鈕靠右縮小
                             with c_main:
                                 with st.expander("🔐 站長專用：寫入追蹤名單", expanded=True):
                                     track_pw = st.text_input("輸入密碼解鎖", type="password", key="track_pw")
                                     
                                     if track_pw == "DDong888":
-                                        # 按鈕稍微用自訂 CSS 縮小一點
                                         st.markdown("""
                                         <style>
-                                        div[data-testid="stButton"] > button {
-                                            padding: 0.25rem 0.5rem; font-size: 14px;
-                                        }
+                                        div[data-testid="stButton"] > button { padding: 0.25rem 0.5rem; font-size: 14px; }
                                         </style>
                                         """, unsafe_allow_html=True)
                                         
                                         if st.button("💾 儲存至 Google 雲端", type="primary", use_container_width=True):
                                             with st.spinner("正在抓取當前收盤價並寫入雲端..."):
                                                 track_date = datetime.datetime.now().strftime("%Y-%m-%d")
-                                                
-                                                # 1. 抓取這五檔當下的收盤價
                                                 current_prices = {}
                                                 import yfinance as yf
                                                 for sid in top5_df['代號']:
@@ -4801,24 +4796,18 @@ if current_page in ["all", "pool"]:
                                                 top5_df['鎖定日期'] = track_date
                                                 top5_df['鎖定收盤價'] = top5_df['代號'].astype(str).map(current_prices)
                                                 
-                                                # 2. 寫入 Google Sheets (工作表名稱為 "歷史名單回測觀察")
                                                 try:
-                                                    # 讀取舊資料
-                                                    try: 
-                                                        old_track = conn.read(spreadsheet=SHEET_URL, worksheet="歷史名單回測觀察", ttl=0).dropna(how="all")
-                                                    except: 
-                                                        old_track = pd.DataFrame()
-                                                    
-                                                    # 合併新資料並儲存
+                                                    try: old_track = conn.read(spreadsheet=SHEET_URL, worksheet="歷史名單回測觀察", ttl=0).dropna(how="all")
+                                                    except: old_track = pd.DataFrame()
                                                     new_track = pd.concat([old_track, top5_df], ignore_index=True)
                                                     conn.update(spreadsheet=SHEET_URL, worksheet="歷史名單回測觀察", data=new_track)
                                                     st.success(f"✅ 已成功將 {track_date} 的名單寫入 Google Sheets！")
                                                 except Exception as e:
-                                                    st.error(f"❌ 寫入 Google Sheets 失敗：{e} (請確認 Google Sheet 中是否有建立名為『歷史名單回測觀察』的工作表)")
+                                                    st.error(f"❌ 寫入失敗：{e} (請確認 Google Sheets 是否已建立『歷史名單回測觀察』工作表)")
                                     elif track_pw != "": st.error("密碼錯誤")
                                         
                     # ==========================================
-                    # 📊 歷史名單回測觀察：加入最新價格與漲跌幅追蹤
+                    # 📊 歷史名單回測觀察：搭載時光機結案引擎
                     # ==========================================
                     st.markdown("### 📊 歷史名單回測觀察")
                     try:
@@ -4827,27 +4816,57 @@ if current_page in ["all", "pool"]:
                             selected_week = st.selectbox("📅 選擇要回顧的鎖定日期", sorted(history_track_df['鎖定日期'].unique(), reverse=True))
                             week_df = history_track_df[history_track_df['鎖定日期'] == selected_week].copy()
                             
-                            with st.spinner("正在連線抓取最新價格..."):
-                                # 抓取歷史名單中股票的「最新價格」
+                            # 計算此梯次名單已鎖定多久
+                            import datetime
+                            from datetime import timedelta
+                            lock_date_obj = datetime.datetime.strptime(selected_week, "%Y-%m-%d")
+                            days_passed = (datetime.datetime.now() - lock_date_obj).days
+                            
+                            is_expired = days_passed >= 28 # 超過4週(28天)即判定結案
+                            
+                            if is_expired:
+                                status_tag = "🔴 已結案 (凍結在第4週)"
+                                # 決定時光機的目標日期：鎖定日後第 28 天
+                                target_start = lock_date_obj + timedelta(days=28)
+                                start_str = target_start.strftime("%Y-%m-%d")
+                                end_str = (target_start + timedelta(days=5)).strftime("%Y-%m-%d") # 給5天緩衝防假日
+                            else:
+                                weeks_passed = (days_passed // 7) + 1
+                                status_tag = f"🟢 追蹤中 (第 {weeks_passed} 週)"
+                                start_str = None # 代表抓最新
+
+                            st.markdown(f"**目前狀態：** `{status_tag}` ｜ **已鎖定：** `{days_passed} 天`")
+
+                            with st.spinner("正在連線抓取檢測價格..."):
                                 import yfinance as yf
                                 latest_prices = {}
                                 for sid in week_df['代號'].astype(str).str.replace(r'\.0$', '', regex=True):
                                     try:
-                                        p_df = yf.download(f"{sid}.TW", period="1d", progress=False)
-                                        if p_df.empty: p_df = yf.download(f"{sid}.TWO", period="1d", progress=False)
-                                        if not p_df.empty:
-                                            val = p_df['Close'].iloc[-1]
-                                            latest_prices[sid] = round(float(val.iloc[0] if isinstance(val, pd.Series) else val), 2)
-                                        else: latest_prices[sid] = 0.0
+                                        ticker_tw = f"{sid}.TW"
+                                        ticker_two = f"{sid}.TWO"
+                                        if start_str: # 🔴 已結案：啟動時光機抓取歷史凍結價
+                                            p_df = yf.download(ticker_tw, start=start_str, end=end_str, progress=False)
+                                            if p_df.empty: p_df = yf.download(ticker_two, start=start_str, end=end_str, progress=False)
+                                            if not p_df.empty:
+                                                val = p_df['Close'].iloc[0] # 抓該區間第一天的價格
+                                                latest_prices[sid] = round(float(val.iloc[0] if isinstance(val, pd.Series) else val), 2)
+                                            else: latest_prices[sid] = 0.0
+                                        else: # 🟢 追蹤中：抓取今日最新價
+                                            p_df = yf.download(ticker_tw, period="1d", progress=False)
+                                            if p_df.empty: p_df = yf.download(ticker_two, period="1d", progress=False)
+                                            if not p_df.empty:
+                                                val = p_df['Close'].iloc[-1]
+                                                latest_prices[sid] = round(float(val.iloc[0] if isinstance(val, pd.Series) else val), 2)
+                                            else: latest_prices[sid] = 0.0
                                     except: latest_prices[sid] = 0.0
 
-                            week_df['最新價格'] = week_df['代號'].astype(str).str.replace(r'\.0$', '', regex=True).map(latest_prices)
+                            col_price_name = "結案價格" if is_expired else "最新價格"
+                            week_df[col_price_name] = week_df['代號'].astype(str).str.replace(r'\.0$', '', regex=True).map(latest_prices)
                             
-                            # 計算價格漲跌幅
                             def calc_price_return(row):
                                 try:
                                     lock_p = float(row.get('鎖定收盤價', 0))
-                                    curr_p = float(row.get('最新價格', 0))
+                                    curr_p = float(row.get(col_price_name, 0))
                                     if lock_p > 0 and curr_p > 0:
                                         pct = ((curr_p - lock_p) / lock_p) * 100
                                         if pct > 0: return f"🚀 +{pct:.1f}%"
@@ -4872,10 +4891,13 @@ if current_page in ["all", "pool"]:
                                     
                                 week_df['模型分數變化'] = week_df.apply(score_diff, axis=1)
                                 
-                                # 整理顯示欄位
-                                show_cols = ['鎖定日期', '代號', '名稱', '鎖定收盤價', '最新價格', '區間報酬', '總分', '今日分數', '模型分數變化']
+                                show_cols = ['鎖定日期', '代號', '名稱', '鎖定收盤價', col_price_name, '區間報酬', '總分', '今日分數', '模型分數變化']
                                 st.dataframe(week_df[[c for c in show_cols if c in week_df.columns]], use_container_width=True, hide_index=True)
-                                st.info("💡 **驗證方法**：觀察鎖定股票的『區間報酬』是否為正，並核對『模型分數變化』是否持續上升。這能印證籌碼集中度與股價的連動性！")
+                                
+                                if is_expired:
+                                    st.info("🔒 此梯次名單已追蹤滿 4 週。為了客觀評估波段策略，此表已凍結於結案當時的收盤價與績效，不再隨每日盤勢波動。")
+                                else:
+                                    st.info("💡 **驗證方法**：觀察鎖定股票的『區間報酬』是否為正，並核對『模型分數變化』是否持續上升。這能印證籌碼集中度與股價的連動性！")
                     except Exception as e:
                         st.write("⚪ 尚無歷史追蹤紀錄，請輸入密碼鎖定第一筆，或確認 Google Sheets 已建立工作表。")
 # ==========================================
