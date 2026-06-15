@@ -4773,24 +4773,8 @@ if current_page in ["all", "pool"]:
 # ==========================================
 # 🧪 測試區：Google Sheets 連線測試
 # ==========================================
-
-# ==========================================
-# 📊 【蜂蜜計數器】本站累計觀測人次統計
-# ==========================================
-st.write("---")
-
-# 🌟 新增防護罩：如果伺服器上沒有這個資料夾，就自動建立一個，避免當機
-if not os.path.exists(DATA_DIR):
-    os.makedirs(DATA_DIR)
-
-counter_file = os.path.join(DATA_DIR, "counter.txt")
-if not os.path.exists(counter_file):
-    with open(counter_file, "w") as f: f.write("1")
-    count = 1
-else:
-    with open(counter_file, "r") as f:
-        try: count = int(f.read().strip()) + 1
-        except: count = 1
-    with open(counter_file, "w") as f: f.write(str(count))
-
-st.markdown(f"<p style='text-align: center; font-size: 16px; color: #DDA400; font-weight: bold;'>🐝 🍯 迷途不回家的小蜜蜂： {count} 隻 ｜ 祝阿東甜美收尾，順利通關畢業！ 🍯 🐝</p>", unsafe_allow_html=True)
+if st.button("🔄 立即強制同步大數據"):
+    # 在這裡做完你的資料更新邏輯...
+    
+    # 強制網頁從頭重跑，清洗並更新畫面
+    st.rerun()
