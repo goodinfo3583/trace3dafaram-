@@ -437,44 +437,78 @@ st.markdown(
 current_page = st.query_params.get("page", "news")
 
 # ==========================================
-# 📍 頂部：戰情室快速導航 (已移除載入全數據，保持純淨)
+# 📍 頂部按鈕
 # ==========================================
+
 st.markdown("""
 <style>
-/* 強制釘在瀏覽器最頂端的外框 */
+
+/* 2. 強制釘在瀏覽器最頂端的外框 */
 .sticky-header-wrapper {
     position: fixed; top: 0; left: 0; width: 100%; z-index: 999999;
-    box-shadow: 0px 4px 20px rgba(0, 0, 0, 0.6); background-color: #0A0D14;
+    background-color: transparent; /* 【修改】完全透明 */
+    /* box-shadow: 0px 4px 20px rgba(0, 0, 0, 0.6); 【刪除】移除外框陰影 */
+    pointer-events: none; /* 【關鍵】讓滑鼠可以穿透透明區域，避免擋住下方 Streamlit 元件 */
 }
-.disclaimer-bar { display: flex; background-color: #111622; padding: 0px 15px; border-bottom: 1px dashed #1E293B; }
+
+/* 【關鍵】恢復按鈕區塊的滑鼠互動能力 */
+.disclaimer-bar, .nav-btn-container {
+    pointer-events: auto; 
+}
+
+/* 3. 上層聲明列：透明背景 */
+.disclaimer-bar { 
+    display: flex; 
+    background-color: transparent; /* 【修改】完全透明 */
+    padding: 0px 15px; 
+    /* border-bottom: 1px dashed #1E293B; 【刪除】移除底線 */
+}
 .disclaimer-item { position: relative; padding: 6px 15px; cursor: help; }
-.disclaimer-title { color: #64748B; font-size: 13px; font-weight: 500; transition: all 0.2s; text-decoration: none; }
-.disclaimer-item:hover .disclaimer-title { color: #FFD700; text-shadow: 0 0 8px rgba(255, 215, 0, 0.5); }
+
+/* 【新增】文字陰影：背景透明後，必須加點陰影，否則字會跟下方圖表融在一起看不清 */
+.disclaimer-title { 
+    color: #64748B; font-size: 13px; font-weight: 500; transition: all 0.2s; text-decoration: none; 
+    text-shadow: 1px 1px 3px rgba(0, 0, 0, 0.9); 
+}
+.disclaimer-item:hover .disclaimer-title { color: #FFD700; text-shadow: 0 0 8px rgba(255, 215, 0, 0.8); }
+
+/* ⚠️ 下拉內容框不能透明，否則文字會無法閱讀，因此保留背景色並加一點微透 */
 .disclaimer-content {
     position: absolute; top: 100%; left: 0; width: 350px; max-width: 90vw;
-    background-color: #111622; border: 1px solid #1E293B; border-top: none;
+    background-color: rgba(17, 22, 34, 0.95); 
+    border: 1px solid #1E293B; border-top: none;
     border-radius: 0 0 8px 8px; padding: 0px 15px; max-height: 0; opacity: 0;
     overflow: hidden; transition: all 0.3s ease-in-out; font-size: 12px; color: #94A3B8; line-height: 1.6;
     box-shadow: 0px 8px 20px rgba(0,0,0,0.8);
 }
 .disclaimer-item:hover .disclaimer-content { max-height: 400px; opacity: 1; padding: 12px 15px; }
+
+/* 4. 下層導覽按鈕列：透明背景 */
 .nav-btn-container {
     display: flex; flex-wrap: wrap; justify-content: flex-end; align-items: center;
-    padding: 8px 15px; background-color: #0A0D14; border-bottom: 2px solid #1E293B; gap: 6px;
+    padding: 8px 15px; 
+    background-color: transparent; /* 【修改】完全透明 */
+    /* border-bottom: 2px solid #1E293B; 【刪除】移除底線 */
+    gap: 6px;
 }
 .nav-text-link {
     text-decoration: none !important; color: #94A3B8 !important; font-size: 16px; font-weight: 600; 
     padding: 4px 6px; transition: all 0.2s ease-in-out; font-family: -apple-system, BlinkMacSystemFont, "Microsoft JhengHei", sans-serif !important;
+    text-shadow: 1px 1px 3px rgba(0, 0, 0, 0.9); /* 【新增】文字陰影 */
 }
 .nav-text-link:hover { color: #FFD700 !important; text-shadow: 0 0 12px rgba(255, 215, 0, 0.8); transform: scale(1.08); }
 .nav-divider { color: #334155; font-size: 16px; user-select: none; }
+
 @media (max-width: 768px) {
     .nav-btn-container { justify-content: flex-end; padding: 5px 10px; }
     .nav-divider { display: none; }
     .nav-text-link { font-size: 14px; margin: 2px; }
 }
-.stApp { margin-top: 90px; }
+
+/* 讓 Streamlit 主要內容稍微往下推，避免被頂部按鈕擋住 */
+.stApp { margin-top: 50px; }
 </style>
+
 <div class="sticky-header-wrapper">
     <div class="disclaimer-bar">
         <div class="disclaimer-item"><span class="disclaimer-title">使用聲明</span><div class="disclaimer-content">本平台僅供教育研究與籌碼觀察，絕不構成任何實質投資建議、勸誘或要約。所有資料源自公開數據，受限於網路技術，可能有延遲或錯誤。<br><br>投資必有風險，依本平台資訊所做之任何決策與損益，均須由使用者自行負責，本平台不負擔任何法律賠償責任。</div></div>
@@ -493,9 +527,6 @@ st.markdown("""
     </div>
 </div>
 """, unsafe_allow_html=True)
-
-# 👇👇👇 魔法傳送門接收點 (必須在導航列下方，完全靠左不縮排) 👇👇👇
-top_pool_slot = st.container()
 # 👆👆👆 ========================================================== 👆👆👆
 import time  # 引入時間模組來做快取破壞器開始市場消息
 # ========================================================== 
