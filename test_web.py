@@ -141,42 +141,40 @@ for i, img_name in enumerate(image_files):
 
 # 4. 輪播圖 (Slideshow) HTML/CSS
 # 設定：總共 3 張圖，每張圖分配 5 秒，總共一輪 15 秒
-slideshow_code = f"""
+marquee_code = f"""
 <style>
-    /* 輪播圖的外部容器 */
     .slideshow-container {{
         position: relative;
         width: 100%;
-        height: 70px; /* 💡 可以在這裡調整圖片顯示的高度 */
-        background-color: #0A0D14; /* 配合您的深色背景 */
+        height: 70px;
+        background-color: #0A0D14;
         display: flex;
-        justify-content: center; /* 讓圖片置中對齊 */
+        justify-content: center;
         align-items: center;
         overflow: hidden;
         margin-bottom: 10px;
     }}
     
-    /* 每張圖片的預設狀態 */
     .slide {{
         position: absolute;
-        height: 100%; /* 讓圖片高度填滿容器 */
-        object-fit: contain; /* 保持圖片比例，不變形 */
-        opacity: 0; /* 預設全部透明隱藏 */
-        animation: fade 15s infinite; /* 總動畫長度 15 秒，無限循環 */
+        height: 100%;
+        object-fit: contain;
+        /* 核心修改：使用 visibility 來徹底隔離重疊影像 */
+        visibility: hidden; 
+        opacity: 0;
+        animation: fade 15s infinite;
     }}
 
-    /* 控制每張圖片的出場時間 (延遲播放) */
-    .slide-0 {{ animation-delay: 0s; }}   /* 第 1 張馬上出現 */
-    .slide-1 {{ animation-delay: 5s; }}   /* 第 2 張等 5 秒後出現 */
-    .slide-2 {{ animation-delay: 10s; }}  /* 第 3 張等 10 秒後出現 */
+    .slide-0 {{ animation-delay: 0s; }}
+    .slide-1 {{ animation-delay: 5s; }}
+    .slide-2 {{ animation-delay: 10s; }}
 
-    /* 淡入淡出的動畫腳本 (佔總長度 15 秒的百分比) */
     @keyframes fade {{
-        0%   {{ opacity: 0; }}
-        5%   {{ opacity: 1; }}   /* 快速淡入 */
-        28%  {{ opacity: 1; }}   /* 保持顯示狀態 */
-        33%  {{ opacity: 0; }}   /* 淡出隱藏，交棒給下一張 */
-        100% {{ opacity: 0; }}   /* 剩下的時間保持隱藏 */
+        0%   {{ visibility: hidden; opacity: 0; }}
+        1%   {{ visibility: visible; opacity: 1; }} /* 瞬間出現 */
+        32%  {{ visibility: visible; opacity: 1; }} /* 持續顯示 */
+        33%  {{ visibility: hidden; opacity: 0; }}  /* 瞬間消失 */
+        100% {{ visibility: hidden; opacity: 0; }}
     }}
 </style>
 
@@ -184,7 +182,6 @@ slideshow_code = f"""
     {image_tags}
 </div>
 """
-
 # 渲染到網頁上
 st.markdown(slideshow_code, unsafe_allow_html=True)
 #
