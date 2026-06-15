@@ -508,7 +508,7 @@ if (!parentDoc.getElementById('custom-sticky-header')) {
         .nav-text-link:hover { color: #FFD700 !important; text-shadow: 0 0 12px rgba(255, 215, 0, 0.8); transform: scale(1.08); }
         .nav-divider { color: #334155; font-size: 16px; user-select: none; }
         
-        /* 側邊欄專屬按鈕：拔除框線與背景，完美融入導覽列，只保留科技藍字體 */
+        /* 側邊欄專屬按鈕：融入導覽列，只保留科技藍字體 */
         #custom-sidebar-toggle {
             color: #38BDF8 !important; 
         }
@@ -843,9 +843,7 @@ def robust_read_csv_pool(file_path):
         except: continue
     return pd.read_csv(file_path, encoding='cp950', errors='ignore')
 
-# 👇 下方緊接著你原本的快搜工具...
-# --- 1. 快搜專屬工具 ---
-# def robust_search_engine(df, query):
+
 # ==========================================
 # 🌟 所有側邊欄專屬工具函數區 (🚨 必須放在 with st.sidebar 的最上方！)
 # ==========================================
@@ -1587,30 +1585,28 @@ if 'my_final_df' not in st.session_state or st.session_state['my_final_df'].empt
 # =======================================================
 # 側邊欄：戰情指揮中心 (內建個股快搜 + 大盤總經)
 # =======================================================
-with st.sidebar:
+# =======================================================
+# 🚀 終極局部渲染魔法：將整個側邊欄獨立為「不閃爍區塊」
+# =======================================================↓↓↓
+@st.fragment
+def render_sidebar_war_room():
     st.markdown("<div id='section-search'></div>", unsafe_allow_html=True)
 
     # 🌟 使用 100% 絕對生效的 Inline HTML 設計超高質感橫幅
     st.markdown("""
     <div style="background: linear-gradient(90deg, rgba(15,23,42,1) 0%, rgba(14,165,233,0.3) 50%, rgba(15,23,42,1) 100%); 
-                border-top: 1px solid #38bdf8; 
-                border-bottom: 1px solid #38bdf8; 
-                padding: 20px 20px; 
-                border-radius: 10px;
-                text-align: center;
-                box-shadow: 0px 0px 20px rgba(56, 189, 248, 0.2);
-                margin-bottom: 25px;">
+                border-top: 1px solid #38bdf8; border-bottom: 1px solid #38bdf8; padding: 20px 20px; 
+                border-radius: 10px; text-align: center; box-shadow: 0px 0px 20px rgba(56, 189, 248, 0.2); margin-bottom: 25px;">
         <h2 style="color: #e0f2fe; margin: 0; letter-spacing: 2px; text-shadow: 0 0 15px rgba(56, 189, 248, 0.8);">
             🔍 個股籌碼快搜
         </h2>
-        <p style="color: #94a3b8; margin-top: 8px; font-size: 14px; margin-bottom: 0;">
-            輸入代號聯動
-        </p>
+        <p style="color: #94a3b8; margin-top: 8px; font-size: 14px; margin-bottom: 0;">輸入代號聯動</p>
     </div>
     """, unsafe_allow_html=True)
-
     # 使用預設的帶邊框容器把圖表和表格包起來
     with st.container(border=True):
+################*************↑↑↑
+        
         # ==========================================
         # 📈 繪製 K 線圖與技術分析引擎
         # ==========================================
@@ -2016,6 +2012,35 @@ with st.sidebar:
                     st.warning("⚠️ 技術 K 線圖目前僅支援代號查詢。")
 
             st.markdown("<hr style='border-color: #334155;'>", unsafe_allow_html=True)
+#******************↓↓↓
+        # ==========================================
+        # 📊 優化：K 線控制台 (利用 Fragment 特性，捨棄 st.rerun)
+        # ==========================================
+        show_kline = st.toggle("📊 展開技術 K 線圖", value=st.session_state.get('show_kline', False), key="toggle_kline")
+        st.session_state.show_kline = show_kline
+
+        if show_kline:
+            if 'pure_stock_id' in locals() and pure_stock_id != "":          
+                st.markdown("##### ⚙️ 技術線圖與指標配置面板")
+                
+                # 改用 radio 取代 button，按下去會自動局部更新，完全不需要 st.rerun()！
+                kline_period = st.radio("選擇週期", ["日線", "週線", "月線"], horizontal=True, label_visibility="collapsed", key="kline_radio_period")
+                
+                ind_c1, ind_c2, ind_c3 = st.columns(3)
+                chk_kd = ind_c1.checkbox("顯示 KD (9,3,3)", value=False, key="kd_chk")
+                chk_macd = ind_c2.checkbox("顯示 MACD (12,26,9)", value=False, key="macd_chk")
+                chk_rsi = ind_c3.checkbox("顯示 RSI (14)", value=False, key="rsi_chk")
+                st.write("") 
+                
+                with st.spinner(f"正在擷取 {pure_stock_id} 的最新數據..."):
+                    all_mas = ["5MA", "10MA", "20MA", "60MA", "120MA", "240MA"]
+                    render_technical_chart(pure_stock_id, kline_period, all_mas, chk_rsi, chk_macd, chk_kd)
+            else:
+                st.warning("⚠️ 技術 K 線圖目前僅支援代號查詢。")
+
+#******************↑↑↑
+
+            
             st.markdown("<h4 style='color: #FCD34D;'>👑 區塊 1：短中長線三大法人持股變化</h4>", unsafe_allow_html=True)
             
             if 'my_final_df' in st.session_state:
@@ -2214,8 +2239,13 @@ with st.sidebar:
                     <div style="font-size: 14px; font-weight: 600; color: {fng_color};">{f_rating}</div>
                 </div>
                 """, unsafe_allow_html=True)
-
-
+##**************************************↓↓↓
+# =======================================================
+# 側邊欄：實際呼叫魔法渲染區塊
+# =======================================================
+with st.sidebar:
+    render_sidebar_war_room()
+##**************************************↑↑↑    
 # ==========================================
 # ✉️ 獨立分頁：聯絡我們 (完美黑夜派對版)
 # ==========================================
