@@ -183,7 +183,7 @@ marquee_code = f"""
 </div>
 """
 # 渲染到網頁上
-slideshow_code = f""" ... """  # 將定義名稱也改為 slideshow_code
+st.markdown(marquee_code, unsafe_allow_html=True)
 #
 # ==========================================
 # 🛑 隱形急救引擎 (請置於程式最頂端，絕對不要刪除！)
