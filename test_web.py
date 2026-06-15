@@ -12,7 +12,7 @@ import math
 # ==========================================
 # 1. 網頁基本設定 & 目錄路徑初始化
 # ==========================================
-st.set_page_config(page_title="台股籌碼五大核心矩陣儀表板", layout="wide")
+st.set_page_config(page_title="股市派對", layout="wide")
 
 # 👇 啟動 Google Sheets 永久連線引擎 (全域共用)
 from streamlit_gsheets import GSheetsConnection
