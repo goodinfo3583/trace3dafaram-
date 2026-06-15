@@ -435,7 +435,7 @@ def show_news_page():
         return
 
     date_range_str = f"{loaded_dates[-1]} ~ {loaded_dates[0]}" if len(loaded_dates) > 1 else loaded_dates[0]
-    st.success(請勿僅透過新聞研究股票！")
+    
     
     # ==========================================
     # 🎨 注入 CSS 樣式
