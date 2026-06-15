@@ -9,6 +9,16 @@ import datetime
 import requests  
 import pytz  
 import math
+# 隱藏 Streamlit
+hide_streamlit_style = """
+            <style>
+            #MainMenu {visibility: hidden;}
+            footer {visibility: hidden;}
+            header {visibility: hidden;}
+            div[data-testid="stToolbar"] {visibility: hidden;}
+            </style>
+            """
+st.markdown(hide_streamlit_style, unsafe_allow_html=True)
 # ==========================================
 # 1. 網頁基本設定 & 目錄路徑初始化
 # ==========================================
