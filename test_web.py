@@ -441,7 +441,7 @@ import streamlit as st
 import streamlit.components.v1 as components
 
 # ==========================================
-# 📍 頂部按鈕 (終極版：全域凍結 + 內建側邊欄呼叫開關)
+# 📍 頂部按鈕 (終極無縫切換版 - 拒絕白屏閃爍)
 # ==========================================
 inject_js = """
 <script>
@@ -449,129 +449,106 @@ const parentDoc = window.parent.document;
 
 if (!parentDoc.getElementById('custom-sticky-header')) {
     
-    // 1. 注入 CSS 樣式
     const style = parentDoc.createElement('style');
     style.innerHTML = `
-        /* 隱藏 Streamlit 原生頂部選單與右上角三點 */
+        /* 隱藏原生選單與外框 */
         [data-testid="stHeader"] { display: none !important; }
         [data-testid="stToolbar"] { display: none !important; }
-        
-        /* 將原生展開按鈕稍微往下推，作為備用 (使用者也可以直接按我們的新按鈕) */
-        [data-testid="collapsedControl"] {
-            top: 70px !important; 
-            z-index: 1000000 !important;
-            background-color: rgba(10, 13, 20, 0.8) !important;
-            border-radius: 50%;
-        }
+        [data-testid="collapsedControl"] { top: 70px !important; z-index: 1000000 !important; background-color: rgba(10, 13, 20, 0.8) !important; border-radius: 50%; }
 
-        /* 最外層框架：完全透明、滑鼠穿透 */
-        #custom-sticky-header {
-            position: fixed; top: 0; left: 0; width: 100%; z-index: 999999;
-            background: transparent !important;
-            background-color: transparent !important;
-            box-shadow: none !important;
-            pointer-events: none;
-        }
-        
-        /* 恢復區塊的滑鼠點擊功能 */
+        /* 透明導覽列 CSS (保持你原本的絕美設計) */
+        #custom-sticky-header { position: fixed; top: 0; left: 0; width: 100%; z-index: 999999; background: transparent !important; pointer-events: none; }
         .disclaimer-bar, .nav-btn-container { pointer-events: auto; }
-        
-        /* 上排聲明區塊：強制透明、拔除底線 */
-        .disclaimer-bar { 
-            display: flex; background: transparent !important; background-color: transparent !important; 
-            padding: 0px 15px; border: none !important; border-bottom: none !important; box-shadow: none !important;
-        }
+        .disclaimer-bar { display: flex; background: transparent !important; padding: 0px 15px; border: none !important; }
         .disclaimer-item { position: relative; padding: 6px 15px; cursor: help; background: transparent !important; }
-        .disclaimer-title { color: #64748B; font-size: 13px; font-weight: 500; transition: all 0.2s; text-decoration: none; text-shadow: 1px 1px 4px rgba(0, 0, 0, 1), -1px -1px 4px rgba(0, 0, 0, 1); }
+        .disclaimer-title { color: #64748B; font-size: 13px; font-weight: 500; text-decoration: none; text-shadow: 1px 1px 4px rgba(0,0,0,1), -1px -1px 4px rgba(0,0,0,1); }
         .disclaimer-item:hover .disclaimer-title { color: #FFD700; text-shadow: 0 0 8px rgba(255, 215, 0, 0.8); }
-        
-        .disclaimer-content {
-            position: absolute; top: 100%; left: 0; width: 350px; max-width: 90vw;
-            background-color: rgba(17, 22, 34, 0.95); border: 1px solid #1E293B; border-top: none;
-            border-radius: 0 0 8px 8px; padding: 0px 15px; max-height: 0; opacity: 0;
-            overflow: hidden; transition: all 0.3s ease-in-out; font-size: 12px; color: #94A3B8; line-height: 1.6;
-            box-shadow: 0px 8px 20px rgba(0,0,0,0.8);
-        }
+        .disclaimer-content { position: absolute; top: 100%; left: 0; width: 350px; max-width: 90vw; background-color: rgba(17, 22, 34, 0.95); border: 1px solid #1E293B; border-top: none; border-radius: 0 0 8px 8px; padding: 0px 15px; max-height: 0; opacity: 0; overflow: hidden; transition: all 0.3s; font-size: 12px; color: #94A3B8; line-height: 1.6; box-shadow: 0px 8px 20px rgba(0,0,0,0.8); }
         .disclaimer-item:hover .disclaimer-content { max-height: 400px; opacity: 1; padding: 12px 15px; }
         
-        /* 下排導覽按鈕：全透明、無底線 */
-        .nav-btn-container {
-            display: flex; flex-wrap: wrap; justify-content: flex-end; align-items: center;
-            padding: 8px 15px; background: transparent !important; background-color: transparent !important; 
-            gap: 6px; border: none !important; border-bottom: none !important;
-        }
-        .nav-text-link {
-            text-decoration: none !important; color: #94A3B8 !important; font-size: 16px; font-weight: 600; 
-            padding: 4px 6px; transition: all 0.2s ease-in-out; font-family: -apple-system, BlinkMacSystemFont, "Microsoft JhengHei", sans-serif !important;
-            text-shadow: 1px 1px 4px rgba(0, 0, 0, 1), -1px -1px 4px rgba(0, 0, 0, 1);
-        }
+        .nav-btn-container { display: flex; flex-wrap: wrap; justify-content: flex-end; align-items: center; padding: 8px 15px; background: transparent !important; gap: 6px; border: none !important; }
+        .nav-text-link { text-decoration: none !important; color: #94A3B8 !important; font-size: 16px; font-weight: 600; padding: 4px 6px; transition: all 0.2s ease-in-out; text-shadow: 1px 1px 4px rgba(0,0,0,1), -1px -1px 4px rgba(0,0,0,1); cursor: pointer; }
         .nav-text-link:hover { color: #FFD700 !important; text-shadow: 0 0 12px rgba(255, 215, 0, 0.8); transform: scale(1.08); }
         .nav-divider { color: #334155; font-size: 16px; user-select: none; }
-        
-        /* 側邊欄專屬按鈕：融入導覽列，只保留科技藍字體 */
-        #custom-sidebar-toggle {
-            color: #38BDF8 !important; 
-        }
-
-        @media (max-width: 768px) {
-            .nav-btn-container { justify-content: flex-end; padding: 5px 10px; }
-            .nav-divider { display: none; }
-            .nav-text-link { font-size: 14px; margin: 2px; }
-        }
-        
+        #custom-sidebar-toggle { color: #38BDF8 !important; }
+        @media (max-width: 768px) { .nav-btn-container { padding: 5px 10px; } .nav-divider { display: none; } .nav-text-link { font-size: 14px; margin: 2px; } }
         .stApp { margin-top: 50px !important; }
     `;
     parentDoc.head.appendChild(style);
 
-    // 2. 注入 HTML 結構 (在按鈕列最左側加入「📂 呼叫/收合側邊欄」)
+    // 🚀 關鍵修正：將 href="?page=xxx" 改為 href="#"，並加入 data-target 對接傀儡按鈕
     const headerDiv = parentDoc.createElement('div');
     headerDiv.id = 'custom-sticky-header';
     headerDiv.innerHTML = `
         <div class="disclaimer-bar">
-            <div class="disclaimer-item"><span class="disclaimer-title">使用聲明</span><div class="disclaimer-content">本平台僅供教育研究與籌碼觀察，絕不構成任何實質投資建議、勸誘或要約。所有資料源自公開數據，受限於網路技術，可能有延遲或錯誤。<br><br>投資必有風險，依本平台資訊所做之任何決策與損益，均須由使用者自行負責，本平台不負擔任何法律賠償責任.</div></div>
-            <div class="disclaimer-item"><span class="disclaimer-title">隱私權政策</span><div class="disclaimer-content"><b>1. 蒐集目的與範圍：</b><br>本平台依個資法蒐集您的識別資料僅供維持系統安全與優化服務使用。<br><b>2. 資料利用：</b><br>您的資料絕不向第三方洩露。<br><b>3. 資料刪除：</b><br>您可透過「聯絡我們」請求刪除資料。<br><b>4. 政策修訂：</b><br>本站保留修改政策之權利，繼續使用即視為同意。</div></div>
-            <div class="disclaimer-item"><a href="?page=contact" target="_self" class="disclaimer-title" style="cursor: pointer;">聯絡我們</a></div>
+            <div class="disclaimer-item"><span class="disclaimer-title">使用聲明</span><div class="disclaimer-content">本平台僅供教育研究...</div></div>
+            <div class="disclaimer-item"><span class="disclaimer-title">隱私權政策</span><div class="disclaimer-content">1. 蒐集目的與範圍...</div></div>
+            <div class="disclaimer-item"><a href="#" data-target="NavToContact" class="disclaimer-title internal-nav" style="cursor: pointer;">聯絡我們</a></div>
         </div>
         <div class="nav-btn-container">
             <a href="#" id="custom-sidebar-toggle" class="nav-text-link">📂 呼叫側邊欄</a><span class="nav-divider">|</span>
-            <a href="?page=news" target="_self" class="nav-text-link">☕ 市場消息</a><span class="nav-divider">|</span>
-            <a href="?page=pool" target="_self" class="nav-text-link">⛲ 觀察名單</a><span class="nav-divider">|</span>
-            <a href="?page=b1" target="_self" class="nav-text-link">👑 法人持股</a><span class="nav-divider">|</span>
-            <a href="?page=b2" target="_self" class="nav-text-link">🎯 法人掃貨</a><span class="nav-divider">|</span>
-            <a href="?page=b3" target="_self" class="nav-text-link">📅 法人連買</a><span class="nav-divider">|</span>
-            <a href="?page=b4" target="_self" class="nav-text-link">🔄 資券軋空</a><span class="nav-divider">|</span>
-            <a href="?page=b5" target="_self" class="nav-text-link">💰 大腿動向</a><span class="nav-divider">|</span>
-            <a href="?page=b6" target="_self" class="nav-text-link">🎣 鉅額交易</a>
+            <a href="#" data-target="NavToNews" class="nav-text-link internal-nav">☕ 市場消息</a><span class="nav-divider">|</span>
+            <a href="#" data-target="NavToPool" class="nav-text-link internal-nav">⛲ 觀察名單</a><span class="nav-divider">|</span>
+            <a href="#" data-target="NavToB1" class="nav-text-link internal-nav">👑 法人持股</a><span class="nav-divider">|</span>
+            <a href="#" data-target="NavToB2" class="nav-text-link internal-nav">🎯 法人掃貨</a><span class="nav-divider">|</span>
+            <a href="#" data-target="NavToB3" class="nav-text-link internal-nav">📅 法人連買</a><span class="nav-divider">|</span>
+            <a href="#" data-target="NavToB4" class="nav-text-link internal-nav">🔄 資券軋空</a><span class="nav-divider">|</span>
+            <a href="#" data-target="NavToB5" class="nav-text-link internal-nav">💰 大腿動向</a><span class="nav-divider">|</span>
+            <a href="#" data-target="NavToB6" class="nav-text-link internal-nav">🎣 鉅額交易</a>
         </div>
     `;
     parentDoc.body.insertBefore(headerDiv, parentDoc.body.firstChild);
 
-    // 3. 綁定按鈕的 JavaScript 點擊事件，無縫控制 Streamlit 側邊欄
+    // 🚀 無縫攔截點擊事件，代為點擊底層的 Streamlit 傀儡按鈕
     setTimeout(() => {
+        const navLinks = parentDoc.querySelectorAll('.internal-nav');
+        navLinks.forEach(link => {
+            link.addEventListener('click', (e) => {
+                e.preventDefault(); // 絕對阻止瀏覽器白畫面重載
+                const targetName = link.getAttribute('data-target');
+                
+                // 尋找隱藏的 Streamlit 按鈕並點擊
+                const btns = Array.from(parentDoc.querySelectorAll('button'));
+                const targetBtn = btns.find(b => b.innerText.includes(targetName));
+                if (targetBtn) {
+                    targetBtn.click();
+                }
+            });
+        });
+
+        // 側邊欄呼叫按鈕邏輯 (不變)
         const toggleBtn = parentDoc.getElementById('custom-sidebar-toggle');
         if (toggleBtn) {
             toggleBtn.addEventListener('click', (e) => {
-                e.preventDefault(); // 阻止 href="#" 造成的畫面跳動
-                
-                // 尋找 Streamlit 預設的「展開」按鈕 (此時側邊欄為收合狀態)
+                e.preventDefault();
                 const expandBtn = parentDoc.querySelector('[data-testid="collapsedControl"]');
-                
-                if (expandBtn) {
-                    expandBtn.click(); // 執行展開
-                } else {
-                    // 如果找不到展開按鈕，代表側邊欄正在開啟狀態，我們去點擊裡面的「關閉」按鈕
+                if (expandBtn) expandBtn.click();
+                else {
                     const sidebar = parentDoc.querySelector('[data-testid="stSidebar"]');
                     if (sidebar) {
                         const closeBtn = sidebar.querySelector('button');
-                        if (closeBtn) closeBtn.click(); // 執行收合
+                        if (closeBtn) closeBtn.click();
                     }
                 }
             });
         }
-    }, 1000); // 稍微延遲 1 秒，確保 Streamlit 原生元件已完全載入
+        
+        // 🛡️ 隱藏守護員：持續掃描並隱藏那些醜醜的傀儡按鈕
+        setInterval(() => {
+            const allBtns = Array.from(parentDoc.querySelectorAll('button'));
+            allBtns.forEach(b => {
+                if(b.innerText.includes('NavTo')) {
+                    const wrapper = b.closest('div[data-testid="stElementContainer"]');
+                    if (wrapper) wrapper.style.display = 'none';
+                }
+            });
+        }, 50);
+
+    }, 500);
 }
 </script>
 """
+components.html(inject_js, height=0, width=0)
 
 # 透過隱藏的 iframe 執行上述的 JavaScript 注入
 components.html(inject_js, height=0, width=0)
@@ -4844,3 +4821,23 @@ if current_page == "contact":
     
     # 強制網頁從頭重跑，清洗並更新畫面
     #st.rerun()
+# ==========================================
+# 🎭 幕後無縫換頁引擎 (傀儡按鈕區)
+# 請將這段放在程式碼的最底部！
+# ==========================================
+def change_page(page_name):
+    """狀態切換器：改變頁面狀態並自動重新局部渲染，不閃屏"""
+    st.session_state.current_page = page_name
+    # st.query_params["page"] = page_name  # 如果你需要網址也跟著變，可以取消註解這行
+
+with st.container():
+    # 這些按鈕會被上面的 JS 瞬間隱藏，使用者永遠看不到
+    st.button("NavToNews", on_click=change_page, args=("news",))
+    st.button("NavToPool", on_click=change_page, args=("pool",))
+    st.button("NavToB1", on_click=change_page, args=("b1",))
+    st.button("NavToB2", on_click=change_page, args=("b2",))
+    st.button("NavToB3", on_click=change_page, args=("b3",))
+    st.button("NavToB4", on_click=change_page, args=("b4",))
+    st.button("NavToB5", on_click=change_page, args=("b5",))
+    st.button("NavToB6", on_click=change_page, args=("b6",))
+    st.button("NavToContact", on_click=change_page, args=("contact",))
