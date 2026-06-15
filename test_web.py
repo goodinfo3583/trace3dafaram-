@@ -442,7 +442,10 @@ current_page = st.query_params.get("page", "news")
 
 st.markdown("""
 <style>
-
+/* 1. 隱藏 Streamlit 預設頂部選單，避免重新整理時往下擠壓干擾 */
+[data-testid="stHeader"] {
+    display: none;
+}
 /* 2. 強制釘在瀏覽器最頂端的外框 */
 .sticky-header-wrapper {
     position: fixed; top: 0; left: 0; width: 100%; z-index: 999999;
