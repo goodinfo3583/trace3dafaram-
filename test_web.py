@@ -4463,24 +4463,72 @@ if current_page in ["all", "pool"]:
                         if not temp_block.empty:
                             block_sids = set(temp_block['證券代號'].astype(str).str.replace(r'\D', '', regex=True))
                 except: pass
-
+###########
                 # ==========================================
-                # 🚀 修正 2：終極版代號清洗與字典對接引擎
+                # 🚀 修正 2：終極版代號清洗與「動態欄位」智慧轉換引擎
                 # ==========================================
                 def ultra_clean_id(val):
                     """將任何奇怪型別或夾帶小數點、空白的代號，全部扒光剩下純數字字串"""
                     v = str(val).strip().replace('.0', '')
                     return re.sub(r'\D', '', v)
 
+                def raw_delta_to_trend(val):
+                    """把原始 CSV 的數字增減，當場轉換為大戶動態文字"""
+                    try:
+                        v = float(str(val).replace('+', '').replace('%', '').strip())
+                        if v >= 1.5: return "🔥 大增"
+                        if v >= 0.5: return "📈 增"
+                        if v > 0: return "↗️ 微增"
+                        if v == 0: return "🔄 持平"
+                        if v > -0.5: return "↘️ 微減"
+                        return "🚨 減/大減"
+                    except: return "無資料"
+
                 dict_1000, dict_400 = {}, {}
                 
-                # 強制轉換 Key 為純字串並配對，絕對不會對接失敗
-                if not df_b5_1000.empty and '股票代號' in df_b5_1000.columns and '週動態' in df_b5_1000.columns:
-                    dict_1000 = {ultra_clean_id(k): str(v) for k, v in zip(df_b5_1000['股票代號'], df_b5_1000['週動態'])}
-                
-                if not df_b5_400.empty and '股票代號' in df_b5_400.columns and '週動態' in df_b5_400.columns:
-                    dict_400 = {ultra_clean_id(k): str(v) for k, v in zip(df_b5_400['股票代號'], df_b5_400['週動態'])}
+                # ------------------------------------------
+                # 🎯 處理 1000 張大戶字典 (支援雙模態)
+                # ------------------------------------------
+                if not df_b5_1000.empty and '股票代號' in df_b5_1000.columns:
+                    if '週動態' in df_b5_1000.columns:
+                        # 情況 A：讀取到的是區塊 5 處理過的表格
+                        dict_1000 = {ultra_clean_id(k): str(v) for k, v in zip(df_b5_1000['股票代號'], df_b5_1000['週動態'])}
+                    else:
+                        # 情況 B：讀取到的是原始 CSV！自動尋找增減欄位並當場轉換！
+                        delta_col = next((c for c in df_b5_1000.columns if '1千張增減' in c or '1000張增減' in c or '增減' in c), None)
+                        if delta_col:
+                            dict_1000 = {ultra_clean_id(k): raw_delta_to_trend(v) for k, v in zip(df_b5_1000['股票代號'], df_b5_1000[delta_col])}
 
+                # ------------------------------------------
+                # 🎯 處理 400 張大戶字典 (支援雙模態)
+                # ------------------------------------------
+                if not df_b5_400.empty and '股票代號' in df_b5_400.columns:
+                    if '週動態' in df_b5_400.columns:
+                        dict_400 = {ultra_clean_id(k): str(v) for k, v in zip(df_b5_400['股票代號'], df_b5_400['週動態'])}
+                    else:
+                        delta_col = next((c for c in df_b5_400.columns if '400張增減' in c or '總增減' in c or '增減' in c), None)
+                        if delta_col:
+                            dict_400 = {ultra_clean_id(k): raw_delta_to_trend(v) for k, v in zip(df_b5_400['股票代號'], df_b5_400[delta_col])}
+
+
+                # ==========================================
+                # 🕵️‍♂️ [觀察名單專屬] 大戶對接抓蟲雷達 (修復後確認用)
+                # ==========================================
+                st.success("🕵️‍♂️ **[抓蟲雷達] 智慧對接引擎已啟動！**")
+                c_test1, c_test2 = st.columns(2)
+                with c_test1:
+                    st.write(f"📌 **1. 字典 1000 張轉換結果**")
+                    st.write(f"- 成功配對筆數: `{len(dict_1000)}`")
+                    if dict_1000: st.write(f"- 抽樣預覽: `{list(dict_1000.items())[:3]}`")
+                
+                with c_test2:
+                    st.write(f"📌 **2. 字典 400 張轉換結果**")
+                    st.write(f"- 成功配對筆數: `{len(dict_400)}`")
+                    if dict_400: st.write(f"- 抽樣預覽: `{list(dict_400.items())[:3]}`")
+                st.write("---")
+                # ==========================================
+..
+###########
                 results = []
                 for _, row in pool_df.iterrows():
                     # 在迴圈內，一樣用最高規格把代號洗乾淨
