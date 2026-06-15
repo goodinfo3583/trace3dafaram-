@@ -112,7 +112,7 @@ bg_path = os.path.join(IMAGE_DIR, "派對盛宴邀請.png")
 set_background(bg_path)
 #跑馬燈
 # ==========================================
-# 跑馬燈區塊 (終極全自動配時 + 尺寸自訂版)
+# 跑馬燈區塊 (終極全自動配時 + 尺寸自訂 + 無縫直接切換版)
 # ==========================================
 import base64
 import os
@@ -128,13 +128,15 @@ def get_image_base64(image_path):
 
 # 2. 圖片檔名列表與資料夾設定
 image_folder = "static" 
-image_files = ["老虎滾滾.png", "畫家.png", "主城.png", "實驗家.png", "燈籠財源.png"]
+image_files = ["籌碼盛宴.png", "跑馬燈1.PNG", "跑馬燈2.PNG", "跑馬燈3.PNG", "花朵的樣子.gif"]
 
 # 💡 核心升級：自動計算時間，防呆防錯！
 total_images = len(image_files)
 time_per_slide = 5  # 每張圖片顯示 5 秒
-total_time = total_images * time_per_slide  # 自動算出總時間 (5張就是 25s)
-visible_percent = int((1 / total_images) * 100)  # 自動算出每張圖佔據的動畫百分比 (5張就是 20%)
+total_time = total_images * time_per_slide
+
+# 自動算出每張圖佔據的百分比 (例如 5 張就是 20.0%)
+visible_percent = (1 / total_images) * 100 
 
 # 3. 組合圖片標籤與自動生成 CSS 延遲時間
 image_tags = ""
@@ -144,20 +146,18 @@ for i, img_name in enumerate(image_files):
     if os.path.exists(img_path):
         b64 = get_image_base64(img_path)
         image_tags += f'<img class="slide slide-{i}" src="{b64}">'
-        # 自動為每一張圖寫入精確的延遲秒數 (0s, 5s, 10s...)
         delay_css += f"    .slide-{i} {{ animation-delay: {i * time_per_slide}s; }}\n"
     else:
         st.error(f"系統找不到這張圖片：{img_path}，請檢查檔名或大小寫！")
 
-# 4. 輪播圖 HTML/CSS
+# 4. 輪播圖 HTML/CSS (直接切換版)
 marquee_code = f"""
 <style>
     .slideshow-container {{
         position: relative;
-        /* 🎯 您指定的長寬設定 */
         width: 800px;
         height: 100px;
-        margin: 0 auto 10px auto; /* 讓 800px 的區塊在畫面正中間 */
+        margin: 0 auto 10px auto; 
         background-color: #0A0D14;
         display: flex;
         justify-content: center;
@@ -168,23 +168,19 @@ marquee_code = f"""
     .slide {{
         position: absolute;
         height: 100%;
-        object-fit: contain; /* 確保圖片不變形，會自動縮放適應 100px 高度 */
+        object-fit: contain; 
         visibility: hidden; 
         opacity: 0;
-        /* 自動代入總時間 */
-        animation: fade {total_time}s infinite; 
+        animation: cut {total_time}s infinite; /* 改用名為 cut 的動畫 */
     }}
 
-    /* 這裡會自動注入剛剛 Python 算好的延遲時間 */
+    /* 注入 Python 算好的延遲時間 */
 {delay_css}
 
-    /* 自動代入算好的百分比，完美接力 */
-    @keyframes fade {{
-        0%   {{ visibility: hidden; opacity: 0; }}
-        1%   {{ visibility: visible; opacity: 1; }} 
-        {visible_percent - 1}%  {{ visibility: visible; opacity: 1; }} 
-        {visible_percent}%  {{ visibility: hidden; opacity: 0; }}  
-        100% {{ visibility: hidden; opacity: 0; }}  
+    /* 💡 乾淨俐落的「直接切換」，強制在極短瞬間完成交接 */
+    @keyframes cut {{
+        0%, {visible_percent - 0.01:.2f}%   {{ visibility: visible; opacity: 1; }} 
+        {visible_percent:.2f}%, 100%        {{ visibility: hidden; opacity: 0; }}  
     }}
 </style>
 
