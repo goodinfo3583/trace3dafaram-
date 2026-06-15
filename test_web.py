@@ -36,27 +36,34 @@ if (!parentDoc.getElementById('custom-sticky-header')) {
         /* 隱藏 Streamlit 預設頂部選單 */
         [data-testid="stHeader"] { display: none !important; }
         
-        /* 最外層框架：完全透明、滑鼠穿透 */
+        /* 最外層框架：完全透明、滑鼠穿透、並強制移除可能繼承的背景底色 */
         #custom-sticky-header {
             position: fixed; top: 0; left: 0; width: 100%; z-index: 999999;
+            background: transparent !important;
             background-color: transparent !important;
+            box-shadow: none !important;
             pointer-events: none;
         }
         
         /* 恢復區塊的滑鼠點擊功能 */
         .disclaimer-bar, .nav-btn-container { pointer-events: auto; }
         
-        /* 【修改】上排聲明區塊：背景全透明、移除底部渲染線 */
+        /* 【關鍵修正】上排聲明區塊：強制使用 background: transparent 並拔除任何可能渲染的黑底線、框線 */
         .disclaimer-bar { 
             display: flex; 
+            background: transparent !important;
             background-color: transparent !important; 
             padding: 0px 15px; 
-            border: none !important; /* 確保沒有任何底線或邊框 */
+            border: none !important;
+            border-bottom: none !important;
+            box-shadow: none !important;
         }
-        .disclaimer-item { position: relative; padding: 6px 15px; cursor: help; }
+        .disclaimer-item { position: relative; padding: 6px 15px; cursor: help; background: transparent !important; }
+        
+        /* 提升標題文字在透明背景下的辨識度，加重陰影避免跟背景城堡圖融合 */
         .disclaimer-title { 
             color: #64748B; font-size: 13px; font-weight: 500; transition: all 0.2s; text-decoration: none; 
-            text-shadow: 1px 1px 3px rgba(0, 0, 0, 0.9); 
+            text-shadow: 1px 1px 4px rgba(0, 0, 0, 1), -1px -1px 4px rgba(0, 0, 0, 1); 
         }
         .disclaimer-item:hover .disclaimer-title { color: #FFD700; text-shadow: 0 0 8px rgba(255, 215, 0, 0.8); }
         
@@ -74,13 +81,17 @@ if (!parentDoc.getElementById('custom-sticky-header')) {
         /* 下排導覽按鈕：全透明、無底線 */
         .nav-btn-container {
             display: flex; flex-wrap: wrap; justify-content: flex-end; align-items: center;
-            padding: 8px 15px; background-color: transparent !important; gap: 6px; 
+            padding: 8px 15px; 
+            background: transparent !important;
+            background-color: transparent !important; 
+            gap: 6px; 
             border: none !important;
+            border-bottom: none !important;
         }
         .nav-text-link {
             text-decoration: none !important; color: #94A3B8 !important; font-size: 16px; font-weight: 600; 
             padding: 4px 6px; transition: all 0.2s ease-in-out; font-family: -apple-system, BlinkMacSystemFont, "Microsoft JhengHei", sans-serif !important;
-            text-shadow: 1px 1px 3px rgba(0, 0, 0, 0.9);
+            text-shadow: 1px 1px 4px rgba(0, 0, 0, 1), -1px -1px 4px rgba(0, 0, 0, 1);
         }
         .nav-text-link:hover { color: #FFD700 !important; text-shadow: 0 0 12px rgba(255, 215, 0, 0.8); transform: scale(1.08); }
         .nav-divider { color: #334155; font-size: 16px; user-select: none; }
@@ -101,7 +112,7 @@ if (!parentDoc.getElementById('custom-sticky-header')) {
     headerDiv.id = 'custom-sticky-header';
     headerDiv.innerHTML = `
         <div class="disclaimer-bar">
-            <div class="disclaimer-item"><span class="disclaimer-title">使用聲明</span><div class="disclaimer-content">本平台僅供教育研究與籌碼觀察，絕不構成任何實質投資建議、勸誘或要約。所有資料源自公開數據，受限於網路技術，可能有延遲或錯誤。<br><br>投資必有風險，依本平台資訊所做之任何決策與損益，均須由使用者自行負責，本平台不負擔任何法律賠償責任。</div></div>
+            <div class="disclaimer-item"><span class="disclaimer-title">使用聲明</span><div class="disclaimer-content">本平台僅供教育研究與籌碼觀察，絕不構成任何實質投資建議、勸誘或要約。所有資料源自公開數據，受限於網路技術，可能有延遲或錯誤。<br><br>投資必有風險，依本平台資訊所做之任何決策與損益，均須由使用者自行負責，本平台不負擔任何法律賠償責任.</div></div>
             <div class="disclaimer-item"><span class="disclaimer-title">隱私權政策</span><div class="disclaimer-content"><b>1. 蒐集目的與範圍：</b><br>本平台依個資法蒐集您的識別資料僅供維持系統安全與優化服務使用。<br><b>2. 資料利用：</b><br>您的資料絕不向第三方洩露。<br><b>3. 資料刪除：</b><br>您可透過「聯絡我們」請求刪除資料。<br><b>4. 政策修訂：</b><br>本站保留修改政策之權利，繼續使用即視為同意。</div></div>
             <div class="disclaimer-item"><a href="?page=contact" target="_self" class="disclaimer-title" style="cursor: pointer;">聯絡我們</a></div>
         </div>
