@@ -3810,7 +3810,6 @@ if current_page in ["all", "b4"]:
 # 💰 區塊 5：大股東動向 (四層級對稱系統 + 4碼日期完美排版)
 # ==========================================
 
-# 💡 修正點 1：將工具函數移到 if 鎖外面，確保全域可用且不干擾 Streamlit 執行
 def apply_b5_market_filters(df, show_etf, show_bond):
     if df is None or df.empty: return df
     is_etf = df['股票代號'].astype(str).str.startswith('00')
@@ -3822,17 +3821,17 @@ def apply_b5_market_filters(df, show_etf, show_bond):
 
 def process_major_shareholders(target_level):
     """
-    通用大戶資料產生器 (支援分批檔案合併與精準欄位對接)
-    target_level: '1千', '800', '600'
+    通用大戶資料產生器 (終極容錯防呆版 - 支援多種編碼與動態欄位對接)
     """
     import os, glob, re
     import pandas as pd
     
-    # 抓取所有大股東檔案
-    files = glob.glob(os.path.join(DATA_DIR, "*大股東*.csv"))
+    # 1. 不分大小寫抓取所有 CSV (避免附檔名變成 .CSV 抓不到)
+    files = []
+    for ext in ('*.csv', '*.CSV'):
+        files.extend(glob.glob(os.path.join(DATA_DIR, f"*大股東{ext}")))
     if not files: return pd.DataFrame()
     
-    # 依照檔名中的 8 碼日期分組 (把同為 20260613 的分批檔案歸類在一起)
     groups = {}
     for f in files:
         m = re.search(r'(\d{8})', os.path.basename(f))
@@ -3840,62 +3839,61 @@ def process_major_shareholders(target_level):
         groups.setdefault(key, []).append(f)
     
     merged, all_dates_4 = [], []
-    
-    # 動態產生要尋找的精準欄位名稱 (例如：'持股超過1千張(%)')
-    col_abs_name = f'持股超過{target_level}張(%)'
-    col_delta_name = f'超過{target_level}張增減'
+    # 建立彈性數字 (例如傳入 '1千'，就會同時尋找 '1千' 或 '1000')
+    target_num = target_level.replace('1千', '1000').replace('千', '000')
 
-    # 從最新日期開始處理
     for prefix, fs in sorted(groups.items(), reverse=True):
         chunks = []
         detected_date = None
         
         for f in fs:
+            df = None
+            # 2. 自動嘗試多種編碼，解決 Excel 另存新檔造成的亂碼報錯 (無聲崩潰的主因)
+            for enc in ['utf-8-sig', 'big5', 'cp950', 'utf-8']:
+                try:
+                    df = pd.read_csv(f, encoding=enc)
+                    break # 成功讀取就跳出編碼嘗試
+                except: pass
+            
+            if df is None or df.empty: continue
+            
+            # 3. 終極清洗：拔除所有隱形空白、換行符號與 BOM
+            df.columns = [re.sub(r'\s+', '', str(c)).replace('\ufeff', '') for c in df.columns]
+            
+            c_code = next((c for c in df.columns if '代號' in c or '代碼' in c), None)
+            c_name = next((c for c in df.columns if '名稱' in c), None)
+            
+            # 4. 高容錯比對 (容許 '1千' 或 '1000', 容許 '%' 或 '比例')
+            c_abs = next((c for c in df.columns if (target_level in c or target_num in c) and ('%' in c or '比例' in c) and '增減' not in c and '差' not in c), None)
+            c_delta = next((c for c in df.columns if (target_level in c or target_num in c) and ('增減' in c or '差' in c)), None)
+            c_date = next((c for c in df.columns if '日期' in c), None)
+            
+            if not all([c_code, c_name, c_abs, c_delta]): continue
+            
             try:
-                df = pd.read_csv(f, encoding='utf-8-sig')
-                # 清洗所有欄位名稱，避免隱形空白干擾
-                df.columns = [str(c).strip().replace('\n', '') for c in df.columns]
-                
-                c_code = next((c for c in df.columns if '代號' in c), None)
-                c_name = next((c for c in df.columns if '名稱' in c), None)
-                c_abs = next((c for c in df.columns if col_abs_name in c), None)
-                c_delta = next((c for c in df.columns if col_delta_name in c), None)
-                c_date = next((c for c in df.columns if '更新日期' in c or '更新 日期' in c), None)
-                
-                if not all([c_code, c_name, c_abs, c_delta]): continue
-                
-                # ✅ 關鍵修正：確保代號轉為乾淨的一維字串陣列
                 df['股票代號'] = df[c_code].astype(str).str.extract(r'(\d+)', expand=False)
                 df['股票名稱'] = df[c_name].astype(str).str.strip()
                 df['持股%'] = pd.to_numeric(df[c_abs].astype(str).str.replace('%', ''), errors='coerce')
                 df['增減%'] = pd.to_numeric(df[c_delta].astype(str).str.replace('+', '').str.replace('%', ''), errors='coerce')
                 
-                # 抓取實際檔案內的更新日期 (例如：檔名是0613，但裡面寫0612)
                 if detected_date is None and c_date and not df[c_date].dropna().empty:
-                    raw_date = str(df[c_date].dropna().iloc[0]).replace('/', '').strip()
-                    detected_date = raw_date[-4:] if len(raw_date) in [4, 8] else prefix[-4:]
-
+                    raw_date = str(df[c_date].dropna().iloc[0]).replace('/', '').replace('-', '').strip()
+                    detected_date = raw_date[-4:] if len(raw_date) >= 4 else prefix[-4:]
+                
                 chunks.append(df[['股票代號', '股票名稱', '持股%', '增減%']].dropna(subset=['股票代號']))
             except: continue
         
-        # 將同一個日期 (例如0613) 的所有分批檔案 (1-300, 301-600...) 組合起來
         if chunks:
-            comb = pd.concat(chunks, ignore_index=True)
-            # 如果有重複的代號，取最大值 (保險機制)
-            comb = comb.groupby(['股票代號', '股票名稱']).max().reset_index()
-            
+            # 合併同日期的分批資料 (1-300, 301-600...)
+            comb = pd.concat(chunks, ignore_index=True).groupby(['股票代號', '股票名稱']).max().reset_index()
             date_4 = detected_date if detected_date else prefix[-4:]
             if date_4 not in all_dates_4: all_dates_4.append(date_4)
-            
-            # 建立暫時名稱，以便後續合併
             comb = comb.rename(columns={'持股%': f"{date_4}持有%", '增減%': f"DELTA_{date_4}"})
             merged.append(comb)
             
     if merged:
         master = merged[0]
-        # 將不同週別的歷史資料進行 Outer Join 合併
         for m in merged[1:]: master = pd.merge(master, m, on=['股票代號', '股票名稱'], how='outer')
-        
         sorted_dates_4 = sorted(all_dates_4, reverse=True)
         latest_date_4 = sorted_dates_4[0]
         
@@ -3910,27 +3908,23 @@ def process_major_shareholders(target_level):
             
         master['週動態'] = master[f"DELTA_{latest_date_4}"].apply(get_trend)
         
-        # 計算 6 週增減
         delta_cols = [f"DELTA_{d}" for d in sorted_dates_4 if f"DELTA_{d}" in master.columns]
         master['▼6周增減'] = master[delta_cols[:6]].sum(axis=1, min_count=1)
         
-        # 欄位重新命名與排序邏輯 (只給最新日期加 ▼)
         rename_dict = {}
         cols_order = ['股票代號', '股票名稱', '週動態', '▼6周增減']
         
-        if f"{latest_date_4}持有%" in master.columns:
-            cols_order.append(f"{latest_date_4}持有%")
+        if f"{latest_date_4}持有%" in master.columns: cols_order.append(f"{latest_date_4}持有%")
             
         for i, d in enumerate(sorted_dates_4):
             original_delta_col = f"DELTA_{d}"
             if original_delta_col in master.columns:
-                new_delta_name = f"▼{d}" if i == 0 else f"{d}" # 最新增減加上 ▼
+                new_delta_name = f"▼{d}" if i == 0 else f"{d}"
                 rename_dict[original_delta_col] = new_delta_name
                 cols_order.append(new_delta_name)
                 
         master = master.rename(columns=rename_dict)
         final_df = master[[c for c in cols_order if c in master.columns]]
-        # 依照最新日期的增減幅度進行降冪排序
         final_df = final_df.sort_values(by=f"▼{latest_date_4}", ascending=False)
         return final_df
         
@@ -3938,23 +3932,58 @@ def process_major_shareholders(target_level):
 
 
 # ----------------------------------------------------
-# 🔒 區塊 5 專屬包廂鎖 (這以下才是 UI 渲染，包進 if 裡面)
+# 🔒 區塊 5 專屬包廂鎖
 # ----------------------------------------------------
 if current_page in ["all", "b5"]:
-    
     st.write("---")
-          
-        # 🕵️‍♂️ 系統抓蟲雷達：放在這裡，幫你直接看透 CSV 檔案結構！
-    st.error("🕵️‍♂️ **系統抓蟲雷達 (測試用，確認沒問題後可刪除)**")
-    b5_test_files = glob.glob(os.path.join(DATA_DIR, "*大股東*.csv")) + glob.glob(os.path.join(DATA_DIR, "*神秘金字塔*.csv"))
-    if b5_test_files:
-        test_df = pd.read_csv(b5_test_files[0], encoding='utf-8-sig')
-        st.write(f"📂 找到最新檔案： `{os.path.basename(b5_test_files[0])}`")
-        st.write(f"🏷️ 實際的欄位名稱有這些：", test_df.columns.tolist())
-    else:
-        st.warning("⚠️ 警告：在 DATA_DIR 資料夾內，完全找不到檔名包含『大股東』或『神秘金字塔』的 CSV 檔案！請檢查檔名。")
     
+    # ==========================================
+    # 🕵️‍♂️ 新版智慧抓蟲雷達：精準鎖定最新日期檔案進行體檢
+    # ==========================================
+    import glob, os, re
+    import pandas as pd
+    st.error("🕵️‍♂️ **系統抓蟲雷達：正在診斷最新大股東檔案...**")
+    
+    all_b5 = []
+    for ext in ('*.csv', '*.CSV'):
+        all_b5.extend(glob.glob(os.path.join(DATA_DIR, f"*大股東{ext}")))
+    
+    if all_b5:
+        # 強制依據檔名日期進行降冪排序，確保雷達抓到的是 0613，而不是 0529
+        all_b5_sorted = sorted(all_b5, key=lambda x: re.search(r'(\d{8})', x).group(1) if re.search(r'(\d{8})', x) else "00", reverse=True)
+        newest_file = all_b5_sorted[0]
+        st.write(f"📂 系統判定最新檔案為： `{os.path.basename(newest_file)}`")
+        
+        df_test = None
+        for enc in ['utf-8-sig', 'big5', 'cp950', 'utf-8']:
+            try:
+                df_test = pd.read_csv(newest_file, encoding=enc)
+                st.write(f"✅ 成功以 `{enc}` 編碼讀取檔案！(如果不是 utf-8-sig，代表檔案編碼已改變)")
+                break
+            except: pass
+        
+        if df_test is not None:
+            cleaned_cols = [re.sub(r'\s+', '', str(c)).replace('\ufeff', '') for c in df_test.columns]
+            st.write("🏷️ 檔案內的真實欄位名稱 (已清除隱形空白)：", cleaned_cols)
+            
+            c_c = next((c for c in cleaned_cols if '代號' in c or '代碼' in c), None)
+            c_a = next((c for c in cleaned_cols if ('1千' in c or '1000' in c) and ('%' in c or '比例' in c) and '增減' not in c and '差' not in c), None)
+            c_d = next((c for c in cleaned_cols if ('1千' in c or '1000' in c) and ('增減' in c or '差' in c)), None)
+            st.write(f"⚙️ 內部對接測試： 代號=[{c_c}], 持股比例=[{c_a}], 增減=[{c_d}]")
+            
+            if not all([c_c, c_a, c_d]):
+                st.warning("⚠️ 警告：系統無法對接這些欄位！(請比對上方標籤與內部對接的文字是否有落差)")
+            else:
+                st.success("✅ 欄位對接測試完美通過！請點擊『🚀 啟動全市場掃描』按鈕，讓它重新寫入記憶體生效。")
+        else:
+            st.warning("⚠️ 警告：系統完全無法解析該 CSV，請確認檔案是否損壞或被 Excel 鎖定。")
+    else:
+        st.warning("⚠️ 警告：資料夾內沒有大股東 CSV。")
+    # ==========================================
+
     st.markdown("<div id='section-5'></div>", unsafe_allow_html=True)
+    
+    # ...(以下保留你原本區塊5的 UI 渲染與 Tab 分頁邏輯)...
     
     # 0. 預先掃描最新檔案日期以供標題基準日顯示
     import glob, os, re
