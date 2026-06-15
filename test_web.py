@@ -111,32 +111,23 @@ if not os.path.exists(IMAGE_DIR):
 bg_path = os.path.join(IMAGE_DIR, "派對盛宴邀請.png")
 set_background(bg_path)
 #跑馬燈
-# 1. 圖片轉 Base64 的輔助函式
-def get_image_base64(image_path):
-    with open(image_path, "rb") as image_file:
-        encoded_string = base64.b64encode(image_file.read()).decode()
-    return f"data:image/png;base64,{encoded_string}"
+# 圖片檔名列表
+image_files = ["img1.png", "img2.png", "img3.png"]
 
-# 2. 讀取 image 資料夾下的 3 張圖
-image_folder = "image"
-image_files = ["跑馬燈1.png", "跑馬燈2.png", "跑馬燈3.png"] # 請確認您的檔名
+# 生成圖片標籤的 HTML
 image_tags = ""
-
 for img_name in image_files:
-    img_path = os.path.join(image_folder, img_name)
-    if os.path.exists(img_path):
-        b64 = get_image_base64(img_path)
-        # 設定圖片高度為 50px，寬度自動調整
-        image_tags += f'<img src="{b64}" style="height: 50px; margin: 0 20px;">'
+    # 直接使用 Streamlit 的 static 存取路徑
+    image_tags += f'<img src="/app/static/{img_name}" style="height: 50px; margin: 0 20px;">'
 
-# 3. 注入跑馬燈 CSS 與 HTML
+# 跑馬燈 HTML/CSS
 marquee_code = f"""
 <style>
     .marquee {{
         width: 100%;
         overflow: hidden;
         white-space: nowrap;
-        background-color: #0A0D14; /* 跟您的底色一致 */
+        background-color: #0A0D14;
         padding: 5px 0;
     }}
     .marquee-inner {{
@@ -156,6 +147,7 @@ marquee_code = f"""
 </div>
 """
 
+# 重要：unsafe_allow_html=True 是關鍵！
 st.markdown(marquee_code, unsafe_allow_html=True)
 #
 # ==========================================
