@@ -111,16 +111,38 @@ if not os.path.exists(IMAGE_DIR):
 bg_path = os.path.join(IMAGE_DIR, "派對盛宴邀請.png")
 set_background(bg_path)
 #跑馬燈
-# 圖片檔名列表
+# ==========================================
+# 跑馬燈區塊 (使用無敵的 Base64 直接讀取法)
+# ==========================================
+import base64
+import os
+
+# 1. 圖片轉 Base64 的輔助函式
+def get_image_base64(image_path):
+    with open(image_path, "rb") as image_file:
+        encoded_string = base64.b64encode(image_file.read()).decode()
+    return f"data:image/png;base64,{encoded_string}"
+
+# 2. 圖片檔名列表與資料夾設定
+# 🚨 剛剛您把圖片放進了 static 資料夾，所以這裡路徑指向 static
+image_folder = "static" 
 image_files = ["跑馬燈1.PNG", "跑馬燈2.PNG", "跑馬燈3.PNG"]
 
-# 生成圖片標籤的 HTML
+# 3. 生成圖片標籤的 HTML
 image_tags = ""
 for img_name in image_files:
-    # 直接使用 Streamlit 的 static 存取路徑
-    image_tags += f'<img src="/app/static/{img_name}" style="height: 50px; margin: 0 20px;">'
+    # 組合出檔案的真實路徑 (例如：static/跑馬燈1.PNG)
+    img_path = os.path.join(image_folder, img_name)
+    
+    if os.path.exists(img_path):
+        # 如果 Python 有找到這個檔案，就轉成 Base64 塞入網頁
+        b64 = get_image_base64(img_path)
+        image_tags += f'<img src="{b64}" style="height: 50px; margin: 0 20px;">'
+    else:
+        # 🐛 除錯小幫手：如果真的連 Python 都看不到檔案，它會在網頁最上面印出警告
+        st.error(f"系統找不到這張圖片：{img_path}，請檢查檔名或大小寫！")
 
-# 跑馬燈 HTML/CSS
+# 4. 跑馬燈 HTML/CSS
 marquee_code = f"""
 <style>
     .marquee {{
@@ -147,7 +169,6 @@ marquee_code = f"""
 </div>
 """
 
-# 重要：unsafe_allow_html=True 是關鍵！
 st.markdown(marquee_code, unsafe_allow_html=True)
 #
 # ==========================================
