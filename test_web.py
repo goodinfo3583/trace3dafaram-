@@ -4698,12 +4698,24 @@ if current_page in ["all", "pool"]:
                 elif not valid_calc:
                     st.warning("⚠️ 本次計算總分多數為 0，已啟動防呆攔截機制：暫不覆寫 Google Sheets 歷史紀錄。請點擊上方按鈕載入最新籌碼大數據。")
 
-                tab1, tab2, tab3 = st.tabs(["🔹 今日最新排行", "🔹 歷史分數追蹤表", "🔹 模型驗證：每週 Top 5 追蹤"])
+# ==========================================
+                # 🚀 終極 UI 修正：改用「帶有記憶功能的按鈕選單」取代傳統 Tabs
+                # 解決點選按鈕或輸入密碼後，畫面瘋狂跳回第一頁的痛點！
+                # ==========================================
+                st.markdown("<hr style='border-color: #334155;'>", unsafe_allow_html=True)
                 
-                with tab1:
+                selected_view = st.radio(
+                    "切換檢視面板：",
+                    ["🔹 今日最新排行", "🔹 歷史分數追蹤表", "🔹 模型驗證：每週 Top 5 追蹤"],
+                    horizontal=True,
+                    label_visibility="collapsed",
+                    key="pool_view_state"  # 🔑 這是關鍵！Streamlit 會自動記憶你的選擇，不再跳走
+                )
+                
+                if selected_view == "🔹 今日最新排行":
                     st.dataframe(res_df, use_container_width=True, hide_index=True, column_config={"▼明細": st.column_config.TextColumn("▼明細", help="滑鼠游標停留在這裡查看", width="small", max_chars=4)})
                     
-                with tab2:
+                elif selected_view == "🔹 歷史分數追蹤表":
                     try:
                         if not hist_combined.empty:
                             recent_dates = sorted(hist_combined['紀錄日期'].unique(), reverse=True)[:20]
@@ -4723,7 +4735,7 @@ if current_page in ["all", "pool"]:
                         else: st.warning("⚪ 尚無足夠的歷史分數紀錄。")
                     except: pass
 
-                with tab3:
+                elif selected_view == "🔹 模型驗證：每週 Top 5 追蹤":
                     st.markdown("### 🏆 AI 嚴選：今日最強 5 檔")
                     st.info("💡 **篩選邏輯**：排除任何帶有「外/投倒貨」警示的標的，並依據「總分」與「當日△」選出前 5 名。")
                     if not res_df.empty:
@@ -4751,7 +4763,8 @@ if current_page in ["all", "pool"]:
                             st.dataframe(top5_df[['代號', '名稱', '總分', '▼變量', '△', '最新動態', '▼明細']], use_container_width=True, hide_index=True)
                             
                             st.write("---")
-                            with st.expander("🛠 站長專用：鎖定本週追蹤名單", expanded=False):
+                            # 🔧 這裡將 expanded 改為 True，避免按下按鈕後又自動收合！
+                            with st.expander("🛠 站長專用：鎖定本週追蹤名單", expanded=True):
                                 c_pw, c_btn = st.columns([1, 2])
                                 with c_pw: track_pw = st.text_input("請輸入密碼解鎖", type="password", key="track_pw")
                                 with c_btn:
