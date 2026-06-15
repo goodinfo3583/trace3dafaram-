@@ -19,6 +19,16 @@ hide_streamlit_style = """
             </style>
             """
 st.markdown(hide_streamlit_style, unsafe_allow_html=True)
+#除錯紅色框
+st.markdown("""
+    <style>
+    /* 給所有主要的區塊加上紅色邊框 */
+    div[data-testid="stVerticalBlock"] {
+        border: 2px solid red !important;
+    }
+    </style>
+""", unsafe_allow_html=True)
+#除錯紅色框
 # ==========================================
 # 1. 網頁基本設定 & 目錄路徑初始化
 # ==========================================
