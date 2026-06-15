@@ -114,10 +114,6 @@ set_background(bg_path)
 # ==========================================
 # 跑馬燈區塊 (終極全自動配時 + 尺寸自訂 + 無縫直接切換版)
 # ==========================================
-import base64
-import os
-import streamlit as st
-
 # 1. 圖片轉 Base64 的輔助函式
 def get_image_base64(image_path):
     with open(image_path, "rb") as image_file:
@@ -356,11 +352,6 @@ STOCK_DICT = get_stock_dictionary()
 # ==========================================
 # 📡 證交所 API 直連：後台資料抓取引擎 (保留給側邊欄使用)
 # ==========================================
-import requests
-import datetime
-import pandas as pd
-import streamlit as st
-
 @st.cache_data(ttl=600)
 def fetch_twse_institutional_data():
     """自動連線證交所抓取今日三大法人買賣超 (BFI82U)"""
@@ -441,7 +432,7 @@ st.markdown(
 current_page = st.query_params.get("page", "news")
 
 # ==========================================
-# 📍 頂部：戰情室快速導航 (已移除載入全數據，保持純淨)
+# 📍 頂部按鈕
 # ==========================================
 st.markdown("""
 <style>
