@@ -123,7 +123,7 @@ def get_image_base64(image_path):
 
 # 2. 讀取 image 資料夾下的 3 張圖
 image_folder = "image"
-image_files = ["img1.png", "img2.png", "img3.png"] # 請確認您的檔名
+image_files = ["跑馬燈1.png", "跑馬燈2.png", "跑馬燈3.png"] # 請確認您的檔名
 image_tags = ""
 
 for img_name in image_files:
