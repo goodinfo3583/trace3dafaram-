@@ -3857,7 +3857,7 @@ def process_major_shareholders(target_level):
                 
                 if not all([c_code, c_name, c_abs, c_delta]): continue
                 
-                df['股票代號'] = df[c_code].astype(str).str.extract(r'(\d+)')
+                df['股票代號'] = df[c_code].astype(str).str.extract(r'(\d+)', expand=False)# ✅ 修正觀察名單讀取不到
                 df['股票名稱'] = df[c_name].astype(str).str.strip()
                 df['持股%'] = pd.to_numeric(df[c_abs].astype(str).str.replace('%', ''), errors='coerce')
                 df['增減%'] = pd.to_numeric(df[c_delta].astype(str).str.replace('+', '').str.replace('%', ''), errors='coerce')
@@ -4012,7 +4012,7 @@ if current_page in ["all", "b5"]:
                     df.columns = new_cols
                     
                     if '股票代號/名稱' in df.columns:
-                        df['股票代號'] = df['股票代號/名稱'].astype(str).str.extract(r'(\d+)')
+                        df['股票代號'] = df['股票代號/名稱'].astype(str).str.extract(r'(\d+)', expand=False)# ✅ 修正觀察名單讀取不到
                         df['股票名稱'] = df['股票代號/名稱'].astype(str).str.replace(r'^\d+', '', regex=True)
                     
                     df = df.set_index(['股票代號', '股票名稱'])
@@ -4458,12 +4458,35 @@ if current_page in ["all", "pool"]:
                             block_sids = set(temp_block['證券代號'].astype(str).str.replace(r'\D', '', regex=True))
                 except: pass
 
+                #results = []
+                #for _, row in pool_df.iterrows():
+                    #sid = str(row['股票代號']).strip()
+                    #sname = str(row.get('股票名稱', '')).strip()
+                    #b1_dyn = str(row.get(dyn_col, '')) if dyn_col else '-'
+                # ==========================================
+                # 🚀 關鍵修正：建立大股東動向極速字典 (確保代號全部為乾淨字串)
+                # ==========================================
+                dict_1000, dict_400 = {}, {}
+                if not df_b5_1000.empty and '股票代號' in df_b5_1000.columns and '週動態' in df_b5_1000.columns:
+                    dict_1000 = dict(zip(df_b5_1000['股票代號'].astype(str).str.strip(), df_b5_1000['週動態'].astype(str)))
+                
+                if not df_b5_400.empty and '股票代號' in df_b5_400.columns and '週動態' in df_b5_400.columns:
+                    dict_400 = dict(zip(df_b5_400['股票代號'].astype(str).str.strip(), df_b5_400['週動態'].astype(str)))
+
                 results = []
                 for _, row in pool_df.iterrows():
                     sid = str(row['股票代號']).strip()
                     sname = str(row.get('股票名稱', '')).strip()
                     b1_dyn = str(row.get(dyn_col, '')) if dyn_col else '-'
+               # ==========================================     
+                    try:
+                        delta_val = float(row.get('△', 0.0))
+                        b1_delta = "0.00" if abs(delta_val) < 0.005 else (f"+{delta_val:.2f}" if delta_val > 0 else f"{delta_val:.2f}")
+                    except: b1_delta = "0.00"
                     
+                    if sid in block_sids: b1_dyn = f"{b1_dyn} | 🎣 鉅額交易"
+                    b1_rank = str(row.get(rank_col, '-')) if rank_col else '-'
+                    score, details = 0.0, []    
                     try:
                         delta_val = float(row.get('△', 0.0))
                         b1_delta = "0.00" if abs(delta_val) < 0.005 else (f"+{delta_val:.2f}" if delta_val > 0 else f"{delta_val:.2f}")
@@ -4526,9 +4549,14 @@ if current_page in ["all", "pool"]:
                                 except: pass
                         if abs(short_decrease_val) >= 1: score += 1.2; details.append("空頭認輸(借券減>1%): +1.2")
 
+                    # ==========================================
+                    # 🚀 關鍵修正：使用字典 get() 抓取動態，取代原本的 .values 條件比對
+                    # ==========================================
                     r_b5_1000, r_b5_400, trend_1000_val, trend_400_val = "-", "-", "", ""
-                    if not df_b5_1000.empty and sid in df_b5_1000['股票代號'].values:
-                        trend_1000_val = str(df_b5_1000[df_b5_1000['股票代號'] == sid].iloc[0].get('週動態', ''))
+                    
+                    # 取出 1000 張動態
+                    trend_1000_val = dict_1000.get(sid, "")
+                    if trend_1000_val:
                         if '大增' in trend_1000_val: score += 2.0; r_b5_1000 = "🔥千張大增(+2)"; details.append("千張大增: +2")
                         elif '增' in trend_1000_val and '微' not in trend_1000_val: score += 1.0; r_b5_1000 = "📈千張增(+1)"; details.append("千張增: +1")
                         elif '微增' in trend_1000_val: score += 0.5; r_b5_1000 = "↗️千微增(+0.5)"; details.append("千張微增: +0.5")
@@ -4536,8 +4564,9 @@ if current_page in ["all", "pool"]:
                         elif '減' in trend_1000_val: score -= 0.5; r_b5_1000 = "📉千減(-0.5)"; details.append("千張減: -0.5")
                         else: r_b5_1000 = f"千{trend_1000_val}"
 
-                    if not df_b5_400.empty and sid in df_b5_400['股票代號'].values:
-                        trend_400_val = str(df_b5_400[df_b5_400['股票代號'] == sid].iloc[0].get('週動態', ''))
+                    # 取出 400 張動態
+                    trend_400_val = dict_400.get(sid, "")
+                    if trend_400_val:
                         if '大增' in trend_400_val: score += 1.0; r_b5_400 = "🔥四百大增(+1)"; details.append("四百大增: +1")
                         elif '增' in trend_400_val and '微' not in trend_400_val: score += 0.5; r_b5_400 = "📈四百增(+0.5)"; details.append("四百增: +0.5")
                         elif '微增' in trend_400_val: score += 0.0; r_b5_400 = "↗️四百微增(0)"
@@ -4545,10 +4574,37 @@ if current_page in ["all", "pool"]:
                         elif '減' in trend_400_val: score -= 0.0; r_b5_400 = "📉四百減(0)"
                         else: r_b5_400 = f"四百{trend_400_val}"
 
+                    # 雙引擎共振加分
                     if ('增' in trend_1000_val and '減' in trend_400_val):
                         score += 1.0; details.append("🌟籌碼極集中: +1"); r_b5_1000 = f"{r_b5_1000}🌟"
 
                     r_b5 = f"{r_b5_1000} | {r_b5_400}" if (r_b5_1000 != "-" or r_b5_400 != "-") else "-"
+
+
+
+                    #r_b5_1000, r_b5_400, trend_1000_val, trend_400_val = "-", "-", "", ""
+                    #if not df_b5_1000.empty and sid in df_b5_1000['股票代號'].values:
+                        #trend_1000_val = str(df_b5_1000[df_b5_1000['股票代號'] == sid].iloc[0].get('週動態', ''))
+                        #if '大增' in trend_1000_val: score += 2.0; r_b5_1000 = "🔥千張大增(+2)"; details.append("千張大增: +2")
+                        #elif '增' in trend_1000_val and '微' not in trend_1000_val: score += 1.0; r_b5_1000 = "📈千張增(+1)"; details.append("千張增: +1")
+                        #elif '微增' in trend_1000_val: score += 0.5; r_b5_1000 = "↗️千微增(+0.5)"; details.append("千張微增: +0.5")
+                        #elif '大減' in trend_1000_val: score -= 0.5; r_b5_1000 = "🚨千大減(-0.5)"; details.append("千張大減: -0.5")
+                        #elif '減' in trend_1000_val: score -= 0.5; r_b5_1000 = "📉千減(-0.5)"; details.append("千張減: -0.5")
+                        #else: r_b5_1000 = f"千{trend_1000_val}"
+
+                    #if not df_b5_400.empty and sid in df_b5_400['股票代號'].values:
+                        #trend_400_val = str(df_b5_400[df_b5_400['股票代號'] == sid].iloc[0].get('週動態', ''))
+                        #if '大增' in trend_400_val: score += 1.0; r_b5_400 = "🔥四百大增(+1)"; details.append("四百大增: +1")
+                        #elif '增' in trend_400_val and '微' not in trend_400_val: score += 0.5; r_b5_400 = "📈四百增(+0.5)"; details.append("四百增: +0.5")
+                        #elif '微增' in trend_400_val: score += 0.0; r_b5_400 = "↗️四百微增(0)"
+                        #elif '大減' in trend_400_val: score -= 0.0; r_b5_400 = "🚨四百大減(0)" 
+                        #elif '減' in trend_400_val: score -= 0.0; r_b5_400 = "📉四百減(0)"
+                        #else: r_b5_400 = f"四百{trend_400_val}"
+
+                    #if ('增' in trend_1000_val and '減' in trend_400_val):
+                        #score += 1.0; details.append("🌟籌碼極集中: +1"); r_b5_1000 = f"{r_b5_1000}🌟"
+
+                    #r_b5 = f"{r_b5_1000} | {r_b5_400}" if (r_b5_1000 != "-" or r_b5_400 != "-") else "-"
                     is_fo_sell = sid in fo_sell_ids; is_it_sell = sid in it_sell_ids
                     if is_fo_sell and is_it_sell: r_warn = "🚨外投雙倒"; score -= 2.0; details.append("外投雙倒: -2")
                     elif is_fo_sell: r_warn = "⚠️外資倒"
