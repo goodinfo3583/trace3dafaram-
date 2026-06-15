@@ -111,10 +111,6 @@ if not os.path.exists(IMAGE_DIR):
 bg_path = os.path.join(IMAGE_DIR, "派對盛宴邀請.png")
 set_background(bg_path)
 #跑馬燈
-import base64
-import os
-import streamlit as st
-
 # 1. 圖片轉 Base64 的輔助函式
 def get_image_base64(image_path):
     with open(image_path, "rb") as image_file:
