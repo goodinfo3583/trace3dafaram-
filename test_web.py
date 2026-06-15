@@ -508,17 +508,9 @@ if (!parentDoc.getElementById('custom-sticky-header')) {
         .nav-text-link:hover { color: #FFD700 !important; text-shadow: 0 0 12px rgba(255, 215, 0, 0.8); transform: scale(1.08); }
         .nav-divider { color: #334155; font-size: 16px; user-select: none; }
         
-        /* 側邊欄專屬按鈕的特別樣式，讓它更醒目 */
+        /* 側邊欄專屬按鈕：拔除框線與背景，完美融入導覽列，只保留科技藍字體 */
         #custom-sidebar-toggle {
-            color: #38BDF8 !important;
-            border: 1px solid rgba(56, 189, 248, 0.5);
-            border-radius: 6px;
-            padding: 4px 10px;
-            background-color: rgba(15, 23, 42, 0.6);
-        }
-        #custom-sidebar-toggle:hover {
-            background-color: rgba(56, 189, 248, 0.2);
-            box-shadow: 0 0 10px rgba(56, 189, 248, 0.5);
+            color: #38BDF8 !important; 
         }
 
         @media (max-width: 768px) {
@@ -2266,20 +2258,19 @@ if current_page == "contact":
                         
     # 🛑 最核心的魔法：渲染完聯絡表單後，直接強制停止後續程式！完全不讀取底下的大數據！
     st.stop()
+
+# ==========================================
+# 📍 預留給底層「觀察名單」傳送上來的隱形卡位槽
+# ==========================================
+top_pool_slot = st.empty()
 # ==========================================
 # 🏠 核心五大區塊
 # ==========================================
 # ==========================================
 # 🌟 區塊 1 專屬工具函數區 (必須放在 if 鎖外面，供應全站數據)
 # ==========================================
-import re
-import os
-import glob
-import pandas as pd
-import requests
-import datetime
+
 from collections import defaultdict
-import streamlit as st
 
 @st.cache_data(ttl=3600)
 def fetch_github_json_all():
