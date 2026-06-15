@@ -114,15 +114,15 @@ set_background(bg_path)
 # ==========================================
 # 跑馬燈區塊 (使用無敵的 Base64 直接讀取法)
 # ==========================================
-import base64
-import os
-
 # 1. 圖片轉 Base64 的輔助函式
+# 修正後的 Base64 轉換器，加入對 GIF 的支援
 def get_image_base64(image_path):
     with open(image_path, "rb") as image_file:
-        encoded_string = base64.b64encode(image_file.read()).decode()
-    return f"data:image/png;base64,{encoded_string}"
-
+        data = image_file.read()
+        # 判斷副檔名來決定編碼類型
+        mime_type = "image/gif" if image_path.lower().endswith('.gif') else "image/png"
+        encoded_string = base64.b64encode(data).decode()
+    return f"data:{mime_type};base64,{encoded_string}"
 # 2. 圖片檔名列表與資料夾設定
 # 🚨 剛剛您把圖片放進了 static 資料夾，所以這裡路徑指向 static
 image_folder = "static" 
