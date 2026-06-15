@@ -4550,7 +4550,60 @@ if current_page in ["all", "pool"]:
                                 try: short_decrease_val = float(str(df_b4_sho_pct.loc[df_b4_sho_pct['股票代號'] == sid, s_col].iloc[0]).replace('%', ''))
                                 except: pass
                         if abs(short_decrease_val) >= 1: score += 1.2; details.append("空頭認輸(借券減>1%): +1.2")
+#爬蟲除錯
+                # ==========================================
+                # 🚀 修正 2：終極版代號清洗與字典對接引擎
+                # ==========================================
+                def ultra_clean_id(val):
+                    """將任何奇怪型別或夾帶小數點、空白的代號，全部扒光剩下純數字字串"""
+                    v = str(val).strip().replace('.0', '')
+                    return re.sub(r'\D', '', v)
 
+                dict_1000, dict_400 = {}, {}
+                
+                # 強制轉換 Key 為純字串並配對
+                if not df_b5_1000.empty and '股票代號' in df_b5_1000.columns and '週動態' in df_b5_1000.columns:
+                    dict_1000 = {ultra_clean_id(k): str(v) for k, v in zip(df_b5_1000['股票代號'], df_b5_1000['週動態'])}
+                
+                if not df_b5_400.empty and '股票代號' in df_b5_400.columns and '週動態' in df_b5_400.columns:
+                    dict_400 = {ultra_clean_id(k): str(v) for k, v in zip(df_b5_400['股票代號'], df_b5_400['週動態'])}
+
+                # ==========================================
+                # 🕵️‍♂️ [觀察名單專屬] 大戶對接抓蟲雷達
+                # ==========================================
+                st.error("🕵️‍♂️ **[觀察名單專屬] 系統抓蟲雷達：正在診斷大戶資料對接...**")
+                
+                c_test1, c_test2 = st.columns(2)
+                with c_test1:
+                    st.write("📌 **1. 記憶體 df_blk5_1000 狀態**")
+                    st.write(f"- 是否為空: `{df_b5_1000.empty}`")
+                    if not df_b5_1000.empty:
+                        st.write(f"- 實際欄位: `{df_b5_1000.columns.tolist()}`")
+                        st.write(f"- 抽樣代號: `{df_b5_1000['股票代號'].head(3).tolist()}`")
+                        st.write(f"- 抽樣動態: `{df_b5_1000['週動態'].head(3).tolist() if '週動態' in df_b5_1000.columns else '無此欄位!'}`")
+                
+                with c_test2:
+                    st.write("📌 **2. 字典 dict_1000 狀態**")
+                    st.write(f"- 字典長度 (轉換成功筆數): `{len(dict_1000)}`")
+                    if dict_1000:
+                        sample_keys = list(dict_1000.keys())[:3]
+                        st.write(f"- 抽樣 Keys (代號): `{sample_keys}`")
+                        st.write(f"- 抽樣 Values (動態): `{[dict_1000[k] for k in sample_keys]}`")
+                
+                st.write("📌 **3. 觀察名單 (pool_df) 對接測試**")
+                if not pool_df.empty:
+                    test_sids = [ultra_clean_id(x) for x in pool_df['股票代號'].head(3)]
+                    st.write(f"- 觀察池準備拿去對接的代號 (已清洗): `{test_sids}`")
+                    for s in test_sids:
+                        st.write(f"  > 測試對接 `sid={s}` ➡️ 1000張結果: `{dict_1000.get(s, '找不到，回傳預設值!')}`")
+                # ==========================================
+
+                results = []
+                for _, row in pool_df.iterrows():
+                    # 在迴圈內，一樣用最高規格把代號洗乾淨
+                    sid = ultra_clean_id(row['股票代號'])
+                    # ... 後續程式碼不變 ...
+#爬蟲除錯
                     # ==========================================
                     # 🚀 修正 3：利用極速字典精準抓取動態
                     # ==========================================
