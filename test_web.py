@@ -114,33 +114,33 @@ set_background(bg_path)
 # ==========================================
 # 跑馬燈區塊 (使用無敵的 Base64 直接讀取法)
 # ==========================================
+import base64
+import os
+import streamlit as st
+
 # 1. 圖片轉 Base64 的輔助函式
-# 修正後的 Base64 轉換器，加入對 GIF 的支援
 def get_image_base64(image_path):
     with open(image_path, "rb") as image_file:
         data = image_file.read()
-        # 判斷副檔名來決定編碼類型
         mime_type = "image/gif" if image_path.lower().endswith('.gif') else "image/png"
         encoded_string = base64.b64encode(data).decode()
     return f"data:{mime_type};base64,{encoded_string}"
-# 2. 圖片檔名列表與資料夾設定
-# 🚨 剛剛您把圖片放進了 static 資料夾，所以這裡路徑指向 static
-image_folder = "static" 
-image_files = ["跑馬燈1.PNG", "跑馬燈2.PNG", "跑馬燈3.PNG", "花朵的樣子.gif"]
 
-# 3. 生成圖片標籤的 HTML (改成輪播專用格式)
+# 2. 圖片檔名列表與資料夾設定 (目前共 4 張圖)
+image_folder = "static" 
+image_files = ["籌碼盛宴.png","跑馬燈1.PNG", "跑馬燈2.PNG", "跑馬燈3.PNG", "花朵的樣子.gif"]
+
+# 3. 生成圖片標籤的 HTML
 image_tags = ""
 for i, img_name in enumerate(image_files):
     img_path = os.path.join(image_folder, img_name)
     if os.path.exists(img_path):
         b64 = get_image_base64(img_path)
-        # 給每張圖片加上獨立的 class (slide-0, slide-1, slide-2)，用來控制出場順序
         image_tags += f'<img class="slide slide-{i}" src="{b64}">'
     else:
         st.error(f"系統找不到這張圖片：{img_path}")
 
-# 4. 輪播圖 (Slideshow) HTML/CSS
-# 設定：總共 3 張圖，每張圖分配 5 秒，總共一輪 15 秒
+# 4. 輪播圖 (Slideshow) HTML/CSS (4張圖專用優化版)
 marquee_code = f"""
 <style>
     .slideshow-container {{
@@ -159,22 +159,24 @@ marquee_code = f"""
         position: absolute;
         height: 100%;
         object-fit: contain;
-        /* 核心修改：使用 visibility 來徹底隔離重疊影像 */
         visibility: hidden; 
         opacity: 0;
-        animation: fade 15s infinite;
+        animation: fade 20s infinite; /* 💡 4張圖 × 5秒 = 總共 20 秒 */
     }}
 
+    /* 💡 精確分配每張圖的出場時間，每 5 秒交棒一次 */
     .slide-0 {{ animation-delay: 0s; }}
     .slide-1 {{ animation-delay: 5s; }}
     .slide-2 {{ animation-delay: 10s; }}
+    .slide-3 {{ animation-delay: 15s; }} /* 補上關鍵的第 4 張圖延遲 */
 
+    /* 💡 重新計算 4 張圖的百分比 (每張佔 25%) */
     @keyframes fade {{
         0%   {{ visibility: hidden; opacity: 0; }}
-        1%   {{ visibility: visible; opacity: 1; }} /* 瞬間出現 */
-        32%  {{ visibility: visible; opacity: 1; }} /* 持續顯示 */
-        33%  {{ visibility: hidden; opacity: 0; }}  /* 瞬間消失 */
-        100% {{ visibility: hidden; opacity: 0; }}
+        1%   {{ visibility: visible; opacity: 1; }} /* 瞬間亮起 */
+        24%  {{ visibility: visible; opacity: 1; }} /* 保持顯示到接近第 5 秒 */
+        25%  {{ visibility: hidden; opacity: 0; }}  /* 第 5 秒準時隱形 */
+        100% {{ visibility: hidden; opacity: 0; }}  /* 剩餘時間保持隱形 */
     }}
 </style>
 
@@ -182,6 +184,7 @@ marquee_code = f"""
     {image_tags}
 </div>
 """
+
 # 渲染到網頁上
 st.markdown(marquee_code, unsafe_allow_html=True)
 #
