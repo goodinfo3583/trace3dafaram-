@@ -19,7 +19,16 @@ hide_streamlit_style = """
             </style>
             """
 st.markdown(hide_streamlit_style, unsafe_allow_html=True)
-
+#置頂預留縮排
+st.markdown("""
+    <style>
+    /* 縮小頁面頂部的留白 */
+    .block-container {
+        padding-top: 0.2 rem; /* 預設通常是 3rem，您可以調整成 0.5rem 或 0rem */
+    }
+    </style>
+""", unsafe_allow_html=True)
+#置頂預留縮排
 #除錯紅色框
 st.markdown("""
     <style>
