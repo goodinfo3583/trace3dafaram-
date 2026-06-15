@@ -110,6 +110,58 @@ if not os.path.exists(IMAGE_DIR):
 # 👉 自動組合新路徑：./image/派對盛宴邀請.png
 bg_path = os.path.join(IMAGE_DIR, "派對盛宴邀請.png")
 set_background(bg_path)
+#跑馬燈
+import base64
+import os
+import streamlit as st
+
+# 1. 圖片轉 Base64 的輔助函式
+def get_image_base64(image_path):
+    with open(image_path, "rb") as image_file:
+        encoded_string = base64.b64encode(image_file.read()).decode()
+    return f"data:image/png;base64,{encoded_string}"
+
+# 2. 讀取 image 資料夾下的 3 張圖
+image_folder = "image"
+image_files = ["img1.png", "img2.png", "img3.png"] # 請確認您的檔名
+image_tags = ""
+
+for img_name in image_files:
+    img_path = os.path.join(image_folder, img_name)
+    if os.path.exists(img_path):
+        b64 = get_image_base64(img_path)
+        # 設定圖片高度為 50px，寬度自動調整
+        image_tags += f'<img src="{b64}" style="height: 50px; margin: 0 20px;">'
+
+# 3. 注入跑馬燈 CSS 與 HTML
+marquee_code = f"""
+<style>
+    .marquee {{
+        width: 100%;
+        overflow: hidden;
+        white-space: nowrap;
+        background-color: #0A0D14; /* 跟您的底色一致 */
+        padding: 5px 0;
+    }}
+    .marquee-inner {{
+        display: inline-block;
+        animation: scroll 20s linear infinite;
+    }}
+    @keyframes scroll {{
+        0% {{ transform: translateX(100%); }}
+        100% {{ transform: translateX(-100%); }}
+    }}
+</style>
+
+<div class="marquee">
+    <div class="marquee-inner">
+        {image_tags}
+    </div>
+</div>
+"""
+
+st.markdown(marquee_code, unsafe_allow_html=True)
+#
 # ==========================================
 # 🛑 隱形急救引擎 (請置於程式最頂端，絕對不要刪除！)
 # ==========================================
