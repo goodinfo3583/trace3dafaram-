@@ -155,9 +155,9 @@ marquee_code = f"""
     .slideshow-container {{
         position: relative;
         /* 🎯 您指定的長寬設定 */
-        width: 400px;
+        width: 800px;
         height: 100px;
-        margin: 0 auto 10px auto; /* 讓 400px 的區塊在畫面正中間 */
+        margin: 0 auto 10px auto; /* 讓 800px 的區塊在畫面正中間 */
         background-color: #0A0D14;
         display: flex;
         justify-content: center;
