@@ -9,6 +9,7 @@ import datetime
 import requests  
 import pytz  
 import math
+import streamlit.components.v1 as components
 # 隱藏 Streamlit
 hide_streamlit_style = """
             <style>
@@ -442,9 +443,7 @@ current_page = st.query_params.get("page", "news")
 
 st.markdown("""
 <style>
-/* 1. 隱藏 Streamlit 預設頂部選單，避免重新整理時往下擠壓干擾 */
-[data-testid="stHeader"] {
-    display: none;
+
 }
 /* 2. 強制釘在瀏覽器最頂端的外框 */
 .sticky-header-wrapper {
