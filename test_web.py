@@ -2150,48 +2150,6 @@ def render_sidebar_war_room():
 # =======================================================
 with st.sidebar:
     render_sidebar_war_room()
-# ==========================================
-# ✉️ 獨立分頁：聯絡我們 (完美黑夜派對版)
-# ==========================================
-if current_page == "contact":
-    st.markdown("<h2 style='color: #FFD700; text-align: center; margin-top: 30px;'>✉️ 聯絡管家</h2>", unsafe_allow_html=True)
-    
-    with st.container(border=True):
-        st.write("如果您發現任何系統異常，或是對本平台有任何建議，歡迎填寫紙條傳送至後台！")
-        
-        with st.form("contact_us_form", clear_on_submit=True):
-            c1, c2 = st.columns(2)
-            with c1: sender_name = st.text_input("您的稱呼 (選填)", placeholder="例如：股市冒險家")
-            with c2: sender_email = st.text_input("電子信箱 (選填)", placeholder="若需回覆請務必留下 Email")
-                
-            message_body = st.text_area("回報內容 / 建議事項*", placeholder="請描述您遇到的問題或建議...", height=120)
-            submit_btn = st.form_submit_button("傳送訊息", use_container_width=True)
-            
-            if submit_btn:
-                if not message_body.strip():
-                    st.error("⚠️ 傳送失敗：紙條上似乎空無一字喔！")
-                else:
-                    try:
-                        import datetime
-                        try:
-                            old_contact_df = conn.read(spreadsheet=SHEET_URL, worksheet="聯絡我們", ttl=0)
-                            old_contact_df = old_contact_df.dropna(how="all")
-                        except:
-                            old_contact_df = pd.DataFrame(columns=["時間", "稱呼", "信箱", "內容"])
-                        
-                        now_str = datetime.datetime.now().strftime("%Y-%m-%d %H:%M:%S")
-                        new_data = pd.DataFrame([{"時間": now_str, "稱呼": sender_name.strip() if sender_name else "匿名使用者", "信箱": sender_email.strip() if sender_email else "-", "內容": message_body.strip()}])
-                        
-                        final_contact_df = pd.concat([old_contact_df, new_data], ignore_index=True)
-                        conn.update(spreadsheet=SHEET_URL, worksheet="聯絡我們", data=final_contact_df)
-                        
-                        st.toast("您的訊息已悄悄送達派對後台...", icon="🦇")
-                        st.success("✨ 感謝回報！您的建議是盛宴最棒的點綴。")
-                    except Exception as e:
-                        st.error(f"❌ 傳送失敗，後台連線異常：{str(e)}")
-                        
-    # 🛑 最核心的魔法：渲染完聯絡表單後，直接強制停止後續程式！完全不讀取底下的大數據！
-    st.stop()
 
 # ==========================================
 # 📍 預留給底層「觀察名單」傳送上來的隱形卡位槽
@@ -4834,6 +4792,50 @@ if current_page in ["all", "pool"]:
                                     st.info("💡 **驗證方法**：觀察鎖定股票的『區間報酬』是否為正，並核對『模型分數變化』是否持續上升。這能印證籌碼集中度與股價的連動性！")
                     except Exception as e:
                         st.write("⚪ 尚無歷史追蹤紀錄，請輸入密碼鎖定第一筆，或確認 Google Sheets 已建立工作表。")
+
+# ==========================================
+# ✉️ 獨立分頁：聯絡我們 (完美黑夜派對版)
+# ==========================================
+if current_page == "contact":
+    st.markdown("<h2 style='color: #FFD700; text-align: center; margin-top: 30px;'>✉️ 聯絡管家</h2>", unsafe_allow_html=True)
+    
+    with st.container(border=True):
+        st.write("如果您發現任何系統異常，或是對本平台有任何建議，歡迎填寫紙條傳送至後台！")
+        
+        with st.form("contact_us_form", clear_on_submit=True):
+            c1, c2 = st.columns(2)
+            with c1: sender_name = st.text_input("您的稱呼 (選填)", placeholder="例如：股市冒險家")
+            with c2: sender_email = st.text_input("電子信箱 (選填)", placeholder="若需回覆請務必留下 Email")
+                
+            message_body = st.text_area("回報內容 / 建議事項*", placeholder="請描述您遇到的問題或建議...", height=120)
+            submit_btn = st.form_submit_button("傳送訊息", use_container_width=True)
+            
+            if submit_btn:
+                if not message_body.strip():
+                    st.error("⚠️ 傳送失敗：紙條上似乎空無一字喔！")
+                else:
+                    try:
+                        import datetime
+                        try:
+                            old_contact_df = conn.read(spreadsheet=SHEET_URL, worksheet="聯絡我們", ttl=0)
+                            old_contact_df = old_contact_df.dropna(how="all")
+                        except:
+                            old_contact_df = pd.DataFrame(columns=["時間", "稱呼", "信箱", "內容"])
+                        
+                        now_str = datetime.datetime.now().strftime("%Y-%m-%d %H:%M:%S")
+                        new_data = pd.DataFrame([{"時間": now_str, "稱呼": sender_name.strip() if sender_name else "匿名使用者", "信箱": sender_email.strip() if sender_email else "-", "內容": message_body.strip()}])
+                        
+                        final_contact_df = pd.concat([old_contact_df, new_data], ignore_index=True)
+                        conn.update(spreadsheet=SHEET_URL, worksheet="聯絡我們", data=final_contact_df)
+                        
+                        st.toast("您的訊息已悄悄送達派對後台...", icon="🦇")
+                        st.success("✨ 感謝回報！您的建議是盛宴最棒的點綴。")
+                    except Exception as e:
+                        st.error(f"❌ 傳送失敗，後台連線異常：{str(e)}")
+                        
+    # 🛑 最核心的魔法：渲染完聯絡表單後，直接強制停止後續程式！完全不讀取底下的大數據！
+    st.stop()
+
 # ==========================================
 # 🧪 測試區：Google Sheets 連線測試
 # ==========================================
@@ -4843,8 +4845,8 @@ if current_page in ["all", "pool"]:
 # ==========================================
 # 🧪 測試區：Google Sheets 連線測試
 # ==========================================
-if st.button("🔄 立即強制同步大數據"):
+#if st.button("🔄 立即強制同步大數據"):
     # 在這裡做完你的資料更新邏輯...
     
     # 強制網頁從頭重跑，清洗並更新畫面
-    st.rerun()
+    #st.rerun()
