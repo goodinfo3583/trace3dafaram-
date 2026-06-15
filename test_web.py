@@ -4399,7 +4399,9 @@ if current_page in ["all", "pool"]:
         df_b5_1000 = get_df_safe('df_blk5_1000')
         df_b5_400 = get_df_safe('df_blk5')
         
-        # 自動掃描最新資料日期
+        # ==========================================
+        # 🚀 修正 1：統一並簡化所有區塊的「最新日期」掃描邏輯
+        # ==========================================
         all_files = glob.glob(os.path.join(DATA_DIR, "*"))
         anchor_date_str = "00000000"
         d_b1_inst, d_b23_chip, d_b4_margin, d_b5_share = "00000000", "00000000", "00000000", "00000000"
@@ -4409,29 +4411,21 @@ if current_page in ["all", "pool"]:
             match = re.search(r'(202\d{5})', filename)
             if match:
                 file_date = match.group(1)
+                # 總檔期基準
                 if file_date > anchor_date_str: anchor_date_str = file_date
+                
+                # 區塊 1
                 if "持股排名變化" in filename or "JSON_History" in filename:
                     if file_date > d_b1_inst: d_b1_inst = file_date
+                # 區塊 2 & 3
                 elif "佔成交比" in filename or "連買" in filename or "買賣超" in filename:
                     if file_date > d_b23_chip: d_b23_chip = file_date
+                # 區塊 4
                 elif "融資" in filename or "融券" in filename or "借券" in filename or "資券" in filename:
                     if file_date > d_b4_margin: d_b4_margin = file_date
-
-        b5_files = glob.glob(os.path.join(DATA_DIR, "*大股東*")) + glob.glob(os.path.join(DATA_DIR, "*神秘金字塔*")) + glob.glob(os.path.join(DATA_DIR, "*集保*"))
-        if b5_files:
-            latest_b5_file = sorted(b5_files, reverse=True)[0]
-            try:
-                with open(latest_b5_file, 'r', encoding='utf-8-sig', errors='ignore') as f:
-                    head_content = f.read(4000)
-                    d_match = re.search(r'(\d{4})週動態', head_content)
-                    if d_match: d_b5_share = f"2026{d_match.group(1)}"
-                    else:
-                        d_match2 = re.search(r'更新\s*日期[^\d]*(\d{4})', head_content)
-                        if d_match2: d_b5_share = f"2026{d_match2.group(1)}"
-                        else:
-                            f_match = re.search(r'(202\d{5})', os.path.basename(latest_b5_file))
-                            if f_match: d_b5_share = f_match.group(1)
-            except: pass
+                # 區塊 5 (大戶動向，直接用檔名的日期比對，最準確！)
+                elif "大股東" in filename or "神秘金字塔" in filename or "集保" in filename:
+                    if file_date > d_b5_share: d_b5_share = file_date
 
         st.markdown(f"""
         <div style="background: linear-gradient(90deg, rgba(15,23,42,1) 0%, rgba(14,165,233,0.3) 50%, rgba(15,23,42,1) 100%); 
@@ -4449,19 +4443,7 @@ if current_page in ["all", "pool"]:
         with st.container(border=True):
             st.info("💡 **評分方式**：法人籌碼上榜為底，搭配「千張大戶權重加乘」與其他數據積分。(請參考▼明細)")
 
-            # 🚨 關鍵阻斷器：如果沒載入區塊 2 的籌碼，直接亮出按鈕要求運算並「停止」往下跑 0 分！
-            if 'df_blk2_1' not in st.session_state or st.session_state['df_blk2_1'].empty:
-                st.warning("⚠️ 記憶體中尚無各區塊大數據，請點擊下方按鈕啟動全市場掃描引擎。")
-                c_btn1, c_btn2, c_btn3 = st.columns([1, 2, 1])
-                with c_btn2:
-                    if st.button("🚀 啟動全市場掃描 (計算總分)", type="primary", use_container_width=True):
-                        st.query_params["page"] = "all"
-                        st.rerun()
-                st.stop() # 🛑 絕對停止！不准用 0 分往下算！
-
-# ==========================================
-            # 🚨 關鍵阻斷器升級：把大股東也加入檢查範圍！
-            # ==========================================
+            # 🚨 關鍵阻斷器：確保各區塊都有數據
             if 'df_blk2_1' not in st.session_state or st.session_state['df_blk2_1'].empty or 'df_blk5_1000' not in st.session_state or st.session_state['df_blk5_1000'].empty:
                 st.warning("⚠️ 記憶體中尚無最新數據 (或尚未載入大股東資料)，請點擊下方按鈕啟動全市場掃描引擎。")
                 c_btn1, c_btn2, c_btn3 = st.columns([1, 2, 1])
@@ -4526,28 +4508,29 @@ if current_page in ["all", "pool"]:
                 except: pass
 
                 # ==========================================
-                # 🚀 關鍵修正 1：建立大股東動向極速字典 (加上終極防呆)
+                # 🚀 修正 2：終極版代號清洗與字典對接引擎
                 # ==========================================
+                def ultra_clean_id(val):
+                    """將任何奇怪型別或夾帶小數點、空白的代號，全部扒光剩下純數字字串"""
+                    v = str(val).strip().replace('.0', '')
+                    return re.sub(r'\D', '', v)
+
                 dict_1000, dict_400 = {}, {}
                 
-                # 定義洗代號函數：去空白、去小數點、去除非數字，確保 '2330.0' 變 '2330'
-                def clean_id(series):
-                    return series.astype(str).str.strip().str.replace(r'\.0$', '', regex=True).str.replace(r'\D', '', regex=True)
-
+                # 強制轉換 Key 為純字串並配對，絕對不會對接失敗
                 if not df_b5_1000.empty and '股票代號' in df_b5_1000.columns and '週動態' in df_b5_1000.columns:
-                    dict_1000 = dict(zip(clean_id(df_b5_1000['股票代號']), df_b5_1000['週動態'].astype(str)))
+                    dict_1000 = {ultra_clean_id(k): str(v) for k, v in zip(df_b5_1000['股票代號'], df_b5_1000['週動態'])}
                 
                 if not df_b5_400.empty and '股票代號' in df_b5_400.columns and '週動態' in df_b5_400.columns:
-                    dict_400 = dict(zip(clean_id(df_b5_400['股票代號']), df_b5_400['週動態'].astype(str)))
+                    dict_400 = {ultra_clean_id(k): str(v) for k, v in zip(df_b5_400['股票代號'], df_b5_400['週動態'])}
 
                 results = []
                 for _, row in pool_df.iterrows():
-                    # 🚀 關鍵修正 2：確保迴圈內的 sid 也是絕對乾淨的字串
-                    sid = str(row['股票代號']).strip().replace('.0', '')
+                    # 在迴圈內，一樣用最高規格把代號洗乾淨
+                    sid = ultra_clean_id(row['股票代號'])
                     sname = str(row.get('股票名稱', '')).strip()
                     b1_dyn = str(row.get(dyn_col, '')) if dyn_col else '-'
                     
-                    # 🚀 關鍵修正 3：幫你把剛剛重複貼上的冗餘代碼刪除了，保持乾淨
                     try:
                         delta_val = float(row.get('△', 0.0))
                         b1_delta = "0.00" if abs(delta_val) < 0.005 else (f"+{delta_val:.2f}" if delta_val > 0 else f"{delta_val:.2f}")
@@ -4612,9 +4595,9 @@ if current_page in ["all", "pool"]:
                         if abs(short_decrease_val) >= 1: score += 1.2; details.append("空頭認輸(借券減>1%): +1.2")
 
                     # ==========================================
-                    # 🚀 關鍵修正 4：利用極速字典抓取動態，取代 .values 比對
+                    # 🚀 修正 3：利用極速字典精準抓取動態
                     # ==========================================
-                    r_b5_1000, r_b5_400, trend_1000_val, trend_400_val = "-", "-", "", ""
+                    r_b5_1000, r_b5_400 = "-", "-"
                     
                     # 取出 1000 張動態
                     trend_1000_val = dict_1000.get(sid, "")
