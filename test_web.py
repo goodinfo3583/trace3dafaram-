@@ -435,7 +435,7 @@ def show_news_page():
         return
 
     date_range_str = f"{loaded_dates[-1]} ~ {loaded_dates[0]}" if len(loaded_dates) > 1 else loaded_dates[0]
-    st.success(f"成功載入 {len(loaded_dates)} 天的資料 ({date_range_str})，資料庫共備妥 {len(news_data)} 則新聞！")
+    st.success(請勿僅透過新聞研究股票！")
     
     # ==========================================
     # 🎨 注入 CSS 樣式
