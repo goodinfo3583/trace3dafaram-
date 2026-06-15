@@ -112,7 +112,7 @@ bg_path = os.path.join(IMAGE_DIR, "派對盛宴邀請.png")
 set_background(bg_path)
 #跑馬燈
 # 圖片檔名列表
-image_files = ["img1.png", "img2.png", "img3.png"]
+image_files = ["跑馬燈1.png", "跑馬燈2.png", "跑馬燈3.png"]
 
 # 生成圖片標籤的 HTML
 image_tags = ""
