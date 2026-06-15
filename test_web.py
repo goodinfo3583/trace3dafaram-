@@ -112,7 +112,7 @@ bg_path = os.path.join(IMAGE_DIR, "派對盛宴邀請.png")
 set_background(bg_path)
 #跑馬燈
 # ==========================================
-# 跑馬燈區塊 (5張圖專用輪播系統)
+# 跑馬燈區塊 (終極全自動配時 + 尺寸自訂版)
 # ==========================================
 import base64
 import os
@@ -126,58 +126,65 @@ def get_image_base64(image_path):
         encoded_string = base64.b64encode(data).decode()
     return f"data:{mime_type};base64,{encoded_string}"
 
-# 2. 圖片檔名列表與資料夾設定 (💡 目前共 5 張圖，順序可隨意對調)
+# 2. 圖片檔名列表與資料夾設定
 image_folder = "static" 
 image_files = ["籌碼盛宴.png", "跑馬燈1.PNG", "跑馬燈2.PNG", "跑馬燈3.PNG", "花朵的樣子.gif"]
 
-# 3. 生成圖片標籤的 HTML
+# 💡 核心升級：自動計算時間，防呆防錯！
+total_images = len(image_files)
+time_per_slide = 5  # 每張圖片顯示 5 秒
+total_time = total_images * time_per_slide  # 自動算出總時間 (5張就是 25s)
+visible_percent = int((1 / total_images) * 100)  # 自動算出每張圖佔據的動畫百分比 (5張就是 20%)
+
+# 3. 組合圖片標籤與自動生成 CSS 延遲時間
 image_tags = ""
+delay_css = ""
 for i, img_name in enumerate(image_files):
     img_path = os.path.join(image_folder, img_name)
     if os.path.exists(img_path):
         b64 = get_image_base64(img_path)
         image_tags += f'<img class="slide slide-{i}" src="{b64}">'
+        # 自動為每一張圖寫入精確的延遲秒數 (0s, 5s, 10s...)
+        delay_css += f"    .slide-{i} {{ animation-delay: {i * time_per_slide}s; }}\n"
     else:
         st.error(f"系統找不到這張圖片：{img_path}，請檢查檔名或大小寫！")
 
-# 4. 輪播圖 (Slideshow) HTML/CSS (5張圖完美配時版)
+# 4. 輪播圖 HTML/CSS
 marquee_code = f"""
 <style>
     .slideshow-container {{
         position: relative;
-        width: 100%;
-        height: 70px;
+        /* 🎯 您指定的長寬設定 */
+        width: 400px;
+        height: 100px;
+        margin: 0 auto 10px auto; /* 讓 400px 的區塊在畫面正中間 */
         background-color: #0A0D14;
         display: flex;
         justify-content: center;
         align-items: center;
         overflow: hidden;
-        margin-bottom: 10px;
     }}
     
     .slide {{
         position: absolute;
         height: 100%;
-        object-fit: contain;
+        object-fit: contain; /* 確保圖片不變形，會自動縮放適應 100px 高度 */
         visibility: hidden; 
         opacity: 0;
-        animation: fade 25s infinite; /* 💡 5張圖 × 5秒 = 總共 25 秒 */
+        /* 自動代入總時間 */
+        animation: fade {total_time}s infinite; 
     }}
 
-    /* 💡 每個標籤依序遞增 5 秒延遲，未來對調 list 順序時這裡完全不需修改 */
-    .slide-0 {{ animation-delay: 0s; }}
-    .slide-1 {{ animation-delay: 5s; }}
-    .slide-2 {{ animation-delay: 10s; }}
-    .slide-3 {{ animation-delay: 15s; }}
-    .slide-4 {{ animation-delay: 20s; }} /* 補上關鍵的第 5 張圖延遲 */
+    /* 這裡會自動注入剛剛 Python 算好的延遲時間 */
+{delay_css}
 
-    /* 💡 重新計算 5 張圖的百分比 (每張佔 20%) */
+    /* 自動代入算好的百分比，完美接力 */
     @keyframes fade {{
         0%   {{ visibility: hidden; opacity: 0; }}
-        1%   {{ visibility: visible; opacity: 1; }} /* 瞬間亮起 */
-        19%  {{ visibility: visible; opacity: 1; }} /* 保持顯示到接近第 5 秒 */
-        20%  {{ visibility: hidden; opacity: 0; }}  /* 第 5 秒準時隱形 */
-        100% {{ visibility: hidden; opacity: 0; }}  /* 剩餘時間保持隱形 */
+        1%   {{ visibility: visible; opacity: 1; }} 
+        {visible_percent - 1}%  {{ visibility: visible; opacity: 1; }} 
+        {visible_percent}%  {{ visibility: hidden; opacity: 0; }}  
+        100% {{ visibility: hidden; opacity: 0; }}  
     }}
 </style>
 
