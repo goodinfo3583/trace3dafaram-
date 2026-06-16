@@ -4275,6 +4275,28 @@ if current_page in ["all", "b6"]:
         else:
             st.info("📂 資料夾內尚無足夠的歷史交易紀錄，請確認檔名包含「鉅額」字樣。")       
 # ==========================================以上網頁核心區塊↑↑↑↑↑
+# ==========================================
+# 🎭 幕後無縫換頁引擎 (先定義成函數，供全站各區塊的 st.stop() 呼叫)切換頁避免卡死
+# ==========================================
+def render_proxy_buttons():
+    """將隱藏按鈕打包成函數，確保在 st.stop() 切斷程式前能被提早渲染"""
+    def change_page(page_name):
+        st.session_state.current_page = page_name
+        st.query_params["page"] = page_name 
+
+    with st.container():
+        st.button("NavToNews", on_click=change_page, args=("news",))
+        st.button("NavToPool", on_click=change_page, args=("pool",))
+        st.button("NavToB1", on_click=change_page, args=("b1",))
+        st.button("NavToB2", on_click=change_page, args=("b2",))
+        st.button("NavToB3", on_click=change_page, args=("b3",))
+        st.button("NavToB4", on_click=change_page, args=("b4",))
+        st.button("NavToB5", on_click=change_page, args=("b5",))
+        st.button("NavToB6", on_click=change_page, args=("b6",))
+        st.button("NavToContact", on_click=change_page, args=("contact",))
+
+
+
 # ==========================================↓↓↓
 # 🔒 觀察名單專屬包廂鎖 (🚨 必須放在計分部分檔案最下方！)
 # ==========================================
@@ -4340,6 +4362,9 @@ if current_page in ["all", "pool"]:
                     if st.button("🚀 啟動全市場掃描 (計算總分)", type="primary", use_container_width=True):
                         st.query_params["page"] = "all"
                         st.rerun()
+                # 🛑 防呆卡死：提早渲染隱藏按鈕，避免頂部導覽列失效！
+                render_proxy_buttons()
+                
                 st.stop() #  絕對停止！不准用舊的 0 分往下算！
 
             # ---------------- 開始正式運算數據分析觀察名單打底及積分 ----------------
@@ -4994,30 +5019,19 @@ if current_page == "contact":
                         st.success("✨ 感謝回報！您的建議是盛宴最棒的點綴。")
                     except Exception as e:
                         st.error(f"❌ 傳送失敗，後台連線異常：{str(e)}")
-                        
+    # 🛑 補上隱藏的傀儡按鈕，避免在聯絡我們頁面時頂部導覽列失效網頁卡死！
+    render_proxy_buttons()
+    
     # 🛑 最核心的魔法：渲染完聯絡表單後，直接強制停止後續程式！完全不讀取底下的大數據！
     st.stop()
 # ==========================================
 # 🧪 測試區：Google Sheets 連線測試
 # ==========================================
 # ==========================================
-# 🎭 幕後無縫換頁引擎 (傀儡按鈕區 - 必須放在整份程式碼最底部)
+# 🎭 幕後無縫換頁引擎 (正常情況下在這裡渲染)
 # ==========================================
-def change_page(page_name):
-    """狀態切換器：改變頁面狀態並自動重新局部渲染，不閃屏"""
-    st.session_state.current_page = page_name
-    st.query_params["page"] = page_name 
-
-with st.container():
-    st.button("NavToNews", on_click=change_page, args=("news",))
-    st.button("NavToPool", on_click=change_page, args=("pool",))
-    st.button("NavToB1", on_click=change_page, args=("b1",))
-    st.button("NavToB2", on_click=change_page, args=("b2",))
-    st.button("NavToB3", on_click=change_page, args=("b3",))
-    st.button("NavToB4", on_click=change_page, args=("b4",))
-    st.button("NavToB5", on_click=change_page, args=("b5",))
-    st.button("NavToB6", on_click=change_page, args=("b6",))
-    st.button("NavToContact", on_click=change_page, args=("contact",))
+# 如果程式順利走到這裡(沒有被上面的 st.stop 攔截)，就渲染按鈕
+render_proxy_buttons()
 
 
 # ==========================================
