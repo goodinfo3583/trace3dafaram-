@@ -10,6 +10,7 @@ import requests
 import pytz  
 import math
 import streamlit.components.v1 as components
+import plotly.express as px
 # 隱藏 Streamlit
 hide_streamlit_style = """
             <style>
@@ -350,41 +351,6 @@ def get_stock_dictionary():
 # 在系統啟動時，直接載入這本字典
 STOCK_DICT = get_stock_dictionary()
 
-# ==========================================
-# 📡 證交所 API 直連：後台資料抓取引擎 (保留給側邊欄使用)
-# ==========================================
-import requests
-import datetime
-import pandas as pd
-import streamlit as st
-
-@st.cache_data(ttl=600)
-def fetch_twse_institutional_data():
-    """自動連線證交所抓取今日三大法人買賣超 (BFI82U)"""
-    url = "https://www.twse.com.tw/rwd/zh/fund/BFI82U?response=json"
-    headers = {"User-Agent": "Mozilla/5.0"}
-    try:
-        res = requests.get(url, headers=headers, timeout=5)
-        data = res.json()
-        if data.get('stat') == 'OK':
-            return data.get('title', '三大法人買賣金額統計表'), pd.DataFrame(data['data'], columns=data['fields'])
-        return None, None
-    except:
-        return None, None
-
-@st.cache_data(ttl=600)
-def fetch_block_trades():
-    """抓取證交所每日鉅額交易明細 (BFIAUU)"""
-    url = "https://www.twse.com.tw/rwd/zh/block/BFIAUU?response=json"
-    headers = {"User-Agent": "Mozilla/5.0"}
-    try:
-        res = requests.get(url, headers=headers, timeout=5)
-        data = res.json()
-        if data.get('stat') == 'OK':
-            return pd.DataFrame(data['data'], columns=data['fields'])
-        return pd.DataFrame()
-    except:
-        return pd.DataFrame()
 
 # ==========================================
 # 🌌 網頁風格設計
