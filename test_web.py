@@ -441,7 +441,7 @@ import streamlit as st
 import streamlit.components.v1 as components
 
 # ==========================================
-# 📍 頂部按鈕 (終極無縫切換版 - 拒絕白屏閃爍)
+# 📍 頂部按鈕 (終極無縫切換版 + 手機版專屬收闔浮標)
 # ==========================================
 inject_js = """
 <script>
@@ -451,22 +451,20 @@ if (!parentDoc.getElementById('custom-sticky-header')) {
     
     const style = parentDoc.createElement('style');
     style.innerHTML = `
-        /* 隱藏原生選單與外框 */
         [data-testid="stHeader"] { display: none !important; }
         [data-testid="stToolbar"] { display: none !important; }
         [data-testid="collapsedControl"] { top: 70px !important; z-index: 1000000 !important; background-color: rgba(10, 13, 20, 0.8) !important; border-radius: 50%; }
 
-        /* 透明導覽列 CSS (保持你原本的絕美設計) */
         #custom-sticky-header { position: fixed; top: 0; left: 0; width: 100%; z-index: 999999; background: transparent !important; pointer-events: none; }
         .disclaimer-bar, .nav-btn-container { pointer-events: auto; }
-        .disclaimer-bar { display: flex; background: transparent !important; padding: 0px 15px; border: none !important; }
+        .disclaimer-bar { display: flex; align-items: center; background: transparent !important; padding: 0px 15px; border: none !important; }
         .disclaimer-item { position: relative; padding: 6px 15px; cursor: help; background: transparent !important; }
         .disclaimer-title { color: #64748B; font-size: 13px; font-weight: 500; text-decoration: none; text-shadow: 1px 1px 4px rgba(0,0,0,1), -1px -1px 4px rgba(0,0,0,1); }
         .disclaimer-item:hover .disclaimer-title { color: #FFD700; text-shadow: 0 0 8px rgba(255, 215, 0, 0.8); }
         .disclaimer-content { position: absolute; top: 100%; left: 0; width: 350px; max-width: 90vw; background-color: rgba(17, 22, 34, 0.95); border: 1px solid #1E293B; border-top: none; border-radius: 0 0 8px 8px; padding: 0px 15px; max-height: 0; opacity: 0; overflow: hidden; transition: all 0.3s; font-size: 12px; color: #94A3B8; line-height: 1.6; box-shadow: 0px 8px 20px rgba(0,0,0,0.8); }
         .disclaimer-item:hover .disclaimer-content { max-height: 400px; opacity: 1; padding: 12px 15px; }
         
-        .nav-btn-container { display: flex; flex-wrap: wrap; justify-content: flex-end; align-items: center; padding: 8px 15px; background: transparent !important; gap: 6px; border: none !important; }
+        .nav-btn-container { display: flex; flex-wrap: wrap; justify-content: flex-end; align-items: center; padding: 8px 15px; background: transparent !important; gap: 6px; border: none !important; transition: all 0.3s ease-in-out; }
         .nav-text-link { text-decoration: none !important; color: #94A3B8 !important; font-size: 16px; font-weight: 600; padding: 4px 6px; transition: all 0.2s ease-in-out; text-shadow: 1px 1px 4px rgba(0,0,0,1), -1px -1px 4px rgba(0,0,0,1); cursor: pointer; }
         .nav-text-link:hover { color: #FFD700 !important; text-shadow: 0 0 12px rgba(255, 215, 0, 0.8); transform: scale(1.08); }
         .nav-divider { color: #334155; font-size: 16px; user-select: none; }
@@ -476,7 +474,6 @@ if (!parentDoc.getElementById('custom-sticky-header')) {
     `;
     parentDoc.head.appendChild(style);
 
-    // 🚀 關鍵：href 改為 #，並加入 data-target 對接傀儡按鈕
     const headerDiv = parentDoc.createElement('div');
     headerDiv.id = 'custom-sticky-header';
     headerDiv.innerHTML = `
@@ -484,8 +481,13 @@ if (!parentDoc.getElementById('custom-sticky-header')) {
             <div class="disclaimer-item"><span class="disclaimer-title">使用聲明</span><div class="disclaimer-content">本平台僅供教育研究...</div></div>
             <div class="disclaimer-item"><span class="disclaimer-title">隱私權政策</span><div class="disclaimer-content">1. 蒐集目的與範圍...</div></div>
             <div class="disclaimer-item"><a href="#" data-target="NavToContact" class="disclaimer-title internal-nav" style="cursor: pointer;">聯絡我們</a></div>
+            
+            <div style="flex-grow: 1;"></div>
+            <div class="disclaimer-item" id="mobile-nav-toggle" style="cursor: pointer; padding-right: 5px;">
+                <span class="disclaimer-title" style="font-size: 15px; color: #38BDF8;">📜 收起按鈕</span>
+            </div>
         </div>
-        <div class="nav-btn-container">
+        <div class="nav-btn-container" id="nav-btn-container">
             <a href="#" id="custom-sidebar-toggle" class="nav-text-link">📂 呼叫側邊欄</a><span class="nav-divider">|</span>
             <a href="#" data-target="NavToNews" class="nav-text-link internal-nav">☕ 市場消息</a><span class="nav-divider">|</span>
             <a href="#" data-target="NavToPool" class="nav-text-link internal-nav">⛲ 觀察名單</a><span class="nav-divider">|</span>
@@ -499,24 +501,34 @@ if (!parentDoc.getElementById('custom-sticky-header')) {
     `;
     parentDoc.body.insertBefore(headerDiv, parentDoc.body.firstChild);
 
-    // 🚀 無縫攔截點擊事件，代為點擊底層的 Streamlit 傀儡按鈕
     setTimeout(() => {
         const navLinks = parentDoc.querySelectorAll('.internal-nav');
         navLinks.forEach(link => {
             link.addEventListener('click', (e) => {
-                e.preventDefault(); // 絕對阻止瀏覽器白畫面重載
+                e.preventDefault(); 
                 const targetName = link.getAttribute('data-target');
-                
-                // 尋找隱藏的 Streamlit 按鈕並點擊
                 const btns = Array.from(parentDoc.querySelectorAll('button'));
                 const targetBtn = btns.find(b => b.innerText.includes(targetName));
-                if (targetBtn) {
-                    targetBtn.click();
-                }
+                if (targetBtn) targetBtn.click();
             });
         });
 
-        // 側邊欄呼叫按鈕邏輯 (不變)
+        // 🚀 新增：選單收闔/展開切換邏輯
+        const menuToggle = parentDoc.getElementById('mobile-nav-toggle');
+        const navContainer = parentDoc.getElementById('nav-btn-container');
+        if (menuToggle && navContainer) {
+            menuToggle.addEventListener('click', (e) => {
+                e.preventDefault();
+                if (navContainer.style.display === 'none') {
+                    navContainer.style.display = 'flex';
+                    menuToggle.innerHTML = '<span class="disclaimer-title" style="font-size: 15px; color: #38BDF8;">📜 收起按鈕</span>';
+                } else {
+                    navContainer.style.display = 'none';
+                    menuToggle.innerHTML = '<span class="disclaimer-title" style="font-size: 15px; color: #FFD700;">📙 展開按鈕</span>';
+                }
+            });
+        }
+
         const toggleBtn = parentDoc.getElementById('custom-sidebar-toggle');
         if (toggleBtn) {
             toggleBtn.addEventListener('click', (e) => {
@@ -533,15 +545,12 @@ if (!parentDoc.getElementById('custom-sticky-header')) {
             });
         }
         
-        // 🛡️ 隱藏守護員：持續掃描並隱藏傀儡按鈕 (保留點擊屬性)
         setInterval(() => {
             const allBtns = Array.from(parentDoc.querySelectorAll('button'));
             allBtns.forEach(b => {
                 if(b.innerText.includes('NavTo')) {
                     const wrapper = b.closest('div[data-testid="stElementContainer"]');
                     if (wrapper) {
-                        // ❌ 絕對不能用 display: none，會導致按鈕失效！
-                        // ✅ 改為完全透明並移出可視範圍，讓 JS 依然按得到！
                         wrapper.style.opacity = '0';
                         wrapper.style.position = 'absolute';
                         wrapper.style.top = '-9999px';
@@ -549,12 +558,10 @@ if (!parentDoc.getElementById('custom-sticky-header')) {
                 }
             });
         }, 100);
-
     }, 500);
 }
 </script>
 """
-components.html(inject_js, height=0, width=0)
 
 # 透過隱藏的 iframe 執行上述的 JavaScript 注入
 components.html(inject_js, height=0, width=0)
