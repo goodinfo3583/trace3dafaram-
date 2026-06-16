@@ -4913,7 +4913,42 @@ if current_page == "contact":
     st.markdown("<h2 style='color: #FFD700; text-align: center; margin-top: 30px;'>✉️ 聯絡管家</h2>", unsafe_allow_html=True)
     
     with st.container(border=True):
-        st.write("如果您發現任何系統異常，或是對本平台有任何建議，歡迎填寫紙條傳送至後台！")
+        # 建立左右兩欄，左邊放 NPC 圖片，右邊放引言
+        col_img, col_text = st.columns([1, 4])
+        
+        with col_img:
+            # 讀取並顯示 NPC 圖片 (假設圖檔名為 75743.jpg)
+            npc_image_path = os.path.join(image_folder, "75743.jpg")
+            try:
+                img_base64 = get_image_base64(npc_image_path)
+                st.markdown(
+                    f"""
+                    <div style="display: flex; justify-content: center; align-items: center; height: 100%;">
+                        <img src="{img_base64}" width="100%" style="border-radius: 50%; border: 2px solid #FFD700; box-shadow: 0 0 10px rgba(255, 215, 0, 0.5);">
+                    </div>
+                    """, 
+                    unsafe_allow_html=True
+                )
+            except Exception as e:
+                # 若找不到圖片時的防呆備案 (顯示一個幽靈或信封符號)
+                st.markdown("<div style='font-size: 60px; text-align: center;'>🦇</div>", unsafe_allow_html=True)
+
+        with col_text:
+            # 使用類似對話框的樣式來呈現管家的台詞
+            st.markdown(
+                """
+                <div style="background-color: rgba(255, 255, 255, 0.05); padding: 15px; border-radius: 10px; border-left: 4px solid #FFD700; height: 100%; display: flex; align-items: center;">
+                    <p style="margin: 0; font-size: 16px; color: #E2E8F0; line-height: 1.6;">
+                        「夜安，貴客。<br>
+                        如果您在派對中發現任何系統異常，或是對本平台有任何建議，<br>
+                        歡迎隨時填寫下方的紙條傳送至後台交給我處理。」
+                    </p>
+                </div>
+                """, 
+                unsafe_allow_html=True
+            )
+        
+        st.write("") # 留白增加呼吸感
         
         with st.form("contact_us_form", clear_on_submit=True):
             c1, c2 = st.columns(2)
@@ -4921,7 +4956,7 @@ if current_page == "contact":
             with c2: sender_email = st.text_input("電子信箱 (選填)", placeholder="若需回覆請務必留下 Email")
                 
             message_body = st.text_area("回報內容 / 建議事項*", placeholder="請描述您遇到的問題或建議...", height=120)
-            submit_btn = st.form_submit_button("傳送訊息", use_container_width=True)
+            submit_btn = st.form_submit_button("傳送紙條 ✉️", use_container_width=True)
             
             if submit_btn:
                 if not message_body.strip():
@@ -4948,7 +4983,6 @@ if current_page == "contact":
                         
     # 🛑 最核心的魔法：渲染完聯絡表單後，直接強制停止後續程式！完全不讀取底下的大數據！
     st.stop()
-
 # ==========================================
 # 🧪 測試區：Google Sheets 連線測試
 # ==========================================
