@@ -2508,7 +2508,7 @@ if current_page in ["all", "b1"]:
 
     st.write("---")
     st.markdown("### 🧩 資金聚落板塊：三大法人進榜產業分佈")
-    st.caption("透過區塊面積大小，一眼看出法人資金正在集中攻擊哪些產業 (已排除 ETF 與債券)。")
+    st.caption("透過區塊面積大小，看出5日法人資金正在集中攻擊哪些產業 (排除 ETF 與債券 且文字大小沒有任何意義)。")
     
     if 'df_5' in locals() and not df_5.empty and STOCK_DICT:
         
