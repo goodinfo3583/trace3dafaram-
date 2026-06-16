@@ -302,11 +302,13 @@ def get_diff_ui(today_val, prev_val):
 def get_stock_dictionary():
     """讀取證交所 ISIN 檔案，在後台安靜地建立雙向對照表"""
     import re
+    import glob
+    import os
     mapping = {}
     
+    # 假設 DATA_DIR 已經在全域宣告，若無請確保替換為實際字串
     search_patterns = [
-        os.path.join(DATA_DIR, "*辨識號碼*.txt"),
-        os.path.join("./goodinfo_rankings", "*辨識號碼*.txt"),
+        "./Goodinfo_Rankings/*辨識號碼*.txt",
         "./*辨識號碼*.txt"
     ]
     dict_files = []
@@ -334,21 +336,21 @@ def get_stock_dictionary():
             name_part = parts[0].strip()
             industry = parts[4].strip()
             
-            clean_name = re.sub(r'[\s　]+', ' ', name_part).strip()
+            clean_name = re.sub(r'[\s ]+', ' ', name_part).strip()
             tokens = clean_name.split(' ')
             
             if len(tokens) >= 2:
                 sid = tokens[0].strip()
                 sname = tokens[1].strip()
                 
-                if sid.isdigit():
-                    # 建立雙向字典 (輸入代號或名稱都能通)
+                # 💡 修改處：用 isalnum 容許 ETF 代號 (如 00983A)
+                if sid.isalnum(): 
                     mapping[sname] = {"id": sid, "name": sname, "industry": industry}
                     mapping[sid] = {"id": sid, "name": sname, "industry": industry}
                     
     return mapping
 
-# 在系統啟動時，直接載入這本字典
+# 啟動時載入字典
 STOCK_DICT = get_stock_dictionary()
 
 
@@ -2501,57 +2503,58 @@ if current_page in ["all", "b1"]:
     st.info("💡 欄位說明：【△】為精準單日法人持股增減；【◯日ΔChange】為天期累積變化。")
 
     # ==========================================
-    # 📊 畫圖區塊 ：產業聚落與資金輪動板塊 (Treemap)
+    # 📊 畫圖  區塊：產業聚落與資金輪動板塊 (Treemap)
     # ==========================================
+    import plotly.express as px
+
     st.write("---")
     st.markdown("### 🧩 資金聚落板塊：三大法人進榜產業分佈")
     st.caption("透過區塊面積大小，一眼看出法人資金正在集中攻擊哪些產業。")
     
-    # 1. 取得產業對照表
-    industry_map_df = load_industry_mapping()
-    
-    # 確保 5日 資料表存在且非空
-    if 'df_5' in locals() and not df_5.empty and not industry_map_df.empty:
+    # 確保 5日 資料表存在且非空 (若要畫全部，可改成 filtered_df)
+    if 'df_5' in locals() and not df_5.empty and STOCK_DICT:
         
-        # 2. 將 5日榜單 與 產業別 進行合併
-        treemap_df = pd.merge(df_5, industry_map_df, on='股票代號', how='left')
+        # 複製一份專門用來畫圖的 DataFrame
+        treemap_df = df_5.copy()
         
-        # 處理空值 (例如 ETF、債券，或是 txt 中沒寫產業別的標的)
-        treemap_df['產業別'] = treemap_df['產業別'].fillna('ETF / 債券 / 其他')
+        # 💡 修改處：透過剛剛建立的 STOCK_DICT 字典，把產業別對應進來
+        # 利用股票代號去查字典，查不到就預設為 'ETF / 債券 / 其他'
+        treemap_df['產業別'] = treemap_df['股票代號'].apply(
+            lambda sid: STOCK_DICT.get(sid, {}).get("industry", "ETF / 債券 / 其他")
+        )
+        
+        # 把空的產業名稱也統一取代
         treemap_df['產業別'] = treemap_df['產業別'].replace('', 'ETF / 債券 / 其他')
         
-        # 3. 設定每個標的面積權重
-        # 這裡設定為 1，代表面積大小取決於該產業「進榜的檔數」多寡
+        # 設定面積權重 (每一檔算 1，表示面積大小 = 進榜檔數多寡)
         treemap_df['計數'] = 1 
         
-        # 4. 使用 Plotly 繪製 Treemap
+        # 使用 Plotly 繪製 Treemap
         fig = px.treemap(
             treemap_df,
             path=[px.Constant("全市場進榜標的"), '產業別', '股票名稱'],
             values='計數',
-            color='產業別', # 依據產業別給予不同顏色
-            hover_data=['股票代號', '5日ΔChange', '法人持股'], # 滑鼠移過去顯示的詳細資訊
-            color_discrete_sequence=px.colors.qualitative.Pastel # 使用柔和的配色
+            color='產業別', 
+            hover_data=['股票代號', '5日ΔChange', '法人持股'], 
+            color_discrete_sequence=px.colors.qualitative.Pastel 
         )
         
-        # 優化圖表顯示細節
         fig.update_traces(
-            textinfo="label", # 方塊內顯示文字 (產業或股票名稱)
+            textinfo="label", 
             textfont_size=15,
             hovertemplate='<b>%{label}</b><br>佔比/檔數: %{value}<br>'
         )
         fig.update_layout(
             margin=dict(t=20, l=0, r=0, b=0),
-            height=600, # 設定圖表高度，讓 200 檔有足夠空間顯示
+            height=600, 
             plot_bgcolor='rgba(0,0,0,0)',
             paper_bgcolor='rgba(0,0,0,0)'
         )
         
-        # 5. 渲染到 Streamlit 上
         st.plotly_chart(fig, use_container_width=True)
         
     else:
-        st.info("⚪ 尚無數據或找不到產業對照表，無法繪製產業板塊圖。")    
+        st.info("⚪ 尚無數據或找不到產業字典，無法繪製產業板塊圖。")
     
 # ==========================================
 # 🔒 區塊 2 專屬包廂鎖 (2-1 到 2-4 所有畫面渲染包進這裡)
