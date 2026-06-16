@@ -2502,48 +2502,58 @@ if current_page in ["all", "b1"]:
     st.write("")
     st.info("💡 欄位說明：【△】為精準單日法人持股增減；【◯日ΔChange】為天期累積變化。")
 
+    #==========================================
+    # 📊 繪製區塊 ：產業聚落與資金輪動板塊 (Treemap)
     # ==========================================
-    # 📊 畫圖  區塊：產業聚落與資金輪動板塊 (Treemap)
-    # ==========================================
-    import plotly.express as px
 
     st.write("---")
     st.markdown("### 🧩 資金聚落板塊：三大法人進榜產業分佈")
-    st.caption("透過區塊面積大小，一眼看出法人資金正在集中攻擊哪些產業。")
+    st.caption("透過區塊面積大小，一眼看出法人資金正在集中攻擊哪些產業 (已排除 ETF 與債券)。")
     
-    # 確保 5日 資料表存在且非空 (若要畫全部，可改成 filtered_df)
     if 'df_5' in locals() and not df_5.empty and STOCK_DICT:
         
         # 複製一份專門用來畫圖的 DataFrame
         treemap_df = df_5.copy()
         
-        # 💡 修改處：透過剛剛建立的 STOCK_DICT 字典，把產業別對應進來
-        # 利用股票代號去查字典，查不到就預設為 'ETF / 債券 / 其他'
+        # 透過字典配對產業別
         treemap_df['產業別'] = treemap_df['股票代號'].apply(
             lambda sid: STOCK_DICT.get(sid, {}).get("industry", "ETF / 債券 / 其他")
         )
         
-        # 把空的產業名稱也統一取代
         treemap_df['產業別'] = treemap_df['產業別'].replace('', 'ETF / 債券 / 其他')
         
-        # 設定面積權重 (每一檔算 1，表示面積大小 = 進榜檔數多寡)
+        # 💡 修正 1：剔除 ETF / 債券 / 其他，不列入 200 大計算
+        treemap_df = treemap_df[treemap_df['產業別'] != 'ETF / 債券 / 其他']
+        
+        # 設定面積權重
         treemap_df['計數'] = 1 
+        
+        # 💡 修正 3-1：設定要帶入懸停提示框的欄位 (請確認 df_5 確實有這些欄位)
+        # 例如你想看法人金額，就可以把 '法人金額' 加進來
+        hover_columns = ['股票代號', '法人金額'] 
         
         # 使用 Plotly 繪製 Treemap
         fig = px.treemap(
             treemap_df,
-            path=[px.Constant("全市場進榜標的"), '產業別', '股票名稱'],
+            path=[px.Constant("全市場進榜標的 (排除ETF/債券)"), '產業別', '股票名稱'],
             values='計數',
             color='產業別', 
-            hover_data=['股票代號', '5日ΔChange', '法人持股'], 
+            hover_data=hover_columns, 
             color_discrete_sequence=px.colors.qualitative.Pastel 
         )
         
+        # 💡 修正 3-2：利用 customdata 正確呼叫 hover_data 中的數值
         fig.update_traces(
             textinfo="label", 
-            textfont_size=15,
-            hovertemplate='<b>%{label}</b><br>佔比/檔數: %{value}<br>'
+            hovertemplate=(
+                '<b>%{label}</b><br>'
+                '股票代號: %{customdata[0]}<br>'
+                '法人金額: %{customdata[1]}<br>' # 對應 hover_columns 的第二個元素
+                '佔比/檔數: %{value}<br>'
+                '<extra></extra>' # 隱藏旁邊多餘的 trace 名稱
+            )
         )
+        
         fig.update_layout(
             margin=dict(t=20, l=0, r=0, b=0),
             height=600, 
