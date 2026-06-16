@@ -4645,8 +4645,8 @@ if current_page in ["all", "pool"]:
                     # ==========================================
                  
                     st.write("---")
-                    st.markdown("### 🧩 嚴選池資金聚落：高分群產業分佈")
-                    st.caption("透過區塊面積大小，一眼看出今日高分觀察名單集中在哪些產業 (已排除 ETF 與債券)。")
+                    st.markdown("### 🧩 觀察池中的資金聚落")
+                    st.caption("透過產業類別面積大小，或許可以找找看目前高分觀察名單集中在哪些產業 ,我們已排除 ETF 與債券。")
                     
                     # 確認名單不為空，且前台字典 STOCK_DICT 存在
                     if not res_df.empty and 'STOCK_DICT' in globals() and STOCK_DICT:
