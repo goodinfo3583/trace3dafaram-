@@ -441,7 +441,7 @@ import streamlit as st
 import streamlit.components.v1 as components
 
 # ==========================================
-# 📍 頂部按鈕 (終極無縫切換版 + 懸浮提示收闔浮標)
+# 📍 頂部按鈕 (終極無縫切換版 + 手機版專屬收闔浮標)
 # ==========================================
 inject_js = """
 <script>
@@ -478,13 +478,13 @@ if (!parentDoc.getElementById('custom-sticky-header')) {
     headerDiv.id = 'custom-sticky-header';
     headerDiv.innerHTML = `
         <div class="disclaimer-bar">
-            <div class="disclaimer-item"><span class="disclaimer-title">使用聲明</span><div class="disclaimer-content">本平台僅供教育研究與籌碼觀察，絕不構成任何實質投資建議、勸誘或要約。所有資料源自公開數據，受限於網路技術，可能有延遲或錯誤。<br><br>投資必有風險，依本平台資訊所做之任何決策與損益，均須由使用者自行負責，本平台不負擔任何法律賠償責任.</div></div>
-            <div class="disclaimer-item"><span class="disclaimer-title">隱私權政策</span><div class="disclaimer-content"><b>1. 蒐集目的與範圍：</b><br>本平台依個資法蒐集您的識別資料僅供維持系統安全與優化服務使用。<br><b>2. 資料利用：</b><br>您的資料絕不向第三方洩露。<br><b>3. 資料刪除：</b><br>您可透過「聯絡我們」請求刪除資料。<br><b>4. 政策修訂：</b><br>本站保留修改政策之權利，繼續使用即視為同意。</div></div>
+            <div class="disclaimer-item"><span class="disclaimer-title">使用聲明</span><div class="disclaimer-content">本平台僅供教育研究...</div></div>
+            <div class="disclaimer-item"><span class="disclaimer-title">隱私權政策</span><div class="disclaimer-content">1. 蒐集目的與範圍...</div></div>
             <div class="disclaimer-item"><a href="#" data-target="NavToContact" class="disclaimer-title internal-nav" style="cursor: pointer;">聯絡我們</a></div>
             
             <div style="flex-grow: 1;"></div>
-            <div class="disclaimer-item" id="mobile-nav-toggle" title="收起選單" style="cursor: pointer; padding-right: 5px;">
-                <span class="disclaimer-title" style="font-size: 18px; color: #38BDF8;">📜</span>
+            <div class="disclaimer-item" id="mobile-nav-toggle" style="cursor: pointer; padding-right: 5px;">
+                <span class="disclaimer-title" style="font-size: 15px; color: #38BDF8;">📜 收起按鈕</span>
             </div>
         </div>
         <div class="nav-btn-container" id="nav-btn-container">
@@ -513,7 +513,7 @@ if (!parentDoc.getElementById('custom-sticky-header')) {
             });
         });
 
-        // 🚀 修正：切換邏輯一併更改 title 與 icon，沒有多餘文字
+        // 🚀 新增：選單收闔/展開切換邏輯
         const menuToggle = parentDoc.getElementById('mobile-nav-toggle');
         const navContainer = parentDoc.getElementById('nav-btn-container');
         if (menuToggle && navContainer) {
@@ -521,12 +521,10 @@ if (!parentDoc.getElementById('custom-sticky-header')) {
                 e.preventDefault();
                 if (navContainer.style.display === 'none') {
                     navContainer.style.display = 'flex';
-                    menuToggle.title = "收起選單";
-                    menuToggle.innerHTML = '<span class="disclaimer-title" style="font-size: 18px; color: #38BDF8;">📜</span>';
+                    menuToggle.innerHTML = '<span class="disclaimer-title" style="font-size: 15px; color: #38BDF8;">📜 收起按鈕</span>';
                 } else {
                     navContainer.style.display = 'none';
-                    menuToggle.title = "展開選單";
-                    menuToggle.innerHTML = '<span class="disclaimer-title" style="font-size: 18px; color: #FFD700;">📙</span>';
+                    menuToggle.innerHTML = '<span class="disclaimer-title" style="font-size: 15px; color: #FFD700;">📙 展開按鈕</span>';
                 }
             });
         }
@@ -564,6 +562,7 @@ if (!parentDoc.getElementById('custom-sticky-header')) {
 }
 </script>
 """
+
 
 # 透過隱藏的 iframe 執行上述的 JavaScript 注入
 components.html(inject_js, height=0, width=0)
