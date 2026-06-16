@@ -4281,7 +4281,7 @@ if current_page in ["all", "b6"]:
             st.info("📂 資料夾內尚無足夠的歷史交易紀錄，請確認檔名包含「鉅額」字樣。")       
 # ==========================================以上網頁核心區塊
 # ==========================================
-# 🔒 觀察名單專屬包廂鎖 (🚨 必須放在整份檔案最下方，區塊 6 之後！)
+# 🔒 觀察名單專屬包廂鎖 (🚨 必須放在計分部分檔案最下方！)
 # ==========================================
 if current_page in ["all", "pool"]:
     
@@ -4450,7 +4450,7 @@ if current_page in ["all", "pool"]:
 
 
                 # ==========================================
-###########
+
                 results = []
                 for _, row in pool_df.iterrows():
                     # 在迴圈內，一樣用最高規格把代號洗乾淨
@@ -4520,9 +4520,7 @@ if current_page in ["all", "pool"]:
                                 try: short_decrease_val = float(str(df_b4_sho_pct.loc[df_b4_sho_pct['股票代號'] == sid, s_col].iloc[0]).replace('%', ''))
                                 except: pass
                         if abs(short_decrease_val) >= 1: score += 1.2; details.append("空頭認輸(借券減>1%): +1.2")
-#爬蟲除錯
 
-#爬蟲除錯
                     # ==========================================
                     # 🚀 修正 3：利用極速字典精準抓取動態
                     # ==========================================
@@ -4635,7 +4633,7 @@ if current_page in ["all", "pool"]:
                 elif not valid_calc:
                     st.warning("⚠️ 本次計算總分多數為 0，已啟動防呆攔截機制：暫不覆寫 Google Sheets 歷史紀錄。請點擊上方按鈕載入最新籌碼大數據。")
 
-# ==========================================
+                # ==========================================
                 # 🚀 終極 UI 修正：改用「帶有記憶功能的按鈕選單」取代傳統 Tabs
                 # 解決點選按鈕或輸入密碼後，畫面瘋狂跳回第一頁的痛點！
                 # ==========================================
@@ -4643,35 +4641,86 @@ if current_page in ["all", "pool"]:
                 
                 selected_view = st.radio(
                     "切換檢視面板：",
-                    ["🔹 今日最新排行", "🔹 歷史分數追蹤表", "🔹 模型驗證：每週 Top 5 追蹤"],
+                    ["今日最新排行", "歷史分數追蹤表", "模型驗證：每週 Top 5 追蹤"],
                     horizontal=True,
                     label_visibility="collapsed",
                     key="pool_view_state"  # 🔑 這是關鍵！Streamlit 會自動記憶你的選擇，不再跳走
                 )
-                
-                if selected_view == "🔹 今日最新排行":
+                #********************************************************************************
+if selected_view == "🔹 今日最新排行" or selected_view == "今日最新排行":
+                    # 1. 顯示原本的 DataFrame 總表
                     st.dataframe(res_df, use_container_width=True, hide_index=True, column_config={"▼明細": st.column_config.TextColumn("▼明細", help="滑鼠游標停留在這裡查看", width="small", max_chars=4)})
                     
-                elif selected_view == "🔹 歷史分數追蹤表":
-                    try:
-                        if not hist_combined.empty:
-                            recent_dates = sorted(hist_combined['紀錄日期'].unique(), reverse=True)[:20]
-                            df_h = hist_combined[hist_combined['紀錄日期'].isin(recent_dates)].copy()
-                            id_col = '代號' if '代號' in df_h.columns else '股票代號' if '股票代號' in df_h.columns else None
-                            if id_col and '總分' in df_h.columns:
-                                df_h['日期'] = df_h['紀錄日期'].apply(lambda x: f"{x[4:6]}/{x[6:]}" if len(x)==8 else x)
-                                df_h['代號'] = df_h[id_col].astype(str).str.replace(r'\.0$', '', regex=True).str.replace(r'\D', '', regex=True)
-                                hist_pivot = df_h[['代號', '總分', '日期']].pivot_table(index='代號', columns='日期', values='總分', aggfunc='first').reset_index()
-                                sorted_date_columns = sorted([col for col in hist_pivot.columns if col not in ['代號', '名稱']], reverse=True)
-                                hist_pivot = hist_pivot[['代號'] + sorted_date_columns]
-                                hist_pivot.insert(1, '名稱', hist_pivot['代號'].map(dict(zip(res_df['代號'].astype(str).str.replace(r'\.0$', '', regex=True).str.replace(r'\D', '', regex=True), res_df['名稱']))).fillna('-'))
-                                hist_pivot = hist_pivot[hist_pivot['名稱'] != '-']
-                                if not hist_pivot.empty and sorted_date_columns[0] in hist_pivot.columns:
-                                    st.dataframe(hist_pivot.sort_values(by=sorted_date_columns[0], ascending=False).reset_index(drop=True), use_container_width=True, hide_index=True)
-                                    st.info("💡 二篩進榜標的在選股池中的總分變化，觀察籌碼動能的延續性與驗證 ▼變量！")
-                        else: st.warning("⚪ 尚無足夠的歷史分數紀錄。")
-                    except: pass
-
+                    # ==========================================
+                    # 📊 區塊擴充：觀察名單專屬產業聚落板塊 (Treemap)
+                    # ==========================================
+                    import plotly.express as px
+                    
+                    st.write("---")
+                    st.markdown("### 🧩 嚴選池資金聚落：高分群產業分佈")
+                    st.caption("透過區塊面積大小，一眼看出今日高分觀察名單集中在哪些產業 (已排除 ETF 與債券)。")
+                    
+                    # 確認名單不為空，且前台字典 STOCK_DICT 存在
+                    if not res_df.empty and 'STOCK_DICT' in globals() and STOCK_DICT:
+                        
+                        # 複製一份專門用來畫圖的 DataFrame
+                        treemap_pool_df = res_df.copy()
+                        
+                        # 透過字典配對產業別 (注意這裡要確保代號轉為字串格式去查字典)
+                        treemap_pool_df['產業別'] = treemap_pool_df['代號'].astype(str).apply(
+                            lambda sid: STOCK_DICT.get(sid, {}).get("industry", "ETF / 債券 / 其他")
+                        )
+                        
+                        # 把空值轉換
+                        treemap_pool_df['產業別'] = treemap_pool_df['產業別'].replace('', 'ETF / 債券 / 其他')
+                        
+                        # 💡 剔除 ETF / 債券 / 其他，不列入計算
+                        treemap_pool_df = treemap_pool_df[treemap_pool_df['產業別'] != 'ETF / 債券 / 其他']
+                        
+                        if not treemap_pool_df.empty:
+                            # 設定面積權重 (進榜一檔代表 1 單位面積)
+                            treemap_pool_df['計數'] = 1 
+                            
+                            # 💡 設定要帶入懸停提示框的專屬欄位 (從觀察名單 res_df 取出)
+                            hover_columns = ['代號', '總分', '最新動態', '大股東動向'] 
+                            
+                            # 使用 Plotly 繪製 Treemap
+                            fig = px.treemap(
+                                treemap_pool_df,
+                                path=[px.Constant("高分觀察名單 (排除ETF/債券)"), '產業別', '名稱'],
+                                values='計數',
+                                color='產業別', 
+                                hover_data=hover_columns, 
+                                color_discrete_sequence=px.colors.qualitative.Pastel 
+                            )
+                            
+                            # 利用 customdata 呼叫 hover_columns 中的數值
+                            fig.update_traces(
+                                textinfo="label", 
+                                hovertemplate=(
+                                    '<b>%{label}</b><br>'
+                                    '股票代號: %{customdata[0]}<br>'
+                                    '模型總分: <b>%{customdata[1]} 分</b><br>'
+                                    '最新動態: %{customdata[2]}<br>'
+                                    '大戶動向: %{customdata[3]}<br>'
+                                    '佔比/檔數: %{value}<br>'
+                                    '<extra></extra>' 
+                                )
+                            )
+                            
+                            fig.update_layout(
+                                margin=dict(t=20, l=0, r=0, b=0),
+                                height=500, # 觀察名單檔數通常較少，高度設 500 即可
+                                plot_bgcolor='rgba(0,0,0,0)',
+                                paper_bgcolor='rgba(0,0,0,0)'
+                            )
+                            
+                            st.plotly_chart(fig, use_container_width=True)
+                        else:
+                            st.info("⚪ 目前觀察名單中沒有一般產業的股票（可能全為 ETF/債券，或無符合條件標的）。")
+                    else:
+                        st.info("⚪ 尚無數據或找不到產業字典，無法繪製產業板塊圖。")
+                #********************************************************************************
                 elif selected_view == "🔹 模型驗證：每週 Top 5 追蹤":
                     st.markdown("### 🏆 AI 嚴選：今日最強 5 檔")
                     st.info("💡 **篩選邏輯**：排除任何帶有「外/投倒貨」警示的標的，並依據「總分」與「當日△」選出前 5 名。")
