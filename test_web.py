@@ -4689,9 +4689,10 @@ if current_page in ["all", "pool"]:
                                     '<b>%{label}</b><br>'
                                     '股票代號: %{customdata[0]}<br>'
                                     '模型總分: <b>%{customdata[1]} 分</b><br>'
-                                    '▼明細: %{customdata[4]}<br>'
-                                    '最新動態: %{customdata[2]}<br>'
-                                    '大戶動向: %{customdata[3]}<br>'
+                                    '▼明細: %{customdata[2]}<br>'
+                                    '△: %{customdata[3]}<br>'
+                                    '最新動態: %{customdata[4]}<br>'
+                                    '大戶動向: %{customdata[5]}<br>'
                                     '佔比/檔數: %{value}<br>'
                                     '<extra></extra>' 
                                 )
