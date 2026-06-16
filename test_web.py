@@ -2058,7 +2058,7 @@ def render_sidebar_war_room():
     # 💡 當搜尋列「沒有內容」時，顯示大盤總經 (隱藏下方 Tabs)
     if not search_query:
         st.write("---") # 側邊欄快搜與三大導航 Tab 的分隔線
-        tab1, tab2, tab3 = st.tabs(["🔹 大盤籌碼", "🔹 選擇權", "🔹 總經導航"])
+        tab1, tab2, tab3 = st.tabs(["🔹 大盤籌碼", "🔹 選擇權", "🔹 總經導航🛠️"])
         
         with tab1:
             actual_data_date = render_sidebar_market_summary()
