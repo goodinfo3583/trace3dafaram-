@@ -4279,13 +4279,13 @@ if current_page in ["all", "b6"]:
             st.dataframe(hist_matrix, use_container_width=True, hide_index=True)
         else:
             st.info("📂 資料夾內尚無足夠的歷史交易紀錄，請確認檔名包含「鉅額」字樣。")       
-# ==========================================以上網頁核心區塊
-# ==========================================
+# ==========================================以上網頁核心區塊↑↑↑↑↑
+# ==========================================↓↓↓
 # 🔒 觀察名單專屬包廂鎖 (🚨 必須放在計分部分檔案最下方！)
 # ==========================================
 if current_page in ["all", "pool"]:
     
-    # 🧙‍♂️ 魔法開啟：強制將這個區塊的畫面傳送回網頁最頂端的卡位槽顯示！
+    # 🧙 強制將這個區塊的畫面傳送回網頁最頂端的卡位槽顯示！
     with top_pool_slot:
         st.write("---")
         st.markdown("<div id='section-top-pool'></div>", unsafe_allow_html=True)
@@ -4320,7 +4320,7 @@ if current_page in ["all", "pool"]:
                 # 區塊 5 (大戶動向，直接用檔名的日期比對，最準確！)
                 elif "大股東" in filename or "神秘金字塔" in filename or "集保" in filename:
                     if file_date > d_b5_share: d_b5_share = file_date
-
+        #標題及更新時間
         st.markdown(f"""
         <div style="background: linear-gradient(90deg, rgba(15,23,42,1) 0%, rgba(14,165,233,0.3) 50%, rgba(15,23,42,1) 100%); 
                     border-top: 1px solid #38bdf8; border-bottom: 1px solid #38bdf8; padding: 15px 20px; border-radius: 10px;
@@ -4333,7 +4333,7 @@ if current_page in ["all", "pool"]:
             </div>
         </div>
         """, unsafe_allow_html=True)
-
+        #容器
         with st.container(border=True):
             st.info("💡 **評分方式**：法人籌碼上榜為底，搭配「千張大戶權重加乘」與其他數據積分。(請參考▼明細)")
 
@@ -4345,9 +4345,9 @@ if current_page in ["all", "pool"]:
                     if st.button("🚀 啟動全市場掃描 (計算總分)", type="primary", use_container_width=True):
                         st.query_params["page"] = "all"
                         st.rerun()
-                st.stop() # 🛑 絕對停止！不准用舊的 0 分往下算！
+                st.stop() #  絕對停止！不准用舊的 0 分往下算！
 
-            # ---------------- 開始正式運算 ----------------
+            # ---------------- 開始正式運算數據分析觀察名單打底及積分 ----------------
             df_b1 = st.session_state.get('my_final_df', pd.DataFrame()).copy()
             dyn_col = next((c for c in df_b1.columns if '動態' in c or '動能' in c), None)
             rank_col = next((c for c in df_b1.columns if '今日上榜' in c or '上榜' in c), None)
@@ -4415,9 +4415,9 @@ if current_page in ["all", "pool"]:
                         v = float(str(val).replace('+', '').replace('%', '').strip())
                         if v >= 1.5: return "🔥 大增"
                         if v >= 0.5: return "📈 增"
-                        if v > 0: return "↗️ 微增"
+                        if v > 0: return "↗ 微增"
                         if v == 0: return "🔄 持平"
-                        if v > -0.5: return "↘️ 微減"
+                        if v > -0.5: return "↘ 微減"
                         return "🚨 減/大減"
                     except: return "無資料"
 
@@ -4446,9 +4446,6 @@ if current_page in ["all", "pool"]:
                         delta_col = next((c for c in df_b5_400.columns if '400張增減' in c or '總增減' in c or '增減' in c), None)
                         if delta_col:
                             dict_400 = {ultra_clean_id(k): raw_delta_to_trend(v) for k, v in zip(df_b5_400['股票代號'], df_b5_400[delta_col])}
-
-
-
                 # ==========================================
 
                 results = []
@@ -4635,7 +4632,7 @@ if current_page in ["all", "pool"]:
 
                 # ==========================================
                 # 🚀 終極 UI 修正：改用「帶有記憶功能的按鈕選單」取代傳統 Tabs
-                # 解決點選按鈕或輸入密碼後，畫面瘋狂跳回第一頁的痛點！
+                # 解決點選按鈕或輸入密碼後，畫面瘋狂跳回第一頁的問題！
                 # ==========================================
                 st.markdown("<hr style='border-color: #334155;'>", unsafe_allow_html=True)
                 
@@ -4720,6 +4717,33 @@ if current_page in ["all", "pool"]:
                             st.info("⚪ 目前觀察名單中沒有一般產業的股票（可能全為 ETF/債券，或無符合條件標的）。")
                     else:
                         st.info("⚪ 尚無數據或找不到產業字典，無法繪製產業板塊圖。")
+
+                # ********************************************************************************
+                # 面板二：歷史分數追蹤表 (🚀 幫你把不小心刪掉的這段救回來了！)
+                # ********************************************************************************
+                elif selected_view == "🔹 歷史分數追蹤表":
+                    try:
+                        if not hist_combined.empty:
+                            recent_dates = sorted(hist_combined['紀錄日期'].unique(), reverse=True)[:20]
+                            df_h = hist_combined[hist_combined['紀錄日期'].isin(recent_dates)].copy()
+                            id_col = '代號' if '代號' in df_h.columns else '股票代號' if '股票代號' in df_h.columns else None
+                            if id_col and '總分' in df_h.columns:
+                                df_h['日期'] = df_h['紀錄日期'].apply(lambda x: f"{x[4:6]}/{x[6:]}" if len(x)==8 else x)
+                                df_h['代號'] = df_h[id_col].astype(str).str.replace(r'\.0$', '', regex=True).str.replace(r'\D', '', regex=True)
+                                hist_pivot = df_h[['代號', '總分', '日期']].pivot_table(index='代號', columns='日期', values='總分', aggfunc='first').reset_index()
+                                sorted_date_columns = sorted([col for col in hist_pivot.columns if col not in ['代號', '名稱']], reverse=True)
+                                hist_pivot = hist_pivot[['代號'] + sorted_date_columns]
+                                hist_pivot.insert(1, '名稱', hist_pivot['代號'].map(dict(zip(res_df['代號'].astype(str).str.replace(r'\.0$', '', regex=True).str.replace(r'\D', '', regex=True), res_df['名稱']))).fillna('-'))
+                                hist_pivot = hist_pivot[hist_pivot['名稱'] != '-']
+                                if not hist_pivot.empty and sorted_date_columns[0] in hist_pivot.columns:
+                                    st.dataframe(hist_pivot.sort_values(by=sorted_date_columns[0], ascending=False).reset_index(drop=True), use_container_width=True, hide_index=True)
+                                    st.info("💡 二篩進榜標的在選股池中的總分變化，觀察籌碼動能的延續性與驗證 ▼變量！")
+                                else:
+                                    st.warning("⚪ 尚無足夠的歷史分數紀錄。")
+                        else: 
+                            st.warning("⚪ 尚無足夠的歷史分數紀錄。")
+                    except Exception as e: 
+                        st.error(f"發生錯誤: {e}")
                 #********************************************************************************
                 elif selected_view == "🔹 模型驗證：每週 Top 5 追蹤":
                     st.markdown("### 🏆 AI 嚴選：今日最強 5 檔")
