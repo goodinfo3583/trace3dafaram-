@@ -484,7 +484,7 @@ if (!parentDoc.getElementById('custom-sticky-header')) {
             
             <div style="flex-grow: 1;"></div>
             <div class="disclaimer-item" id="mobile-nav-toggle" style="cursor: pointer; padding-right: 5px;">
-                <span class="disclaimer-title" style="font-size: 15px; color: #38BDF8;">📜 </span>
+                <span class="disclaimer-title" style="font-size: 15px; color: #38BDF8;">📜 收起按鈕</span>
             </div>
         </div>
         <div class="nav-btn-container" id="nav-btn-container">
@@ -521,10 +521,10 @@ if (!parentDoc.getElementById('custom-sticky-header')) {
                 e.preventDefault();
                 if (navContainer.style.display === 'none') {
                     navContainer.style.display = 'flex';
-                    menuToggle.innerHTML = '<span class="disclaimer-title" style="font-size: 15px; color: #38BDF8;">📜 </span>';
+                    menuToggle.innerHTML = '<span class="disclaimer-title" style="font-size: 15px; color: #38BDF8;">📜 收起按鈕</span>';
                 } else {
                     navContainer.style.display = 'none';
-                    menuToggle.innerHTML = '<span class="disclaimer-title" style="font-size: 15px; color: #FFD700;">📙 </span>';
+                    menuToggle.innerHTML = '<span class="disclaimer-title" style="font-size: 15px; color: #FFD700;">📙 展開按鈕</span>';
                 }
             });
         }
@@ -1884,14 +1884,43 @@ def render_sidebar_war_room():
     """, unsafe_allow_html=True)
 
     # 使用預設的帶邊框容器把圖表和表格包起來
+# 使用預設的帶邊框容器把圖表和表格包起來
     with st.container(border=True):
+        
         # ==========================================
-        # 🎯 搜尋輸入框
+        # 🎯 搜尋輸入框 (🚀 升級版：支援行動裝置按鈕與一鍵清空)
         # ==========================================
-        search_query = st.text_input("輸入代號或名稱 (例如: 3231 或 緯創 或 3231緯創)：", key="global_search_final")
+        # 建立清空搜尋欄的專屬回呼函數
+        def clear_search():
+            st.session_state['global_search_final'] = ""
+
+        # 手動繪製標題，避免 Streamlit 預設 Label 導致排版高低不齊
+        st.markdown("<div style='font-size: 14px; color: #E2E8F0; margin-bottom: 5px; font-weight: bold;'>輸入代號或名稱 (例如: 3231 或 緯創)：</div>", unsafe_allow_html=True)
+        
+        # 切割版面：搜尋框佔大空間，兩個按鈕各佔小空間
+        c_search, c_btn_go, c_btn_clear = st.columns([6, 1.5, 1.5])
+        
+        with c_search:
+            search_query = st.text_input(
+                "搜尋標的", 
+                key="global_search_final", 
+                label_visibility="collapsed", 
+                placeholder="點此輸入..."
+            )
+        
+        with c_btn_go:
+            # 此按鈕不需要綁定特別的動作，因為點擊按鈕會強制讓文字框失去焦點，
+            # 自然就會把輸入的字串送進系統並觸發 Fragment 重新渲染。
+            st.button("➡️", key="btn_go", use_container_width=True, help="送出搜尋")
+            
+        with c_btn_clear:
+            # 點擊時呼叫 clear_search 清空 session_state
+            st.button("🔄", key="btn_clear", on_click=clear_search, use_container_width=True, help="清空欄位")
 
         pure_stock_id = ""
         display_name = search_query
+        
+        # ... (以下保留你原本的 pure_stock_id 解析邏輯與排版) ...
 
         if search_query:
             query_clean = search_query.strip()
