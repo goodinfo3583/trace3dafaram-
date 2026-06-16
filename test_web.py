@@ -4910,38 +4910,49 @@ if current_page in ["all", "pool"]:
 # ✉️ 獨立分頁：聯絡我們 (完美黑夜派對版)
 # ==========================================
 if current_page == "contact":
-    st.markdown("<h2 style='color: #FFD700; text-align: center; margin-top: 30px;'>✉️ 聯絡管家</h2>", unsafe_allow_html=True)
+    # 標題也換成一致的藍色科技光暈
+    st.markdown("<h2 style='color: #00D2FF; text-align: center; margin-top: 30px; text-shadow: 0 0 10px rgba(0,210,255,0.5);'>✉️ 聯絡管家</h2>", unsafe_allow_html=True)
     
     with st.container(border=True):
-        # 建立左右兩欄，左邊放 NPC 圖片，右邊放引言
-        col_img, col_text = st.columns([1, 4])
+        # 💡 調整欄位比例：原本是 [1, 4]，改為 [1.5, 3.5] 讓圖片區塊變寬放大
+        col_img, col_text = st.columns([1.5, 3.5])
         
         with col_img:
-            # 讀取並顯示 NPC 圖片 (假設圖檔名為 75743.jpg)
             npc_image_path = os.path.join(image_folder, "75743.jpg")
             try:
                 img_base64 = get_image_base64(npc_image_path)
+                # 💡 圖片外框改為科技藍，加上微發光陰影
                 st.markdown(
                     f"""
-                    <div style="display: flex; justify-content: center; align-items: center; height: 100%;">
-                        <img src="{img_base64}" width="100%" style="border-radius: 50%; border: 2px solid #FFD700; box-shadow: 0 0 10px rgba(255, 215, 0, 0.5);">
+                    <div style="display: flex; justify-content: center; align-items: center; height: 100%; padding: 10px;">
+                        <img src="{img_base64}" style="width: 100%; max-width: 220px; border-radius: 50%; border: 3px solid rgba(0, 210, 255, 0.7); box-shadow: 0 0 20px rgba(0, 210, 255, 0.4);">
                     </div>
                     """, 
                     unsafe_allow_html=True
                 )
             except Exception as e:
-                # 若找不到圖片時的防呆備案 (顯示一個幽靈或信封符號)
-                st.markdown("<div style='font-size: 60px; text-align: center;'>🦇</div>", unsafe_allow_html=True)
+                st.markdown("<div style='font-size: 80px; text-align: center; color: #00D2FF;'>🦇</div>", unsafe_allow_html=True)
 
         with col_text:
-            # 使用類似對話框的樣式來呈現管家的台詞
+            # 💡 對話框改為玻璃藍卡片 (Glassmorphism) 效果，並更新台詞
             st.markdown(
                 """
-                <div style="background-color: rgba(255, 255, 255, 0.05); padding: 15px; border-radius: 10px; border-left: 3px solid #E2E8F0; height: 100%; display: flex; align-items: center;">
-                    <p style="margin: 0; font-size: 16px; color: #E2E8F0; line-height: 1.6;">
-                        「夜安，冒險家。<br>
-                        如果您在平台中發現任何系統異常，或是有任何建議，<br>
-                        歡迎隨時將紙條傳遞至後台交給我處理。」
+                <div style="background: linear-gradient(135deg, rgba(0, 210, 255, 0.05) 0%, rgba(0, 210, 255, 0.12) 100%); 
+                            padding: 20px 25px; 
+                            border-radius: 12px; 
+                            border-left: 5px solid #00D2FF; 
+                            border-top: 1px solid rgba(0, 210, 255, 0.2); 
+                            border-right: 1px solid rgba(0, 210, 255, 0.2); 
+                            border-bottom: 1px solid rgba(0, 210, 255, 0.2); 
+                            box-shadow: 0 8px 25px rgba(0, 210, 255, 0.1); 
+                            backdrop-filter: blur(4px); 
+                            height: 100%; 
+                            display: flex; 
+                            align-items: center;">
+                    <p style="margin: 0; font-size: 17px; color: #E2E8F0; line-height: 1.8; letter-spacing: 0.5px;">
+                        「夜安，股市冒險家。<br>
+                        如果您在平台中發現任何系統異常，或是對本平台有任何建議，<br>
+                        歡迎將寫好的紙條傳遞到後台交給我處理。😱」
                     </p>
                 </div>
                 """, 
