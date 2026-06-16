@@ -4937,11 +4937,11 @@ if current_page == "contact":
             # 使用類似對話框的樣式來呈現管家的台詞
             st.markdown(
                 """
-                <div style="background-color: rgba(255, 255, 255, 0.05); padding: 15px; border-radius: 10px; border-left: 4px solid #FFD700; height: 100%; display: flex; align-items: center;">
+                <div style="background-color: rgba(255, 255, 255, 0.05); padding: 15px; border-radius: 10px; border-left: 3px solid #E2E8F0; height: 100%; display: flex; align-items: center;">
                     <p style="margin: 0; font-size: 16px; color: #E2E8F0; line-height: 1.6;">
-                        「夜安，貴客。<br>
-                        如果您在派對中發現任何系統異常，或是對本平台有任何建議，<br>
-                        歡迎隨時填寫下方的紙條傳送至後台交給我處理。」
+                        「夜安，冒險家。<br>
+                        如果您在平台中發現任何系統異常，或是有任何建議，<br>
+                        歡迎隨時將紙條傳遞至後台交給我處理。」
                     </p>
                 </div>
                 """, 
