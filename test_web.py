@@ -4641,13 +4641,13 @@ if current_page in ["all", "pool"]:
                 
                 selected_view = st.radio(
                     "切換檢視面板：",
-                    ["今日最新排行", "歷史分數追蹤表", "模型驗證：每週 Top 5 追蹤"],
+                    ["🔹 今日最新排行", "🔹 歷史分數追蹤表", "🔹 模型驗證：每週 Top 5 追蹤"],
                     horizontal=True,
                     label_visibility="collapsed",
                     key="pool_view_state"  # 🔑 這是關鍵！Streamlit 會自動記憶你的選擇，不再跳走
                 )
                 #********************************************************************************
-if selected_view == "🔹 今日最新排行" or selected_view == "今日最新排行":
+                if selected_view == "🔹 今日最新排行" or selected_view == "今日最新排行":
                     # 1. 顯示原本的 DataFrame 總表
                     st.dataframe(res_df, use_container_width=True, hide_index=True, column_config={"▼明細": st.column_config.TextColumn("▼明細", help="滑鼠游標停留在這裡查看", width="small", max_chars=4)})
                     
