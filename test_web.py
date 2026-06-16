@@ -436,12 +436,8 @@ st.markdown(
 # ==========================================
 # 【修改 1】：把預設值改成 "news"，這樣一進網站就會是最新消息！
 current_page = st.query_params.get("page", "news")
-
-import streamlit as st
-import streamlit.components.v1 as components
-
 # ==========================================
-# 📍 頂部按鈕 (終極無縫切換版 + 手機版專屬收闔浮標)
+# 📍 頂部按鈕 (終極無縫切換版 + 懸浮提示收闔浮標 + 修復死鍵Bug)
 # ==========================================
 inject_js = """
 <script>
@@ -478,13 +474,13 @@ if (!parentDoc.getElementById('custom-sticky-header')) {
     headerDiv.id = 'custom-sticky-header';
     headerDiv.innerHTML = `
         <div class="disclaimer-bar">
-            <div class="disclaimer-item"><span class="disclaimer-title">使用聲明</span><div class="disclaimer-content">本平台僅供教育研究...</div></div>
-            <div class="disclaimer-item"><span class="disclaimer-title">隱私權政策</span><div class="disclaimer-content">1. 蒐集目的與範圍...</div></div>
+            <div class="disclaimer-item"><span class="disclaimer-title">使用聲明</span><div class="disclaimer-content">本平台僅供教育研究與籌碼觀察，絕不構成任何實質投資建議、勸誘或要約。所有資料源自公開數據，受限於網路技術，可能有延遲或錯誤。<br><br>投資必有風險，依本平台資訊所做之任何決策與損益，均須由使用者自行負責，本平台不負擔任何法律賠償責任。</div></div>
+            <div class="disclaimer-item"><span class="disclaimer-title">隱私權政策</span><div class="disclaimer-content"><b>1. 蒐集目的與範圍：</b><br>本平台依個資法蒐集您的識別資料僅供維持系統安全與優化服務使用。<br><b>2. 資料利用：</b><br>您的資料絕不向第三方洩露。<br><b>3. 資料刪除：</b><br>您可透過「聯絡我們」請求刪除資料。<br><b>4. 政策修訂：</b><br>本站保留修改政策之權利，繼續使用即視為同意。</div></div>
             <div class="disclaimer-item"><a href="#" data-target="NavToContact" class="disclaimer-title internal-nav" style="cursor: pointer;">聯絡我們</a></div>
             
             <div style="flex-grow: 1;"></div>
-            <div class="disclaimer-item" id="mobile-nav-toggle" style="cursor: pointer; padding-right: 5px;">
-                <span class="disclaimer-title" style="font-size: 15px; color: #38BDF8;">📜 收起按鈕</span>
+            <div class="disclaimer-item" id="mobile-nav-toggle" title="收起選單" style="cursor: pointer; padding-right: 5px;">
+                <span id="nav-toggle-icon" style="font-size: 18px; color: #38BDF8;">📜</span>
             </div>
         </div>
         <div class="nav-btn-container" id="nav-btn-container">
@@ -502,36 +498,46 @@ if (!parentDoc.getElementById('custom-sticky-header')) {
     parentDoc.body.insertBefore(headerDiv, parentDoc.body.firstChild);
 
     setTimeout(() => {
+        // 🚀 主按鈕切換邏輯
         const navLinks = parentDoc.querySelectorAll('.internal-nav');
         navLinks.forEach(link => {
-            link.addEventListener('click', (e) => {
+            link.onclick = (e) => {
                 e.preventDefault(); 
                 const targetName = link.getAttribute('data-target');
                 const btns = Array.from(parentDoc.querySelectorAll('button'));
-                const targetBtn = btns.find(b => b.innerText.includes(targetName));
+                
+                // 💡 終極殺招：使用 textContent 取代 innerText，保證隱藏按鈕也能被找到！
+                const targetBtn = btns.find(b => b.textContent.includes(targetName));
                 if (targetBtn) targetBtn.click();
-            });
+            };
         });
 
-        // 🚀 新增：選單收闔/展開切換邏輯
+        // 🚀 收闔邏輯：只改變 title 與 icon 內容
         const menuToggle = parentDoc.getElementById('mobile-nav-toggle');
         const navContainer = parentDoc.getElementById('nav-btn-container');
-        if (menuToggle && navContainer) {
-            menuToggle.addEventListener('click', (e) => {
+        const iconSpan = parentDoc.getElementById('nav-toggle-icon');
+        
+        if (menuToggle && navContainer && iconSpan) {
+            menuToggle.onclick = (e) => {
                 e.preventDefault();
                 if (navContainer.style.display === 'none') {
                     navContainer.style.display = 'flex';
-                    menuToggle.innerHTML = '<span class="disclaimer-title" style="font-size: 15px; color: #38BDF8;">📜 收起按鈕</span>';
+                    menuToggle.title = "收起選單";
+                    iconSpan.innerText = '📜';
+                    iconSpan.style.color = '#38BDF8';
                 } else {
                     navContainer.style.display = 'none';
-                    menuToggle.innerHTML = '<span class="disclaimer-title" style="font-size: 15px; color: #FFD700;">📙 展開按鈕</span>';
+                    menuToggle.title = "展開選單";
+                    iconSpan.innerText = '📙';
+                    iconSpan.style.color = '#FFD700';
                 }
-            });
+            };
         }
 
+        // 側邊欄開關邏輯
         const toggleBtn = parentDoc.getElementById('custom-sidebar-toggle');
         if (toggleBtn) {
-            toggleBtn.addEventListener('click', (e) => {
+            toggleBtn.onclick = (e) => {
                 e.preventDefault();
                 const expandBtn = parentDoc.querySelector('[data-testid="collapsedControl"]');
                 if (expandBtn) expandBtn.click();
@@ -542,19 +548,16 @@ if (!parentDoc.getElementById('custom-sticky-header')) {
                         if (closeBtn) closeBtn.click();
                     }
                 }
-            });
+            };
         }
         
+        // 🛡️ 隱藏守護員：可以安心使用 display: none 了
         setInterval(() => {
             const allBtns = Array.from(parentDoc.querySelectorAll('button'));
             allBtns.forEach(b => {
-                if(b.innerText.includes('NavTo')) {
+                if(b.textContent.includes('NavTo')) { // 這裡也要用 textContent
                     const wrapper = b.closest('div[data-testid="stElementContainer"]');
-                    if (wrapper) {
-                        wrapper.style.opacity = '0';
-                        wrapper.style.position = 'absolute';
-                        wrapper.style.top = '-9999px';
-                    }
+                    if (wrapper) wrapper.style.display = 'none';
                 }
             });
         }, 100);
@@ -562,7 +565,6 @@ if (!parentDoc.getElementById('custom-sticky-header')) {
 }
 </script>
 """
-
 
 # 透過隱藏的 iframe 執行上述的 JavaScript 注入
 components.html(inject_js, height=0, width=0)
