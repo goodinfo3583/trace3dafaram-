@@ -739,8 +739,6 @@ if current_page == "news":
 # ==========================================
 # 🌟 觀察名單專屬工具函數區 (補回遺失的計分工具)
 # ==========================================
-import pandas as pd
-import streamlit as st
 
 def get_df_safe(key): 
     return st.session_state.get(key, pd.DataFrame())
@@ -3193,12 +3191,6 @@ if current_page in ["all", "b3"]:
 # ==========================================
 # 🌟 區塊 4 專屬工具函數區 (必須放在 if 鎖外面，確保全域可用)
 # ==========================================
-import os
-import glob
-import re
-import pandas as pd
-import streamlit as st
-
 # 🛠️ 1. 強化版 CSV 讀取 (合併去重)
 def robust_read_csv_local(file_path):
     for encoding in ['cp950', 'utf-8-sig', 'utf-8']:
@@ -4292,7 +4284,20 @@ if current_page in ["all", "pool"]:
 
         df_b5_1000 = get_df_safe('df_blk5_1000')
         df_b5_400 = get_df_safe('df_blk5')
-        
+
+                #標題及更新時間
+        st.markdown(f"""
+        <div style="background: linear-gradient(90deg, rgba(15,23,42,1) 0%, rgba(14,165,233,0.3) 50%, rgba(15,23,42,1) 100%); 
+                    border-top: 1px solid #38bdf8; border-bottom: 1px solid #38bdf8; padding: 15px 20px; border-radius: 10px;
+                    text-align: center; box-shadow: 0px 0px 20px rgba(56, 189, 248, 0.2); margin-bottom: 20px;">
+            <h2 style="color: #e0f2fe; margin: 0; letter-spacing: 2px; text-shadow: 0 0 15px rgba(56, 189, 248, 0.8);">
+                ⛲ 觀察名單
+            </h2>
+            <div style='font-size:13px; color:#00D2FF; font-weight:500; margin-top:8px;'>
+                 基準日 : 📍區塊1(法人): {fmt_d(d_b1_inst)} ｜ 📍區塊2&3(籌碼): {fmt_d(d_b23_chip)} ｜ 📍區塊4(資券): {fmt_d(d_b4_margin)} ｜ 📍區塊5(大戶): {fmt_d(d_b5_share)}
+            </div>
+        </div>
+        """, unsafe_allow_html=True)
         # ==========================================
         # 🚀 修正 1：統一並簡化所有區塊的「最新日期」掃描邏輯
         # ==========================================
@@ -4320,19 +4325,7 @@ if current_page in ["all", "pool"]:
                 # 區塊 5 (大戶動向，直接用檔名的日期比對，最準確！)
                 elif "大股東" in filename or "神秘金字塔" in filename or "集保" in filename:
                     if file_date > d_b5_share: d_b5_share = file_date
-        #標題及更新時間
-        st.markdown(f"""
-        <div style="background: linear-gradient(90deg, rgba(15,23,42,1) 0%, rgba(14,165,233,0.3) 50%, rgba(15,23,42,1) 100%); 
-                    border-top: 1px solid #38bdf8; border-bottom: 1px solid #38bdf8; padding: 15px 20px; border-radius: 10px;
-                    text-align: center; box-shadow: 0px 0px 20px rgba(56, 189, 248, 0.2); margin-bottom: 20px;">
-            <h2 style="color: #e0f2fe; margin: 0; letter-spacing: 2px; text-shadow: 0 0 15px rgba(56, 189, 248, 0.8);">
-                ⛲ 觀察名單
-            </h2>
-            <div style='font-size:13px; color:#00D2FF; font-weight:500; margin-top:8px;'>
-                 基準日 : 📍區塊1(法人): {fmt_d(d_b1_inst)} ｜ 📍區塊2&3(籌碼): {fmt_d(d_b23_chip)} ｜ 📍區塊4(資券): {fmt_d(d_b4_margin)} ｜ 📍區塊5(大戶): {fmt_d(d_b5_share)}
-            </div>
-        </div>
-        """, unsafe_allow_html=True)
+
         #容器
         with st.container(border=True):
             st.info("💡 **評分方式**：法人籌碼上榜為底，搭配「千張大戶權重加乘」與其他數據積分。(請參考▼明細)")
