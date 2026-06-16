@@ -484,7 +484,7 @@ if (!parentDoc.getElementById('custom-sticky-header')) {
             
             <div style="flex-grow: 1;"></div>
             <div class="disclaimer-item" id="mobile-nav-toggle" style="cursor: pointer; padding-right: 5px;">
-                <span class="disclaimer-title" style="font-size: 15px; color: #38BDF8;">📜 收起按鈕</span>
+                <span class="disclaimer-title" style="font-size: 15px; color: #38BDF8;">📜 </span>
             </div>
         </div>
         <div class="nav-btn-container" id="nav-btn-container">
@@ -521,10 +521,10 @@ if (!parentDoc.getElementById('custom-sticky-header')) {
                 e.preventDefault();
                 if (navContainer.style.display === 'none') {
                     navContainer.style.display = 'flex';
-                    menuToggle.innerHTML = '<span class="disclaimer-title" style="font-size: 15px; color: #38BDF8;">📜 收起按鈕</span>';
+                    menuToggle.innerHTML = '<span class="disclaimer-title" style="font-size: 15px; color: #38BDF8;">📜 </span>';
                 } else {
                     navContainer.style.display = 'none';
-                    menuToggle.innerHTML = '<span class="disclaimer-title" style="font-size: 15px; color: #FFD700;">📙 展開按鈕</span>';
+                    menuToggle.innerHTML = '<span class="disclaimer-title" style="font-size: 15px; color: #FFD700;">📙 </span>';
                 }
             });
         }
