@@ -4949,11 +4949,11 @@ if current_page == "contact":
             npc_image_path = os.path.join(image_folder, "75743.jpg")
             try:
                 img_base64 = get_image_base64(npc_image_path)
-                # 💡 圖片外框改為科技藍，加上微發光陰影
+                # 💡 圖片圓外框改為科技藍，加上微發光陰影
                 st.markdown(
                     f"""
                     <div style="display: flex; justify-content: center; align-items: center; height: 100%; padding: 10px;">
-                        <img src="{img_base64}" style="width: 100%; max-width: 220px; border-radius: 50%; border: 3px solid rgba(0, 210, 255, 0.7); box-shadow: 0 0 20px rgba(0, 210, 255, 0.4);">
+                        <img src="{img_base64}" style="width: 100%; max-width: 220px; border-radius: 50%; border: 1px solid rgba(0, 210, 255, 0.7); box-shadow: 0 0 20px rgba(0, 210, 255, 0.4);">
                     </div>
                     """, 
                     unsafe_allow_html=True
@@ -4968,7 +4968,7 @@ if current_page == "contact":
                 <div style="background: linear-gradient(135deg, rgba(0, 210, 255, 0.05) 0%, rgba(0, 210, 255, 0.12) 100%); 
                             padding: 20px 25px; 
                             border-radius: 12px; 
-                            border-left: 5px solid #00D2FF; 
+                            border-left: 2px solid #00D2FF; 
                             border-top: 1px solid rgba(0, 210, 255, 0.2); 
                             border-right: 1px solid rgba(0, 210, 255, 0.2); 
                             border-bottom: 1px solid rgba(0, 210, 255, 0.2); 
