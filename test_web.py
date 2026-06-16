@@ -4272,7 +4272,7 @@ if current_page in ["all", "b6"]:
         else:
             st.info("📂 資料夾內尚無足夠的歷史交易紀錄，請確認檔名包含「鉅額」字樣。")       
 # ==========================================以上網頁核心區塊↑↑↑↑↑
-# ==========================================
+# ==========================================↓↓↓
 # 🔒 觀察名單專屬包廂鎖 (🚨 必須放在計分部分檔案最下方！)
 # ==========================================
 if current_page in ["all", "pool"]:
@@ -4312,13 +4312,7 @@ if current_page in ["all", "pool"]:
                 # 區塊 5 (大戶動向，直接用檔名的日期比對，最準確！)
                 elif "大股東" in filename or "神秘金字塔" in filename or "集保" in filename:
                     if file_date > d_b5_share: d_b5_share = file_date
-
-        # 💡 防呆機制：確保日期格式化函數存在，否則標題會渲染失敗
-        def safe_fmt_d(d_str):
-            if not d_str or d_str == "00000000": return "無資料"
-            return f"{d_str[:4]}/{d_str[4:6]}/{d_str[6:]}"
-
-        # 🌟 標題及更新時間 (放在這裡，確保緊貼著 top_pool_slot 頂部顯示)
+        #標題及更新時間
         st.markdown(f"""
         <div style="background: linear-gradient(90deg, rgba(15,23,42,1) 0%, rgba(14,165,233,0.3) 50%, rgba(15,23,42,1) 100%); 
                     border-top: 1px solid #38bdf8; border-bottom: 1px solid #38bdf8; padding: 15px 20px; border-radius: 10px;
@@ -4327,12 +4321,11 @@ if current_page in ["all", "pool"]:
                 ⛲ 觀察名單
             </h2>
             <div style='font-size:13px; color:#00D2FF; font-weight:500; margin-top:8px;'>
-                 基準日 : 📍區塊1(法人): {safe_fmt_d(d_b1_inst)} ｜ 📍區塊2&3(籌碼): {safe_fmt_d(d_b23_chip)} ｜ 📍區塊4(資券): {safe_fmt_d(d_b4_margin)} ｜ 📍區塊5(大戶): {safe_fmt_d(d_b5_share)}
+                 基準日 : 📍區塊1(法人): {fmt_d(d_b1_inst)} ｜ 📍區塊2&3(籌碼): {fmt_d(d_b23_chip)} ｜ 📍區塊4(資券): {fmt_d(d_b4_margin)} ｜ 📍區塊5(大戶): {fmt_d(d_b5_share)}
             </div>
         </div>
         """, unsafe_allow_html=True)
-
-        # 容器
+        #容器
         with st.container(border=True):
             st.info("💡 **評分方式**：法人籌碼上榜為底，搭配「千張大戶權重加乘」與其他數據積分。(請參考▼明細)")
 
@@ -4344,10 +4337,10 @@ if current_page in ["all", "pool"]:
                     if st.button("🚀 啟動全市場掃描 (計算總分)", type="primary", use_container_width=True):
                         st.query_params["page"] = "all"
                         st.rerun()
-                st.stop() # 絕對停止！不准用舊的 0 分往下算！
+                st.stop() #  絕對停止！不准用舊的 0 分往下算！
 
-        # ---------------- 開始正式運算數據分析觀察名單打底及積分 ----------------
-        df_b1 = st.session_state.get('my_final_df', pd.DataFrame()).copy()
+            # ---------------- 開始正式運算數據分析觀察名單打底及積分 ----------------
+            df_b1 = st.session_state.get('my_final_df', pd.DataFrame()).copy()
             dyn_col = next((c for c in df_b1.columns if '動態' in c or '動能' in c), None)
             rank_col = next((c for c in df_b1.columns if '今日上榜' in c or '上榜' in c), None)
             
