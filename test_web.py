@@ -2499,6 +2499,60 @@ if current_page in ["all", "b1"]:
 
     st.write("")
     st.info("💡 欄位說明：【△】為精準單日法人持股增減；【◯日ΔChange】為天期累積變化。")
+
+    # ==========================================
+    # 📊 畫圖區塊 ：產業聚落與資金輪動板塊 (Treemap)
+    # ==========================================
+    st.write("---")
+    st.markdown("### 🧩 資金聚落板塊：三大法人進榜產業分佈")
+    st.caption("透過區塊面積大小，一眼看出法人資金正在集中攻擊哪些產業。")
+    
+    # 1. 取得產業對照表
+    industry_map_df = load_industry_mapping()
+    
+    # 確保 5日 資料表存在且非空
+    if 'df_5' in locals() and not df_5.empty and not industry_map_df.empty:
+        
+        # 2. 將 5日榜單 與 產業別 進行合併
+        treemap_df = pd.merge(df_5, industry_map_df, on='股票代號', how='left')
+        
+        # 處理空值 (例如 ETF、債券，或是 txt 中沒寫產業別的標的)
+        treemap_df['產業別'] = treemap_df['產業別'].fillna('ETF / 債券 / 其他')
+        treemap_df['產業別'] = treemap_df['產業別'].replace('', 'ETF / 債券 / 其他')
+        
+        # 3. 設定每個標的面積權重
+        # 這裡設定為 1，代表面積大小取決於該產業「進榜的檔數」多寡
+        treemap_df['計數'] = 1 
+        
+        # 4. 使用 Plotly 繪製 Treemap
+        fig = px.treemap(
+            treemap_df,
+            path=[px.Constant("全市場進榜標的"), '產業別', '股票名稱'],
+            values='計數',
+            color='產業別', # 依據產業別給予不同顏色
+            hover_data=['股票代號', '5日ΔChange', '法人持股'], # 滑鼠移過去顯示的詳細資訊
+            color_discrete_sequence=px.colors.qualitative.Pastel # 使用柔和的配色
+        )
+        
+        # 優化圖表顯示細節
+        fig.update_traces(
+            textinfo="label", # 方塊內顯示文字 (產業或股票名稱)
+            textfont_size=15,
+            hovertemplate='<b>%{label}</b><br>佔比/檔數: %{value}<br>'
+        )
+        fig.update_layout(
+            margin=dict(t=20, l=0, r=0, b=0),
+            height=600, # 設定圖表高度，讓 200 檔有足夠空間顯示
+            plot_bgcolor='rgba(0,0,0,0)',
+            paper_bgcolor='rgba(0,0,0,0)'
+        )
+        
+        # 5. 渲染到 Streamlit 上
+        st.plotly_chart(fig, use_container_width=True)
+        
+    else:
+        st.info("⚪ 尚無數據或找不到產業對照表，無法繪製產業板塊圖。")    
+    
 # ==========================================
 # 🔒 區塊 2 專屬包廂鎖 (2-1 到 2-4 所有畫面渲染包進這裡)
 # ==========================================
