@@ -4735,33 +4735,15 @@ if current_page in ["all", "pool"]:
                             #***************
                             for idx, (i, row) in enumerate(top5_df.iterrows()):
                                 with cols[idx]:
-                                    # 1. 處理 △ (當日增減) 的文字與顏色
                                     delta_str = str(row['△'])
                                     delta_color = "#FF4B4B" if "+" in delta_str else ("#00E272" if "-" in delta_str else "#E2E8F0")
-                                    
-                                    # 2. 處理 ▼明細，把換行符號 \n 轉換成 HTML 認得的 <br>
-                                    detail_str = str(row.get('▼明細', '無明細')).replace('\n', '<br>')
-                                    
-                                    # 3. 渲染便籤卡片 (新增虛線分隔與明細區塊)
                                     st.markdown(f"""
-                                        <div style="background-color:rgba(0, 210, 255, 0.05); border-top: 3px solid #00D2FF; padding: 10px; border-radius: 5px; height: 100%;">
+                                        <div style="background-color:rgba(0, 210, 255, 0.05); border-top: 3px solid #00D2FF; padding: 10px; border-radius: 5px;">
                                             <h4 style="margin:0; color:#E2E8F0;">{row['名稱']}</h4>
                                             <p style="margin:0; font-size:12px; color:#A0AEC0;">{row['代號']}</p>
                                             <h2 style="margin:10px 0; color:#00D2FF;">{row['總分']:.1f} 分</h2>
-                                            
-                                            <p style="margin:0; font-size:14px;">
-                                                <strong>當日△:</strong> <span style="color:{delta_color}; font-weight:bold;">{delta_str}</span>
-                                            </p>
-                                            <p style="margin:5px 0 0 0; font-size:12px; line-height:1.2;">
-                                                {row['大股東動向']}
-                                            </p>
-                                            
-                                            <hr style="border: 0; border-top: 1px dashed rgba(255,255,255,0.2); margin: 10px 0;">
-                                            
-                                            <p style="margin:0; font-size:11px; color:#cbd5e1; line-height:1.5;">
-                                                <strong style="color:#94a3b8;">▼ 評分明細：</strong><br>
-                                                {detail_str}
-                                            </p>
+                                            <p style="margin:0; font-size:14px;"><strong>當日△:</strong> <span style="color:{delta_color}; font-weight:bold;">{delta_str}</span></p>
+                                            <p style="margin:5px 0 0 0; font-size:12px; line-height:1.2;">{row['大股東動向']}</p>
                                         </div>
                                     """, unsafe_allow_html=True)
                             #****************
