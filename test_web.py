@@ -404,6 +404,9 @@ st.markdown(
 # ==========================================
 # 【修改 1】：把預設值改成 "news"，這樣一進網站就會是最新消息！
 current_page = st.query_params.get("page", "news")
+import streamlit as st
+import streamlit.components.v1 as components
+
 # ==========================================
 # 📍 頂部按鈕 (終極無縫切換版 + 懸浮提示收闔浮標 + 修復死鍵Bug)
 # ==========================================
@@ -4998,15 +5001,13 @@ if current_page == "contact":
 # 🧪 測試區：Google Sheets 連線測試
 # ==========================================
 # ==========================================
-# 🎭 幕後無縫換頁引擎 (傀儡按鈕區)
+# 🎭 幕後無縫換頁引擎 (傀儡按鈕區 - 必須放在整份程式碼最底部)
 # ==========================================
 def change_page(page_name):
     """狀態切換器：改變頁面狀態並自動重新局部渲染，不閃屏"""
     st.session_state.current_page = page_name
-    # 🔑 絕對要有這行！這樣你的主系統才知道現在要渲染哪一個區塊 (對應你的 ?page=xxx 邏輯)
     st.query_params["page"] = page_name 
 
-# 把按鈕放在一個不干擾排版的隱藏槽裡
 with st.container():
     st.button("NavToNews", on_click=change_page, args=("news",))
     st.button("NavToPool", on_click=change_page, args=("pool",))
