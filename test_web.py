@@ -408,7 +408,7 @@ import streamlit as st
 import streamlit.components.v1 as components
 
 # ==========================================
-# 📍 頂部按鈕 (終極無縫切換版 + 懸浮提示收闔浮標 + 修復死鍵Bug)
+# 📍 頂部按鈕 (終極無縫切換版 + 懸浮提示收闔浮標 + 修復死鍵Bug + 支援自訂圖片圖示)
 # ==========================================
 inject_js = """
 <script>
@@ -432,11 +432,21 @@ if (!parentDoc.getElementById('custom-sticky-header')) {
         .disclaimer-item:hover .disclaimer-content { max-height: 400px; opacity: 1; padding: 12px 15px; }
         
         .nav-btn-container { display: flex; flex-wrap: wrap; justify-content: flex-end; align-items: center; padding: 8px 15px; background: transparent !important; gap: 6px; border: none !important; transition: all 0.3s ease-in-out; }
-        .nav-text-link { text-decoration: none !important; color: #94A3B8 !important; font-size: 16px; font-weight: 600; padding: 4px 6px; transition: all 0.2s ease-in-out; text-shadow: 1px 1px 4px rgba(0,0,0,1), -1px -1px 4px rgba(0,0,0,1); cursor: pointer; }
+        .nav-text-link { text-decoration: none !important; color: #94A3B8 !important; font-size: 16px; font-weight: 600; padding: 4px 6px; transition: all 0.2s ease-in-out; text-shadow: 1px 1px 4px rgba(0,0,0,1), -1px -1px 4px rgba(0,0,0,1); cursor: pointer; display: flex; align-items: center; }
         .nav-text-link:hover { color: #FFD700 !important; text-shadow: 0 0 12px rgba(255, 215, 0, 0.8); transform: scale(1.08); }
         .nav-divider { color: #334155; font-size: 16px; user-select: none; }
         #custom-sidebar-toggle { color: #38BDF8 !important; }
-        @media (max-width: 768px) { .nav-btn-container { padding: 5px 10px; } .nav-divider { display: none; } .nav-text-link { font-size: 14px; margin: 2px; } }
+        
+        /* 🎨 新增：自訂圖片圖示的 CSS 樣式 */
+        .nav-icon { 
+            width: 18px; 
+            height: 18px; 
+            margin-right: 5px; 
+            border-radius: 4px; /* 如果您想要圖示稍微圓角，可以保留這行 */
+            object-fit: cover;
+        }
+
+        @media (max-width: 768px) { .nav-btn-container { padding: 5px 10px; } .nav-divider { display: none; } .nav-text-link { font-size: 14px; margin: 2px; } .nav-icon { width: 16px; height: 16px; } }
         .stApp { margin-top: 50px !important; }
     `;
     parentDoc.head.appendChild(style);
@@ -462,7 +472,9 @@ if (!parentDoc.getElementById('custom-sticky-header')) {
             <a href="#" data-target="NavToB2" class="nav-text-link internal-nav">🎯 法人掃貨</a><span class="nav-divider">|</span>
             <a href="#" data-target="NavToB3" class="nav-text-link internal-nav">📅 法人連買</a><span class="nav-divider">|</span>
             <a href="#" data-target="NavToB4" class="nav-text-link internal-nav">🔄 資券軋空</a><span class="nav-divider">|</span>
-            <a href="#" data-target="NavToB5" class="nav-text-link internal-nav">💰 大腿動向</a><span class="nav-divider">|</span>
+            
+            <a href="#" data-target="NavToB5" class="nav-text-link internal-nav"><img src="app/static/wirt_leg.jpg" class="nav-icon" alt="icon">大腿動向</a><span class="nav-divider">|</span>
+            
             <a href="#" data-target="NavToB6" class="nav-text-link internal-nav">🎣 鉅額交易</a>
         </div>
     `;
@@ -477,7 +489,6 @@ if (!parentDoc.getElementById('custom-sticky-header')) {
                 const targetName = link.getAttribute('data-target');
                 const btns = Array.from(parentDoc.querySelectorAll('button'));
                 
-                // 💡 終極殺招：使用 textContent 取代 innerText，保證隱藏按鈕也能被找到！
                 const targetBtn = btns.find(b => b.textContent.includes(targetName));
                 if (targetBtn) targetBtn.click();
             };
@@ -522,11 +533,11 @@ if (!parentDoc.getElementById('custom-sticky-header')) {
             };
         }
         
-        // 🛡️ 隱藏守護員：可以安心使用 display: none 了
+        // 🛡️ 隱藏守護員
         setInterval(() => {
             const allBtns = Array.from(parentDoc.querySelectorAll('button'));
             allBtns.forEach(b => {
-                if(b.textContent.includes('NavTo')) { // 這裡也要用 textContent
+                if(b.textContent.includes('NavTo')) { 
                     const wrapper = b.closest('div[data-testid="stElementContainer"]');
                     if (wrapper) wrapper.style.display = 'none';
                 }
