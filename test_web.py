@@ -2501,7 +2501,7 @@ if current_page in ["all", "b1"]:
             st.dataframe(filtered_df[all_display_cols].style.apply(highlight_row, axis=1), use_container_width=True)
 
     st.write("")
-    st.info("💡 欄位說明：【△】為精準單日法人持股增減；【◯日ΔChange】為天期累積變化。")
+    st.info("💡 △是單日的法人持股增減；5/20/60/120日ΔChange為5/20/60/120期間的累積變化，我們可以試著短線與長線一起觀察。")
 
     #==========================================
     # 📊 繪製區塊 ：產業聚落與資金輪動板塊 (Treemap)
@@ -4352,7 +4352,7 @@ if current_page in ["all", "pool"]:
         """, unsafe_allow_html=True)
         #容器
         with st.container(border=True):
-            st.info("💡 **評分方式**：法人籌碼上榜為底，搭配「千張大戶權重加乘」與其他數據積分。(請參考▼明細)")
+            st.info("💡 **評分方式**：我們試著觀察法人持股前段班且當天持續加碼的標的，搭配其他掃貨、連買、大腿數據，看看是否能找出法人們的口袋標的。(試著參考"▼明細")")
 
             # 🚨 關鍵阻斷器：確保各區塊都有數據
             if 'df_blk2_1' not in st.session_state or st.session_state['df_blk2_1'].empty or 'df_blk5_1000' not in st.session_state or st.session_state['df_blk5_1000'].empty:
@@ -4674,7 +4674,7 @@ if current_page in ["all", "pool"]:
                  
                     st.write("---")
                     st.markdown("### 🧩 觀察池中的資金聚落")
-                    st.caption("透過產業類別面積大小，或許可以找找看目前高分觀察名單集中在哪些產業 ,我們已排除 ETF 與債券。")
+                    st.caption("透過產業類別面積大小，或許可以找找看目前高分觀察名單集中在哪些產業 ,我們排除了 ETF 與債券。")
                     
                     # 確認名單不為空，且前台字典 STOCK_DICT 存在
                     if not res_df.empty and 'STOCK_DICT' in globals() and STOCK_DICT:
@@ -4758,7 +4758,7 @@ if current_page in ["all", "pool"]:
                                 hist_pivot = hist_pivot[hist_pivot['名稱'] != '-']
                                 if not hist_pivot.empty and sorted_date_columns[0] in hist_pivot.columns:
                                     st.dataframe(hist_pivot.sort_values(by=sorted_date_columns[0], ascending=False).reset_index(drop=True), use_container_width=True, hide_index=True)
-                                    st.info("💡 二篩進榜標的在選股池中的總分變化，觀察籌碼動能的延續性與驗證 ▼變量！")
+                                    st.info("我們也記錄了口袋名單在觀察名單的總分變化，試著觀察籌碼動能的延續性與驗證 ▼變量...")
                                 else:
                                     st.warning("⚪ 尚無足夠的歷史分數紀錄。")
                         else: 
