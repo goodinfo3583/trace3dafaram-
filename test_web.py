@@ -2501,7 +2501,7 @@ if current_page in ["all", "b1"]:
             st.dataframe(filtered_df[all_display_cols].style.apply(highlight_row, axis=1), use_container_width=True)
 
     st.write("")
-    st.info("💡 △是單日的法人持股增減；5/20/60/120日ΔChange為5/20/60/120期間的累積變化，我們可以試著短線與長線一起觀察。")
+    st.info("💡 △是單日的法人持股增減(如果最新基準日未進前200榜，△會直接以歸0計算)；5/20/60/120日ΔChange為5/20/60/120期間的累積變化，我們可以試著短線與長線一起觀察。")
 
     #==========================================
     # 📊 繪製區塊 ：產業聚落與資金輪動板塊 (Treemap)
