@@ -4352,7 +4352,7 @@ if current_page in ["all", "pool"]:
         """, unsafe_allow_html=True)
         #容器
         with st.container(border=True):
-            st.info("💡 我們試著觀察法人持股前段班且當天持續加碼的標的，搭配其他掃貨、連買、大腿數據，看看是否能找出法人們的口袋標的。(試著參考▼明細)")
+            st.info("💡 我們試著觀察近5/20/60/120日法人持股上升的變化前段班且當天持續買入的標的，搭配其他掃貨、連買、大腿數據等，看看是否能找出藏在法人們口袋裡的標的。(試著參考▼明細)")
 
             # 🚨 關鍵阻斷器：確保各區塊都有數據
             if 'df_blk2_1' not in st.session_state or st.session_state['df_blk2_1'].empty or 'df_blk5_1000' not in st.session_state or st.session_state['df_blk5_1000'].empty:
