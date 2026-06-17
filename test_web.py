@@ -440,8 +440,8 @@ if (!parentDoc.getElementById('custom-sticky-header')) {
 
         /* 🎨 新增：自訂圖片圖示的 CSS 樣式 */
         .nav-icon { 
-            width: 18px; 
-            height: 18px; 
+            width: 22px; 
+            height: 22px; 
             margin-right: 5px; 
             border-radius: 4px; /* 如果您想要圖示稍微圓角，可以保留這行 */
             object-fit: cover;
