@@ -474,7 +474,7 @@ if (!parentDoc.getElementById('custom-sticky-header')) {
             <a href="#" data-target="NavToB2" class="nav-text-link internal-nav">🎯 法人掃貨</a><span class="nav-divider">|</span>
             <a href="#" data-target="NavToB3" class="nav-text-link internal-nav">📅 法人連買</a><span class="nav-divider">|</span>
             <a href="#" data-target="NavToB4" class="nav-text-link internal-nav">🔄 資券軋空</a><span class="nav-divider">|</span>
-            <a href="#" data-target="NavToB5" class="nav-text-link internal-nav"><img src="app/static/magicbook2.png" class="nav-icon" alt="icon">大腿動向</a><span class="nav-divider">|</span>
+            <a href="#" data-target="NavToB5" class="nav-text-link internal-nav"><img src="app/static/magicbook1.png" class="nav-icon" alt="icon">大腿動向</a><span class="nav-divider">|</span>
             <a href="#" data-target="NavToB6" class="nav-text-link internal-nav">🎣 鉅額交易</a>
         </div>
     `;
