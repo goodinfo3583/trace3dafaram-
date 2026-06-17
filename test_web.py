@@ -445,6 +445,10 @@ if (!parentDoc.getElementById('custom-sticky-header')) {
             margin-right: 5px; 
             border-radius: 4px; /* 如果您想要圖示稍微圓角，可以保留這行 */
             object-fit: cover;
+            /* 🚀 微調參數區 */
+            position: relative; /* 啟用相對定位 */
+            top: -2px;          /* 負值往上移，正值往下移。可試試 -1px, -2px, 1px */
+            left: 0px;          /* 負值往左移，正值往右移 */
         }
 
 
