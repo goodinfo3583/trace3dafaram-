@@ -2650,7 +2650,7 @@ if current_page in ["all", "b2"]:
 
             csv_display['今日短動態'] = csv_display.apply(evaluate_continuity, axis=1)
             
-            st.info("**動態說明：** 🔥 強延續 (買盤加速) ⚠️ 趨緩 (買盤力道減弱) 🔄 持平 📉 調節洗盤 (微幅調節) 🚨 劇烈倒貨 (強烈賣出)")
+            st.info("動態 🔥 強延續 (買盤加速) ⚠️ 趨緩 (買盤力道減弱) 🔄 持平 📉 調節洗盤 (微幅調節) 🚨 劇烈倒貨 (強烈賣出)")
             
             c1, c2 = st.columns(2)
             show_etf = c1.checkbox("顯示 ETF", value=True, key="fo_etf_v9")
@@ -3101,9 +3101,9 @@ if current_page in ["all", "b3"]:
     # ========================================================
     h_day1, h_day2 = st.columns(2)
     with h_day1:
-        st.markdown(f"<h3 style='margin-top: 0; margin-bottom: 0;'>🌐 外資最新日連買</h3>", unsafe_allow_html=True)
+        st.markdown(f"<h3 style='margin-top: 0; margin-bottom: 0;'>🌐 外資最新 日 連買</h3>", unsafe_allow_html=True)
     with h_day2:
-        st.markdown(f"<h3 style='margin-top: 0; margin-bottom: 0;'>🏦 投信最新日連買</h3>", unsafe_allow_html=True)
+        st.markdown(f"<h3 style='margin-top: 0; margin-bottom: 0;'>🏦 投信最新 日 連買</h3>", unsafe_allow_html=True)
 
     st.markdown("<div style='color: white; margin-top: 5px; margin-bottom: 18px; font-size: 16px;'>💡 <b>日動態說明：</b> 🔥 波段認養 (連買10天以上)  ⚡ 買盤點火 (連買5~9天)  🆕 試單觀察 (連買1~4天)</div>", unsafe_allow_html=True)
 
@@ -4352,7 +4352,7 @@ if current_page in ["all", "pool"]:
         """, unsafe_allow_html=True)
         #容器
         with st.container(border=True):
-            st.info("💡 **評分方式**：我們試著觀察法人持股前段班且當天持續加碼的標的，搭配其他掃貨、連買、大腿數據，看看是否能找出法人們的口袋標的。(試著參考▼明細)")
+            st.info("💡 我們試著觀察法人持股前段班且當天持續加碼的標的，搭配其他掃貨、連買、大腿數據，看看是否能找出法人們的口袋標的。(試著參考▼明細)")
 
             # 🚨 關鍵阻斷器：確保各區塊都有數據
             if 'df_blk2_1' not in st.session_state or st.session_state['df_blk2_1'].empty or 'df_blk5_1000' not in st.session_state or st.session_state['df_blk5_1000'].empty:
@@ -4767,8 +4767,8 @@ if current_page in ["all", "pool"]:
                         st.error(f"發生錯誤: {e}")
                 #********************************************************************************
                 elif selected_view == "🔹 模型驗證：每週 Top 5 追蹤":
-                    st.markdown("### 🏆 AI 嚴選：今日最強 5 檔")
-                    st.info("💡 **篩選邏輯**：排除任何帶有「外/投倒貨」警示的標的，並依據「總分」與「當日△」選出前 5 名。")
+                    st.markdown("### 🏆 嚴選 5 檔模型追蹤")
+                    st.info("💡 我們先排除了法人丟出籌碼警示的標的，並根據總分與當日△選出前 5 名，但是有時候倒貨僅是換手，這個部分還相當困難阿，真是傷腦筋")
                     if not res_df.empty:
                         safe_df = res_df[res_df['賣出警示'] == "-"].copy()
                         if not safe_df.empty:
