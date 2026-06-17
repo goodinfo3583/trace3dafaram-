@@ -436,6 +436,18 @@ if (!parentDoc.getElementById('custom-sticky-header')) {
         .nav-text-link:hover { color: #FFD700 !important; text-shadow: 0 0 12px rgba(255, 215, 0, 0.8); transform: scale(1.08); }
         .nav-divider { color: #334155; font-size: 16px; user-select: none; }
         #custom-sidebar-toggle { color: #38BDF8 !important; }
+
+
+        /* 🎨 新增：自訂圖片圖示的 CSS 樣式 */
+        .nav-icon { 
+            width: 18px; 
+            height: 18px; 
+            margin-right: 5px; 
+            border-radius: 4px; /* 如果您想要圖示稍微圓角，可以保留這行 */
+            object-fit: cover;
+        }
+
+
         @media (max-width: 768px) { .nav-btn-container { padding: 5px 10px; } .nav-divider { display: none; } .nav-text-link { font-size: 14px; margin: 2px; } }
         .stApp { margin-top: 50px !important; }
     `;
@@ -462,7 +474,7 @@ if (!parentDoc.getElementById('custom-sticky-header')) {
             <a href="#" data-target="NavToB2" class="nav-text-link internal-nav">🎯 法人掃貨</a><span class="nav-divider">|</span>
             <a href="#" data-target="NavToB3" class="nav-text-link internal-nav">📅 法人連買</a><span class="nav-divider">|</span>
             <a href="#" data-target="NavToB4" class="nav-text-link internal-nav">🔄 資券軋空</a><span class="nav-divider">|</span>
-            <a href="#" data-target="NavToB5" class="nav-text-link internal-nav">💰 大腿動向</a><span class="nav-divider">|</span>
+            <a href="#" data-target="NavToB5" class="nav-text-link internal-nav"><img src="app/static/wirt_leg.jpg" class="nav-icon" alt="icon">大腿動向</a><span class="nav-divider">|</span>
             <a href="#" data-target="NavToB6" class="nav-text-link internal-nav">🎣 鉅額交易</a>
         </div>
     `;
