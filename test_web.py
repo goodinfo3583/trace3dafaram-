@@ -449,9 +449,17 @@ if (!parentDoc.getElementById('custom-sticky-header')) {
             position: relative; /* 啟用相對定位 */
             top: -2px;          /* 負值往上移，正值往下移。可試試 -1px, -2px, 1px */
             left: 0px;          /* 負值往左移，正值往右移 */
+            /* 🚀 1. 讓圖片發光時有滑順的漸變動畫 */
+            transition: all 0.3s ease-in-out;
+        
+        }
+        /* 🚀 2. 當滑鼠滑過外層連結時，連帶讓裡面的圖片發光！ */
+        .nav-text-link:hover .nav-icon {
+            /* 加上與文字同款的黃色光暈，並稍微調亮圖片 */
+            filter: drop-shadow(0px 0px 6px rgba(255, 215, 0, 0.9)) brightness(1.15);
         }
 
-
+        
         @media (max-width: 768px) { .nav-btn-container { padding: 5px 10px; } .nav-divider { display: none; } .nav-text-link { font-size: 14px; margin: 2px; } }
         .stApp { margin-top: 50px !important; }
     `;
