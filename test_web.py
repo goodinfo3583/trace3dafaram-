@@ -3101,9 +3101,9 @@ if current_page in ["all", "b3"]:
     # ========================================================
     h_day1, h_day2 = st.columns(2)
     with h_day1:
-        st.markdown(f"<h3 style='margin-top: 0; margin-bottom: 0;'>🌐 外資最新 日 連買</h3>", unsafe_allow_html=True)
+        st.markdown(f"<h3 style='margin-top: 0; margin-bottom: 0;'>🌐 外資最新 日連買</h3>", unsafe_allow_html=True)
     with h_day2:
-        st.markdown(f"<h3 style='margin-top: 0; margin-bottom: 0;'>🏦 投信最新 日 連買</h3>", unsafe_allow_html=True)
+        st.markdown(f"<h3 style='margin-top: 0; margin-bottom: 0;'>🏦 投信最新 日連買</h3>", unsafe_allow_html=True)
 
     st.markdown("<div style='color: white; margin-top: 5px; margin-bottom: 18px; font-size: 16px;'>💡 <b>日動態說明：</b> 🔥 波段認養 (連買10天以上)  ⚡ 買盤點火 (連買5~9天)  🆕 試單觀察 (連買1~4天)</div>", unsafe_allow_html=True)
 
@@ -3114,7 +3114,7 @@ if current_page in ["all", "b3"]:
         else:
             st.write("無資料")
         date_val = date_fo_day if date_fo_day else '無資料'
-        st.markdown(f"<div style='color: #00D2FF; font-size: 16px; margin-top: 1px;'>最新數據: {date_val}</div>", unsafe_allow_html=True)
+        st.markdown(f"<div style='color: #00D2FF; font-size: 16px; margin-top: 1px;'>基準日: {date_val}</div>", unsafe_allow_html=True)
 
     with c_day2:
         if not live_it_day.empty:
@@ -3122,7 +3122,7 @@ if current_page in ["all", "b3"]:
         else:
             st.write("無資料")
         date_val = date_it_day if date_it_day else '無資料'
-        st.markdown(f"<div style='color: #00D2FF; font-size: 16px; margin-top: 1px;'>最新數據: {date_val}</div>", unsafe_allow_html=True)
+        st.markdown(f"<div style='color: #00D2FF; font-size: 16px; margin-top: 1px;'>基準日: {date_val}</div>", unsafe_allow_html=True)
 
     st.write("---") 
 
@@ -3131,9 +3131,9 @@ if current_page in ["all", "b3"]:
     # ========================================================
     h_wk1, h_wk2 = st.columns(2)
     with h_wk1:
-        st.markdown(f"<h3 style='margin-top: 0; margin-bottom: 0;'>🌐 外資最新週連買</h3>", unsafe_allow_html=True)
+        st.markdown(f"<h3 style='margin-top: 0; margin-bottom: 0;'>🌐 外資最新 週連買</h3>", unsafe_allow_html=True)
     with h_wk2:
-        st.markdown(f"<h3 style='margin-top: 0; margin-bottom: 0;'>🏦 投信最新週連買</h3>", unsafe_allow_html=True)
+        st.markdown(f"<h3 style='margin-top: 0; margin-bottom: 0;'>🏦 投信最新 週連買</h3>", unsafe_allow_html=True)
 
     st.markdown("<div style='color: white; margin-top: 5px; margin-bottom: 18px; font-size: 16px;'>💡 <b>週動態說明：</b> 👑 長線主控 (連買10週以上)  🚀 趨勢加溫 (連買5~9週)  🌱 週線發動 (連買1~4週)</div>", unsafe_allow_html=True)
 
@@ -3144,7 +3144,7 @@ if current_page in ["all", "b3"]:
         else:
             st.write("無資料")
         date_val = date_fo_wk if date_fo_wk else '無資料'
-        st.markdown(f"<div style='color: #00D2FF; font-size: 16px; margin-top: 1px;'>最新數據: {date_val}</div>", unsafe_allow_html=True)
+        st.markdown(f"<div style='color: #00D2FF; font-size: 16px; margin-top: 1px;'>基準日: {date_val}</div>", unsafe_allow_html=True)
 
     with c_wk2:
         if not live_it_wk.empty:
@@ -3152,7 +3152,7 @@ if current_page in ["all", "b3"]:
         else:
             st.write("無資料")
         date_val = date_it_wk if date_it_wk else '無資料'
-        st.markdown(f"<div style='color: #00D2FF; font-size: 16px; margin-top: 1px;'>最新數據: {date_val}</div>", unsafe_allow_html=True)
+        st.markdown(f"<div style='color: #00D2FF; font-size: 16px; margin-top: 1px;'>基準日: {date_val}</div>", unsafe_allow_html=True)
 
     # ========================================================
     # 🖼️ 記憶體整合連動區塊 (供快搜功能使用)
@@ -3622,7 +3622,7 @@ if current_page in ["all", "b4"]:
             header_html += f"<span style='color: #00D2FF; font-size: 0.7em;'>({radar_date})</span> <span style='color: #ffa500; font-size: 0.5em;'>⏳籌碼待更新</span>"
 
     st.markdown(f"<h2>{header_html}</h2>", unsafe_allow_html=True)
-    st.write("💡 三大法人買超，伴隨融資退場、借券回補或融券逆勢增加的潛在軋空標的。")
+    st.write("💡 觀察法人們買超，且伴隨融資退場、借券回補或融券逆勢增加的潛在軋空標的。")
 
     if not df_squeeze_radar.empty:
         show_all = st.checkbox("顯示榜內被法人買超的上漲標的，但籌碼未見軋空特徵", value=False)
@@ -3687,7 +3687,7 @@ if current_page in ["all", "b4"]:
             header_html += f"<span style='color: #00D2FF; font-size: 0.7em;'>({radar_date})</span> <span style='color: #ffa500; font-size: 0.5em;'>⏳融券資待更新</span>"
 
     st.markdown(f"<h2>{header_html}</h2>", unsafe_allow_html=True)
-    st.write("💡 三大法人賣超,融資套牢或借券增加的籌碼惡化標的,若當日成交轉正有望回溫。")
+    st.write("💡 法人們賣超，且股價下跌融資套牢或借券增加的籌碼惡化標的，不過我們似乎觀察倒若當日成交轉正有望回溫或是反彈...")
 
     if not df_risk_radar.empty:
         show_all = st.checkbox("顯示榜內被法人賣超的下跌/持平標的但融資借券未上榜", value=False)
@@ -4075,7 +4075,7 @@ if current_page in ["all", "b5"]:
                 if sort_col:
                     sync = sync.sort_values(by=sort_col, ascending=False)
 
-                st.success(f"🔥 強烈訊號！共有 **{len(sync)}** 檔標的出現大戶雙引擎共振 (千張與四百張同增)！")
+                st.success(f"這是強烈的大腿訊號！共有 **{len(sync)}** 檔標的出現大腿雷達共振 (千張與四百張同時增加)，值得好好研究！")
                 st.dataframe(sync, use_container_width=True, hide_index=True)
             else:
                 st.info("⚪ 最新一週目前沒有「千張與四百張」同時增加的共振標的。")
@@ -4164,7 +4164,7 @@ if current_page in ["all", "b6"]:
     status_icon = "🟢" if df_block is not None else "🌕"
 
     st.markdown(f"### 🎣 區塊 6：鉅額交易動向 <span style='font-size: 0.6em; color: #00D2FF;'>({formatted_date} {status_icon})</span>", unsafe_allow_html=True)
-    st.write("💡 鉅額交易常為大戶私下換手籌碼，成交價可視為「支撐/壓力」防守線；短線跌破建議嚴設停損。")
+    st.write("💡 鉅額交易有時為大戶私下換手籌碼，成交價可作為「支撐/壓力」的防守線；如果短線跌破建議嚴設停損。")
 
     tab_today, tab_hist = st.tabs(["🔹 今日最新鉅額交易", "🔹 歷史防守價追蹤表"])
 
