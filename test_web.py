@@ -4722,22 +4722,22 @@ if current_page in ["all", "pool"]:
                             treemap_pool_df['計數'] = 1
          ##############################
 
-                            # ==========================================
-                            # 💡 新增：計算檔數，並修改產業標籤 (不含昨日比較)
+# ==========================================
+                            # 💡 新增：計算檔數，並修改產業標籤 (加入字體大小控制)
                             # ==========================================
                             # 1. 統計今日觀察池中，各產業的總檔數
                             today_counts = treemap_pool_df['產業別'].value_counts().to_dict()
                             
-                            # 2. 建立標籤轉換函式：只顯示產業名稱與今日檔數
+                            # 2. 建立標籤轉換函式：利用 HTML 標籤放大字體並加粗
                             def format_industry_label(industry):
                                 t_count = today_counts.get(industry, 0)
-                                # 組合字串，使用 <br> 讓文字在 Treemap 上換行顯示
-                                # 結果範例："電子零組件<br>31檔"
-                                return f"{industry}<br>{t_count}檔"
+                                # 組合字串：產業名稱設為 18px 並加粗，檔數設為 14px
+                                # 你可以根據視覺需求隨時調整 px 的數值
+                                return f"<b><span style='font-size: 18px;'>{industry}</span></b><br><span style='font-size: 14px;'>{t_count}檔</span>"
 
                             # 3. 將原本的產業別替換為帶有數據的新名稱
                             treemap_pool_df['產業別'] = treemap_pool_df['產業別'].apply(format_industry_label)
-                            
+                            # ==========================================                            
           ############################                  
                             # 💡 設定要帶入懸停提示框的專屬欄位 (從觀察名單 res_df 取出)
                             hover_columns = ['代號', '總分','▼明細','△', '最新動態', '大股東動向'] 
