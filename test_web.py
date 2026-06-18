@@ -4813,28 +4813,13 @@ if current_page in ["all", "pool"]:
                             def format_stock_label(row):
                                 name = row.get('名稱', '')
                                 score = row.get('總分', '')
-                                detail = row.get('▼明細', '')
-                                delta = row.get('△', '')
-                                news = row.get('最新動態', '')
-                                holder = row.get('大股東動向', '')
-                                
-                                # 將數據組合成 HTML，變成板塊上的顯示文字
-                                # 利用不同字體大小與顏色(淡灰色)做出層次，確保視覺舒適度
-                                return (
-                                    f"<b><span style='font-size: 16px;'>{name}</span></b><br>"
-                                    f"<span style='font-size: 13px; line-height: 1.5;'>"
-                                    f"總分: <b>{score}</b> | △: {delta}<br>"
-                                    f"動態: {news}<br>"
-                                    f"大戶: {holder}<br>"
-                                    f"<span style='font-size: 11px; color: #D1D5DB;'>{detail}</span>"
-                                    f"</span>"
-                                )
-                                
+                                return f"<b>{name}</b><br><span style='font-size: 11px; color: #E5E7EB;'>{score}分</span>"
                             # 套用轉換，建立新欄位作為 Treemap 的最底層節點
-                            treemap_pool_df['顯示名稱'] = treemap_pool_df.apply(format_stock_label, axis=1)
-
+                            treemap_pool_df['顯示名稱'] = treemap_pool_df.apply(format_clean_stock_label, axis=1)
+                                
+                                
                             #################
-                            # 💡 【已修正】這裡必須與你 DataFrame 原始欄位完全一致：'大股東動向'
+                            # 💡 【懸停欄位框】這裡必須與你 DataFrame 原始欄位完全一致：'大股東動向'
                             hover_columns = ['代號', '總分', '▼明細', '△', '最新動態', '大股東動向'] 
                             
                             # ==========================================
@@ -4870,7 +4855,7 @@ if current_page in ["all", "pool"]:
                                 textinfo="label", 
                                 textfont=dict(
                                     color="white", # 強制所有文字變成白色，在深色背景上才清楚
-                                    size=13        # 設定基礎字體大小
+                                    size=15        # 設定基礎字體大小
                                 ),
                                 marker=dict(
                                     line=dict(color='#0B0F19', width=2), # 在便條紙之間加上深色粗邊框
@@ -4883,7 +4868,7 @@ if current_page in ["all", "pool"]:
                                     '▼明細: %{customdata[2]}<br>'
                                     '△: %{customdata[3]}<br>'
                                     '最新動態: %{customdata[4]}<br>'
-                                    '大戶動向: %{customdata[5]}<br>' # 這裡顯示的文字可以維持大戶動向沒關係
+                                    '大股東動向: %{customdata[5]}<br>' # 這裡顯示的文字可以維持大戶動向沒關係
                                     '<extra></extra>' 
                                 )
                             )
