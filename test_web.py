@@ -4806,7 +4806,34 @@ if current_page in ["all", "pool"]:
                                 return f"<b>{industry}</b><br><span style='font-size: 13px;'>{t_count}檔</span>"
 
                             treemap_pool_df['產業別'] = treemap_pool_df['產業別'].apply(format_industry_label)
-                            
+                            #################
+                            # ==========================================
+                            # 💡 新增：建立個股層級的詳細數據標籤 (顯示在產業板塊內容上)
+                            # ==========================================
+                            def format_stock_label(row):
+                                name = row.get('名稱', '')
+                                score = row.get('總分', '')
+                                detail = row.get('▼明細', '')
+                                delta = row.get('△', '')
+                                news = row.get('最新動態', '')
+                                holder = row.get('大股東動向', '')
+                                
+                                # 將數據組合成 HTML，變成板塊上的顯示文字
+                                # 利用不同字體大小與顏色(淡灰色)做出層次，確保視覺舒適度
+                                return (
+                                    f"<b><span style='font-size: 16px;'>{name}</span></b><br>"
+                                    f"<span style='font-size: 13px; line-height: 1.5;'>"
+                                    f"總分: <b>{score}</b> | △: {delta}<br>"
+                                    f"動態: {news}<br>"
+                                    f"大戶: {holder}<br>"
+                                    f"<span style='font-size: 11px; color: #D1D5DB;'>{detail}</span>"
+                                    f"</span>"
+                                )
+                                
+                            # 套用轉換，建立新欄位作為 Treemap 的最底層節點
+                            treemap_pool_df['顯示名稱'] = treemap_pool_df.apply(format_stock_label, axis=1)
+
+                            #################
                             # 💡 【已修正】這裡必須與你 DataFrame 原始欄位完全一致：'大股東動向'
                             hover_columns = ['代號', '總分', '▼明細', '△', '最新動態', '大股東動向'] 
                             
@@ -4830,7 +4857,8 @@ if current_page in ["all", "pool"]:
                             # 使用 Plotly 繪製 Treemap
                             fig = px.treemap(
                                 treemap_pool_df,
-                                path=[px.Constant("板塊資金聚落"), '產業別', '名稱'], 
+                                #顯示重新整理的板塊名稱
+                                path=[px.Constant("板塊資金聚落"), '產業別', '顯示名稱'], 
                                 values='計數',
                                 color='產業別', 
                                 hover_data=hover_columns, 
@@ -4842,7 +4870,7 @@ if current_page in ["all", "pool"]:
                                 textinfo="label", 
                                 textfont=dict(
                                     color="white", # 強制所有文字變成白色，在深色背景上才清楚
-                                    size=14        # 設定基礎字體大小
+                                    size=13        # 設定基礎字體大小
                                 ),
                                 marker=dict(
                                     line=dict(color='#0B0F19', width=2), # 在便條紙之間加上深色粗邊框
@@ -4862,7 +4890,7 @@ if current_page in ["all", "pool"]:
                             
                             fig.update_layout(
                                 margin=dict(t=30, l=0, r=0, b=0),
-                                height=550, # 稍微拉高一點，讓文字更有空間呼吸
+                                height=650, # 稍微拉高一點，讓文字更有空間呼吸
                                 plot_bgcolor='rgba(0,0,0,0)',
                                 paper_bgcolor='rgba(0,0,0,0)',
                                 font=dict(family="sans-serif") 
