@@ -4810,7 +4810,7 @@ if current_page in ["all", "pool"]:
                             # ==========================================
                             # 💡 新增：建立個股層級的詳細數據標籤 (顯示在產業板塊內容上)
                             # ==========================================
-                            def format_stock_label(row):
+                            def format_clean_stock_label(row):
                                 name = row.get('名稱', '')
                                 score = row.get('總分', '')
                                 return f"<b>{name}</b><br><span style='font-size: 11px; color: #E5E7EB;'>{score}分</span>"
