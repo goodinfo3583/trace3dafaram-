@@ -4779,7 +4779,7 @@ if current_page in ["all", "pool"]:
                                     '▼明細: %{customdata[2]}<br>'
                                     '△: %{customdata[3]}<br>'
                                     '最新動態: %{customdata[4]}<br>'
-                                    '大戶動向: %{customdata[5]}<br>'
+                                    '大股東動向: %{customdata[5]}<br>'
                                     '<extra></extra>' 
                                 )
                             )
