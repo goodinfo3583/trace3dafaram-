@@ -4719,8 +4719,26 @@ if current_page in ["all", "pool"]:
                         
                         if not treemap_pool_df.empty:
                             # 設定面積權重 (進榜一檔代表 1 單位面積)
-                            treemap_pool_df['計數'] = 1 
+                            treemap_pool_df['計數'] = 1
+         ##############################
+
+                            # ==========================================
+                            # 💡 新增：計算檔數，並修改產業標籤 (不含昨日比較)
+                            # ==========================================
+                            # 1. 統計今日觀察池中，各產業的總檔數
+                            today_counts = treemap_pool_df['產業別'].value_counts().to_dict()
                             
+                            # 2. 建立標籤轉換函式：只顯示產業名稱與今日檔數
+                            def format_industry_label(industry):
+                                t_count = today_counts.get(industry, 0)
+                                # 組合字串，使用 <br> 讓文字在 Treemap 上換行顯示
+                                # 結果範例："電子零組件<br>31檔"
+                                return f"{industry}<br>{t_count}檔"
+
+                            # 3. 將原本的產業別替換為帶有數據的新名稱
+                            treemap_pool_df['產業別'] = treemap_pool_df['產業別'].apply(format_industry_label)
+                            
+          ############################                  
                             # 💡 設定要帶入懸停提示框的專屬欄位 (從觀察名單 res_df 取出)
                             hover_columns = ['代號', '總分','▼明細','△', '最新動態', '大股東動向'] 
                             
