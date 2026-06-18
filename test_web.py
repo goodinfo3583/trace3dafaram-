@@ -123,7 +123,7 @@ def render_fireflies():
     import random
     
     # 🌟 這裡可以自訂螢火蟲的數量
-    num_fireflies = 15 
+    num_fireflies = 5 
     
     css_rules = []
     html_divs = []
