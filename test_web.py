@@ -123,7 +123,7 @@ def render_fireflies():
     import random
     
     # 🌟 這裡可以自訂螢火蟲的數量
-    num_fireflies = 30 
+    num_fireflies = 15 
     
     css_rules = []
     html_divs = []
@@ -145,7 +145,7 @@ def render_fireflies():
             position: absolute;
             width: {size}px; height: {size}px;
             left: {start_x}vw; top: {start_y}vh;
-            background: #FFD700; /* 🟡 核心顏色：金黃色 */
+            background: #00FFCC; /* 🟡 核心顏色：金黃色 */
             border-radius: 50%;
             box-shadow: 0 0 {size*3}px {size}px rgba(255, 215, 0, 0.6); /* 發光暈暈效果 */
             animation: drift-{i} {duration}s infinite ease-in-out {delay}s, flash-{i} {pulse_dur}s infinite ease-in-out {delay}s;
