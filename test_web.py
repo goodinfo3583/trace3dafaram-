@@ -4717,7 +4717,7 @@ if current_page in ["all", "pool"]:
                         # 💡 剔除 ETF / 債券 / 其他，不列入計算
                         treemap_pool_df = treemap_pool_df[treemap_pool_df['產業別'] != 'ETF / 債券 / 其他']
                         
-                    if not treemap_pool_df.empty:
+                        if not treemap_pool_df.empty:
                             # 1. 統計今日觀察池中，各產業的總檔數
                             treemap_pool_df['計數'] = 1 
                             today_counts = treemap_pool_df['產業別'].value_counts().to_dict()
