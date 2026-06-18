@@ -108,6 +108,77 @@ IMAGE_DIR = "./image"
 # 🌟 新增防護罩：如果資料夾不存在，就自動建立一個，避免程式報錯
 if not os.path.exists(IMAGE_DIR):
     os.makedirs(IMAGE_DIR)
+#=====
+#動態視覺特效
+#=====
+# ==========================================
+# ✨ 頂級視覺魔法：純代碼動態螢火蟲/粒子引擎
+# ==========================================
+def render_fireflies():
+    import random
+    
+    # 🌟 這裡可以自訂螢火蟲的數量
+    num_fireflies = 30 
+    
+    css_rules = []
+    html_divs = []
+    
+    # 利用 Python 迴圈，隨機生成每一隻螢火蟲的飛行軌跡與閃爍頻率
+    for i in range(num_fireflies):
+        size = random.uniform(2, 5)          # 螢火蟲大小 (px)
+        start_x = random.uniform(0, 100)     # 初始 X 座標 (0~100vw)
+        start_y = random.uniform(0, 100)     # 初始 Y 座標 (0~100vh)
+        move_x = random.uniform(-20, 20)     # 橫向飄移範圍
+        move_y = random.uniform(-20, 20)     # 縱向飄移範圍
+        duration = random.uniform(10, 25)    # 飛行一圈花費時間 (10~25秒，製造錯落感)
+        delay = random.uniform(0, 10)        # 延遲出發時間
+        pulse_dur = random.uniform(2, 5)     # 呼吸燈閃爍頻率
+        
+        # 針對單隻螢火蟲寫入專屬 CSS 動畫
+        css_rules.append(f"""
+        .firefly-{i} {{
+            position: absolute;
+            width: {size}px; height: {size}px;
+            left: {start_x}vw; top: {start_y}vh;
+            background: #FFD700; /* 🟡 核心顏色：金黃色 */
+            border-radius: 50%;
+            box-shadow: 0 0 {size*3}px {size}px rgba(255, 215, 0, 0.6); /* 發光暈暈效果 */
+            animation: drift-{i} {duration}s infinite ease-in-out {delay}s, flash-{i} {pulse_dur}s infinite ease-in-out {delay}s;
+            opacity: 0;
+        }}
+        /* 飛行軌跡動畫 */
+        @keyframes drift-{i} {{
+            0% {{ transform: translate(0px, 0px); }}
+            25% {{ transform: translate({move_x}vw, {move_y}vh); }}
+            50% {{ transform: translate({move_x/2}vw, {move_y*1.5}vh); }}
+            75% {{ transform: translate({-move_x}vw, {move_y/2}vh); }}
+            100% {{ transform: translate(0px, 0px); }}
+        }}
+        /* 呼吸燈閃爍動畫 */
+        @keyframes flash-{i} {{
+            0%, 100% {{ opacity: 0; }}
+            50% {{ opacity: {random.uniform(0.5, 1.0)}; }}
+        }}
+        """)
+        html_divs.append(f"<div class='firefly-{i}'></div>")
+    
+    # 組合 CSS 與 HTML 容器
+    full_code = f"""
+    <style>
+    .fireflies-container {{
+        position: fixed;
+        top: 0; left: 0; width: 100vw; height: 100vh;
+        pointer-events: none; /* 🛡️ 絕對關鍵：這讓滑鼠可以穿透特效，不會擋住任何按鈕點擊！ */
+        z-index: 1000;        /* 浮在背景之上，但可以在你的下拉選單或置頂選單之下 */
+        overflow: hidden;
+    }}
+    {''.join(css_rules)}
+    </style>
+    <div class="fireflies-container">
+        {''.join(html_divs)}
+    </div>
+    """
+    st.markdown(full_code, unsafe_allow_html=True)
 
 # 👉 自動組合新路徑：./image/派對盛宴邀請.png
 bg_path = os.path.join(IMAGE_DIR, "派對盛宴邀請.png")
