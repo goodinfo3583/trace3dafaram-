@@ -108,8 +108,13 @@ IMAGE_DIR = "./image"
 # 🌟 新增防護罩：如果資料夾不存在，就自動建立一個，避免程式報錯
 if not os.path.exists(IMAGE_DIR):
     os.makedirs(IMAGE_DIR)
+
+# 👉 自動組合新路徑：./image/派對盛宴邀請.png
+bg_path = os.path.join(IMAGE_DIR, "派對盛宴邀請.png")
+set_background(bg_path)
+
 #=====
-#動態視覺特效
+#動態視覺特效設計
 #=====
 # ==========================================
 # ✨ 頂級視覺魔法：純代碼動態螢火蟲/粒子引擎
@@ -180,9 +185,18 @@ def render_fireflies():
     """
     st.markdown(full_code, unsafe_allow_html=True)
 
-# 👉 自動組合新路徑：./image/派對盛宴邀請.png
-bg_path = os.path.join(IMAGE_DIR, "派對盛宴邀請.png")
-set_background(bg_path)
+
+
+
+
+# =========================
+# 👇 呼叫動態視覺特效設計
+# =========================
+render_fireflies()
+
+
+
+
 #跑馬燈
 # ==========================================
 # 跑馬燈區塊 (終極全自動配時 + 尺寸自訂 + 無縫直接切換版)
