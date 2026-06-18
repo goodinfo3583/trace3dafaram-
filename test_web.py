@@ -4717,27 +4717,25 @@ if current_page in ["all", "pool"]:
                         # 💡 剔除 ETF / 債券 / 其他，不列入計算
                         treemap_pool_df = treemap_pool_df[treemap_pool_df['產業別'] != 'ETF / 債券 / 其他']
                         
-                        if not treemap_pool_df.empty:
+                            if not treemap_pool_df.empty:
                             # 1. 統計今日觀察池中，各產業的總檔數
                             treemap_pool_df['計數'] = 1 
                             today_counts = treemap_pool_df['產業別'].value_counts().to_dict()
                             
-                            # 2. 簡化標籤：因為無法做巨大浮水印，我們讓標題保持乾淨
+                            # 2. 建立標籤轉換函式：使用 HTML 調整產業名稱與檔數
                             def format_industry_label(industry):
                                 t_count = today_counts.get(industry, 0)
-                                # 使用簡單的 HTML 讓標題稍微大一點，並與檔數換行
                                 return f"<b>{industry}</b><br><span style='font-size: 13px;'>({t_count}檔)</span>"
 
                             treemap_pool_df['產業別'] = treemap_pool_df['產業別'].apply(format_industry_label)
                             
-                            # 💡 懸停提示框欄位
-                            hover_columns = ['代號', '總分','▼明細','△', '最新動態', '大戶動向'] 
+                            # 💡 【已修正】這裡必須與你 DataFrame 原始欄位完全一致：'大股東動向'
+                            hover_columns = ['代號', '總分', '▼明細', '△', '最新動態', '大股東動向'] 
                             
                             # ==========================================
                             # 🎨 顏色與視覺風格深度客製化
                             # ==========================================
                             # 自訂深色/冷色調色盤 (配合你的深藍/紫/灰背景)
-                            # 這些是類似 Tailwind CSS 的深色系色碼
                             custom_dark_colors = [
                                 "#1E3A8A", # 深藍
                                 "#312E81", # 靛青
@@ -4754,23 +4752,23 @@ if current_page in ["all", "pool"]:
                             # 使用 Plotly 繪製 Treemap
                             fig = px.treemap(
                                 treemap_pool_df,
-                                path=[px.Constant("板塊資金聚落"), '產業別', '名稱'], # 簡化了 Root 名稱
+                                path=[px.Constant("板塊資金聚落"), '產業別', '名稱'], 
                                 values='計數',
                                 color='產業別', 
                                 hover_data=hover_columns, 
-                                color_discrete_sequence=custom_dark_colors # 👉 套用自訂色盤
+                                color_discrete_sequence=custom_dark_colors # 套用深色色盤
                             )
                             
                             # 樣式細節調整
                             fig.update_traces(
                                 textinfo="label", 
                                 textfont=dict(
-                                    color="white", # 👉 強制所有文字變成白色，在深色背景上才清楚
+                                    color="white", # 強制所有文字變成白色，在深色背景上才清楚
                                     size=14        # 設定基礎字體大小
                                 ),
                                 marker=dict(
-                                    line=dict(color='#0B0F19', width=2), # 👉 在便條紙之間加上深色粗邊框，增加立體與分割感
-                                    pad=dict(t=35, l=10, r=10, b=10)     # 👉 增加產業標題(Top)與股票名稱之間的留白距離
+                                    line=dict(color='#0B0F19', width=2), # 在便條紙之間加上深色粗邊框
+                                    pad=dict(t=35, l=10, r=10, b=10)     # 增加產業標題與股票名稱之間的距離
                                 ),
                                 hovertemplate=(
                                     '<b>%{label}</b><br>'
@@ -4779,7 +4777,7 @@ if current_page in ["all", "pool"]:
                                     '▼明細: %{customdata[2]}<br>'
                                     '△: %{customdata[3]}<br>'
                                     '最新動態: %{customdata[4]}<br>'
-                                    '大股東動向: %{customdata[5]}<br>'
+                                    '大戶動向: %{customdata[5]}<br>' # 這裡顯示的文字可以維持大戶動向沒關係
                                     '<extra></extra>' 
                                 )
                             )
@@ -4789,7 +4787,7 @@ if current_page in ["all", "pool"]:
                                 height=550, # 稍微拉高一點，讓文字更有空間呼吸
                                 plot_bgcolor='rgba(0,0,0,0)',
                                 paper_bgcolor='rgba(0,0,0,0)',
-                                font=dict(family="sans-serif") # 確保字體乾淨
+                                font=dict(family="sans-serif") 
                             )
                             
                             st.plotly_chart(fig, use_container_width=True)
