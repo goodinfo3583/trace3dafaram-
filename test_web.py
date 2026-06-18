@@ -4725,7 +4725,7 @@ if current_page in ["all", "pool"]:
                             # 2. 建立標籤轉換函式：使用 HTML 調整產業名稱與檔數
                             def format_industry_label(industry):
                                 t_count = today_counts.get(industry, 0)
-                                return f"<b>{industry}</b><br><span style='font-size: 13px;'>({t_count}檔)</span>"
+                                return f"<b>{industry}</b><br><span style='font-size: 13px;'>{t_count}檔</span>"
 
                             treemap_pool_df['產業別'] = treemap_pool_df['產業別'].apply(format_industry_label)
                             
@@ -4738,7 +4738,7 @@ if current_page in ["all", "pool"]:
                             # 自訂深色/冷色調色盤 (配合你的深藍/紫/灰背景)
                             custom_dark_colors = [
                                 "#1E3A8A", # 深藍
-                                "#312E81", # 靛青
+                                "#1e888a", # 靛青
                                 "#115E59", # 深青綠
                                 "#374151", # 鐵灰
                                 "#4C1D95", # 深紫
