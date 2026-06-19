@@ -33,7 +33,7 @@ jobs:
     - name: 🚀 4. 執行籌碼爬蟲腳本
       run: |
         # ⚠️ 請把 'your_script_name.py' 換成你 Python 檔案的實際名稱！
-        python your_script_name.py
+        python saturday1230_scraper.py
 
     - name: 💾 5. 自動將產生的 CSV 提交並上傳回 GitHub
       run: |
