@@ -2681,7 +2681,7 @@ if current_page in ["all", "b1"]:
                 except:
                     rank_str = str(rank_val)
                     
-                return f"<b>{name}</b><br><span style='font-size: 11px; color: #E5E7EB;'>△ {delta_str}<br>排名: {rank_str}</span>"
+                return f"<b>{name}</b><br><span style='font-size: 11px; color: #E5E7EB;'>△ {delta_str}<br>{rank_str}名</span>"
             
             period_df['顯示名稱'] = period_df.apply(format_block_label, axis=1)
 
