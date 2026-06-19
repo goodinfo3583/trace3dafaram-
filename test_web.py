@@ -4323,6 +4323,89 @@ if current_page in ["all", "b6"]:
 
 
     # ==================== Tab 2: 歷史防守價追蹤表 ====================
+def build_historical_block_matrix(data_dir="."):
+    """
+    掃描目錄下所有鉅額交易 CSV，並彙整成以「日期」為欄位的歷史防守價矩陣。
+    """
+    # 1. 尋找所有包含「鉅額」的 CSV 檔案 (若放在特定資料夾，可修改 data_dir 路徑)
+    file_list = glob.glob(os.path.join(data_dir, "*鉅額*.csv"))
+    
+    if not file_list:
+        return None, []
+        
+    all_data = []
+    detected_files = []
+    
+    for file_path in file_list:
+        try:
+            # 嘗試從檔名提取 8 位數日期 (例如 20260618)
+            match = re.search(r'\d{8}', os.path.basename(file_path))
+            if not match:
+                continue
+                
+            date_str = match.group()
+            # 格式化日期為 MM/DD，這將成為表格的橫向欄位名稱
+            col_date = f"{date_str[4:6]}/{date_str[6:8]}"
+            
+            # 讀取 CSV 資料
+            df = pd.read_csv(file_path)
+            col_code = next((c for c in df.columns if '代號' in c), None)
+            col_name = next((c for c in df.columns if '名稱' in c), None)
+            col_price = next((c for c in df.columns if '單價' in c or '成交價' in c), None)
+            
+            if col_code and col_name and col_price:
+                df['代號'] = df[col_code].astype(str).str.replace(r'\.0$', '', regex=True).str.replace(r'\D', '', regex=True)
+                df['股票名稱'] = df[col_name]
+                df['成交價'] = df[col_price].astype(str).replace(',', '', regex=True)
+                
+                # 剔除無效代號與空值
+                df = df[(df['代號'] != '0') & (df['代號'] != '') & (df['代號'] != 'nan')]
+                if df.empty: continue
+                
+                # 價格格式化小工具
+                def safe_float_format(val):
+                    try: return f"{float(val):.2f}".rstrip('0').rstrip('.')
+                    except: return str(val)
+                        
+                # 聚合同一天同一檔股票的多筆交易價
+                grouped = df.groupby(['代號', '股票名稱']).agg({
+                    '成交價': lambda x: ' / '.join(sorted(set([safe_float_format(i) for i in x.dropna()])))
+                }).reset_index()
+                
+                grouped['日期'] = col_date
+                all_data.append(grouped)
+                detected_files.append(date_str)
+        except Exception as e:
+            continue
+            
+    if not all_data:
+        return None, []
+        
+    # 2. 合併所有天數的歷史資料
+    combined_df = pd.concat(all_data, ignore_index=True)
+    
+    # 3. 轉置樞紐分析表：列 = 股票代號/名稱，欄 = 日期，值 = 成交價
+    hist_matrix = combined_df.pivot_table(
+        index=['代號', '股票名稱'], 
+        columns='日期', 
+        values='成交價', 
+        aggfunc=lambda x: ' / '.join(x)
+    ).reset_index()
+    
+    # 將沒有交易的日期空值填補為 "-"
+    hist_matrix = hist_matrix.fillna('-')
+    
+    # 4. 排序欄位：讓越靠近現在的日期排在越前面
+    date_columns = [c for c in hist_matrix.columns if c not in ['代號', '股票名稱']]
+    date_columns.sort(reverse=True)
+    
+    final_columns = ['代號', '股票名稱'] + date_columns
+    hist_matrix = hist_matrix[final_columns]
+    
+    # 整理偵測到的檔案名單 (去重並依日期由新到舊排序)
+    detected_files = sorted(list(set(detected_files)), reverse=True)
+    
+    return hist_matrix, detected_files
     with tab_hist:
         hist_matrix, detected_files = build_historical_block_matrix()
         
