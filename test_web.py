@@ -684,7 +684,7 @@ def show_news_page():
     with col1:
         days_option = st.selectbox("載入歷史天數", [1, 3, 7, 14, 30, 90, 180, 365], index=0)
     with col2:
-        search_query = st.text_input("🔍 搜尋新聞標題、關鍵字或股票代號")
+        search_query = st.text_input("🔍 搜尋標題、關鍵字或股票代號...")
         
     st.markdown("---")
     
@@ -801,7 +801,7 @@ def show_news_page():
     # 顯示目前觀看的區間提示
     start_item = (current_page - 1) * ITEMS_PER_PAGE + 1
     end_item = min(current_page * ITEMS_PER_PAGE, total_items)
-    st.caption(f"<div style='text-align: center; color: #94A3B8; margin-bottom: 20px;'>共有 {total_items} 則新聞，目前顯示第 {start_item} 到 {end_item} 則，千萬別僅憑新聞買賣操作</div>", unsafe_allow_html=True)
+    st.caption(f"<div style='text-align: center; color: #94A3B8; margin-bottom: 20px;'>共過濾出 {total_items} 則新聞，目前顯示第 {start_item} 到 {end_item} 則</div>", unsafe_allow_html=True)
 
     # ==========================================
     # 📰 步驟三：根據選擇的頁數，裁切陣列並渲染卡片
@@ -2509,7 +2509,7 @@ if current_page in ["all", "b1"]:
     search_kw = c3.text_input("🔍 快速尋找標的 (輸入代號或名稱)", placeholder="例如: 2890 或 永豐金")
 
     tab5, tab20, tab60, tab120, tab_all = st.tabs([
-        "🔴 5日排行", "🟡 20日排行", "🟢 60日排行", "🔵 120日排行", "◆ 歷史軌跡全能池"
+        "🔴 5日排行", "🟡 20日排行", "🟢 60日排行", "🔵 120日排行", "📊 歷史軌跡全能池"
     ])
 
     def format_delta(x):
@@ -2603,7 +2603,7 @@ if current_page in ["all", "b1"]:
             st.dataframe(filtered_df[all_display_cols].style.apply(highlight_row, axis=1), use_container_width=True)
 
     st.write("")
-    st.info("今日上榜是指5/20/60/120日ΔChange累計變化維持在法人持股變化前200名，△是單日的法人持股增減(如果最新基準日未進前200榜，△會直接以歸0計算)；我們可以試著短線與長線一起觀察。")
+    st.info("💡 △是單日的法人持股增減(如果最新基準日未進前200榜，△會直接以歸0計算)；5/20/60/120日ΔChange為5/20/60/120期間的累積變化，我們可以試著短線與長線一起觀察。")
 
     #==========================================
     # 📊 繪製區塊 ：產業聚落與資金輪動板塊 (Treemap)
@@ -4183,6 +4183,77 @@ if current_page in ["all", "b5"]:
                 st.info("⚪ 最新一週目前沒有「千張與四百張」同時增加的共振標的。")
         else:
             st.warning("⚠️ 請確保 1000 張與 400 張資料皆有成功載入，才能啟動共振掃描引擎。")
+# ==========================================
+# 💸 區塊 6：盤後鉅額交易總表 (原生 Dataframe 升級版 + 交易別顯示)
+# ==========================================
+
+# 💡 修正點 1：將函數定義放在 if 鎖的「外面」，確保 Streamlit 的快取正常運作
+def clean_number_for_display(val):
+    try:
+        if pd.isna(val) or str(val).strip() == '-': return '-'
+        f = float(str(val).replace(',', ''))
+        return str(int(f)) if f.is_integer() else str(f).rstrip('0').rstrip('.')
+    except: return str(val)
+
+@st.cache_data(ttl=60)
+def build_historical_block_matrix():
+    """搜尋資料夾中所有的鉅額交易紀錄，自動組成歷史矩陣 (最強寬容版 + 智慧箭頭標示)"""
+    import os, glob
+    import pandas as pd
+    if not os.path.exists(DATA_DIR): return None, []
+    files = glob.glob(os.path.join(DATA_DIR, "*鉅額*.csv"))
+    if not files: return None, []
+    
+    files.sort(reverse=True)
+    target_files = files[:10]
+    master_df = None
+    date_cols = []
+    
+    for f in target_files:
+        try:
+            d_str = os.path.basename(f).replace('-', '').replace('_', '')[:8]
+            short_date = d_str[-4:]
+            col_name = short_date  # 🔥 修改點 1：先使用乾淨的純日期作為欄位名稱
+            if col_name not in date_cols: date_cols.append(col_name)
+            
+            df = pd.read_csv(f)
+            c_code = next((c for c in df.columns if '代號' in c or '證券代號' in c), None)
+            c_name = next((c for c in df.columns if '名稱' in c or '證券名稱' in c), None)
+            c_price = next((c for c in df.columns if '價' in c), None) 
+            
+            if not all([c_code, c_name, c_price]): continue
+            
+            df['代號'] = df[c_code].astype(str).str.replace(r'\.0$', '', regex=True).str.replace(r'\D', '', regex=True)
+            df = df[(df['代號'] != '0') & (df['代號'] != '') & (df['代號'] != 'nan')]
+            
+            day_df = df.groupby(['代號', c_name]).agg({
+                c_price: lambda x: ' / '.join(sorted(set([clean_number_for_display(i) for i in x.dropna()])))
+            }).reset_index()
+            day_df = day_df.rename(columns={c_name: '股票名稱', c_price: col_name})
+            
+            if master_df is None: master_df = day_df
+            else: master_df = pd.merge(master_df, day_df, on=['代號', '股票名稱'], how='outer')
+        except: pass
+        
+    if master_df is not None and not master_df.empty:
+        master_df = master_df.fillna('-')
+        master_df = master_df.loc[:, ~master_df.columns.duplicated()]
+        valid_date_cols = [c for c in date_cols if c in master_df.columns]
+        valid_date_cols.sort(reverse=True) # 排序日期，例如 ['0606', '0605', '0604']
+        
+        # 🔥 修改點 2：只為「最新」的那一天加上 ▼ 標記，其餘保持純數字
+        if valid_date_cols:
+            latest_col = valid_date_cols[0]
+            new_latest_col = f"▼{latest_col}"
+            master_df = master_df.rename(columns={latest_col: new_latest_col})
+            valid_date_cols[0] = new_latest_col # 更新列表中的名稱
+            
+        master_df = master_df[['代號', '股票名稱'] + valid_date_cols]
+        if valid_date_cols:
+            master_df = master_df.sort_values(by=valid_date_cols[0], ascending=False)
+            
+    return master_df, [os.path.basename(f) for f in target_files]
+
 # ----------------------------------------------------
 # 🔒 區塊 6 專屬包廂鎖 (這以下才是 UI 渲染，包進 if 裡面)
 # ----------------------------------------------------
@@ -4207,6 +4278,7 @@ if current_page in ["all", "b6"]:
             col_price = next((c for c in df_block.columns if '單價' in c or '成交價' in c), None)
             col_vol = next((c for c in df_block.columns if '股數' in c or '張數' in c or '成交量' in c), None)
             col_amt = next((c for c in df_block.columns if '金額' in c or '總額' in c), None)
+            # 🔥 新增：動態抓取交易別 (證交所通常寫「交易別」或「類別」)
             col_type = next((c for c in df_block.columns if '交易別' in c or '類別' in c), None)
 
             if all([col_code, col_name, col_price, col_vol, col_amt]):
@@ -4215,11 +4287,13 @@ if current_page in ["all", "b6"]:
                 df_block['成交價'] = pd.to_numeric(df_block[col_price].astype(str).replace(',', '', regex=True), errors='coerce')
                 df_block['成交股數'] = pd.to_numeric(df_block[col_vol].astype(str).replace(',', '', regex=True), errors='coerce')
                 df_block['成交金額'] = pd.to_numeric(df_block[col_amt].astype(str).replace(',', '', regex=True), errors='coerce')
+                # 🔥 處理交易別，若找不到該欄位則預設填入 '-'
                 df_block['交易別'] = df_block[col_type].fillna('-') if col_type else '-'
                 
                 df_block = df_block[(df_block['代號'] != '0') & (df_block['代號'] != '') & (df_block['代號'] != 'nan')]
 
                 grouped_block = df_block.groupby(['代號', '股票名稱']).agg({
+                    # 🔥 將同檔股票的不同交易別合併顯示 (例如: 逐筆交易、配對交易)
                     '交易別': lambda x: '、'.join(sorted(set([str(i) for i in x.dropna() if str(i).strip() != '-']))),
                     
                     # 🔥 修正重點：移除 clean_number_for_display，改用內建的 f-string 格式化來去除多餘的 0 與小數點
@@ -4234,49 +4308,19 @@ if current_page in ["all", "b6"]:
 
                 unique_ids = grouped_block['代號'].unique()
                 close_price_dict = {}
-                
-                # ========================================================
-                # 🚀 修正與強化 YFinance 抓取邏輯 (解決 NaN 與報錯問題)
-                # ========================================================
                 if len(unique_ids) > 0:
-                    # 同時準備 .TW(上市) 與 .TWO(上櫃) 的查詢字串，確保不漏接
-                    tw_tickers = [f"{sid}.TW" for sid in unique_ids]
-                    two_tickers = [f"{sid}.TWO" for sid in unique_ids]
-                    all_tickers = " ".join(tw_tickers + two_tickers)
-                    
+                    yf_tickers = " ".join([f"{sid}.TW" for sid in unique_ids])
                     try:
-                        import yfinance as yf
-                        # 批次下載
-                        df_yf = yf.download(all_tickers, period="5d", progress=False)
-                        
+                        df_yf = yf.download(yf_tickers, period="5d", progress=False)
                         if not df_yf.empty and 'Close' in df_yf:
                             close_data = df_yf['Close']
-                            
-                            # 💡 關鍵：若只成功抓到一檔，強制轉為 DataFrame 以防 .columns 報錯
-                            if isinstance(close_data, pd.Series):
-                                if hasattr(close_data, 'name') and close_data.name:
-                                    close_data = close_data.to_frame(name=close_data.name)
-                                else:
-                                    close_data = close_data.to_frame()
-
-                            # 進行配對寫入
-                            for sid in unique_ids:
-                                tkr_tw = f"{sid}.TW"
-                                tkr_two = f"{sid}.TWO"
-                                
-                                target_tkr = None
-                                if tkr_tw in close_data.columns and not close_data[tkr_tw].dropna().empty:
-                                    target_tkr = tkr_tw
-                                elif tkr_two in close_data.columns and not close_data[tkr_two].dropna().empty:
-                                    target_tkr = tkr_two
-                                    
-                                if target_tkr:
-                                    # 取得最後一筆收盤價，四捨五入至小數點後兩位 (保留浮點數精準度)
-                                    last_price = close_data[target_tkr].dropna().iloc[-1]
-                                    close_price_dict[sid] = str(round(last_price, 2))
-                    except Exception as e:
-                        pass
-                # ========================================================
+                            if len(unique_ids) == 1: close_price_dict[unique_ids[0]] = str(int(round(close_data.dropna().iloc[-1])))
+                            else:
+                                for sid in unique_ids:
+                                    tkr = f"{sid}.TW"
+                                    if tkr in close_data.columns and not close_data[tkr].dropna().empty: 
+                                        close_price_dict[sid] = str(int(round(close_data[tkr].dropna().iloc[-1])))
+                    except: pass
 
                 grouped_block['▼收盤價'] = grouped_block['代號'].map(close_price_dict).fillna('-')
 
@@ -4292,9 +4336,11 @@ if current_page in ["all", "b6"]:
                 grouped_block = grouped_block.sort_values(by=['__rank', '代號'], ascending=[True, True])
                 
                 dynamic_price_col = f"▼{block_date[-4:]} 成交價"
+                # 🔥 將交易別加入最終顯示清單
                 display_df = grouped_block[['代號', '股票名稱', '交易別', '成交價', '▼收盤價', '成交張數', '總額(億)']].copy()
                 display_df = display_df.rename(columns={'成交價': dynamic_price_col})
 
+                # 🔥 保留原本貼心的紅綠字體提示，但改用 Pandas 內建的 Style 傳給 st.dataframe
                 def highlight_price(row):
                     styles = [''] * len(row)
                     try:
@@ -4303,7 +4349,6 @@ if current_page in ["all", "b6"]:
                         avg_p = sum(prices) / len(prices)
                         c_p = float(str(row['▼收盤價']).replace(',', ''))
                         
-                        # 收盤價 > 均價 顯示紅字，相等顯橘字，低於顯綠字
                         if c_p > avg_p:
                             styles[target_idx] = 'color: #FF4B4B; font-weight: bold;'
                         elif c_p == avg_p:
@@ -4313,7 +4358,7 @@ if current_page in ["all", "b6"]:
                     except: pass
                     return styles
 
-                # 使用 pandas 內建 Style 渲染至 st.dataframe
+                # 🔥 使用原生且穩定的 st.dataframe 渲染
                 st.dataframe(display_df.style.apply(highlight_price, axis=1), use_container_width=True, hide_index=True)
                 
             else:
@@ -4425,13 +4470,14 @@ def build_historical_block_matrix(data_dir="."):
     with tab_hist:
         hist_matrix, detected_files = build_historical_block_matrix()
         
+        # 💡 新增：檔案偵測雷達 (協助你確認程式抓到了哪些檔案)
         if detected_files:
             st.caption(f"📡 已自動讀取 {len(detected_files)} 天的歷史檔案，組合中...")
             
         if hist_matrix is not None and not hist_matrix.empty:
             st.dataframe(hist_matrix, use_container_width=True, hide_index=True)
         else:
-            st.info("📂 資料夾內尚無足夠的歷史交易紀錄，請確認檔名包含「鉅額」字樣。")    
+            st.info("📂 資料夾內尚無足夠的歷史交易紀錄，請確認檔名包含「鉅額」字樣。")       
 # ==========================================以上網頁核心區塊↑↑↑↑↑
 # ==========================================
 # 🎭 幕後無縫換頁引擎 (先定義成函數，供全站各區塊的 st.stop() 呼叫)切換頁避免卡死
@@ -4831,8 +4877,8 @@ if current_page in ["all", "pool"]:
                     # ==========================================
                  
                     st.write("---")
-                    st.markdown("### 🧩 觀察名單中法人的資金聚落")
-                    st.caption("我們將上方的觀察名單透過產業類別面積大小直接表示出來，或許可以找找看目前法人口袋觀察名單集中在哪些產業 ,這裡我們排除了 ETF 與債券。")
+                    st.markdown("### 🧩 觀察池中的資金聚落")
+                    st.caption("透過產業類別面積大小，或許可以找找看目前高分觀察名單集中在哪些產業 ,我們排除了 ETF 與債券。")
                     
                     # 確認名單不為空，且前台字典 STOCK_DICT 存在
                     if not res_df.empty and 'STOCK_DICT' in globals() and STOCK_DICT:
@@ -5057,11 +5103,11 @@ if current_page in ["all", "pool"]:
                     # ==========================================
                     # 📊 歷史名單回測觀察：搭載時光機結案引擎
                     # ==========================================
-                    st.markdown("### 歷史名單回測觀察")
+                    st.markdown("### 📊 歷史名單回測觀察")
                     try:
                         history_track_df = conn.read(spreadsheet=SHEET_URL, worksheet="歷史名單回測觀察", ttl=0).dropna(how="all")
                         if not history_track_df.empty:
-                            selected_week = st.selectbox("選擇要回顧的鎖定日期", sorted(history_track_df['鎖定日期'].unique(), reverse=True))
+                            selected_week = st.selectbox("📅 選擇要回顧的鎖定日期", sorted(history_track_df['鎖定日期'].unique(), reverse=True))
                             week_df = history_track_df[history_track_df['鎖定日期'] == selected_week].copy()
                             
                             # 計算此梯次名單已鎖定多久
