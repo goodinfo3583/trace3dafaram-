@@ -1967,7 +1967,7 @@ def render_sidebar_war_room():
         def clear_search():
             st.session_state['global_search_final'] = ""
 
-        st.markdown("<div style='font-size: 14px; color: #E2E8F0; margin-bottom: 5px; font-weight: bold;'>輸入代號或名稱或代號+名稱 ：</div>", unsafe_allow_html=True)
+        st.markdown("<div style='font-size: 14px; color: #E2E8F0; margin-bottom: 5px; font-weight: bold;'>輸入 代號 或 名稱 或 代號+名稱 ：</div>", unsafe_allow_html=True)
         
         c_search, c_btn_go, c_btn_clear = st.columns([6, 1.5, 1.5])
         
@@ -1981,11 +1981,11 @@ def render_sidebar_war_room():
         
         with c_btn_go:
             # 🚀 關鍵修正：加入 type="tertiary" 拔除底色與邊框
-            st.button("➡️", key="btn_go", type="tertiary", use_container_width=True, help="送出搜尋")
+            st.button("→", key="btn_go", type="tertiary", use_container_width=True, help="送出搜尋")
             
         with c_btn_clear:
             # 🚀 關鍵修正：加入 type="tertiary" 拔除底色與邊框
-            st.button("🔄", key="btn_clear", type="tertiary", on_click=clear_search, use_container_width=True, help="清空欄位")
+            st.button("╳", key="btn_clear", type="tertiary", on_click=clear_search, use_container_width=True, help="清空欄位")
 
         pure_stock_id = ""
         display_name = search_query
