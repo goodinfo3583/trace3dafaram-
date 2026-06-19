@@ -4221,7 +4221,10 @@ if current_page in ["all", "b6"]:
 
                 grouped_block = df_block.groupby(['代號', '股票名稱']).agg({
                     '交易別': lambda x: '、'.join(sorted(set([str(i) for i in x.dropna() if str(i).strip() != '-']))),
-                    '成交價': lambda x: ' / '.join(sorted(set([clean_number_for_display(i) for i in x.dropna()]))),
+                    
+                    # 🔥 修正重點：移除 clean_number_for_display，改用內建的 f-string 格式化來去除多餘的 0 與小數點
+                    '成交價': lambda x: ' / '.join(sorted(set([f"{float(i):.2f}".rstrip('0').rstrip('.') for i in x.dropna()]))),
+                    
                     '成交股數': 'sum',
                     '成交金額': 'sum'
                 }).reset_index()
