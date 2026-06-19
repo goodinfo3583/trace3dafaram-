@@ -2608,70 +2608,142 @@ if current_page in ["all", "b1"]:
     st.write("")
     st.info("💡 △是單日的法人持股增減(如果最新基準日未進前200榜，△會直接以歸0計算)；5/20/60/120日ΔChange為5/20/60/120期間的累積變化，我們可以試著短線與長線一起觀察。")
 
-    #==========================================
-    # 📊 繪製區塊 ：產業聚落與資金輪動板塊 (Treemap)
     # ==========================================
-
+    # 📊 繪製區塊 ：產業聚落與資金輪動板塊 (Treemap - 動態分頁熱力圖版)
+    # ==========================================
     st.write("---")
     st.markdown("### 🧩 資金聚落板塊：三大法人進榜產業分佈")
-    st.caption("透過區塊面積大小，看出5日法人資金正在集中攻擊哪些產業 (排除 ETF 與債券 且文字大小沒有任何意義)。")
+    st.caption("透過區塊面積大小，看出法人資金正在集中攻擊哪些產業 (已排除 ETF/債券)。板塊顏色代表「單日法人持股增減(△)」，越紅代表當日買超越強，越綠代表當日賣超。")
     
-    if 'df_5' in locals() and not df_5.empty and STOCK_DICT:
+    st.write("")
+    st.info("💡 △ 是單日的法人持股增減 (如果最新基準日未進前200榜，△會直接以歸0計算)；滑鼠懸停可觀察短長線的持股波段軌跡。")
+
+    # 1. 取得主資料表與股票字典
+    df_b1_master = st.session_state.get('my_final_df', pd.DataFrame())
+    
+    if not df_b1_master.empty and 'STOCK_DICT' in globals() and STOCK_DICT:
         
-        # 複製一份專門用來畫圖的 DataFrame
-        treemap_df = df_5.copy()
-        
-        # 透過字典配對產業別
-        treemap_df['產業別'] = treemap_df['股票代號'].apply(
-            lambda sid: STOCK_DICT.get(sid, {}).get("industry", "ETF / 債券 / 其他")
-        )
-        
-        treemap_df['產業別'] = treemap_df['產業別'].replace('', 'ETF / 債券 / 其他')
-        
-        # 💡 修正 1：剔除 ETF / 債券 / 其他，不列入 200 大計算
-        treemap_df = treemap_df[treemap_df['產業別'] != 'ETF / 債券 / 其他']
-        
-        # 設定面積權重
-        treemap_df['計數'] = 1 
-        
-        # 💡 修正 3-1：設定要帶入懸停提示框的欄位 (請確認 df_5 確實有這些欄位)
-        # 例如你想看法人金額，就可以把 '法人金額' 加進來
-        hover_columns = ['股票代號', '法人金額'] 
-        
-        # 使用 Plotly 繪製 Treemap
-        fig = px.treemap(
-            treemap_df,
-            path=[px.Constant("全市場進榜標的 (排除ETF/債券)"), '產業別', '股票名稱'],
-            values='計數',
-            color='產業別', 
-            hover_data=hover_columns, 
-            color_discrete_sequence=px.colors.qualitative.Pastel 
-        )
-        
-        # 💡 修正 3-2：利用 customdata 正確呼叫 hover_data 中的數值
-        fig.update_traces(
-            textinfo="label", 
-            hovertemplate=(
+        # 2. 建立選項：前 50 名 or 前 200 名
+        top_n_option = st.radio("設定觀測範圍：", ["📌 顯示前 50 名 (核心攻擊重心)", "🌍 顯示前 200 名 (產業擴散全貌)"], horizontal=True)
+        top_n = 50 if "50" in top_n_option else 200
+
+        # 3. 建立四個分頁
+        tab_5, tab_20, tab_60, tab_120 = st.tabs(["🔴 5日排行", "🟡 20日排行", "🟢 60日排行", "🔵 120日排行"])
+
+        # 💡 定義專屬的繪圖引擎函數，避免重複寫四次代碼
+        def render_period_treemap(period_days):
+            rank_col = f"{period_days}日排名"
+            
+            if rank_col not in df_b1_master.columns:
+                st.info(f"⚪ 尚無 {period_days} 日排行資料。")
+                return
+
+            # 篩選出該週期的前 N 名 (確保排名大於0且沒有空值)
+            period_df = df_b1_master[df_b1_master[rank_col] > 0].nsmallest(top_n, rank_col).copy()
+
+            if period_df.empty:
+                st.info(f"⚪ {period_days} 日排行無符合資料。")
+                return
+
+            # 配對產業別 (剔除 ETF / 債券)
+            period_df['產業別'] = period_df['股票代號'].astype(str).apply(
+                lambda sid: STOCK_DICT.get(sid, {}).get("industry", "ETF / 債券 / 其他")
+            )
+            period_df['產業別'] = period_df['產業別'].replace('', 'ETF / 債券 / 其他')
+            period_df = period_df[period_df['產業別'] != 'ETF / 債券 / 其他']
+
+            if period_df.empty:
+                st.info("⚪ 剔除 ETF/債券 後無一般產業資料。")
+                return
+
+            # 面積權重固定為 1，代表每一檔股票面積一樣，整體面積直接反映該產業「進榜的檔數」
+            period_df['計數'] = 1 
+
+            # 將「單日△」轉為純數字，供連續熱力色階使用
+            period_df['熱力數值'] = pd.to_numeric(
+                period_df['△'].astype(str).str.replace('+', '').str.replace('%', ''), 
+                errors='coerce'
+            ).fillna(0.0)
+
+            # 格式化顯示在板塊上的字樣 (名稱 + 單日△)
+            def format_block_label(row):
+                name = str(row.get('股票名稱', ''))
+                delta = row.get('△', 0.0)
+                delta_str = f"+{delta}" if pd.to_numeric(delta, errors='coerce') > 0 else f"{delta}"
+                return f"<b>{name}</b><br><span style='font-size: 11px; color: #E5E7EB;'>△ {delta_str}</span>"
+            period_df['顯示名稱'] = period_df.apply(format_block_label, axis=1)
+
+            # 動態抓取前 7 天的持股欄位 (例如: '0618持股%', '0617持股%')
+            date_cols = sorted([c for c in period_df.columns if '持股%' in c], reverse=True)[:7]
+            
+            # 定義傳遞給 hover_data 的欄位清單
+            hover_columns = ['股票代號', '今日上榜', '最新動態', '△'] + date_cols
+
+            # 定義紅綠漸層色階 (發散型色階)
+            custom_continuous_scale = [
+                [0.0, "rgba(0, 230, 118, 0.85)"],  # 最底端：賣超深綠 (#00E676)
+                [0.5, "rgba(30, 41, 59, 0.95)"],   # 中間值：平淡的暗板岩灰 (#1E293B)
+                [1.0, "rgba(255, 75, 75, 0.85)"]   # 最頂端：買超深紅 (#FF4B4B)
+            ]
+
+            import plotly.express as px
+            fig = px.treemap(
+                period_df,
+                path=[px.Constant(f"🏆 {period_days}日資金聚落"), '產業別', '顯示名稱'],
+                values='計數',                      
+                color='熱力數值',                   # 依照單日增減上色
+                color_continuous_scale=custom_continuous_scale, 
+                color_continuous_midpoint=0,        # 強制將 0 點對齊灰色
+                hover_data=hover_columns
+            )
+            
+            # 隱藏側邊那條色階長條圖
+            fig.update_coloraxes(showscale=False)
+
+            # 🛠️ 動態組合 Hover Template (讓前 7 天的日期可以整齊排好)
+            hover_template = (
                 '<b>%{label}</b><br>'
                 '股票代號: %{customdata[0]}<br>'
-                '法人金額: %{customdata[1]}<br>' # 對應 hover_columns 的第二個元素
-                '佔比/檔數: %{value}<br>'
-                '<extra></extra>' # 隱藏旁邊多餘的 trace 名稱
+                '今日上榜: %{customdata[1]}<br>'
+                '最新動態: %{customdata[2]}<br>'
+                '單日△: <b>%{customdata[3]}</b><br>'
+                '----------------<br>'
             )
-        )
-        
-        fig.update_layout(
-            margin=dict(t=20, l=0, r=0, b=0),
-            height=600, 
-            plot_bgcolor='rgba(0,0,0,0)',
-            paper_bgcolor='rgba(0,0,0,0)'
-        )
-        
-        st.plotly_chart(fig, use_container_width=True)
-        
+            # 依序把歷史日期加進去提示框
+            for i, col in enumerate(date_cols):
+                clean_date = col.replace("持股%", "") # 只顯示如 0618
+                hover_template += f'{clean_date} 持股比: %{{customdata[{4+i}]}}%<br>'
+            hover_template += '<extra></extra>'
+
+            # 樣式細節調整
+            fig.update_traces(
+                textinfo="label", 
+                textfont=dict(color="white", size=14),
+                marker=dict(
+                    line=dict(color='#0B0F19', width=2), # 便條紙之間的深色粗邊框
+                    pad=dict(t=35, l=10, r=10, b=10)     # 標題與股票名稱間距
+                ),
+                hovertemplate=hover_template
+            )
+            
+            fig.update_layout(
+                margin=dict(t=30, l=0, r=0, b=0),
+                height=650, 
+                plot_bgcolor='rgba(0,0,0,0)',
+                paper_bgcolor='rgba(0,0,0,0)',
+                font=dict(family="sans-serif") 
+            )
+            
+            st.plotly_chart(fig, use_container_width=True)
+
+        # 4. 在四個分頁中分別呼叫繪圖引擎
+        with tab_5: render_period_treemap(5)
+        with tab_20: render_period_treemap(20)
+        with tab_60: render_period_treemap(60)
+        with tab_120: render_period_treemap(120)
+
     else:
-        st.info("⚪ 尚無數據或找不到產業字典，無法繪製產業板塊圖。")
-    
+        st.info("⚪ 尚無全市場大數據或找不到產業字典，請確認背景掃描引擎已啟動。")
 # ==========================================
 # 🔒 區塊 2 專屬包廂鎖 (2-1 到 2-4 所有畫面渲染包進這裡)
 # ==========================================
@@ -4857,38 +4929,40 @@ if current_page in ["all", "pool"]:
                             # 🎨 顏色與視覺風格深度客製化
                             # ==========================================
                             # 自訂深色/冷色調色盤 (配合你的深藍/紫/灰背景)
-        # ==========================================
-                            # 🎨 顏色與視覺風格深度客製化 (漸層漲跌色階版)
-                            # ==========================================
-                            # 我們要用 △ 的數值來上色，先確保它是一個純數字的連續欄位
-                            # 將字串如 "+1.5" 轉成浮點數 1.5，無法轉換的給 0.0
-                            treemap_pool_df['熱力數值'] = pd.to_numeric(
-                                treemap_pool_df['△'].astype(str).str.replace('+', '').str.replace('%', ''), 
-                                errors='coerce'
-                            ).fillna(0.0)
-
-                            # 💡 建立紅綠連續色階：最低(深綠) -> 中間(黑色) -> 最高(深紅)
-                            # 在金融視覺化中，使用 Diverging (發散) 色階最適合表現漲跌
-                            custom_continuous_scale = [
-                                [0.0, "rgba(0, 230, 118, 0.85)"],  # 最底端：賣超深綠 (#00E676)
-                                [0.5, "rgba(30, 41, 59, 0.95)"],   # 中間值 (0)：平淡的暗板岩灰 (#1E293B)
-                                [1.0, "rgba(255, 75, 75, 0.85)"]   # 最頂端：買超深紅 (#FF4B4B)
+                            custom_dark_colors = [
+                                "rgba(60, 84, 62, 0.85)",     # 原 #3c543e - 深綠
+                                "rgba(78, 34, 28, 0.85)",     # 原 #4e221c - 赭紅/暗褐
+                                "rgba(81, 81, 168, 0.85)",    # 原 #5151a8 - 藍紫
+                                "rgba(167, 77, 110, 0.85)",   # 原 #a74d6e - 玫瑰紅
+                                "rgba(67, 38, 58, 0.85)",     # 原 #43263a - 深紫
+                                "rgba(244, 124, 35, 0.85)",   # 原 #f47c23 - 深橘
+                                "rgba(177, 128, 236, 0.85)",  # 原 #b180ec - 紫亮
+                                "rgba(13, 82, 89, 0.85)",     # 原 #0d5259 - 澱青
+                                "rgba(111, 97, 94, 0.85)",    # 原 #6f615e - 灰咖
+                                "rgba(196, 8, 28, 0.85)",      # 原 #c4081c - 紅色
+                                # 👇 以下為新擴充的質感深色，您可以模仿這個格式繼續往下加
+                                "rgba(30, 41, 59, 0.85)",     # 11. 石墨藍/軍藍 (#1e293b)
+                                "rgba(77, 83, 60, 0.85)",     # 12. 莫蘭迪橄欖綠 (#4d533c)
+                                "rgba(107, 29, 47, 0.85)",    # 13. 深酒紅 (#6b1d2f)
+                                "rgba(70, 130, 180, 0.85)",   # 14. 鋼鐵藍/霧藍 (#4682b4)
+                                "rgba(133, 100, 4, 0.85)" ,    # 15. 暗金/芥末黃 (#856404)
+                                "rgba(30, 27, 75, 0.85)",     # 16. 夜幕藍/暗靛藍 (#1e1b4b)
+                                "rgba(6, 78, 59, 0.85)",      # 17. 深林綠/墨綠 (#064e3b)
+                                "rgba(154, 52, 18, 0.85)",    # 18. 焦磚紅/紅土色 (#9a3412)
+                                "rgba(112, 26, 117, 0.85)",   # 19. 暗梅紫/深洋紅 (#701a75)
+                                "rgba(51, 65, 85, 0.85)"      # 20. 炭黑/深板岩灰 (#334155)
                             ]
 
-                            # 使用 Plotly 繪製 Treemap (切換為連續色階模式)
-                            import plotly.express as px
+                            # 使用 Plotly 繪製 Treemap
                             fig = px.treemap(
                                 treemap_pool_df,
+                                #顯示重新整理的板塊名稱
                                 path=[px.Constant("板塊資金聚落"), '產業別', '顯示名稱'], 
-                                values='計數',                      # 區塊大小依然由「數量」決定
-                                color='熱力數值',                   # 🎨 顏色由「△ 增減數值」決定！
-                                color_continuous_scale=custom_continuous_scale, # 套用自訂紅綠漸層
-                                color_continuous_midpoint=0,        # 關鍵：強制把 0 點對齊灰色，>0是紅，<0是綠
-                                hover_data=hover_columns
+                                values='計數',
+                                color='產業別', 
+                                hover_data=hover_columns, 
+                                color_discrete_sequence=custom_dark_colors # 套用深色色盤
                             )
-                            
-                            # 隱藏旁邊那條連續色階的 Color Bar (讓畫面保持乾淨)
-                            fig.update_coloraxes(showscale=False)
                             #######################
                             # 樣式細節調整
                             fig.update_traces(
