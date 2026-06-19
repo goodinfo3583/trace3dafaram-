@@ -2624,7 +2624,7 @@ if current_page in ["all", "b1"]:
     if not df_b1_master.empty and 'STOCK_DICT' in globals() and STOCK_DICT:
         
         # 2. 建立選項：前 50 名 or 前 200 名
-        top_n_option = st.radio("設定觀測範圍：", ["📌 顯示前 50 名 (核心攻擊重心)", "🌍 顯示前 200 名 (產業擴散全貌)"], horizontal=True)
+        top_n_option = st.radio("設定觀測範圍：", ["顯示前 50 名 (核心攻擊重心)", "顯示前 200 名 (產業擴散全貌)"], horizontal=True)
         top_n = 50 if "50" in top_n_option else 200
 
         # 3. 建立四個分頁
@@ -2632,6 +2632,7 @@ if current_page in ["all", "b1"]:
 
         # 💡 定義專屬的繪圖引擎函數，避免重複寫四次代碼
         def render_period_treemap(period_days):
+            # 動態生成對應的排名欄位名稱 (例如：'5日排名')
             rank_col = f"{period_days}日排名"
             
             if rank_col not in df_b1_master.columns:
@@ -2665,22 +2666,30 @@ if current_page in ["all", "b1"]:
                 errors='coerce'
             ).fillna(0.0)
 
-            # 🚀 修正點 1：強制把所有數字格式化為「小數點後兩位」的字串，避免版面擁擠
+            # 強制把所有數字格式化為「小數點後兩位」的字串
             period_df['單日△_格式化'] = period_df['熱力數值'].apply(lambda x: f"+{x:.2f}" if x > 0 else f"{x:.2f}")
 
-            # 格式化顯示在板塊上的字樣 (名稱 + 格式化後的單日△)
+            # 🚀 修正點 1：格式化顯示在板塊上的字樣 (名稱 + 單日△ + 排名)
             def format_block_label(row):
                 name = str(row.get('股票名稱', ''))
                 delta_str = row.get('單日△_格式化', '0.00')
-                return f"<b>{name}</b><br><span style='font-size: 11px; color: #E5E7EB;'>△ {delta_str}</span>"
+                
+                # 抓取並清洗排名數值 (確保顯示為乾淨的整數，例如 2 而不是 2.0)
+                rank_val = row.get(rank_col, '-')
+                try:
+                    rank_str = str(int(float(rank_val)))
+                except:
+                    rank_str = str(rank_val)
+                    
+                return f"<b>{name}</b><br><span style='font-size: 11px; color: #E5E7EB;'>△ {delta_str}<br>排名: {rank_str}</span>"
             
             period_df['顯示名稱'] = period_df.apply(format_block_label, axis=1)
 
             # 動態抓取前 7 天的持股欄位 (例如: '0618持股%', '0617持股%')
             date_cols = sorted([c for c in period_df.columns if '持股%' in c], reverse=True)[:7]
             
-            # 🚀 修正點 2：傳遞給 hover_data 的欄位改用剛剛做好的「單日△_格式化」，確保滑鼠指過去也不會出現長尾小數
-            hover_columns = ['股票代號', '今日上榜', '最新動態', '單日△_格式化'] + date_cols
+            # 🚀 修正點 2：把排名欄位 (rank_col) 也加入到懸停資料清單中
+            hover_columns = ['股票代號', '今日上榜', '最新動態', '單日△_格式化', rank_col] + date_cols
 
             # 定義紅綠漸層色階 (發散型色階)
             custom_continuous_scale = [
@@ -2703,19 +2712,20 @@ if current_page in ["all", "b1"]:
             # 隱藏側邊那條色階長條圖
             fig.update_coloraxes(showscale=False)
 
-            # 🛠️ 動態組合 Hover Template (讓前 7 天的日期可以整齊排好)
+            # 🛠️ 動態組合 Hover Template
             hover_template = (
                 '<b>%{label}</b><br>'
                 '股票代號: %{customdata[0]}<br>'
                 '今日上榜: %{customdata[1]}<br>'
                 '最新動態: %{customdata[2]}<br>'
                 '單日△: <b>%{customdata[3]}</b><br>'
+                f'{period_days}日排行: <b>第 %{{customdata[4]}} 名</b><br>' # 🚀 修正點 3：在提示框中加入排名
                 '----------------<br>'
             )
-            # 依序把歷史日期加進去提示框
+            # 依序把歷史日期加進去提示框 (注意 customdata 的 index 往後推了一位變成 5+i)
             for i, col in enumerate(date_cols):
                 clean_date = col.replace("持股%", "") # 只顯示如 0618
-                hover_template += f'{clean_date} 持股比: %{{customdata[{4+i}]}}%<br>'
+                hover_template += f'{clean_date} 持股比: %{{customdata[{5+i}]}}%<br>'
             hover_template += '<extra></extra>'
 
             # 樣式細節調整
