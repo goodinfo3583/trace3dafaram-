@@ -1118,7 +1118,7 @@ def render_sidebar_market_summary():
     if margin_today_yi != 0.0:
         margin_date = margin_csv_name[:8] if margin_csv_name else "未知"
         html += "<div style='margin-top: 8px; padding: 6px; background-color: #1e1e24; border: 1px solid #555; border-radius: 5px; font-size: 13px;'>"
-        html += f"<div style='font-weight: bold;'>📉 大盤融資餘額 <span style='font-size: 13px; color: #00D2FF; font-weight: normal; margin-left: 5px;'>({margin_date})</span></div>"
+        html += f"<div style='font-weight: bold;'>大盤融資餘額 <span style='font-size: 13px; color: #00D2FF; font-weight: normal; margin-left: 5px;'>({margin_date})</span></div>"
         html += f"<div style='color: #aaa; margin-top: 4px;'>今日增減(億) <span style='color: {m_c}; font-weight: bold; float: right;'>{m_s}</span></div>"
         html += f"<div style='color: #aaa; margin-top: 2px;'>餘額總計(億) <span style='float: right; color: #fff;'>{margin_today_yi:,.1f}</span></div>"
         html += "</div>"
@@ -4805,8 +4805,8 @@ if current_page in ["all", "pool"]:
                     # ==========================================
                  
                     st.write("---")
-                    st.markdown("### 🧩 觀察池中的資金聚落")
-                    st.caption("透過產業類別面積大小，或許可以找找看目前高分觀察名單集中在哪些產業 ,我們排除了 ETF 與債券。")
+                    st.markdown("### 🧩 觀察名單中的資金聚落")
+                    st.caption("我們將上述觀察名單轉換為產業類別面積大小，或許可以找找看目前法人口袋中持股變化集中在哪些標的 ,另外我們排除了 ETF 與債券。")
                     
                     # 確認名單不為空，且前台字典 STOCK_DICT 存在
                     if not res_df.empty and 'STOCK_DICT' in globals() and STOCK_DICT:
@@ -4947,7 +4947,7 @@ if current_page in ["all", "pool"]:
                                 hist_pivot = hist_pivot[hist_pivot['名稱'] != '-']
                                 if not hist_pivot.empty and sorted_date_columns[0] in hist_pivot.columns:
                                     st.dataframe(hist_pivot.sort_values(by=sorted_date_columns[0], ascending=False).reset_index(drop=True), use_container_width=True, hide_index=True)
-                                    st.info("我們也記錄了口袋名單在觀察名單的總分變化，試著觀察籌碼動能的延續性與驗證 ▼變量...")
+                                    st.info("我們也記錄了法人們口袋名單在觀察名單的總分變化，試著學習觀察籌碼動能的延續性與驗證 ▼變量...")
                                 else:
                                     st.warning("⚪ 尚無足夠的歷史分數紀錄。")
                         else: 
@@ -4990,8 +4990,8 @@ if current_page in ["all", "pool"]:
                             st.write("---")
                             c_space, c_main = st.columns([3, 2]) # 讓密碼與按鈕靠右縮小
                             with c_main:
-                                with st.expander("🔐 站長專用：寫入追蹤名單", expanded=True):
-                                    track_pw = st.text_input("輸入密碼解鎖", type="password", key="track_pw")
+                                with st.expander("🔐 站長用寫入追蹤名單", expanded=True):
+                                    track_pw = st.text_input("密碼", type="password", key="track_pw")
                                     
                                     if track_pw == "DDong888":
                                         st.markdown("""
@@ -5035,7 +5035,7 @@ if current_page in ["all", "pool"]:
                     try:
                         history_track_df = conn.read(spreadsheet=SHEET_URL, worksheet="歷史名單回測觀察", ttl=0).dropna(how="all")
                         if not history_track_df.empty:
-                            selected_week = st.selectbox("📅 選擇要回顧的鎖定日期", sorted(history_track_df['鎖定日期'].unique(), reverse=True))
+                            selected_week = st.selectbox("選擇要回顧的鎖定日期", sorted(history_track_df['鎖定日期'].unique(), reverse=True))
                             week_df = history_track_df[history_track_df['鎖定日期'] == selected_week].copy()
                             
                             # 計算此梯次名單已鎖定多久
