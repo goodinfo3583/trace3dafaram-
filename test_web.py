@@ -557,7 +557,7 @@ if (!parentDoc.getElementById('custom-sticky-header')) {
             </div>
         </div>
         <div class="nav-btn-container" id="nav-btn-container">
-            <a href="#" id="custom-sidebar-toggle" class="nav-text-link">📂 呼叫側邊欄</a><span class="nav-divider">|</span>
+            <a href="#" id="custom-sidebar-toggle" class="nav-text-link"><img src="app/static/iconarrow1.png" class="nav-icon" alt="icon">呼叫側邊欄</a><span class="nav-divider">|</span>
             <a href="#" data-target="NavToNews" class="nav-text-link internal-nav"><img src="app/static/magicbook2.png" class="nav-icon" alt="icon">市場消息</a><span class="nav-divider">|</span>
             <a href="#" data-target="NavToPool" class="nav-text-link internal-nav"><img src="app/static/magicbookfire2.png" class="nav-icon" alt="icon">觀察名單</a><span class="nav-divider">|</span>
             <a href="#" data-target="NavToB1" class="nav-text-link internal-nav"><img src="app/static/magicbookleaf.png" class="nav-icon" alt="icon">法人持股</a><span class="nav-divider">|</span>
