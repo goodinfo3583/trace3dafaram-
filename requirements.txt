@@ -5,6 +5,4 @@ plotly
 yfinance
 st-gsheets-connection
 lxml
-FinMind
-tqdm
 requests
