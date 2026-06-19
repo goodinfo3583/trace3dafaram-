@@ -1,0 +1,52 @@
+name: 🕷️ 週末籌碼自動爬蟲 (Goodinfo)
+
+on:
+  # 允許在 GitHub Actions 頁面手動點擊執行
+  workflow_dispatch:
+  # 設定每週六台灣時間中午 12:00 (UTC 04:00) 自動執行
+  schedule:
+    - cron: '0 4 * * 6'
+
+# 確保 Action 有權限把爬好的 CSV 推回你的倉庫
+permissions:
+  contents: write
+
+jobs:
+  run-crawler:
+    runs-on: ubuntu-latest
+
+    steps:
+    - name: 📥 1. 取得專案代碼
+      uses: actions/checkout@v4
+
+    - name: 🐍 2. 設定 Python 3.10 環境
+      uses: actions/setup-python@v5
+      with:
+        python-version: '3.10'
+
+    - name: 📦 3. 安裝爬蟲套件 (Selenium, Pandas, Lxml)
+      run: |
+        python -m pip install --upgrade pip
+        # lxml 是 pandas 執行 pd.read_html() 時背後必須依賴的解析套件
+        pip install selenium pandas lxml html5lib
+
+    - name: 🚀 4. 執行籌碼爬蟲腳本
+      run: |
+        # ⚠️ 請把 'your_script_name.py' 換成你 Python 檔案的實際名稱！
+        python your_script_name.py
+
+    - name: 💾 5. 自動將產生的 CSV 提交並上傳回 GitHub
+      run: |
+        git config --local user.email "action@github.com"
+        git config --local user.name "GitHub Action Bot"
+        
+        # 追蹤 Goodinfo_Rankings 資料夾內的所有變更
+        git add Goodinfo_Rankings/
+        
+        # 檢查是否有產生新檔案，有才 push，避免報錯
+        if git diff --quiet && git diff --staged --quiet; then
+          echo "⚪ 本次執行未產生新的 CSV 資料，跳過推播。"
+        else
+          git commit -m "🤖 自動排程：更新大股東籌碼資料 ($(date +'%Y-%m-%d'))"
+          git push
+        fi
