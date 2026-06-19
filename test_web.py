@@ -4326,9 +4326,14 @@ if current_page in ["all", "b6"]:
 def build_historical_block_matrix(data_dir="."):
     """
     掃描目錄下所有鉅額交易 CSV，並彙整成以「日期」為欄位的歷史防守價矩陣。
+    (強化版：支援子資料夾遞迴掃描、台灣 Big5 編碼自動切換、民國7碼與西元8碼日期)
     """
-    # 1. 尋找所有包含「鉅額」的 CSV 檔案 (若放在特定資料夾，可修改 data_dir 路徑)
-    file_list = glob.glob(os.path.join(data_dir, "*鉅額*.csv"))
+    file_list = []
+    # 1. 深入掃描所有子資料夾，尋找檔名包含「鉅額」的 CSV 檔案
+    for root, dirs, files in os.walk(data_dir):
+        for file in files:
+            if '鉅額' in file and file.lower().endswith('.csv'):
+                file_list.append(os.path.join(root, file))
     
     if not file_list:
         return None, []
@@ -4338,17 +4343,32 @@ def build_historical_block_matrix(data_dir="."):
     
     for file_path in file_list:
         try:
-            # 嘗試從檔名提取 8 位數日期 (例如 20260618)
-            match = re.search(r'\d{8}', os.path.basename(file_path))
+            # 2. 解決編碼問題：自動嘗試台灣常見的各種 CSV 編碼
+            df = None
+            for enc in ['utf-8-sig', 'cp950', 'big5', 'utf-8']:
+                try:
+                    df = pd.read_csv(file_path, encoding=enc)
+                    break # 如果讀取成功就跳出迴圈
+                except:
+                    pass
+                    
+            if df is None or df.empty:
+                continue
+                
+            # 3. 解決日期問題：同時支援 7 碼 (如 1130618) 與 8 碼 (如 20260618)
+            match = re.search(r'\d{7,8}', os.path.basename(file_path))
             if not match:
                 continue
                 
             date_str = match.group()
-            # 格式化日期為 MM/DD，這將成為表格的橫向欄位名稱
+            if len(date_str) == 7: 
+                # 將民國年轉換為西元年 (例如 113 + 1911 = 2024)
+                date_str = str(int(date_str[:3]) + 1911) + date_str[3:]
+                
+            # 格式化日期為 MM/DD (作為表格的直行標題)
             col_date = f"{date_str[4:6]}/{date_str[6:8]}"
             
-            # 讀取 CSV 資料
-            df = pd.read_csv(file_path)
+            # 4. 尋找關鍵欄位並清理資料
             col_code = next((c for c in df.columns if '代號' in c), None)
             col_name = next((c for c in df.columns if '名稱' in c), None)
             col_price = next((c for c in df.columns if '單價' in c or '成交價' in c), None)
@@ -4358,7 +4378,6 @@ def build_historical_block_matrix(data_dir="."):
                 df['股票名稱'] = df[col_name]
                 df['成交價'] = df[col_price].astype(str).replace(',', '', regex=True)
                 
-                # 剔除無效代號與空值
                 df = df[(df['代號'] != '0') & (df['代號'] != '') & (df['代號'] != 'nan')]
                 if df.empty: continue
                 
@@ -4367,7 +4386,6 @@ def build_historical_block_matrix(data_dir="."):
                     try: return f"{float(val):.2f}".rstrip('0').rstrip('.')
                     except: return str(val)
                         
-                # 聚合同一天同一檔股票的多筆交易價
                 grouped = df.groupby(['代號', '股票名稱']).agg({
                     '成交價': lambda x: ' / '.join(sorted(set([safe_float_format(i) for i in x.dropna()])))
                 }).reset_index()
@@ -4381,10 +4399,9 @@ def build_historical_block_matrix(data_dir="."):
     if not all_data:
         return None, []
         
-    # 2. 合併所有天數的歷史資料
+    # 5. 合併所有天數並製作樞紐分析表
     combined_df = pd.concat(all_data, ignore_index=True)
     
-    # 3. 轉置樞紐分析表：列 = 股票代號/名稱，欄 = 日期，值 = 成交價
     hist_matrix = combined_df.pivot_table(
         index=['代號', '股票名稱'], 
         columns='日期', 
@@ -4392,10 +4409,9 @@ def build_historical_block_matrix(data_dir="."):
         aggfunc=lambda x: ' / '.join(x)
     ).reset_index()
     
-    # 將沒有交易的日期空值填補為 "-"
     hist_matrix = hist_matrix.fillna('-')
     
-    # 4. 排序欄位：讓越靠近現在的日期排在越前面
+    # 6. 排序日期欄位：讓越靠近現在的日期排在越前面
     date_columns = [c for c in hist_matrix.columns if c not in ['代號', '股票名稱']]
     date_columns.sort(reverse=True)
     
