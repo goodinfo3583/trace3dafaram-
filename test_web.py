@@ -4263,7 +4263,7 @@ if current_page in ["all", "b6"]:
 
     df_block, block_date = get_latest_csv("鉅額交易")
     
-    st.markdown("### 🎣 區塊 6：鉅額交易動向, unsafe_allow_html=True)
+    st.markdown("### 🎣 區塊 6：鉅額交易動向", unsafe_allow_html=True)
     st.write("💡 鉅額交易有時為大戶私下換手籌碼，成交價可作為「支撐/壓力」的防守線；如果短線跌破建議嚴設停損。")
 
     tab_today, tab_hist = st.tabs(["🔹 今日最新鉅額交易", "🔹 歷史防守價追蹤表"])
