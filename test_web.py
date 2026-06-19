@@ -374,47 +374,8 @@ def get_diff_ui(today_val, prev_val):
         return f"<br><span style='color:{color}; font-size:11px;'>({sign}{diff:,})</span>"
     except: return ""
 
-# ==========================================券商分點
-from FinMind.data import DataLoader
-import pandas as pd
-from datetime import datetime
 
-def get_watchlist_broker_data(stock_id_list, target_date):
-    """
-    輸入高分名單的股票代號清單，批次抓取這些股票當天的買超前 3 大分點明細
-    """
-    api = DataLoader()
-    # 💡 如果你有註冊免費 Token，可以把下一行解開註冊
-    # api.login_by_token(api_token="YOUR_FINMIND_TOKEN")
-    
-    all_broker_summary = []
-    
-    for sid in stock_id_list:
-        try:
-            # 呼叫台股分點資料表 API
-            df = api.taiwan_stock_buying_selling_report(
-                stock_id=str(sid),
-                start_date=target_date,
-                end_date=target_date
-            )
-            
-            if not df.empty:
-                # 計算每家分點的「買賣超張數」
-                df['買賣超張數'] = (df['BuyShareNum'] - df['SellShareNum']) / 1000
-                
-                # 篩選出買超前 3 大的分點名稱
-                top_buyers = df.sort_values(by='買賣超張數', ascending=False).head(3)
-                buyer_names = top_buyers['Broker'].tolist()
-                
-                all_broker_summary.append({
-                    "代號": str(sid),
-                    "關鍵買超分點": "、".join(buyer_names)
-                })
-        except:
-            continue
-            
-    return pd.DataFrame(all_broker_summary)
-# ==========================================券商分點
+
 # ==========================================
 # 🗂️ 台股代號與名稱產業類別 萬用字典引擎 (後台靜默運作)
 # ==========================================
@@ -4996,97 +4957,33 @@ if current_page in ["all", "pool"]:
                         st.error(f"發生錯誤: {e}")
                 #********************************************************************************
                 elif selected_view == "🔹 模型驗證：每週 Top 5 追蹤":
-                    st.markdown("### 🏆 嚴選 5 檔模型追蹤 (籌碼加強 + 主力分點版)")
-                    st.info("💡 篩選邏輯：排除賣出警示 ➡️ 當日△ > 0 ➡️ 法人持股呈上升/趨緩/階梯吸籌 ➡️ 優先排序大股東雙增標的 ➡️ 點火 FinMind 自動穿透前 5 名今日盤後關鍵買超分點。")
-                    
+                    st.markdown("### 🏆 嚴選 5 檔模型追蹤")
+                    st.info("💡 我們先排除了法人丟出籌碼警示的標的，並根據總分與當日△選出前 5 名，但是有時候倒貨僅是換手，這個部分還相當困難阿，真是傷腦筋")
                     if not res_df.empty:
-                        # 1. 基礎篩選：排除法人丟出籌碼警示的標的
                         safe_df = res_df[res_df['賣出警示'] == "-"].copy()
-                        
                         if not safe_df.empty:
-                            # 2. 轉換當日 △ 為數值格式
-                            safe_df['數值△'] = pd.to_numeric(
-                                safe_df['△'].astype(str).str.replace('+', '').str.replace('%', ''), 
-                                errors='coerce'
-                            ).fillna(0)
+                            safe_df['數值△'] = pd.to_numeric(safe_df['△'].astype(str).str.replace('+', '').str.replace('%', ''), errors='coerce').fillna(0)
+                            top5_df = safe_df.sort_values(by=['總分', '數值△'], ascending=[False, False]).head(5).drop(columns=['數值△'])
                             
-                            # 3. 籌碼多因子複合篩選條件定義
-                            cond_delta_positive = safe_df['數值△'] > 0
-                            
-                            if '歷史軌跡全能池' in safe_df.columns:
-                                cond_institution = safe_df['歷史軌跡全能池'].isin(['上升', '趨緩', '階梯吸籌'])
-                            else:
-                                cond_institution = safe_df['最新動態'].astype(str).str.contains('上升|趨緩|階梯吸籌|吸籌', na=False)
-                                
-                            if '400張大戶' in safe_df.columns and '1000張大戶' in safe_df.columns:
-                                increase_tags = ['微增', '增', '大增']
-                                cond_large_holder = (safe_df['400張大戶'].isin(increase_tags)) & (safe_df['1000張大戶'].isin(increase_tags))
-                                cond_6weeks_up = safe_df['6周增減'] > 0 if '6周增減' in safe_df.columns else False
-                                cond_large_holder_priority = cond_large_holder | cond_6weeks_up
-                            else:
-                                cond_large_holder_priority = safe_df['大股東動向'].astype(str).str.contains('增|大增|微增', na=False)
-                            
-                            # 賦予大股東優先排序權重
-                            safe_df['大股東優先權重'] = cond_large_holder_priority.astype(int)
-                            
-                            # 執行核心過濾
-                            filtered_df = safe_df[cond_delta_positive & cond_institution].copy()
-                            
-                            if not filtered_df.empty:
-                                # 排序並選出最精華的前 5 名
-                                top5_df = filtered_df.sort_values(
-                                    by=['大股東優先權重', '總分', '數值△'], 
-                                    ascending=[False, False, False]
-                                ).head(5).copy()
-                                
-                                # ========================================================
-                                # 🚀 核心優化：針對前 5 名自動去 FinMind 打包下載今日主力分點
-                                # ========================================================
-                                watchlist_ids = top5_df['代號'].astype(str).tolist()
-                                current_date_str = datetime.today().strftime('%Y-%m-%d') # 自動取得今天日期格式
-                                
-                                # 呼叫外層的 API 工具
-                                broker_res_df = get_watchlist_broker_data(watchlist_ids, current_date_str)
-                                
-                                # 將主力分點欄位 pd.merge 貼回表格中
-                                if not broker_res_df.empty:
-                                    top5_df = pd.merge(top5_df, broker_res_df, on='代號', how='left')
-                                else:
-                                    top5_df['關鍵買超分點'] = '-'
-                                    
-                                top5_df['關鍵買超分點'] = top5_df['關鍵買超分點'].fillna('-')
-                                # ========================================================
-                                
-                                # 4. 渲染美化卡片
-                                cols = st.columns(5)
-                                for idx, (i, row) in enumerate(top5_df.iterrows()):
-                                    with cols[idx]:
-                                        delta_str = str(row['△'])
-                                        delta_color = "#FF4B4B" if "+" in delta_str else ("#00E272" if "-" in delta_str else "#E2E8F0")
-                                        
-                                        # 在原本的卡片底部，順手加進「主力分點」顯示區塊
-                                        st.markdown(f"""
-                                            <div style="background-color:rgba(0, 210, 255, 0.05); border-top: 3px solid #00D2FF; padding: 10px; border-radius: 5px; min-height: 270px;">
-                                                <h4 style="margin:0; color:#E2E8F0;">{row['名稱']}</h4>
-                                                <p style="margin:0; font-size:12px; color:#A0AEC0;">{row['代號']}</p>
-                                                <h2 style="margin:10px 0; color:#00D2FF;">{row['總分']:.1f} 分</h2>
-                                                <p style="margin:0; font-size:14px;"><strong>當日△:</strong> <span style="color:{delta_color}; font-weight:bold;">{delta_str}</span></p>
-                                                <p style="margin:5px 0 0 0; font-size:12px; line-height:1.2; color:#CBD5E1;"><strong>籌碼:</strong> {row['大股東動向']}</p>
-                                                <p style="margin:8px 0 0 0; font-size:11px; line-height:1.3; color:#00D2FF; border-top:1px dashed rgba(0,210,255,0.2); padding-top:5px;">
-                                                    <strong>🔥 今日核心買超分點:</strong><br>{row['關鍵買超分點']}
-                                                </p>
-                                            </div>
-                                        """, unsafe_allow_html=True)
-                                
-                                st.write("")
-                                # 5. 下方總表也同步把「關鍵買超分點」欄位塞進去顯示
-                                show_cols = ['代號', '名稱', '總分', '△', '關鍵買超分點', '最新動態', '▼明細']
-                                existing_cols = [c for c in show_cols if c in top5_df.columns]
-                                st.dataframe(top5_df[existing_cols], use_container_width=True, hide_index=True)
-                            else:
-                                st.warning("⚪ 當前名單中，沒有符合篩選條件的標的。")
-                        else:
-                            st.info("⚪ 排除法人賣出警示後，無剩餘標的。")
+                            cols = st.columns(5)
+
+                            #***************
+                            for idx, (i, row) in enumerate(top5_df.iterrows()):
+                                with cols[idx]:
+                                    delta_str = str(row['△'])
+                                    delta_color = "#FF4B4B" if "+" in delta_str else ("#00E272" if "-" in delta_str else "#E2E8F0")
+                                    st.markdown(f"""
+                                        <div style="background-color:rgba(0, 210, 255, 0.05); border-top: 3px solid #00D2FF; padding: 10px; border-radius: 5px;">
+                                            <h4 style="margin:0; color:#E2E8F0;">{row['名稱']}</h4>
+                                            <p style="margin:0; font-size:12px; color:#A0AEC0;">{row['代號']}</p>
+                                            <h2 style="margin:10px 0; color:#00D2FF;">{row['總分']:.1f} 分</h2>
+                                            <p style="margin:0; font-size:14px;"><strong>當日△:</strong> <span style="color:{delta_color}; font-weight:bold;">{delta_str}</span></p>
+                                            <p style="margin:5px 0 0 0; font-size:12px; line-height:1.2;">{row['大股東動向']}</p>
+                                        </div>
+                                    """, unsafe_allow_html=True)
+                            #****************
+                            st.write("")
+                            st.dataframe(top5_df[['代號', '名稱', '總分', '▼變量', '△', '最新動態', '▼明細']], use_container_width=True, hide_index=True)
 #==========================================
 
 #==========================================
