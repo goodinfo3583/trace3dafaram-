@@ -1101,17 +1101,17 @@ def render_sidebar_market_summary():
     html += f"<tr><td style='padding: 4px;'>🏢 自營商</td><td style='color: {d_c}; vertical-align: middle;'>{d_s}</td><td style='color: {do_c}; vertical-align: middle; padding-bottom: 6px;'>{do_os}{get_diff_ui(oi_dealer, oi_d_prev)}</td></tr>"
     
     tot_prev = (oi_f_prev + oi_t_prev + oi_d_prev) if oi_f_prev is not None else None
-    html += f"<tr style='border-top: 1px solid #555; font-weight: bold;'><td style='padding: 4px;'>🔥 合計</td><td style='color: {to_c}; vertical-align: middle;'>{to_s}</td><td style='color: {too_c}; vertical-align: middle; padding-bottom: 6px;'>{too_os}{get_diff_ui(total_oi, tot_prev)}</td></tr>"
+    html += f"<tr style='border-top: 1px solid #555; font-weight: bold;'><td style='padding: 4px;'> 合計</td><td style='color: {to_c}; vertical-align: middle;'>{to_s}</td><td style='color: {too_c}; vertical-align: middle; padding-bottom: 6px;'>{too_os}{get_diff_ui(total_oi, tot_prev)}</td></tr>"
     html += "</table>"
     
     # 🌟 區塊 2 (新增): 市場成交量 (完美安插在中間)
     if total_vol_today > 0:
         html += "<div style='margin-top: 8px; padding: 6px; background-color: #1e1e24; border: 1px solid #555; border-radius: 5px; font-size: 13px;'>"
-        html += "<div style='font-weight: bold; margin-bottom: 4px;'>📊 市場成交量 (億)</div>"
-        html += f"<div style='color: #aaa; margin-top: 2px;'>🏢 上市 <span style='float: right; color: #fff;'>{twse_vol_today:,.1f} <span style='color: {tw_c}; font-size: 11px; margin-left: 2px;'>({tw_s})</span></span></div>"
-        html += f"<div style='color: #aaa; margin-top: 2px;'>🏪 上櫃 <span style='float: right; color: #fff;'>{tpex_vol_today:,.1f} <span style='color: {tp_c}; font-size: 11px; margin-left: 2px;'>({tp_s})</span></span></div>"
+        html += "<div style='font-weight: bold; margin-bottom: 4px;'>市場成交量 (億)</div>"
+        html += f"<div style='color: #aaa; margin-top: 2px;'> 上市 <span style='float: right; color: #fff;'>{twse_vol_today:,.1f} <span style='color: {tw_c}; font-size: 11px; margin-left: 2px;'>({tw_s})</span></span></div>"
+        html += f"<div style='color: #aaa; margin-top: 2px;'> 上櫃 <span style='float: right; color: #fff;'>{tpex_vol_today:,.1f} <span style='color: {tp_c}; font-size: 11px; margin-left: 2px;'>({tp_s})</span></span></div>"
         html += "<div style='border-top: 1px dashed #555; margin: 4px 0;'></div>"
-        html += f"<div style='color: #fbbf24; font-weight: bold; margin-top: 2px;'>🔥 總量 <span style='float: right;'>{total_vol_today:,.1f} <span style='color: {tot_c}; font-size: 11px; margin-left: 2px;'>({tot_s})</span></span></div>"
+        html += f"<div style='color: #fbbf24; font-weight: bold; margin-top: 2px;'> 總量 <span style='float: right;'>{total_vol_today:,.1f} <span style='color: {tot_c}; font-size: 11px; margin-left: 2px;'>({tot_s})</span></span></div>"
         html += "</div>"
     
     # 區塊 3: 融資餘額
@@ -1985,7 +1985,7 @@ def render_sidebar_war_room():
             
         with c_btn_clear:
             # 🚀 關鍵修正：加入 type="tertiary" 拔除底色與邊框
-            st.button("╳", key="btn_clear", type="tertiary", on_click=clear_search, use_container_width=True, help="清空欄位")
+            st.button("×", key="btn_clear", type="tertiary", on_click=clear_search, use_container_width=True, help="清空欄位")
 
         pure_stock_id = ""
         display_name = search_query
