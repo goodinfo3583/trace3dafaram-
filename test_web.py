@@ -4981,7 +4981,7 @@ if current_page in ["all", "pool"]:
                             #****************
                             st.write("")
                             st.dataframe(top5_df[['代號', '名稱', '總分', '▼變量', '△', '最新動態', '▼明細']], use_container_width=True, hide_index=True)
-                            
+
                             # ==========================================
                             # 🔧 站長儲存區：寫入 Google Sheets + 當下收盤價存檔
                             # ==========================================
