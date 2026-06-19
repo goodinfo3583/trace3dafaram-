@@ -677,14 +677,14 @@ def fetch_historical_news(days_to_load=3):
 # 📰 定義：市場消息主畫面分頁 (極速分頁版)
 # ========================================================== 
 def show_news_page():
-    st.title("☕  市場消息")
+    st.title("市場消息")
     
     # 頂部控制面板 (預設選項加入了 90, 180, 365 天)
     col1, col2 = st.columns([1, 2])
     with col1:
         days_option = st.selectbox("載入歷史天數", [1, 3, 7, 14, 30, 90, 180, 365], index=0)
     with col2:
-        search_query = st.text_input("🔍 搜尋標題、關鍵字或股票代號...")
+        search_query = st.text_input("🔍 搜尋市場新聞標題、關鍵字或股票代號...")
         
     st.markdown("---")
     
@@ -801,7 +801,7 @@ def show_news_page():
     # 顯示目前觀看的區間提示
     start_item = (current_page - 1) * ITEMS_PER_PAGE + 1
     end_item = min(current_page * ITEMS_PER_PAGE, total_items)
-    st.caption(f"<div style='text-align: center; color: #94A3B8; margin-bottom: 20px;'>共過濾出 {total_items} 則新聞，目前顯示第 {start_item} 到 {end_item} 則</div>", unsafe_allow_html=True)
+    st.caption(f"<div style='text-align: center; color: #94A3B8; margin-bottom: 20px;'>共 {total_items} 則新聞，目前顯示第 {start_item} 到 {end_item} 則，千萬不要僅憑新聞操作買賣</div>", unsafe_allow_html=True)
 
     # ==========================================
     # 📰 步驟三：根據選擇的頁數，裁切陣列並渲染卡片
@@ -1953,7 +1953,7 @@ def render_sidebar_war_room():
         <h2 style="color: #e0f2fe; margin: 0; letter-spacing: 2px; text-shadow: 0 0 15px rgba(56, 189, 248, 0.8);">
             🔍 個股籌碼快搜
         </h2>
-        <p style="color: #94a3b8; margin-top: 8px; font-size: 14px; margin-bottom: 0;">輸入代號聯動看K線</p>
+        <p style="color: #94a3b8; margin-top: 8px; font-size: 14px; margin-bottom: 0;">一起看看K線吧</p>
     </div>
     """, unsafe_allow_html=True)
 
@@ -1967,7 +1967,7 @@ def render_sidebar_war_room():
         def clear_search():
             st.session_state['global_search_final'] = ""
 
-        st.markdown("<div style='font-size: 14px; color: #E2E8F0; margin-bottom: 5px; font-weight: bold;'>輸入代號或名稱 (例如: 3231 或 緯創)：</div>", unsafe_allow_html=True)
+        st.markdown("<div style='font-size: 14px; color: #E2E8F0; margin-bottom: 5px; font-weight: bold;'>輸入代號或名稱或代號+名稱 ：</div>", unsafe_allow_html=True)
         
         c_search, c_btn_go, c_btn_clear = st.columns([6, 1.5, 1.5])
         
