@@ -2665,19 +2665,22 @@ if current_page in ["all", "b1"]:
                 errors='coerce'
             ).fillna(0.0)
 
-            # 格式化顯示在板塊上的字樣 (名稱 + 單日△)
+            # 🚀 修正點 1：強制把所有數字格式化為「小數點後兩位」的字串，避免版面擁擠
+            period_df['單日△_格式化'] = period_df['熱力數值'].apply(lambda x: f"+{x:.2f}" if x > 0 else f"{x:.2f}")
+
+            # 格式化顯示在板塊上的字樣 (名稱 + 格式化後的單日△)
             def format_block_label(row):
                 name = str(row.get('股票名稱', ''))
-                delta = row.get('△', 0.0)
-                delta_str = f"+{delta}" if pd.to_numeric(delta, errors='coerce') > 0 else f"{delta}"
+                delta_str = row.get('單日△_格式化', '0.00')
                 return f"<b>{name}</b><br><span style='font-size: 11px; color: #E5E7EB;'>△ {delta_str}</span>"
+            
             period_df['顯示名稱'] = period_df.apply(format_block_label, axis=1)
 
             # 動態抓取前 7 天的持股欄位 (例如: '0618持股%', '0617持股%')
             date_cols = sorted([c for c in period_df.columns if '持股%' in c], reverse=True)[:7]
             
-            # 定義傳遞給 hover_data 的欄位清單
-            hover_columns = ['股票代號', '今日上榜', '最新動態', '△'] + date_cols
+            # 🚀 修正點 2：傳遞給 hover_data 的欄位改用剛剛做好的「單日△_格式化」，確保滑鼠指過去也不會出現長尾小數
+            hover_columns = ['股票代號', '今日上榜', '最新動態', '單日△_格式化'] + date_cols
 
             # 定義紅綠漸層色階 (發散型色階)
             custom_continuous_scale = [
