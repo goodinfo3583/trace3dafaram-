@@ -4263,7 +4263,7 @@ if current_page in ["all", "b6"]:
 
     df_block, block_date = get_latest_csv("鉅額交易")
     formatted_date = f"{block_date[:4]}/{block_date[4:6]}/{block_date[6:8]}" if block_date != "未知" else "未知"
-    status_icon = "🟢" if df_block is not None else "🌕"
+
 
     st.markdown(f"### 🎣 區塊 6：鉅額交易動向 <span style='font-size: 0.6em; color: #00D2FF;'>({formatted_date} {status_icon})</span>", unsafe_allow_html=True)
     st.write("💡 鉅額交易有時為大戶私下換手籌碼，成交價可作為「支撐/壓力」的防守線；如果短線跌破建議嚴設停損。")
