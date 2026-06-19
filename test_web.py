@@ -4981,7 +4981,54 @@ if current_page in ["all", "pool"]:
                             #****************
                             st.write("")
                             st.dataframe(top5_df[['代號', '名稱', '總分', '▼變量', '△', '最新動態', '▼明細']], use_container_width=True, hide_index=True)
+#==========================================
+# 核心邏輯：在你的每週 Top 5 或 Treemap 名單跑完後，順手抓取分點進出模型
+from FinMind.data import DataLoader
+import pandas as pd
 
+def get_watchlist_broker_data(stock_id_list, target_date):
+    """
+    輸入高分名單的股票代號清單，批次抓取這些股票當天的分點明細
+    """
+    api = DataLoader()
+    # 💡 免費註冊 FinMind 即可拿到 Token，每小時可免費查詢 600 次
+    # api.login_by_token(api_token="YOUR_FINMIND_TOKEN")
+    
+    all_broker_summary = []
+    
+    for sid in stock_id_list:
+        try:
+            # 呼叫台股分點資料表 API
+            df = api.taiwan_stock_buying_selling_report(
+                stock_id=sid,
+                start_date=target_date,
+                end_date=target_date
+            )
+            
+            if not df.empty:
+                # 欄位通常包含：Broker(券商), BuyShareNum(買進股數), SellShareNum(賣出股數), Price(價格)
+                # 計算每家分點的「買賣超張數」
+                df['買賣超張數'] = (df['BuyShareNum'] - df['SellShareNum']) / 1000
+                
+                # 找出買超前 3 大分點
+                top_buyers = df.sort_values(by='買賣超張數', ascending=False).head(3)
+                buyer_names = top_buyers['Broker'].tolist()
+                
+                # 放入大字典
+                all_broker_summary.append({
+                    "代號": sid,
+                    "關鍵買超分點": "、".join(buyer_names)
+                })
+        except:
+            continue
+            
+    return pd.DataFrame(all_broker_summary)
+
+# 💡 範例：如果今天模型選出這三檔
+# my_watchlist = ['2330', '2454', '2303']
+# broker_df = get_watchlist_broker_data(my_watchlist, "2026-06-19")
+# 接下來直接 pd.merge(res_df, broker_df, on='代號') 就能在看板上秒看主力是誰！
+#==========================================
                             # ==========================================
                             # 🔧 站長儲存區：寫入 Google Sheets + 當下收盤價存檔
                             # ==========================================
