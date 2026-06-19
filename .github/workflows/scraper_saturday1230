@@ -1,4 +1,4 @@
-name: 🕷️ 週末籌碼自動爬蟲 (Goodinfo)
+name: saturday_scraper 12:30
 
 on:
   # 允許在 GitHub Actions 頁面手動點擊執行
