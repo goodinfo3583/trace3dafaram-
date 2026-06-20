@@ -204,7 +204,7 @@ def get_image_base64(image_path):
 
 # 2. 圖片檔名列表與資料夾設定
 image_folder = "static" 
-image_files = ["主城.png", "組合土地公.png", "組合畫家.png", "組合化學晶礦.png", "端午節.png"]
+image_files = ["沙漠之城.png", "法人意向.png", "組合畫家.png", "組合化學晶礦.png", "端午節.png"]
 
 # 💡 核心升級：自動計算時間，防呆防錯！
 total_images = len(image_files)
@@ -4422,25 +4422,68 @@ if current_page in ["all", "b5"]:
                     st.success(f"🔥 極度嚴苛過濾！找到了 **{len(resonance_df)}** 檔 1000張與400張「長線(6周)與短線(最新週)」同步雙向做多的超級共振標的！")
                     st.dataframe(resonance_df, use_container_width=True, hide_index=True)
 
-                    # ==========================================
+# ==========================================
                     # 🧩 區塊擴充：長短線大戶雙向共振榜 - 產業資金聚落 (Treemap)
                     # ==========================================
                     st.write("---")
                     st.markdown("### 🧩 大股東共振資金聚落板塊")
-                    st.caption("過濾出6週增且最近一週同步增加，看出超級大戶與中實戶雙雙同步做多的核心產業 (已排除 ETF/債券)。板塊顏色與數值為 **1000張大戶的最新一週增減百分比**。")
+                    st.caption("將上述過濾出的「共振名單」轉換為產業面積，一眼看出大戶同步做多的核心產業 (已排除 ETF/債券)。板塊顏色代表 **1000張大戶的最新一週增減百分比**。")
                     
                     if 'STOCK_DICT' in globals() and STOCK_DICT:
                         
+                        # 動態取得最新週次的欄位名稱 (例如：'▼0618(一千)')
+                        target_color_col = f"{latest_col_1k}(一千)"
+                        
+                        # ==========================================
+                        # 🚀 新增：雙層連動控制 UI (排序依據 + 顯示數量)
+                        # ==========================================
+                        st.write("")
+                        c_opt, c_topn = st.columns([3, 1.5])
+                        
+                        with c_opt:
+                            b5_filter = st.radio(
+                                "設定排序依據：", 
+                                ["📌 全部顯示 (預設)", "📈 依 6周增減(一千) 排序", f"🔥 依 {target_color_col} 排序"], 
+                                horizontal=True, 
+                                key="b5_treemap_filter"
+                            )
+                        with c_topn:
+                            # 讓讀者自由選擇要看幾名，預設給 50 名
+                            top_n = st.selectbox(
+                                "顯示檔數：", 
+                                [10, 30, 50, 100], 
+                                index=2, 
+                                key="b5_top_n",
+                                help="當選擇「全部顯示」時，此數量設定不會生效。"
+                            )
+
                         # 複製一份繪圖用 DataFrame
                         tm_b5_df = resonance_df.copy()
                         
+                        # ==========================================
+                        # 💡 執行資料過濾與排序邏輯
+                        # ==========================================
+                        # 1. 確保數值欄位為乾淨的浮點數 (去除 + 號與 % 號)
+                        tm_b5_df['數值_6周'] = pd.to_numeric(tm_b5_df['6周增減(一千)'].astype(str).str.replace('+', '', regex=False).str.replace('%', '', regex=False), errors='coerce').fillna(0.0)
+                        tm_b5_df['數值_最新週'] = pd.to_numeric(tm_b5_df[target_color_col].astype(str).str.replace('+', '', regex=False).str.replace('%', '', regex=False), errors='coerce').fillna(0.0)
+
+                        # 2. 根據讀者選擇的選項進行過濾
+                        if "6周增減" in b5_filter:
+                            tm_b5_df = tm_b5_df.nlargest(top_n, '數值_6周')
+                        elif "依 ▼" in b5_filter or "依 最新" in b5_filter or target_color_col in b5_filter:
+                            tm_b5_df = tm_b5_df.nlargest(top_n, '數值_最新週')
+                        # 若選「全部顯示」則不做 nlargest 裁切，維持原樣
+                        
+                        # ==========================================
+                        # 🎨 產業配對與 Treemap 繪製
+                        # ==========================================
                         # 配對產業別 (剔除 ETF / 債券)
                         tm_b5_df['產業別'] = tm_b5_df['股票代號'].astype(str).apply(
                             lambda sid: STOCK_DICT.get(sid, {}).get("industry", "ETF / 債券 / 其他")
                         )
                         tm_b5_df['產業別'] = tm_b5_df['產業別'].replace('', 'ETF / 債券 / 其他')
                         
-                        # 擷取即將被剔除的 ETF / 債券清單
+                        # 擷取即將被剔除的 ETF / 債券清單 (過濾後的結果)
                         b5_excluded_etfs = tm_b5_df[tm_b5_df['產業別'] == 'ETF / 債券 / 其他'].sort_values(by='股票代號').copy()
                         
                         # 剔除 ETF，保留一般產業畫圖
@@ -4456,13 +4499,8 @@ if current_page in ["all", "b5"]:
                                 return f"<b>{industry}</b><br><span style='font-size: 13px;'>{t_count}檔</span>"
                             tm_b5_df['產業別'] = tm_b5_df['產業別'].apply(format_industry_label)
 
-                            # 💡 將「最新一週 1000張增減」轉為純數字，作為熱力色階來源
-                            # 注意：你上面動態抓取的欄位名稱變數為 latest_col_1k，合併後變為 f"{latest_col_1k}(一千)"
-                            target_color_col = f"{latest_col_1k}(一千)"
-                            tm_b5_df['熱力數值'] = pd.to_numeric(
-                                tm_b5_df[target_color_col].astype(str).str.replace('+', '', regex=False).str.replace('%', '', regex=False), 
-                                errors='coerce'
-                            ).fillna(0.0)
+                            # 💡 繪圖熱力數值一律使用「最新一週 1000張增減」來上色
+                            tm_b5_df['熱力數值'] = tm_b5_df['數值_最新週']
 
                             # 格式化為 "+0.28"
                             tm_b5_df['千張週增減_格式化'] = tm_b5_df['熱力數值'].apply(lambda x: f"+{x:.2f}" if x > 0 else f"{x:.2f}")
@@ -4470,7 +4508,7 @@ if current_page in ["all", "b5"]:
                             def format_clean_stock_label(row):
                                 name = str(row.get('股票名稱', ''))
                                 d_str = row.get('千張週增減_格式化', '0.00')
-                                return f"<b>{name}</b><br><span style='font-size: 11px; color: #E5E7EB;'>週增 {d_str}%</span>"
+                                return f"<b>{name}</b><br><span style='font-size: 11px; color: #E5E7EB;'>大戶週增 {d_str}%</span>"
                             tm_b5_df['顯示名稱'] = tm_b5_df.apply(format_clean_stock_label, axis=1)
 
                             # 懸停欄位 (包含 1000與400 的短長線數據)
@@ -4527,7 +4565,7 @@ if current_page in ["all", "b5"]:
                             st.plotly_chart(fig, use_container_width=True)
                             
                         else:
-                            st.info("⚪ 目前共振名單中沒有一般產業的股票。")
+                            st.info("⚪ 目前過濾後的名單中沒有一般產業的股票。")
 
                         # ==========================================
                         # 🗑️ 在下方顯示被剔除的 ETF / 債券 / 特別股清單
@@ -4535,7 +4573,7 @@ if current_page in ["all", "b5"]:
                         if not b5_excluded_etfs.empty:
                             st.write("")
                             st.markdown("##### 🗑️ 本次已剔除的非一般產業 (ETF / 特別股 / 債券)")
-                            st.caption("以下標的已符合大戶共振條件，但因非一般企業已從上方產業聚落中剔除。💡 **游標懸停可查看大戶持股明細。**")
+                            st.caption("以下標的已符合大戶共振與排序條件，但因非一般企業已從上方產業聚落中剔除。💡 **游標懸停可查看大戶持股明細。**")
                             
                             tags_html = ""
                             import html
@@ -4545,7 +4583,7 @@ if current_page in ["all", "b5"]:
                                 sid = str(r.get('股票代號', ''))
                                 
                                 # 取出 1000與400的資料
-                                k1_w = str(r.get(f"{latest_col_1k}(一千)", '0.00'))
+                                k1_w = str(r.get(target_color_col, '0.00'))
                                 k1_6w = str(r.get('6周增減(一千)', '0.00'))
                                 c4_w = str(r.get(f"{latest_col_400}(四百)", '0.00'))
                                 c4_6w = str(r.get('6周增減(四百)', '0.00'))
@@ -4553,9 +4591,7 @@ if current_page in ["all", "b5"]:
                                 safe_name = html.escape(name, quote=True)
                                 safe_sid = html.escape(sid, quote=True)
                                 
-                                # 計算顏色基準 (以1000張當週為準)
-                                try: d_val = float(k1_w.replace('+', '').replace('%', ''))
-                                except: d_val = 0.0
+                                d_val = r.get('數值_最新週', 0.0)
                                 
                                 if d_val > 0:
                                     bg_color = "rgba(255, 75, 75, 0.15)"   
