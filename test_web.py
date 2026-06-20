@@ -204,7 +204,7 @@ def get_image_base64(image_path):
 
 # 2. 圖片檔名列表與資料夾設定
 image_folder = "static" 
-image_files = ["沙漠之城.png", "法人意向.png", "組合畫家.png", "組合化學晶礦.png", "端午節.png"]
+image_files = ["沙漠之城.png", "法人意向.png", "組合畫家.png", "組合化學晶礦.png", "鐵風堡b.png"]
 
 # 💡 核心升級：自動計算時間，防呆防錯！
 total_images = len(image_files)
@@ -4587,20 +4587,27 @@ if current_page in ["all", "b5"]:
                             tags_html = ""
                             import html
                             
+                            # 🚀 修正 1：建立一個安全轉換單一數字的函數，取代會報錯的 pd.to_numeric(...).fillna()
+                            def safe_float_convert(val):
+                                try:
+                                    return float(str(val).replace('+', '').replace('%', '').replace(',', '').strip())
+                                except:
+                                    return 0.0
+                            
                             for _, r in b5_excluded_etfs.iterrows():
                                 name = str(r.get('股票名稱', ''))
                                 sid = str(r.get('股票代號', ''))
                                 
-                                # 提取剛才前處理算好的乾淨浮點數
-                                num_6w = pd.to_numeric(str(r.get('6周增減(一千)', '0')).replace('+', '').replace('%', ''), errors='coerce').fillna(0.0)
-                                num_w = pd.to_numeric(str(r.get(target_color_col, '0')).replace('+', '').replace('%', ''), errors='coerce').fillna(0.0)
-                                num_400_w = pd.to_numeric(str(r.get(f"{latest_col_400}(四百)", '0')).replace('+', '').replace('%', ''), errors='coerce').fillna(0.0)
-                                num_400_6w = pd.to_numeric(str(r.get('6周增減(四百)', '0')).replace('+', '').replace('%', ''), errors='coerce').fillna(0.0)
+                                # 🚀 修正 2：使用安全轉換函數處理數值
+                                num_6w = safe_float_convert(r.get('6周增減(一千)', '0'))
+                                num_w = safe_float_convert(r.get(target_color_col, '0'))
+                                num_400_w = safe_float_convert(r.get(f"{latest_col_400}(四百)", '0'))
+                                num_400_6w = safe_float_convert(r.get('6周增減(四百)', '0'))
                                 
                                 safe_name = html.escape(name, quote=True)
                                 safe_sid = html.escape(sid, quote=True)
                                 
-                                # 🚀 修正 2-2：最下方膠囊標籤的文字，也跟著單選按鈕同步切換顯示模式！
+                                # 最下方膠囊標籤的文字，也跟著單選按鈕同步切換顯示模式！
                                 if "6周增減" in b5_filter:
                                     d_val = num_6w
                                     label_text = "6周"
@@ -4624,9 +4631,10 @@ if current_page in ["all", "b5"]:
                                     text_color = "#94A3B8"
                                     d_str = "0.00%"
                                     
+                                # 🚀 修正 3：修復換行符號錯字 (把 &n#10; 修正為 &#10;)
                                 tooltip_text = (
                                     f"【{safe_name}】&#10;"
-                                    f"股票代號: {safe_sid}&n#10;"
+                                    f"股票代號: {safe_sid}&#10;"
                                     f"千張大戶本週: {num_w:+.2f}%&#10;"
                                     f"千張大戶6週累積: {num_6w:+.2f}%&#10;"
                                     f"----------------&#10;"
