@@ -4286,7 +4286,7 @@ if current_page in ["all", "b5"]:
                     st.session_state['df_blk5'] = filtered_400_df
 
     # ================= TAB 5: 雙引擎共振 =================
-    with tab_sync:
+    with tab_resonance:
         if not filtered_1000_df.empty and not filtered_400_df.empty:
             # 1. 篩選兩邊大戶都呈現「增」的標的
             df1_inc = filtered_1000_df[filtered_1000_df['週動態'].astype(str).str.contains('增', na=False)].copy()
