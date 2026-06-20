@@ -4470,7 +4470,7 @@ if current_page in ["all", "b5"]:
                             def format_clean_stock_label(row):
                                 name = str(row.get('股票名稱', ''))
                                 d_str = row.get('千張週增減_格式化', '0.00')
-                                return f"<b>{name}</b><br><span style='font-size: 11px; color: #E5E7EB;'>大戶週增 {d_str}%</span>"
+                                return f"<b>{name}</b><br><span style='font-size: 11px; color: #E5E7EB;'>週增 {d_str}%</span>"
                             tm_b5_df['顯示名稱'] = tm_b5_df.apply(format_clean_stock_label, axis=1)
 
                             # 懸停欄位 (包含 1000與400 的短長線數據)
