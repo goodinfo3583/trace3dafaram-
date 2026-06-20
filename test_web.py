@@ -2608,20 +2608,14 @@ if current_page in ["all", "b1"]:
     st.write("")
     st.info("💡 △是單日的法人持股增減(如果最新基準日未進前200榜，△會直接以歸0計算)；5/20/60/120日ΔChange為5/20/60/120期間的累積變化，我們可以試著短線與長線一起觀察。")
 
-    # ==========================================
+# ==========================================
     # 📊 繪製區塊 ：產業聚落與資金輪動板塊 (Treemap - 動態分頁熱力圖版)
     # ==========================================
     st.write("---")
     
-    # 🚀 修正 1：建立雙欄排版，將搜尋框優雅地放置在右上角
-    c_title, c_search = st.columns([3.5, 1.5])
-    with c_title:
-        st.markdown("### 🧩 資金聚落板塊：三大法人進榜產業分佈")
-        st.caption("透過區塊面積大小，看出法人資金集中攻擊哪些產業。顏色代表「單日法人持股增減(△)」，越紅買超越強。")
-    with c_search:
-        # 新增專屬搜尋框
-        treemap_search = st.text_input("🔍 板塊內標的搜尋", placeholder="輸入代號/名稱以聚焦標的...", key="treemap_search_box")
-    
+    # 🚀 修正排版：標題與說明統一放上方
+    st.markdown("### 🧩 資金聚落板塊：三大法人進榜產業分佈")
+    st.caption("透過區塊面積大小，看出法人資金集中攻擊哪些產業。顏色代表「單日法人持股增減(△)」，越紅買超越強。")
     st.info("💡 △ 是單日的法人持股增減 (如果最新基準日未進前200榜，△會直接以歸0計算)；滑鼠懸停可觀察短長線的持股波段軌跡。")
 
     # 1. 取得主資料表與股票字典
@@ -2629,16 +2623,21 @@ if current_page in ["all", "b1"]:
     
     if not df_b1_master.empty and 'STOCK_DICT' in globals() and STOCK_DICT:
         
-        # 2. 建立選項：前 50 名 or 前 200 名
-        top_n_option = st.radio("設定觀測範圍：", ["📌 顯示前 50 名 (核心攻擊重心)", "🌍 顯示前 200 名 (產業擴散全貌)"], horizontal=True)
-        top_n = 50 if "50" in top_n_option else 200
+        # 🚀 修正排版：觀測範圍選項 與 搜尋框 並列於同一列
+        c_opt, c_search = st.columns([2.5, 1.5])
+        with c_opt:
+            top_n_option = st.radio("設定觀測範圍：", ["📌 顯示前 50 名 (核心攻擊重心)", "🌍 顯示前 200 名 (產業擴散全貌)"], horizontal=True)
+            top_n = 50 if "50" in top_n_option else 200
+            
+        with c_search:
+            # 將搜尋框精準對齊，不再佔用頂部空間
+            treemap_search = st.text_input("🔍 板塊內標的搜尋", placeholder="輸入代號/名稱以聚焦...", label_visibility="visible")
 
         # 3. 建立五個分頁
         tab_5, tab_20, tab_60, tab_120, tab_all = st.tabs(["🔴 5日排行", "🟡 20日排行", "🟢 60日排行", "🔵 120日排行", "🌟 綜合熱力池"])
 
         # 💡 定義專屬的繪圖引擎函數
         def render_period_treemap(period_days):
-            # 判斷資料來源模式
             if period_days == "all":
                 has_tag = df_b1_master['今日上榜'].astype(str).str.strip() != ""
                 period_df = df_b1_master[has_tag].copy()
@@ -2686,7 +2685,7 @@ if current_page in ["all", "b1"]:
                 st.info("⚪ 剔除 ETF/債券 後無一般產業資料。")
                 return
 
-            # 🚀 修正 2：如果右上角有輸入搜尋關鍵字，啟動精準聚焦過濾！
+            # 如果有輸入搜尋關鍵字，啟動精準聚焦過濾！
             if treemap_search:
                 query = treemap_search.strip()
                 period_df = period_df[
@@ -2765,7 +2764,7 @@ if current_page in ["all", "b1"]:
         with tab_all: render_period_treemap("all")
 
         # ==========================================
-        # 🗑️ 🚀 修正 3：進階版 ETF 與債券懸停與變色模塊
+        # 🗑️ 進階版 ETF 與債券懸停與變色模塊 (破圖修復版 + 7日持股)
         # ==========================================
         is_etf = df_b1_master['股票代號'].astype(str).apply(
             lambda sid: STOCK_DICT.get(sid, {}).get("industry", "ETF / 債券 / 其他") in ["ETF / 債券 / 其他", ""]
@@ -2776,9 +2775,14 @@ if current_page in ["all", "b1"]:
         if not excluded_etfs.empty:
             st.write("")
             st.markdown("##### 🗑️ 本次已剔除的非一般產業 (ETF / 債券 / 指數)")
-            st.caption("這些標的雖有強大法人資金進駐上榜，但已從上方產業聚落中剔除。💡 **游標懸停於標籤可查看詳細明細。**")
+            st.caption("這些標的雖有強大法人資金進駐上榜，但已從上方產業聚落中剔除。💡 **游標懸停於標籤可查看詳細 7 日明細。**")
             
             tags_html = ""
+            import html # 引入字串跳脫模組
+            
+            # 動態抓取主資料表中的前 7 天持股欄位
+            date_cols_master = sorted([c for c in df_b1_master.columns if '持股%' in c], reverse=True)[:7]
+            
             for _, r in excluded_etfs.iterrows():
                 name = str(r.get('股票名稱', ''))
                 sid = str(r.get('股票代號', ''))
@@ -2786,34 +2790,47 @@ if current_page in ["all", "b1"]:
                 dyn = str(r.get('最新動態', '-'))
                 delta = r.get('△', 0.0)
                 
+                # 🚀 核心修復：強制把字串中引號轉碼 (跳脫)，保護 HTML 結構不被破壞！
+                safe_name = html.escape(name, quote=True)
+                safe_sid = html.escape(sid, quote=True)
+                safe_tag = html.escape(tag, quote=True)
+                safe_dyn = html.escape(dyn, quote=True)
+                
                 # 計算顏色與數值
                 try: d_val = float(str(delta).replace('+', '').replace('%', ''))
                 except: d_val = 0.0
                     
                 if d_val > 0:
-                    bg_color = "rgba(255, 75, 75, 0.15)"   # 偏紅背景
-                    border_color = "rgba(255, 75, 75, 0.4)" # 紅色邊框
-                    text_color = "#FF4B4B"                  # 紅色文字
+                    bg_color = "rgba(255, 75, 75, 0.15)"   
+                    border_color = "rgba(255, 75, 75, 0.4)" 
+                    text_color = "#FF4B4B"                  
                     d_str = f"+{d_val:.2f}"
                 elif d_val < 0:
-                    bg_color = "rgba(0, 230, 118, 0.15)"   # 偏綠背景
-                    border_color = "rgba(0, 230, 118, 0.4)" # 綠色邊框
-                    text_color = "#00E676"                  # 綠色文字
+                    bg_color = "rgba(0, 230, 118, 0.15)"   
+                    border_color = "rgba(0, 230, 118, 0.4)" 
+                    text_color = "#00E676"                  
                     d_str = f"{d_val:.2f}"
                 else:
-                    bg_color = "rgba(30, 41, 59, 0.6)"     # 預設灰底
+                    bg_color = "rgba(30, 41, 59, 0.6)"     
                     border_color = "#334155"
                     text_color = "#94A3B8"
                     d_str = "0.00"
                     
-                # 組合懸停文字 (使用原生 title，透過 &#10; 換行)
+                # 🚀 核心修復 2：組合懸停文字，並加入 7 日歷史持股比
                 tooltip_text = (
-                    f"【{name}】&#10;"
-                    f"股票代號: {sid}&#10;"
-                    f"今日上榜: {tag}&#10;"
-                    f"最新動態: {dyn}&#10;"
-                    f"單日△: {d_str}"
+                    f"【{safe_name}】&#10;"
+                    f"股票代號: {safe_sid}&#10;"
+                    f"今日上榜: {safe_tag}&#10;"
+                    f"最新動態: {safe_dyn}&#10;"
+                    f"單日△: {d_str}&#10;"
+                    f"----------------&#10;"
                 )
+                
+                # 依序寫入歷史日期
+                for col in date_cols_master:
+                    clean_date = col.replace("持股%", "") 
+                    val = r.get(col, "0.00")
+                    tooltip_text += f"{clean_date} 持股比: {val}%&#10;"
                 
                 tags_html += f"""
                 <div title="{tooltip_text}" style='
@@ -2829,7 +2846,7 @@ if current_page in ["all", "b1"]:
                     box-shadow: 0 2px 8px rgba(0,0,0,0.15);
                     cursor: help;
                     transition: transform 0.2s;'>
-                    {name} ({sid}) 
+                    {safe_name} ({safe_sid}) 
                     <span style='color: {text_color}; font-weight: bold; margin-left: 8px;'>△ {d_str}</span>
                 </div>
                 """
