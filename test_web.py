@@ -2624,27 +2624,60 @@ if current_page in ["all", "b1"]:
     if not df_b1_master.empty and 'STOCK_DICT' in globals() and STOCK_DICT:
         
         # 2. 建立選項：前 50 名 or 前 200 名
-        top_n_option = st.radio("設定觀測範圍：", ["顯示前 50 名 (核心攻擊重心)", "顯示前 200 名 (產業擴散全貌)"], horizontal=True)
+        top_n_option = st.radio("設定觀測範圍：", ["📌 顯示前 50 名 (核心攻擊重心)", "🌍 顯示前 200 名 (產業擴散全貌)"], horizontal=True)
         top_n = 50 if "50" in top_n_option else 200
 
-        # 3. 建立四個分頁
-        tab_5, tab_20, tab_60, tab_120 = st.tabs(["🔴 5日排行", "🟡 20日排行", "🟢 60日排行", "🔵 120日排行"])
+        # 3. 🚀 新增第5個分頁「🌟 綜合熱力池」
+        tab_5, tab_20, tab_60, tab_120, tab_all = st.tabs(["🔴 5日排行", "🟡 20日排行", "🟢 60日排行", "🔵 120日排行", "🌟 綜合熱力池"])
 
-        # 💡 定義專屬的繪圖引擎函數，避免重複寫四次代碼
+        # 💡 定義專屬的繪圖引擎函數，相容一般排行與綜合熱力池
         def render_period_treemap(period_days):
-            # 動態生成對應的排名欄位名稱 (例如：'5日排名')
-            rank_col = f"{period_days}日排名"
-            
-            if rank_col not in df_b1_master.columns:
-                st.info(f"⚪ 尚無 {period_days} 日排行資料。")
-                return
+            # 判斷資料來源模式
+            if period_days == "all":
+                # 【模式 A】綜合熱力池：只要有出現在任何週期的榜單上 (今日上榜不為空)
+                has_tag = df_b1_master['今日上榜'].astype(str).str.strip() != ""
+                period_df = df_b1_master[has_tag].copy()
+                
+                if period_df.empty:
+                    st.info("⚪ 今日尚無任何標的上榜。")
+                    return
+                
+                # 計算熱力數值 (單日△)
+                period_df['熱力數值'] = pd.to_numeric(
+                    period_df['△'].astype(str).str.replace('+', '').str.replace('%', ''), 
+                    errors='coerce'
+                ).fillna(0.0)
+                
+                # 依據單日△取前 50 或 200 名 (最強的攻擊力道)
+                period_df = period_df.nlargest(top_n, '熱力數值').copy()
+                
+                # 為綜合池建立一個虛擬的「△強度排行」
+                period_df['綜合△排名'] = period_df['熱力數值'].rank(ascending=False, method='min')
+                rank_col = '綜合△排名'
+                title_name = "🌟 綜合上榜熱力池"
+                
+            else:
+                # 【模式 B】標準 5/20/60/120 日排行
+                rank_col = f"{period_days}日排名"
+                
+                if rank_col not in df_b1_master.columns:
+                    st.info(f"⚪ 尚無 {period_days} 日排行資料。")
+                    return
 
-            # 篩選出該週期的前 N 名 (確保排名大於0且沒有空值)
-            period_df = df_b1_master[df_b1_master[rank_col] > 0].nsmallest(top_n, rank_col).copy()
+                # 篩選出該週期的前 N 名
+                period_df = df_b1_master[df_b1_master[rank_col] > 0].nsmallest(top_n, rank_col).copy()
 
-            if period_df.empty:
-                st.info(f"⚪ {period_days} 日排行無符合資料。")
-                return
+                if period_df.empty:
+                    st.info(f"⚪ {period_days} 日排行無符合資料。")
+                    return
+                
+                # 計算熱力數值 (供上色用)
+                period_df['熱力數值'] = pd.to_numeric(
+                    period_df['△'].astype(str).str.replace('+', '').str.replace('%', ''), 
+                    errors='coerce'
+                ).fillna(0.0)
+                
+                title_name = f"🏆 {period_days}日資金聚落"
 
             # 配對產業別 (剔除 ETF / 債券)
             period_df['產業別'] = period_df['股票代號'].astype(str).apply(
@@ -2657,38 +2690,31 @@ if current_page in ["all", "b1"]:
                 st.info("⚪ 剔除 ETF/債券 後無一般產業資料。")
                 return
 
-            # 面積權重固定為 1，代表每一檔股票面積一樣，整體面積直接反映該產業「進榜的檔數」
+            # 面積權重固定為 1
             period_df['計數'] = 1 
-
-            # 將「單日△」轉為純數字，供連續熱力色階使用
-            period_df['熱力數值'] = pd.to_numeric(
-                period_df['△'].astype(str).str.replace('+', '').str.replace('%', ''), 
-                errors='coerce'
-            ).fillna(0.0)
 
             # 強制把所有數字格式化為「小數點後兩位」的字串
             period_df['單日△_格式化'] = period_df['熱力數值'].apply(lambda x: f"+{x:.2f}" if x > 0 else f"{x:.2f}")
 
-            # 🚀 修正點 1：格式化顯示在板塊上的字樣 (名稱 + 單日△ + 排名)
+            # 格式化顯示在板塊上的字樣 (名稱 + 單日△ + 排名)
             def format_block_label(row):
                 name = str(row.get('股票名稱', ''))
                 delta_str = row.get('單日△_格式化', '0.00')
                 
-                # 抓取並清洗排名數值 (確保顯示為乾淨的整數，例如 2 而不是 2.0)
                 rank_val = row.get(rank_col, '-')
                 try:
                     rank_str = str(int(float(rank_val)))
                 except:
                     rank_str = str(rank_val)
-                    
-                return f"<b>{name}</b><br><span style='font-size: 11px; color: #E5E7EB;'>△ {delta_str}<br>{rank_str}名</span>"
+                
+                rank_display = f"△排行: {rank_str}" if period_days == "all" else f"排名: {rank_str}"
+                return f"<b>{name}</b><br><span style='font-size: 11px; color: #E5E7EB;'>△ {delta_str}<br>{rank_display}</span>"
             
             period_df['顯示名稱'] = period_df.apply(format_block_label, axis=1)
 
-            # 動態抓取前 7 天的持股欄位 (例如: '0618持股%', '0617持股%')
+            # 動態抓取前 7 天的持股欄位
             date_cols = sorted([c for c in period_df.columns if '持股%' in c], reverse=True)[:7]
             
-            # 🚀 修正點 2：把排名欄位 (rank_col) 也加入到懸停資料清單中
             hover_columns = ['股票代號', '今日上榜', '最新動態', '單日△_格式化', rank_col] + date_cols
 
             # 定義紅綠漸層色階 (發散型色階)
@@ -2701,30 +2727,30 @@ if current_page in ["all", "b1"]:
             import plotly.express as px
             fig = px.treemap(
                 period_df,
-                path=[px.Constant(f"🏆 {period_days}日資金聚落"), '產業別', '顯示名稱'],
+                path=[px.Constant(title_name), '產業別', '顯示名稱'],
                 values='計數',                      
-                color='熱力數值',                   # 依照單日增減上色
+                color='熱力數值',                   
                 color_continuous_scale=custom_continuous_scale, 
-                color_continuous_midpoint=0,        # 強制將 0 點對齊灰色
+                color_continuous_midpoint=0,        
                 hover_data=hover_columns
             )
             
-            # 隱藏側邊那條色階長條圖
+            # 隱藏側邊色階長條圖
             fig.update_coloraxes(showscale=False)
 
             # 🛠️ 動態組合 Hover Template
+            rank_hover_label = "綜合△排行" if period_days == "all" else f"{period_days}日排行"
             hover_template = (
                 '<b>%{label}</b><br>'
                 '股票代號: %{customdata[0]}<br>'
                 '今日上榜: %{customdata[1]}<br>'
                 '最新動態: %{customdata[2]}<br>'
                 '單日△: <b>%{customdata[3]}</b><br>'
-                f'{period_days}日排行: <b>第 %{{customdata[4]}} 名</b><br>' # 🚀 修正點 3：在提示框中加入排名
+                f'{rank_hover_label}: <b>第 %{{customdata[4]}} 名</b><br>' 
                 '----------------<br>'
             )
-            # 依序把歷史日期加進去提示框 (注意 customdata 的 index 往後推了一位變成 5+i)
             for i, col in enumerate(date_cols):
-                clean_date = col.replace("持股%", "") # 只顯示如 0618
+                clean_date = col.replace("持股%", "") 
                 hover_template += f'{clean_date} 持股比: %{{customdata[{5+i}]}}%<br>'
             hover_template += '<extra></extra>'
 
@@ -2733,8 +2759,8 @@ if current_page in ["all", "b1"]:
                 textinfo="label", 
                 textfont=dict(color="white", size=14),
                 marker=dict(
-                    line=dict(color='#0B0F19', width=2), # 便條紙之間的深色粗邊框
-                    pad=dict(t=35, l=10, r=10, b=10)     # 標題與股票名稱間距
+                    line=dict(color='#0B0F19', width=2), 
+                    pad=dict(t=35, l=10, r=10, b=10)     
                 ),
                 hovertemplate=hover_template
             )
@@ -2749,11 +2775,36 @@ if current_page in ["all", "b1"]:
             
             st.plotly_chart(fig, use_container_width=True)
 
-        # 4. 在四個分頁中分別呼叫繪圖引擎
+        # 4. 在五個分頁中分別呼叫繪圖引擎
         with tab_5: render_period_treemap(5)
         with tab_20: render_period_treemap(20)
         with tab_60: render_period_treemap(60)
         with tab_120: render_period_treemap(120)
+        with tab_all: render_period_treemap("all")
+
+        # ==========================================
+        # 🗑️ 專屬模塊：顯示被剔除的 ETF 與債券清單
+        # ==========================================
+        # 找出「有進榜」且產業屬性為「ETF / 債券 / 其他」的標的
+        is_etf = df_b1_master['股票代號'].astype(str).apply(
+            lambda sid: STOCK_DICT.get(sid, {}).get("industry", "ETF / 債券 / 其他") in ["ETF / 債券 / 其他", ""]
+        )
+        on_list = df_b1_master['今日上榜'].astype(str).str.strip() != ""
+        excluded_etfs = df_b1_master[is_etf & on_list].sort_values(by='股票代號')
+        
+        if not excluded_etfs.empty:
+            st.write("")
+            st.markdown("##### 🗑️ 本次已剔除的非一般產業 (ETF / 債券 / 指數)")
+            st.caption("這些標的雖有強大法人資金進駐上榜，但因非實質產業公司，已從上方的產業聚落分析中剔除。")
+            
+            tags_html = ""
+            for _, r in excluded_etfs.iterrows():
+                tag_name = f"{r['股票名稱']} ({r['股票代號']})"
+                # 使用圓角透明科技膠囊(Pill Tag)的設計
+                tags_html += f"<span style='background-color: rgba(30, 41, 59, 0.6); color: #94A3B8; border: 1px solid #334155; padding: 4px 10px; border-radius: 12px; margin: 4px; display: inline-block; font-size: 13px; box-shadow: 0 2px 5px rgba(0,0,0,0.2);'>{tag_name}</span>"
+            
+            # 使用 div 容器把標籤包裹起來
+            st.markdown(f"<div style='margin-top: 5px; line-height: 1.8;'>{tags_html}</div>", unsafe_allow_html=True)
 
     else:
         st.info("⚪ 尚無全市場大數據或找不到產業字典，請確認背景掃描引擎已啟動。")
