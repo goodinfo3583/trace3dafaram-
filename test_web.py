@@ -4962,7 +4962,7 @@ if current_page in ["all", "pool"]:
                     # 1. 顯示原本的 DataFrame 總表
                     st.dataframe(res_df, use_container_width=True, hide_index=True, column_config={"▼明細": st.column_config.TextColumn("▼明細", help="滑鼠游標停留在這裡查看", width="small", max_chars=4)})
                     
-# ==========================================
+                    # ==========================================
                     # 📊 區塊擴充：觀察名單專屬產業聚落板塊 (Treemap)
                     # ==========================================
                     st.write("---")
@@ -4976,7 +4976,7 @@ if current_page in ["all", "pool"]:
                         c_opt, c_search = st.columns([3, 1.5])
                         with c_opt:
                             pool_filter = st.radio("設定觀測範圍與排序：", 
-                                ["📌 全部顯示 (預設)", "🏆 顯示總分前100名", "📉 顯示 ▼變量 前100名", "🔥 顯示 △ 前100名"], 
+                                ["全部顯示 (預設)", "顯示總分前100名", "顯示 ▼變量 前100名", "顯示 △ 前100名"], 
                                 horizontal=True, key="pool_treemap_filter"
                             )
                         with c_search:
