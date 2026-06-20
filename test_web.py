@@ -2608,12 +2608,11 @@ if current_page in ["all", "b1"]:
     st.write("")
     st.info("💡 △是單日的法人持股增減(如果最新基準日未進前200榜，△會直接以歸0計算)；5/20/60/120日ΔChange為5/20/60/120期間的累積變化，我們可以試著短線與長線一起觀察。")
 
-# ==========================================
+    # ==========================================
     # 📊 繪製區塊 ：產業聚落與資金輪動板塊 (Treemap - 動態分頁熱力圖版)
     # ==========================================
     st.write("---")
     
-    # 🚀 修正排版：標題與說明統一放上方
     st.markdown("### 🧩 資金聚落板塊：三大法人進榜產業分佈")
     st.caption("透過區塊面積大小，看出法人資金集中攻擊哪些產業。顏色代表「單日法人持股增減(△)」，越紅買超越強。")
     st.info("💡 △ 是單日的法人持股增減 (如果最新基準日未進前200榜，△會直接以歸0計算)；滑鼠懸停可觀察短長線的持股波段軌跡。")
@@ -2623,14 +2622,14 @@ if current_page in ["all", "b1"]:
     
     if not df_b1_master.empty and 'STOCK_DICT' in globals() and STOCK_DICT:
         
-        # 🚀 修正排版：觀測範圍選項 與 搜尋框 並列於同一列
+        # 🚀 修正 2：搜尋框與觀測範圍往下放，排在標題與表格之間 (雙欄並排更美觀)
+        st.write("") # 增加一點呼吸空間
         c_opt, c_search = st.columns([2.5, 1.5])
         with c_opt:
             top_n_option = st.radio("設定觀測範圍：", ["📌 顯示前 50 名 (核心攻擊重心)", "🌍 顯示前 200 名 (產業擴散全貌)"], horizontal=True)
             top_n = 50 if "50" in top_n_option else 200
             
         with c_search:
-            # 將搜尋框精準對齊，不再佔用頂部空間
             treemap_search = st.text_input("🔍 板塊內標的搜尋", placeholder="輸入代號/名稱以聚焦...", label_visibility="visible")
 
         # 3. 建立五個分頁
@@ -2764,7 +2763,7 @@ if current_page in ["all", "b1"]:
         with tab_all: render_period_treemap("all")
 
         # ==========================================
-        # 🗑️ 進階版 ETF 與債券懸停與變色模塊 (破圖修復版 + 7日持股)
+        # 🗑️ 進階版 ETF 與債券懸停與變色模塊 (單行 HTML 防破圖版)
         # ==========================================
         is_etf = df_b1_master['股票代號'].astype(str).apply(
             lambda sid: STOCK_DICT.get(sid, {}).get("industry", "ETF / 債券 / 其他") in ["ETF / 債券 / 其他", ""]
@@ -2780,7 +2779,6 @@ if current_page in ["all", "b1"]:
             tags_html = ""
             import html # 引入字串跳脫模組
             
-            # 動態抓取主資料表中的前 7 天持股欄位
             date_cols_master = sorted([c for c in df_b1_master.columns if '持股%' in c], reverse=True)[:7]
             
             for _, r in excluded_etfs.iterrows():
@@ -2790,13 +2788,11 @@ if current_page in ["all", "b1"]:
                 dyn = str(r.get('最新動態', '-'))
                 delta = r.get('△', 0.0)
                 
-                # 🚀 核心修復：強制把字串中引號轉碼 (跳脫)，保護 HTML 結構不被破壞！
                 safe_name = html.escape(name, quote=True)
                 safe_sid = html.escape(sid, quote=True)
                 safe_tag = html.escape(tag, quote=True)
                 safe_dyn = html.escape(dyn, quote=True)
                 
-                # 計算顏色與數值
                 try: d_val = float(str(delta).replace('+', '').replace('%', ''))
                 except: d_val = 0.0
                     
@@ -2816,7 +2812,6 @@ if current_page in ["all", "b1"]:
                     text_color = "#94A3B8"
                     d_str = "0.00"
                     
-                # 🚀 核心修復 2：組合懸停文字，並加入 7 日歷史持股比
                 tooltip_text = (
                     f"【{safe_name}】&#10;"
                     f"股票代號: {safe_sid}&#10;"
@@ -2826,30 +2821,13 @@ if current_page in ["all", "b1"]:
                     f"----------------&#10;"
                 )
                 
-                # 依序寫入歷史日期
                 for col in date_cols_master:
                     clean_date = col.replace("持股%", "") 
                     val = r.get(col, "0.00")
                     tooltip_text += f"{clean_date} 持股比: {val}%&#10;"
                 
-                tags_html += f"""
-                <div title="{tooltip_text}" style='
-                    background-color: {bg_color}; 
-                    color: #E2E8F0; 
-                    border: 1px solid {border_color}; 
-                    padding: 6px 14px; 
-                    border-radius: 20px; 
-                    margin: 5px; 
-                    display: inline-flex; 
-                    align-items: center;
-                    font-size: 13px; 
-                    box-shadow: 0 2px 8px rgba(0,0,0,0.15);
-                    cursor: help;
-                    transition: transform 0.2s;'>
-                    {safe_name} ({safe_sid}) 
-                    <span style='color: {text_color}; font-weight: bold; margin-left: 8px;'>△ {d_str}</span>
-                </div>
-                """
+                # 🚀 核心修復：強制把 HTML 寫在「單行」內，不留任何換行與縮排，避免觸發 Markdown 程式碼區塊地雷！
+                tags_html += f"<div title=\"{tooltip_text}\" style=\"background-color: {bg_color}; color: #E2E8F0; border: 1px solid {border_color}; padding: 6px 14px; border-radius: 20px; margin: 5px; display: inline-flex; align-items: center; font-size: 13px; box-shadow: 0 2px 8px rgba(0,0,0,0.15); cursor: help; transition: transform 0.2s;\">{safe_name} ({safe_sid}) <span style='color: {text_color}; font-weight: bold; margin-left: 8px;'>△ {d_str}</span></div>"
             
             st.markdown(f"<div style='margin-top: 5px; line-height: 2.4;'>{tags_html}</div>", unsafe_allow_html=True)
 
