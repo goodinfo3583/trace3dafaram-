@@ -4443,7 +4443,7 @@ if current_page in ["all", "b5"]:
                         with c_opt:
                             b5_filter = st.radio(
                                 "設定排序依據：", 
-                                ["📌 全部顯示 (預設)", "📈 依 6周增減(一千) 排序", f"🔥 依 {target_color_col} 排序"], 
+                                ["全部顯示 (預設)", "依 6周增減(一千) 排序", f"依 {target_color_col} 排序"], 
                                 horizontal=True, 
                                 key="b5_treemap_filter"
                             )
