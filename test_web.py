@@ -4362,105 +4362,65 @@ if current_page in ["all", "b5"]:
     # ==================== Tab 6: 🔹 長短線共振 ====================
     with tab_long_short:
         st.markdown("#### ⚡ 長短線大戶籌碼雙向共振榜")
-        st.caption("💡 核心邏輯：1000張大戶波段吸籌（6周增減 > 0）且本週加碼（最新週 > 0），同時聯手 400張短線大戶本週同步加碼（最新週 > 0）的強勢共振標的。後方自動比對 600張 與 800張 大戶數據。")
+        st.caption("💡 核心邏輯：極致嚴苛！1000張大戶波段吸籌（6周增減 > 0）且本週加碼（最新週 > 0），同時聯手 400張短線大戶波段與本週皆同步加碼（雙雙 > 0）的強勢共振標的。")
         
-        # 1. 確保動態讀取四個核心大戶的最新資料
-        df_1000_raw, _ = get_latest_csv("1000張大戶")
-        df_800_raw, _ = get_latest_csv("800張大戶")
-        df_600_raw, _ = get_latest_csv("600張大戶")
-        df_400_raw, _ = get_latest_csv("400張大戶")
-        
-        if df_1000_raw is not None and not df_1000_raw.empty:
-            df_1000 = df_1000_raw.copy()
+        # 直接使用前方已計算好的 DataFrame (無需再讀取 CSV)
+        if not filtered_1000_df.empty and not filtered_400_df.empty:
+            df_1k = filtered_1000_df.copy()
+            df_400 = filtered_400_df.copy()
             
-            # 2. 自動識別動態日期直行 (例如找尋包含了 '▼' 且不是 '6周' 的最新週直行)
-            col_6w_1000 = next((c for c in df_1000.columns if '6周' in c), None)
-            latest_week_col = next((c for c in df_1000.columns if '▼' in c and '6周' not in c), None)
+            # 1. 動態尋找「最新一週」的欄位名稱 (找尋包含 '▼' 且不是 '▼6周' 的直行，例如 '▼0618')
+            latest_col_1k = next((c for c in df_1k.columns if c.startswith('▼') and '6周' not in c), None)
+            latest_col_400 = next((c for c in df_400.columns if c.startswith('▼') and '6周' not in c), None)
             
-            if col_6w_1000 and latest_week_col:
-                # 數值轉換以利篩選
-                df_1000['num_6w_1000'] = pd.to_numeric(df_1000[col_6w_1000].astype(str).str.replace('+', '').str.replace('%', ''), errors='coerce').fillna(0)
-                df_1000['num_latest_1000'] = pd.to_numeric(df_1000[latest_week_col].astype(str).str.replace('+', '').str.replace('%', ''), errors='coerce').fillna(0)
+            if latest_col_1k and latest_col_400 and '▼6周增減' in df_1k.columns and '▼6周增減' in df_400.columns:
                 
-                # 執行 1000張大戶 基礎條件篩選：▼6周增減 > 0 且 最新一周持股 > 0
-                base_df = df_1000[(df_1000['num_6w_1000'] > 0) & (df_1000['num_latest_1000'] > 0)].copy()
+                # 2. 執行 1000 張大戶過濾：▼6周增減 > 0 且 最新週 > 0
+                cond_1k = (pd.to_numeric(df_1k['▼6周增減'], errors='coerce').fillna(0) > 0) & \
+                          (pd.to_numeric(df_1k[latest_col_1k], errors='coerce').fillna(0) > 0)
                 
-                if not base_df.empty:
-                    # 建立基準榜單表格，並重新命名清楚
-                    display_df = base_df[['代號', '股票名稱', col_6w_1000, latest_week_col]].copy() if '股票名稱' in base_df.columns else base_df[['代號', '名稱', col_6w_1000, latest_week_col]].copy()
-                    name_col = '股票名稱' if '股票名稱' in display_df.columns else '名稱'
-                    
-                    display_df = display_df.rename(columns={
-                        col_6w_1000: "6周增減(一千)",
-                        latest_week_col: f"{latest_week_col}(一千)"
-                    })
-                    
-                    # 3. 交叉比對與串接 400張大戶 數據
-                    if df_400_raw is not None and not df_400_raw.empty:
-                        df_400 = df_400_raw.copy()
-                        col_6w_400 = next((c for c in df_400.columns if '6周' in c), None)
-                        latest_col_400 = next((c for c in df_400.columns if '▼' in c and '6周' not in c), None)
-                        if col_6w_400 and latest_col_400:
-                            sub_400 = df_400[['代號', col_6w_400, latest_col_400]].copy()
-                            sub_400 = sub_400.rename(columns={
-                                col_6w_400: "6周增減(四百)",
-                                latest_col_400: f"{latest_week_col}(四百)"
-                            })
-                            display_df = pd.merge(display_df, sub_400, on='代號', how='left')
-                    
-                    # 4. 交叉比對與串接 600張大戶 數據
-                    if df_600_raw is not None and not df_600_raw.empty:
-                        df_600 = df_600_raw.copy()
-                        col_6w_600 = next((c for c in df_600.columns if '6周' in c), None)
-                        latest_col_600 = next((c for c in df_600.columns if '▼' in c and '6周' not in c), None)
-                        if col_6w_600 and latest_col_600:
-                            sub_600 = df_600[['代號', col_6w_600, latest_col_600]].copy()
-                            sub_600 = sub_600.rename(columns={
-                                col_6w_600: "6周增減(六百)",
-                                latest_col_600: f"{latest_week_col}(六百)"
-                            })
-                            display_df = pd.merge(display_df, sub_600, on='代號', how='left')
+                base_df = df_1k[cond_1k][['股票代號', '股票名稱', '▼6周增減', latest_col_1k]].copy()
+                base_df = base_df.rename(columns={'▼6周增減': '6周增減(一千)', latest_col_1k: f"{latest_col_1k}(一千)"})
+                
+                # 3. 執行 400 張中實戶過濾：▼6周增減 > 0 且 最新週 > 0
+                cond_400 = (pd.to_numeric(df_400['▼6周增減'], errors='coerce').fillna(0) > 0) & \
+                           (pd.to_numeric(df_400[latest_col_400], errors='coerce').fillna(0) > 0)
+                
+                df_400_filtered = df_400[cond_400][['股票代號', '▼6周增減', latest_col_400]].copy()
+                df_400_filtered = df_400_filtered.rename(columns={'▼6周增減': '6周增減(四百)', latest_col_400: f"{latest_col_400}(四百)"})
+                
+                # 4. 🚀 核心靈魂：Inner Join 交集 (只保留兩邊都過關的資優生)
+                resonance_df = pd.merge(base_df, df_400_filtered, on='股票代號', how='inner')
+                
+                if not resonance_df.empty:
+                    # 5. 順手把 600 張與 800 張的數據拉進來當作觀察輔助 (用 Left Join，不強制大於0)
+                    if not filtered_600_df.empty:
+                        df_600 = filtered_600_df.copy()
+                        latest_col_600 = next((c for c in df_600.columns if c.startswith('▼') and '6周' not in c), None)
+                        if latest_col_600 and '▼6周增減' in df_600.columns:
+                            sub_600 = df_600[['股票代號', '▼6周增減', latest_col_600]].copy()
+                            sub_600 = sub_600.rename(columns={'▼6周增減': '6周增減(六百)', latest_col_600: f"{latest_col_600}(六百)"})
+                            resonance_df = pd.merge(resonance_df, sub_600, on='股票代號', how='left')
                             
-                    # 5. 交叉比對與串接 800張大戶 數據
-                    if df_800_raw is not None and not df_800_raw.empty:
-                        df_800 = df_800_raw.copy()
-                        col_6w_800 = next((c for c in df_800.columns if '6周' in c), None)
-                        latest_col_800 = next((c for c in df_800.columns if '▼' in c and '6周' not in c), None)
-                        if col_6w_800 and latest_col_800:
-                            sub_800 = df_800[['代號', col_6w_800, latest_col_800]].copy()
-                            sub_800 = sub_800.rename(columns={
-                                col_6w_800: "6周增減(八百)",
-                                latest_col_800: f"{latest_week_col}(八百)"
-                            })
-                            display_df = pd.merge(display_df, sub_800, on='代號', how='left')
+                    if not filtered_800_df.empty:
+                        df_800 = filtered_800_df.copy()
+                        latest_col_800 = next((c for c in df_800.columns if c.startswith('▼') and '6周' not in c), None)
+                        if latest_col_800 and '▼6周增減' in df_800.columns:
+                            sub_800 = df_800[['股票代號', '▼6周增減', latest_col_800]].copy()
+                            sub_800 = sub_800.rename(columns={'▼6周增減': '6周增減(八百)', latest_col_800: f"{latest_col_800}(八百)"})
+                            resonance_df = pd.merge(resonance_df, sub_800, on='股票代號', how='left')
 
-                    # 6. 嚴格過濾共振邏輯：400張大戶的最新一週持股數據變化也必須 > 0
-                    col_latest_400_name = f"{latest_week_col}(四百)"
-                    if col_latest_400_name in display_df.columns:
-                        # 轉為數值，若不存在(比對不到)則填入 -999 以利過濾
-                        num_latest_400 = pd.to_numeric(display_df[col_latest_400_name].astype(str).str.replace('+', '').str.replace('%', ''), errors='coerce').fillna(-999)
-                        display_df = display_df[num_latest_400 > 0].copy()
+                    # 把沒有資料的欄位優雅地補上 None
+                    resonance_df = resonance_df.fillna('None')
                     
-                    # 7. 對於沒比對到的剩餘欄位欄位（如 600張或 800張 未進榜個股）一律填入 'None'
-                    display_df = display_df.fillna('None')
-                    
-                    # 8. 最終輸出渲染表格
-                    if not display_df.empty:
-                        # 將代號與名稱固定在最前面，其餘欄位按級別整齊排列
-                        ordered_cols = ['代號', name_col, '6周增減(一千)', f"{latest_week_col}(一千)", '6周增減(四百)', f"{latest_week_col}(四百)"]
-                        for extra_col in ["6周增減(六百)", f"{latest_week_col}(六百)", "6周增減(八百)", f"{latest_week_col}(八百)"]:
-                            if extra_col in display_df.columns:
-                                ordered_cols.append(extra_col)
-                        
-                        st.dataframe(display_df[ordered_cols], use_container_width=True, hide_index=True)
-                    else:
-                        st.info("⚪ 雖符合 1000張大戶條件，但目前沒有任何一檔個股的 400張短線主力本週亦同步加碼（最新週 > 0）。")
+                    st.success(f"🔥 極度嚴苛過濾！找到了 **{len(resonance_df)}** 檔 1000張與400張「長線(6周)與短線(最新週)」同步雙向做多的超級共振標的！")
+                    st.dataframe(resonance_df, use_container_width=True, hide_index=True)
                 else:
-                    st.info("⚪ 目前 1000張大戶 中沒有符合「▼6周增減 > 0 且 最新週加碼 > 0」的基礎長線股票。")
+                    st.info("⚪ 條件極為嚴苛，本週完全沒有 1000張與400張「長短線皆同步雙增」的標的。")
             else:
-                st.error("⚠️ 讀取的 1000張大戶 CSV 資料表中缺少必要的 6周增減 或 歷史週變動 直行。")
+                st.error("⚠️ 資料表欄位解析失敗，請確認前方大戶表中包含 '▼6周增減' 與最新日期 (如 '▼0618') 欄位。")
         else:
-            st.info("🕒 目前系統內尚未成功讀取到 1000張大戶 歷史資料檔案，請確認對應 CSV 資料是否存在。")
+            st.warning("⚠️ 請確認前方 1000張 與 400張 大戶分頁有成功載入並產生資料，才能啟動共振掃描。")
             
 # ==========================================
 # 💸 區塊 6：盤後鉅額交易總表 (原生 Dataframe 升級版 + 交易別顯示)
