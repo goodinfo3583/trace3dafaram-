@@ -4362,7 +4362,7 @@ if current_page in ["all", "b5"]:
     # ==================== Tab 6: 🔹 長短線共振 ====================
     with tab_long_short:
         st.markdown("#### ⚡ 長短線大戶籌碼雙向共振榜")
-        st.caption("💡 核心邏輯：極致嚴苛！1000張大戶波段吸籌（6周增減 > 0）且本週加碼（最新週 > 0），同時聯手 400張短線大戶波段與本週皆同步加碼（雙雙 > 0）的強勢共振標的。")
+        st.caption("💡 核心邏輯：1000張大戶波段吸籌（6周增減 > 0）且本週加碼（最新週 > 0），同時聯手 400張短線大戶波段與本週皆同步加碼（雙雙 > 0）的強勢共振標的。")
         
         # 直接使用前方已計算好的 DataFrame (無需再讀取 CSV)
         if not filtered_1000_df.empty and not filtered_400_df.empty:
@@ -4421,6 +4421,184 @@ if current_page in ["all", "b5"]:
                     
                     st.success(f"🔥 極度嚴苛過濾！找到了 **{len(resonance_df)}** 檔 1000張與400張「長線(6周)與短線(最新週)」同步雙向做多的超級共振標的！")
                     st.dataframe(resonance_df, use_container_width=True, hide_index=True)
+
+                    # ... (上方保留你原本的 df_1k 和 df_400 交集過濾邏輯) ...
+
+                    # 🧹 終極去重機制：避免金融股/特別股因代號重複，在 Merge 時引發的交錯相乘繁殖
+                    if '股票名稱' in resonance_df.columns:
+                        resonance_df = resonance_df.drop_duplicates(subset=['股票代號', '股票名稱'], keep='first')
+                    else:
+                        resonance_df = resonance_df.drop_duplicates(subset=['股票代號'], keep='first')
+                    
+                    st.success(f"🔥 極度嚴苛過濾！找到了 **{len(resonance_df)}** 檔 1000張與400張「長線(6周)與短線(最新週)」同步雙向做多的超級共振標的！")
+                    st.dataframe(resonance_df, use_container_width=True, hide_index=True)
+                    
+                    # ==========================================
+                    # 🧩 區塊擴充：長短線大戶雙向共振榜 - 產業資金聚落 (Treemap)
+                    # ==========================================
+                    st.write("---")
+                    st.markdown("### 🧩 大股東共振資金聚落板塊")
+                    st.caption("將上述極度嚴格過濾出的「共振名單」轉換為產業面積，一眼看出超級大戶與中實戶雙雙同步做多的核心產業 (已排除 ETF/債券)。板塊顏色與數值為 **1000張大戶的最新一週增減百分比**。")
+                    
+                    if 'STOCK_DICT' in globals() and STOCK_DICT:
+                        
+                        # 複製一份繪圖用 DataFrame
+                        tm_b5_df = resonance_df.copy()
+                        
+                        # 配對產業別 (剔除 ETF / 債券)
+                        tm_b5_df['產業別'] = tm_b5_df['股票代號'].astype(str).apply(
+                            lambda sid: STOCK_DICT.get(sid, {}).get("industry", "ETF / 債券 / 其他")
+                        )
+                        tm_b5_df['產業別'] = tm_b5_df['產業別'].replace('', 'ETF / 債券 / 其他')
+                        
+                        # 擷取即將被剔除的 ETF / 債券清單
+                        b5_excluded_etfs = tm_b5_df[tm_b5_df['產業別'] == 'ETF / 債券 / 其他'].sort_values(by='股票代號').copy()
+                        
+                        # 剔除 ETF，保留一般產業畫圖
+                        tm_b5_df = tm_b5_df[tm_b5_df['產業別'] != 'ETF / 債券 / 其他']
+                        
+                        if not tm_b5_df.empty:
+                            # 面積權重固定為 1
+                            tm_b5_df['計數'] = 1 
+                            today_counts = tm_b5_df['產業別'].value_counts().to_dict()
+
+                            def format_industry_label(industry):
+                                t_count = today_counts.get(industry, 0)
+                                return f"<b>{industry}</b><br><span style='font-size: 13px;'>{t_count}檔</span>"
+                            tm_b5_df['產業別'] = tm_b5_df['產業別'].apply(format_industry_label)
+
+                            # 💡 將「最新一週 1000張增減」轉為純數字，作為熱力色階來源
+                            # 注意：你上面動態抓取的欄位名稱變數為 latest_col_1k，合併後變為 f"{latest_col_1k}(一千)"
+                            target_color_col = f"{latest_col_1k}(一千)"
+                            tm_b5_df['熱力數值'] = pd.to_numeric(
+                                tm_b5_df[target_color_col].astype(str).str.replace('+', '', regex=False).str.replace('%', '', regex=False), 
+                                errors='coerce'
+                            ).fillna(0.0)
+
+                            # 格式化為 "+0.28"
+                            tm_b5_df['千張週增減_格式化'] = tm_b5_df['熱力數值'].apply(lambda x: f"+{x:.2f}" if x > 0 else f"{x:.2f}")
+
+                            def format_clean_stock_label(row):
+                                name = str(row.get('股票名稱', ''))
+                                d_str = row.get('千張週增減_格式化', '0.00')
+                                return f"<b>{name}</b><br><span style='font-size: 11px; color: #E5E7EB;'>大戶週增 {d_str}%</span>"
+                            tm_b5_df['顯示名稱'] = tm_b5_df.apply(format_clean_stock_label, axis=1)
+
+                            # 懸停欄位 (包含 1000與400 的短長線數據)
+                            hover_columns = [
+                                '股票代號', 
+                                '千張週增減_格式化', 
+                                '6周增減(一千)', 
+                                f"{latest_col_400}(四百)", 
+                                '6周增減(四百)'
+                            ]
+
+                            # 定義紅綠漸層色階
+                            custom_continuous_scale = [
+                                [0.0, "rgba(0, 230, 118, 0.85)"],  
+                                [0.5, "rgba(30, 41, 59, 0.95)"],   
+                                [1.0, "rgba(255, 75, 75, 0.85)"]   
+                            ]
+
+                            import plotly.express as px
+                            fig = px.treemap(
+                                tm_b5_df,
+                                path=[px.Constant("🔥 大股東雙向共振池"), '產業別', '顯示名稱'], 
+                                values='計數',
+                                color='熱力數值', 
+                                color_continuous_scale=custom_continuous_scale, 
+                                color_continuous_midpoint=0, 
+                                hover_data=hover_columns
+                            )
+                            fig.update_coloraxes(showscale=False)
+
+                            fig.update_traces(
+                                textinfo="label", 
+                                textfont=dict(color="white", size=14),
+                                marker=dict(line=dict(color='#0B0F19', width=2), pad=dict(t=35, l=10, r=10, b=10)),
+                                hovertemplate=(
+                                    '<b>%{label}</b><br>'
+                                    '股票代號: %{customdata[0]}<br>'
+                                    '千張大戶本週: <b>%{customdata[1]}%</b><br>'
+                                    '千張大戶6週累積: %{customdata[2]}<br>'
+                                    '----------------<br>'
+                                    '400張大戶本週: %{customdata[3]}<br>'
+                                    '400張大戶6週累積: %{customdata[4]}<br>'
+                                    '<extra></extra>' 
+                                )
+                            )
+                            
+                            fig.update_layout(
+                                margin=dict(t=30, l=0, r=0, b=0),
+                                height=650, 
+                                plot_bgcolor='rgba(0,0,0,0)',
+                                paper_bgcolor='rgba(0,0,0,0)',
+                                font=dict(family="sans-serif") 
+                            )
+                            st.plotly_chart(fig, use_container_width=True)
+                            
+                        else:
+                            st.info("⚪ 目前共振名單中沒有一般產業的股票。")
+
+                        # ==========================================
+                        # 🗑️ 在下方顯示被剔除的 ETF / 債券 / 特別股清單
+                        # ==========================================
+                        if not b5_excluded_etfs.empty:
+                            st.write("")
+                            st.markdown("##### 🗑️ 本次已剔除的非一般產業 (ETF / 特別股 / 債券)")
+                            st.caption("以下標的已符合大戶共振條件，但因非一般企業已從上方產業聚落中剔除。💡 **游標懸停可查看大戶持股明細。**")
+                            
+                            tags_html = ""
+                            import html
+                            
+                            for _, r in b5_excluded_etfs.iterrows():
+                                name = str(r.get('股票名稱', ''))
+                                sid = str(r.get('股票代號', ''))
+                                
+                                # 取出 1000與400的資料
+                                k1_w = str(r.get(f"{latest_col_1k}(一千)", '0.00'))
+                                k1_6w = str(r.get('6周增減(一千)', '0.00'))
+                                c4_w = str(r.get(f"{latest_col_400}(四百)", '0.00'))
+                                c4_6w = str(r.get('6周增減(四百)', '0.00'))
+                                
+                                safe_name = html.escape(name, quote=True)
+                                safe_sid = html.escape(sid, quote=True)
+                                
+                                # 計算顏色基準 (以1000張當週為準)
+                                try: d_val = float(k1_w.replace('+', '').replace('%', ''))
+                                except: d_val = 0.0
+                                
+                                if d_val > 0:
+                                    bg_color = "rgba(255, 75, 75, 0.15)"   
+                                    border_color = "rgba(255, 75, 75, 0.4)" 
+                                    text_color = "#FF4B4B"                  
+                                    d_str = f"+{d_val:.2f}"
+                                elif d_val < 0:
+                                    bg_color = "rgba(0, 230, 118, 0.15)"   
+                                    border_color = "rgba(0, 230, 118, 0.4)" 
+                                    text_color = "#00E676"                  
+                                    d_str = f"{d_val:.2f}"
+                                else:
+                                    bg_color = "rgba(30, 41, 59, 0.6)"     
+                                    border_color = "#334155"
+                                    text_color = "#94A3B8"
+                                    d_str = "0.00"
+                                    
+                                tooltip_text = (
+                                    f"【{safe_name}】&#10;"
+                                    f"股票代號: {safe_sid}&#10;"
+                                    f"千張大戶本週: {d_str}%&#10;"
+                                    f"千張大戶6週: {k1_6w}&#10;"
+                                    f"----------------&#10;"
+                                    f"400張本週: {c4_w}&#10;"
+                                    f"400張6週: {c4_6w}"
+                                )
+                                
+                                tags_html += f"<div title=\"{tooltip_text}\" style=\"background-color: {bg_color}; color: #E2E8F0; border: 1px solid {border_color}; padding: 6px 14px; border-radius: 20px; margin: 5px; display: inline-flex; align-items: center; font-size: 13px; box-shadow: 0 2px 8px rgba(0,0,0,0.15); cursor: help; transition: transform 0.2s;\">{safe_name} ({safe_sid}) <span style='color: {text_color}; font-weight: bold; margin-left: 8px;'>千張 {d_str}%</span></div>"
+                            
+                            st.markdown(f"<div style='margin-top: 5px; line-height: 2.4;'>{tags_html}</div>", unsafe_allow_html=True)
+                    else:
+                        st.info("⚪ 找不到產業字典，無法繪製產業板塊圖。")
                     
                 else:
                     st.info("⚪ 條件嚴苛，本週完全沒有 1000張與400張「長短線皆同步雙增」的標的。")
