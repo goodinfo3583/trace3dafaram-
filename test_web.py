@@ -4422,17 +4422,6 @@ if current_page in ["all", "b5"]:
                     st.success(f"🔥 極度嚴苛過濾！找到了 **{len(resonance_df)}** 檔 1000張與400張「長線(6周)與短線(最新週)」同步雙向做多的超級共振標的！")
                     st.dataframe(resonance_df, use_container_width=True, hide_index=True)
 
-                    # ... (上方保留你原本的 df_1k 和 df_400 交集過濾邏輯) ...
-
-                    # 🧹 終極去重機制：避免金融股/特別股因代號重複，在 Merge 時引發的交錯相乘繁殖
-                    if '股票名稱' in resonance_df.columns:
-                        resonance_df = resonance_df.drop_duplicates(subset=['股票代號', '股票名稱'], keep='first')
-                    else:
-                        resonance_df = resonance_df.drop_duplicates(subset=['股票代號'], keep='first')
-                    
-                    st.success(f"🔥 極度嚴苛過濾！找到了 **{len(resonance_df)}** 檔 1000張與400張「長線(6周)與短線(最新週)」同步雙向做多的超級共振標的！")
-                    st.dataframe(resonance_df, use_container_width=True, hide_index=True)
-                    
                     # ==========================================
                     # 🧩 區塊擴充：長短線大戶雙向共振榜 - 產業資金聚落 (Treemap)
                     # ==========================================
