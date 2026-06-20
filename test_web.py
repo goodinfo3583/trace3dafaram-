@@ -2614,8 +2614,8 @@ if current_page in ["all", "b1"]:
     st.write("---")
     
     st.markdown("### 🧩 資金聚落板塊：三大法人進榜產業分佈")
-    st.caption("透過區塊面積大小，看出法人資金集中攻擊哪些產業。顏色代表「單日法人持股增減(△)」，越紅買超越強。")
-    st.info("💡 △ 是單日的法人持股增減 (如果最新基準日未進前200榜，△會直接以歸0計算)；滑鼠懸停可觀察短長線的持股波段軌跡。")
+    st.caption("透過區塊面積大小，觀察法人資金集中攻擊哪些產業。")
+    st.info("💡 △ 是單日的法人持股增減 (如果最新基準日未進前200榜，△會直接以歸0計算)；滑鼠懸停可觀察短長線的持股波段軌跡。底色越紅買超越強，△代表單日法人持股增減，但也要小心大買大賣的名單。")
 
     # 1. 取得主資料表與股票字典
     df_b1_master = st.session_state.get('my_final_df', pd.DataFrame())
@@ -2626,7 +2626,7 @@ if current_page in ["all", "b1"]:
         st.write("") # 增加一點呼吸空間
         c_opt, c_search = st.columns([2.5, 1.5])
         with c_opt:
-            top_n_option = st.radio("設定觀測範圍：", ["📌 顯示前 50 名 (核心攻擊重心)", "🌍 顯示前 200 名 (產業擴散全貌)"], horizontal=True)
+            top_n_option = st.radio("設定觀測範圍：", ["顯示前 50 名", "顯示前 200 名"], horizontal=True)
             top_n = 50 if "50" in top_n_option else 200
             
         with c_search:
@@ -2774,7 +2774,7 @@ if current_page in ["all", "b1"]:
         if not excluded_etfs.empty:
             st.write("")
             st.markdown("##### 🗑️ 本次已剔除的非一般產業 (ETF / 債券 / 指數)")
-            st.caption("這些標的雖有強大法人資金進駐上榜，但已從上方產業聚落中剔除。💡 **游標懸停於標籤可查看詳細 7 日明細。**")
+            st.caption("這些標的雖有強大法人資金進駐上榜，但已從上方產業聚落中剔除。**游標懸停於標籤可查看詳細 7 日明細。**")
             
             tags_html = ""
             import html # 引入字串跳脫模組
