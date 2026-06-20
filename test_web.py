@@ -4413,10 +4413,17 @@ if current_page in ["all", "b5"]:
                     # 把沒有資料的欄位優雅地補上 None
                     resonance_df = resonance_df.fillna('None')
                     
+                    # 🧹 終極去重機制：避免金融股/特別股因代號重複，在 Merge 時引發的交錯相乘繁殖
+                    if '股票名稱' in resonance_df.columns:
+                        resonance_df = resonance_df.drop_duplicates(subset=['股票代號', '股票名稱'], keep='first')
+                    else:
+                        resonance_df = resonance_df.drop_duplicates(subset=['股票代號'], keep='first')
+                    
                     st.success(f"🔥 極度嚴苛過濾！找到了 **{len(resonance_df)}** 檔 1000張與400張「長線(6周)與短線(最新週)」同步雙向做多的超級共振標的！")
                     st.dataframe(resonance_df, use_container_width=True, hide_index=True)
+                    
                 else:
-                    st.info("⚪ 條件極為嚴苛，本週完全沒有 1000張與400張「長短線皆同步雙增」的標的。")
+                    st.info("⚪ 條件嚴苛，本週完全沒有 1000張與400張「長短線皆同步雙增」的標的。")
             else:
                 st.error("⚠️ 資料表欄位解析失敗，請確認前方大戶表中包含 '▼6周增減' 與最新日期 (如 '▼0618') 欄位。")
         else:
