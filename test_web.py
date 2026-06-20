@@ -4973,7 +4973,7 @@ if current_page in ["all", "pool"]:
                             c_opt, c_search = st.columns([3, 1.5])
                             with c_opt:
                                 pool_filter = st.radio("設定觀測範圍與排序：", 
-                                    ["📌 全部顯示 (預設)", "🏆 顯示總分前100名", "📉 顯示 ▼變量 前100名", "🔥 顯示 △ 前100名"], 
+                                    ["全部顯示 (預設)", "顯示總分前100名", "顯示 ▼變量 前100名", "顯示 △ 前100名"], 
                                     horizontal=True, key="pool_treemap_filter"
                                 )
                             with c_search:
