@@ -4945,416 +4945,384 @@ if current_page in ["all", "pool"]:
                     st.warning("⚠️ 本次計算總分多數為 0，已啟動防呆攔截機制：暫不覆寫 Google Sheets 歷史紀錄。請點擊上方按鈕載入最新籌碼大數據。")
 
                 # ==========================================
-                # 🚀 終極 UI 修正：改用「帶有記憶功能的按鈕選單」取代傳統 Tabs
-                # 解決點選按鈕或輸入密碼後，畫面瘋狂跳回第一頁的問題！
+                # 🚀 終極 UI 修正：局部渲染魔法 (Fragment) 避免畫面亂跳
+                # 解決點選按鈕或輸入密碼後，畫面瘋狂跳回頂端的問題！
                 # ==========================================
                 st.markdown("<hr style='border-color: #334155;'>", unsafe_allow_html=True)
                 
-                selected_view = st.radio(
-                    "切換檢視面板：",
-                    ["🔹 今日最新排行", "🔹 歷史分數追蹤表", "🔹 模型驗證：每週 Top 5 追蹤"],
-                    horizontal=True,
-                    label_visibility="collapsed",
-                    key="pool_view_state"  # 🔑 這是關鍵！Streamlit 會自動記憶你的選擇，不再跳走
-                )
-                #********************************************************************************
-                if selected_view == "🔹 今日最新排行" or selected_view == "今日最新排行":
-                    # 1. 顯示原本的 DataFrame 總表
-                    st.dataframe(res_df, use_container_width=True, hide_index=True, column_config={"▼明細": st.column_config.TextColumn("▼明細", help="滑鼠游標停留在這裡查看", width="small", max_chars=4)})
+                # 👇 建立局部渲染魔法函數，包裝所有互動區塊，保證網頁絕對不會亂跳！
+                @st.fragment
+                def render_pool_interactive_ui(f_res_df, f_hist_combined):
+                    selected_view = st.radio(
+                        "切換檢視面板：",
+                        ["🔹 今日最新排行", "🔹 歷史分數追蹤表", "🔹 模型驗證：每週 Top 5 追蹤"],
+                        horizontal=True,
+                        label_visibility="collapsed",
+                        key="pool_view_state"
+                    )
                     
-                    # ==========================================
-                    # 📊 區塊擴充：觀察名單專屬產業聚落板塊 (Treemap)
-                    # ==========================================
-                    st.write("---")
-                    st.markdown("### 🧩 觀察名單中的資金聚落")
-                    st.caption("將觀察名單轉換為產業面積大小，觀察法人口袋中持股變化集中的標的 (已排除 ETF 與債券)。")
-                    
-                    if not res_df.empty and 'STOCK_DICT' in globals() and STOCK_DICT:
+                    if selected_view in ["🔹 今日最新排行", "今日最新排行"]:
+                        st.dataframe(f_res_df, use_container_width=True, hide_index=True, column_config={"▼明細": st.column_config.TextColumn("▼明細", help="滑鼠游標停留在這裡查看", width="small", max_chars=4)})
                         
-                        # 🚀 新增 1 & 3：排版搜尋框與過濾選項按鈕
-                        st.write("")
-                        c_opt, c_search = st.columns([3, 1.5])
-                        with c_opt:
-                            pool_filter = st.radio("設定觀測範圍與排序：", 
-                                ["全部顯示 (預設)", "顯示總分前100名", "顯示 ▼變量 前100名", "顯示 △ 前100名"], 
-                                horizontal=True, key="pool_treemap_filter"
-                            )
-                        with c_search:
-                            pool_search = st.text_input("🔍 板塊內標的搜尋", placeholder="輸入代號/名稱以聚焦...", key="pool_treemap_search")
-
-                        # 複製一份專門用來處理的 DataFrame
-                        treemap_pool_df = res_df.copy()
-
-                        # 💡 資料前處理：轉換數值欄位以供排序與格式化
-                        treemap_pool_df['數值_總分'] = pd.to_numeric(treemap_pool_df['總分'], errors='coerce').fillna(0.0)
-                        treemap_pool_df['數值_△'] = pd.to_numeric(treemap_pool_df['△'].astype(str).str.replace('+', '', regex=False).str.replace('%', '', regex=False), errors='coerce').fillna(0.0)
+                        st.write("---")
+                        st.markdown("### 🧩 觀察名單中的資金聚落")
+                        st.caption("將觀察名單轉換為產業面積大小，觀察法人口袋中持股變化集中的標的 (已排除 ETF 與債券)。")
                         
-                        # ▼變量處理 (若欄位存在則轉換)
-                        if '▼變量' in treemap_pool_df.columns:
-                            treemap_pool_df['數值_變量'] = pd.to_numeric(treemap_pool_df['▼變量'], errors='coerce').fillna(0.0)
-                        else:
-                            treemap_pool_df['數值_變量'] = 0.0
-
-                        # 🚀 執行過濾邏輯 (依據選項提取前 100 名)
-                        if "總分" in pool_filter:
-                            treemap_pool_df = treemap_pool_df.nlargest(100, '數值_總分')
-                        elif "變量" in pool_filter:
-                            treemap_pool_df = treemap_pool_df.nlargest(100, '數值_變量')
-                        elif "△" in pool_filter:
-                            treemap_pool_df = treemap_pool_df.nlargest(100, '數值_△')
-
-                        # 🚀 執行搜尋邏輯
-                        if pool_search:
-                            query = pool_search.strip()
-                            treemap_pool_df = treemap_pool_df[
-                                treemap_pool_df['代號'].astype(str).str.contains(query, case=False, na=False) | 
-                                treemap_pool_df['名稱'].astype(str).str.contains(query, case=False, na=False)
-                            ]
-                            if treemap_pool_df.empty:
-                                st.warning(f"找不到符合「{query}」的標的。")
-
-                        # 配對產業別並分離 ETF
-                        treemap_pool_df['產業別'] = treemap_pool_df['代號'].astype(str).apply(
-                            lambda sid: STOCK_DICT.get(sid, {}).get("industry", "ETF / 債券 / 其他")
-                        )
-                        treemap_pool_df['產業別'] = treemap_pool_df['產業別'].replace('', 'ETF / 債券 / 其他')
-
-                        # 🚀 擷取即將被剔除的 ETF / 債券 清單 (供最下方顯示)
-                        pool_excluded_etfs = treemap_pool_df[treemap_pool_df['產業別'] == 'ETF / 債券 / 其他'].sort_values(by='代號').copy()
-
-                        # 剔除 ETF，保留一般產業畫圖
-                        treemap_pool_df = treemap_pool_df[treemap_pool_df['產業別'] != 'ETF / 債券 / 其他']
-
-                        if not treemap_pool_df.empty:
-                            treemap_pool_df['計數'] = 1 
-                            today_counts = treemap_pool_df['產業別'].value_counts().to_dict()
-
-                            def format_industry_label(industry):
-                                t_count = today_counts.get(industry, 0)
-                                return f"<b>{industry}</b><br><span style='font-size: 13px;'>{t_count}檔</span>"
-                            treemap_pool_df['產業別'] = treemap_pool_df['產業別'].apply(format_industry_label)
-
-                            # 🚀 新增 2：修正總分小數點 (限制顯示 1 位數)，並處理 △ 的符號
-                            treemap_pool_df['總分_格式化'] = treemap_pool_df['數值_總分'].apply(lambda x: f"{x:.1f}")
-                            treemap_pool_df['△_格式化'] = treemap_pool_df['數值_△'].apply(lambda x: f"+{x:.2f}" if x > 0 else f"{x:.2f}")
-
-                            def format_clean_stock_label(row):
-                                name = row.get('名稱', '')
-                                score = row.get('總分_格式化', '0.0')
-                                return f"<b>{name}</b><br><span style='font-size: 11px; color: #E5E7EB;'>{score}分</span>"
-                            treemap_pool_df['顯示名稱'] = treemap_pool_df.apply(format_clean_stock_label, axis=1)
-
-                            # 懸停欄位 (加入剛剛格式化好的欄位取代原本的長尾數字)
-                            hover_columns = ['代號', '總分_格式化', '▼明細', '△_格式化', '最新動態', '大股東動向'] 
-
-                            # 保持原本的深色色盤
-                            custom_dark_colors = [
-                                "rgba(60, 84, 62, 0.85)",     "rgba(78, 34, 28, 0.85)",     "rgba(81, 81, 168, 0.85)",    "rgba(167, 77, 110, 0.85)", 
-                                "rgba(67, 38, 58, 0.85)",     "rgba(244, 124, 35, 0.85)",   "rgba(177, 128, 236, 0.85)",  "rgba(13, 82, 89, 0.85)", 
-                                "rgba(111, 97, 94, 0.85)",    "rgba(196, 8, 28, 0.85)",     "rgba(30, 41, 59, 0.85)",     "rgba(77, 83, 60, 0.85)", 
-                                "rgba(107, 29, 47, 0.85)",    "rgba(70, 130, 180, 0.85)",   "rgba(133, 100, 4, 0.85)",    "rgba(30, 27, 75, 0.85)", 
-                                "rgba(6, 78, 59, 0.85)",      "rgba(154, 52, 18, 0.85)",    "rgba(112, 26, 117, 0.85)",   "rgba(51, 65, 85, 0.85)"
-                            ]
-
-                            import plotly.express as px
-                            fig = px.treemap(
-                                treemap_pool_df,
-                                path=[px.Constant("板塊資金聚落"), '產業別', '顯示名稱'], 
-                                values='計數',
-                                color='產業別', 
-                                hover_data=hover_columns, 
-                                color_discrete_sequence=custom_dark_colors
-                            )
-
-                            fig.update_traces(
-                                textinfo="label", 
-                                textfont=dict(color="white", size=15),
-                                marker=dict(line=dict(color='#0B0F19', width=2), pad=dict(t=35, l=10, r=10, b=10)),
-                                hovertemplate=(
-                                    '<b>%{label}</b><br>'
-                                    '股票代號: %{customdata[0]}<br>'
-                                    '模型總分: <b>%{customdata[1]} 分</b><br>'
-                                    '▼明細: %{customdata[2]}<br>'
-                                    '△: %{customdata[3]}<br>'
-                                    '最新動態: %{customdata[4]}<br>'
-                                    '大股東動向: %{customdata[5]}<br>'
-                                    '<extra></extra>' 
-                                )
-                            )
-                            
-                            fig.update_layout(
-                                margin=dict(t=30, l=0, r=0, b=0),
-                                height=650, 
-                                plot_bgcolor='rgba(0,0,0,0)',
-                                paper_bgcolor='rgba(0,0,0,0)',
-                                font=dict(family="sans-serif") 
-                            )
-                            st.plotly_chart(fig, use_container_width=True)
-                        else:
-                            if not pool_search:
-                                st.info("⚪ 目前觀察名單中沒有一般產業的股票（可能全為 ETF/債券，或無符合條件標的）。")
-
-                        # ==========================================
-                        # 🚀 新增 4：在最下方新增 ETF / 債券 被剔除的名單
-                        # ==========================================
-                        if not pool_excluded_etfs.empty:
+                        if not f_res_df.empty and 'STOCK_DICT' in globals() and STOCK_DICT:
                             st.write("")
-                            st.markdown("##### 🗑️ 本次已剔除的非一般產業 (ETF / 債券 / 指數)")
-                            st.caption("以下標的已進榜觀察名單，但因非一般企業已從上方產業聚落中剔除。💡 **游標懸停於標籤可查看詳細分數與大股東動向。**")
-                            
-                            tags_html = ""
-                            import html
-                            
-                            for _, r in pool_excluded_etfs.iterrows():
-                                name = str(r.get('名稱', ''))
-                                sid = str(r.get('代號', ''))
-                                detail = str(r.get('▼明細', '-'))
-                                dyn = str(r.get('最新動態', '-'))
-                                holder = str(r.get('大股東動向', '-'))
-                                
-                                # 計算顏色與數值
-                                d_val = r.get('數值_△', 0.0)
-                                s_val = r.get('數值_總分', 0.0)
-                                
-                                # HTML 跳脫避免破圖
-                                safe_name = html.escape(name, quote=True)
-                                safe_sid = html.escape(sid, quote=True)
-                                safe_detail = html.escape(detail, quote=True)
-                                safe_dyn = html.escape(dyn, quote=True)
-                                safe_holder = html.escape(holder, quote=True)
-                                
-                                if d_val > 0:
-                                    bg_color = "rgba(255, 75, 75, 0.15)"   
-                                    border_color = "rgba(255, 75, 75, 0.4)" 
-                                    text_color = "#FF4B4B"                  
-                                    d_str = f"+{d_val:.2f}"
-                                elif d_val < 0:
-                                    bg_color = "rgba(0, 230, 118, 0.15)"   
-                                    border_color = "rgba(0, 230, 118, 0.4)" 
-                                    text_color = "#00E676"                  
-                                    d_str = f"{d_val:.2f}"
-                                else:
-                                    bg_color = "rgba(30, 41, 59, 0.6)"     
-                                    border_color = "#334155"
-                                    text_color = "#94A3B8"
-                                    d_str = "0.00"
-                                    
-                                # 組合懸停文字 (針對觀察名單特製的內容)
-                                tooltip_text = (
-                                    f"【{safe_name}】&#10;"
-                                    f"股票代號: {safe_sid}&#10;"
-                                    f"模型總分: {s_val:.1f} 分&#10;"
-                                    f"單日△: {d_str}&#10;"
-                                    f"▼明細: {safe_detail}&#10;"
-                                    f"最新動態: {safe_dyn}&#10;"
-                                    f"大股東動向: {safe_holder}"
+                            c_opt, c_search = st.columns([3, 1.5])
+                            with c_opt:
+                                pool_filter = st.radio("設定觀測範圍與排序：", 
+                                    ["📌 全部顯示 (預設)", "🏆 顯示總分前100名", "📉 顯示 ▼變量 前100名", "🔥 顯示 △ 前100名"], 
+                                    horizontal=True, key="pool_treemap_filter"
                                 )
-                                
-                                # 渲染單行不縮排的 HTML
-                                tags_html += f"<div title=\"{tooltip_text}\" style=\"background-color: {bg_color}; color: #E2E8F0; border: 1px solid {border_color}; padding: 6px 14px; border-radius: 20px; margin: 5px; display: inline-flex; align-items: center; font-size: 13px; box-shadow: 0 2px 8px rgba(0,0,0,0.15); cursor: help; transition: transform 0.2s;\">{safe_name} ({safe_sid}) <span style='color: {text_color}; font-weight: bold; margin-left: 8px;'>△ {d_str}</span></div>"
-                            
-                            st.markdown(f"<div style='margin-top: 5px; line-height: 2.4;'>{tags_html}</div>", unsafe_allow_html=True)
-                            
-                    else:
-                        st.info("⚪ 尚無數據或找不到產業字典，無法繪製產業板塊圖。")
+                            with c_search:
+                                pool_search = st.text_input("🔍 板塊內標的搜尋", placeholder="輸入代號/名稱以聚焦...", key="pool_treemap_search")
 
-                # ********************************************************************************
-                # 歷史分數追蹤表 (🚀 幫你把不小心刪掉的這段救回來了！)
-                # ********************************************************************************
-                elif selected_view == "🔹 歷史分數追蹤表":
-                    try:
-                        if not hist_combined.empty:
-                            recent_dates = sorted(hist_combined['紀錄日期'].unique(), reverse=True)[:20]
-                            df_h = hist_combined[hist_combined['紀錄日期'].isin(recent_dates)].copy()
-                            id_col = '代號' if '代號' in df_h.columns else '股票代號' if '股票代號' in df_h.columns else None
-                            if id_col and '總分' in df_h.columns:
-                                df_h['日期'] = df_h['紀錄日期'].apply(lambda x: f"{x[4:6]}/{x[6:]}" if len(x)==8 else x)
-                                df_h['代號'] = df_h[id_col].astype(str).str.replace(r'\.0$', '', regex=True).str.replace(r'\D', '', regex=True)
-                                hist_pivot = df_h[['代號', '總分', '日期']].pivot_table(index='代號', columns='日期', values='總分', aggfunc='first').reset_index()
-                                sorted_date_columns = sorted([col for col in hist_pivot.columns if col not in ['代號', '名稱']], reverse=True)
-                                hist_pivot = hist_pivot[['代號'] + sorted_date_columns]
-                                hist_pivot.insert(1, '名稱', hist_pivot['代號'].map(dict(zip(res_df['代號'].astype(str).str.replace(r'\.0$', '', regex=True).str.replace(r'\D', '', regex=True), res_df['名稱']))).fillna('-'))
-                                hist_pivot = hist_pivot[hist_pivot['名稱'] != '-']
-                                if not hist_pivot.empty and sorted_date_columns[0] in hist_pivot.columns:
-                                    st.dataframe(hist_pivot.sort_values(by=sorted_date_columns[0], ascending=False).reset_index(drop=True), use_container_width=True, hide_index=True)
-                                    st.info("我們也記錄了法人們口袋名單在觀察名單的總分變化，試著學習觀察籌碼動能的延續性與驗證 ▼變量...")
-                                else:
-                                    st.warning("⚪ 尚無足夠的歷史分數紀錄。")
-                        else: 
-                            st.warning("⚪ 尚無足夠的歷史分數紀錄。")
-                    except Exception as e: 
-                        st.error(f"發生錯誤: {e}")
-                #********************************************************************************
-                elif selected_view == "🔹 模型驗證：每週 Top 5 追蹤":
-                    st.markdown("### 🏆 嚴選 5 檔模型追蹤")
-                    st.info("💡 我們先排除了法人丟出籌碼警示的標的，並根據總分與當日△選出前 5 名，但是有時候倒貨僅是換手，這個部分還相當困難阿，真是傷腦筋")
-                    if not res_df.empty:
-                        safe_df = res_df[res_df['賣出警示'] == "-"].copy()
-                        if not safe_df.empty:
-                            safe_df['數值△'] = pd.to_numeric(safe_df['△'].astype(str).str.replace('+', '').str.replace('%', ''), errors='coerce').fillna(0)
-                            top5_df = safe_df.sort_values(by=['總分', '數值△'], ascending=[False, False]).head(5).drop(columns=['數值△'])
-                            
-                            cols = st.columns(5)
+                            # 複製一份專門用來處理的 DataFrame
+                            treemap_pool_df = f_res_df.copy()
 
-                            #***************
-                            for idx, (i, row) in enumerate(top5_df.iterrows()):
-                                with cols[idx]:
-                                    delta_str = str(row['△'])
-                                    delta_color = "#FF4B4B" if "+" in delta_str else ("#00E272" if "-" in delta_str else "#E2E8F0")
-                                    st.markdown(f"""
-                                        <div style="background-color:rgba(0, 210, 255, 0.05); border-top: 3px solid #00D2FF; padding: 10px; border-radius: 5px;">
-                                            <h4 style="margin:0; color:#E2E8F0;">{row['名稱']}</h4>
-                                            <p style="margin:0; font-size:12px; color:#A0AEC0;">{row['代號']}</p>
-                                            <h2 style="margin:10px 0; color:#00D2FF;">{row['總分']:.1f} 分</h2>
-                                            <p style="margin:0; font-size:14px;"><strong>當日△:</strong> <span style="color:{delta_color}; font-weight:bold;">{delta_str}</span></p>
-                                            <p style="margin:5px 0 0 0; font-size:12px; line-height:1.2;">{row['大股東動向']}</p>
-                                        </div>
-                                    """, unsafe_allow_html=True)
-                            #****************
-                            st.write("")
-                            st.dataframe(top5_df[['代號', '名稱', '總分', '▼變量', '△', '最新動態', '▼明細']], use_container_width=True, hide_index=True)
-#==========================================
-
-#==========================================
-                            # ==========================================
-                            # 🔧 站長儲存區：寫入 Google Sheets + 當下收盤價存檔
-                            # ==========================================
-                            st.write("---")
-                            c_space, c_main = st.columns([3, 2]) # 讓密碼與按鈕靠右縮小
-                            with c_main:
-                                with st.expander("🔐 站長用寫入追蹤名單", expanded=True):
-                                    track_pw = st.text_input("密碼", type="password", key="track_pw")
-                                    
-                                    if track_pw == "DDong888":
-                                        st.markdown("""
-                                        <style>
-                                        div[data-testid="stButton"] > button { padding: 0.25rem 0.5rem; font-size: 14px; }
-                                        </style>
-                                        """, unsafe_allow_html=True)
-                                        
-                                        if st.button("💾 儲存至 Google 雲端", type="primary", use_container_width=True):
-                                            with st.spinner("正在抓取當前收盤價並寫入雲端..."):
-                                                track_date = datetime.datetime.now().strftime("%Y-%m-%d")
-                                                current_prices = {}
-                                                import yfinance as yf
-                                                for sid in top5_df['代號']:
-                                                    try:
-                                                        p_df = yf.download(f"{sid}.TW", period="1d", progress=False)
-                                                        if p_df.empty: p_df = yf.download(f"{sid}.TWO", period="1d", progress=False)
-                                                        if not p_df.empty:
-                                                            val = p_df['Close'].iloc[-1]
-                                                            current_prices[sid] = round(float(val.iloc[0] if isinstance(val, pd.Series) else val), 2)
-                                                        else: current_prices[sid] = 0.0
-                                                    except: current_prices[sid] = 0.0
-                                                
-                                                top5_df['鎖定日期'] = track_date
-                                                top5_df['鎖定收盤價'] = top5_df['代號'].astype(str).map(current_prices)
-                                                
-                                                try:
-                                                    try: old_track = conn.read(spreadsheet=SHEET_URL, worksheet="歷史名單回測觀察", ttl=0).dropna(how="all")
-                                                    except: old_track = pd.DataFrame()
-                                                    new_track = pd.concat([old_track, top5_df], ignore_index=True)
-                                                    conn.update(spreadsheet=SHEET_URL, worksheet="歷史名單回測觀察", data=new_track)
-                                                    st.success(f"✅ 已成功將 {track_date} 的名單寫入 Google Sheets！")
-                                                except Exception as e:
-                                                    st.error(f"❌ 寫入失敗：{e} (請確認 Google Sheets 是否已建立『歷史名單回測觀察』工作表)")
-                                    elif track_pw != "": st.error("密碼錯誤")
-                                        
-                    # ==========================================
-                    # 📊 歷史名單回測觀察：搭載時光機結案引擎
-                    # ==========================================
-                    st.markdown("### 📊 歷史名單回測觀察")
-                    try:
-                        history_track_df = conn.read(spreadsheet=SHEET_URL, worksheet="歷史名單回測觀察", ttl=0).dropna(how="all")
-                        if not history_track_df.empty:
-                            selected_week = st.selectbox("選擇要回顧的鎖定日期", sorted(history_track_df['鎖定日期'].unique(), reverse=True))
-                            week_df = history_track_df[history_track_df['鎖定日期'] == selected_week].copy()
+                            # 💡 資料前處理：轉換數值欄位以供排序與格式化
+                            treemap_pool_df['數值_總分'] = pd.to_numeric(treemap_pool_df['總分'], errors='coerce').fillna(0.0)
+                            treemap_pool_df['數值_△'] = pd.to_numeric(treemap_pool_df['△'].astype(str).str.replace('+', '', regex=False).str.replace('%', '', regex=False), errors='coerce').fillna(0.0)
                             
-                            # 計算此梯次名單已鎖定多久
-                            import datetime
-                            from datetime import timedelta
-                            lock_date_obj = datetime.datetime.strptime(selected_week, "%Y-%m-%d")
-                            days_passed = (datetime.datetime.now() - lock_date_obj).days
-                            
-                            is_expired = days_passed >= 28 # 超過4週(28天)即判定結案
-                            
-                            if is_expired:
-                                status_tag = "🔴 已結案 (凍結在第4週)"
-                                # 決定時光機的目標日期：鎖定日後第 28 天
-                                target_start = lock_date_obj + timedelta(days=28)
-                                start_str = target_start.strftime("%Y-%m-%d")
-                                end_str = (target_start + timedelta(days=5)).strftime("%Y-%m-%d") # 給5天緩衝防假日
+                            if '▼變量' in treemap_pool_df.columns:
+                                treemap_pool_df['數值_變量'] = pd.to_numeric(treemap_pool_df['▼變量'], errors='coerce').fillna(0.0)
                             else:
-                                weeks_passed = (days_passed // 7) + 1
-                                status_tag = f"🟢 追蹤中 (第 {weeks_passed} 週)"
-                                start_str = None # 代表抓最新
+                                treemap_pool_df['數值_變量'] = 0.0
 
-                            st.markdown(f"**目前狀態：** `{status_tag}` ｜ **已鎖定：** `{days_passed} 天`")
+                            if "總分" in pool_filter:
+                                treemap_pool_df = treemap_pool_df.nlargest(100, '數值_總分')
+                            elif "變量" in pool_filter:
+                                treemap_pool_df = treemap_pool_df.nlargest(100, '數值_變量')
+                            elif "△" in pool_filter:
+                                treemap_pool_df = treemap_pool_df.nlargest(100, '數值_△')
 
-                            with st.spinner("正在連線抓取檢測價格..."):
-                                import yfinance as yf
-                                latest_prices = {}
-                                for sid in week_df['代號'].astype(str).str.replace(r'\.0$', '', regex=True):
-                                    try:
-                                        ticker_tw = f"{sid}.TW"
-                                        ticker_two = f"{sid}.TWO"
-                                        if start_str: # 🔴 已結案：啟動時光機抓取歷史凍結價
-                                            p_df = yf.download(ticker_tw, start=start_str, end=end_str, progress=False)
-                                            if p_df.empty: p_df = yf.download(ticker_two, start=start_str, end=end_str, progress=False)
-                                            if not p_df.empty:
-                                                val = p_df['Close'].iloc[0] # 抓該區間第一天的價格
-                                                latest_prices[sid] = round(float(val.iloc[0] if isinstance(val, pd.Series) else val), 2)
-                                            else: latest_prices[sid] = 0.0
-                                        else: # 🟢 追蹤中：抓取今日最新價
-                                            p_df = yf.download(ticker_tw, period="1d", progress=False)
-                                            if p_df.empty: p_df = yf.download(ticker_two, period="1d", progress=False)
-                                            if not p_df.empty:
-                                                val = p_df['Close'].iloc[-1]
-                                                latest_prices[sid] = round(float(val.iloc[0] if isinstance(val, pd.Series) else val), 2)
-                                            else: latest_prices[sid] = 0.0
-                                    except: latest_prices[sid] = 0.0
+                            if pool_search:
+                                query = pool_search.strip()
+                                treemap_pool_df = treemap_pool_df[
+                                    treemap_pool_df['代號'].astype(str).str.contains(query, case=False, na=False) | 
+                                    treemap_pool_df['名稱'].astype(str).str.contains(query, case=False, na=False)
+                                ]
+                                if treemap_pool_df.empty:
+                                    st.warning(f"找不到符合「{query}」的標的。")
 
-                            col_price_name = "結案價格" if is_expired else "最新價格"
-                            week_df[col_price_name] = week_df['代號'].astype(str).str.replace(r'\.0$', '', regex=True).map(latest_prices)
-                            
-                            def calc_price_return(row):
-                                try:
-                                    lock_p = float(row.get('鎖定收盤價', 0))
-                                    curr_p = float(row.get(col_price_name, 0))
-                                    if lock_p > 0 and curr_p > 0:
-                                        pct = ((curr_p - lock_p) / lock_p) * 100
-                                        if pct > 0: return f"🚀 +{pct:.1f}%"
-                                        elif pct < 0: return f"🩸 {pct:.1f}%"
-                                        else: return "0.0%"
-                                    return "-"
-                                except: return "-"
+                            treemap_pool_df['產業別'] = treemap_pool_df['代號'].astype(str).apply(
+                                lambda sid: STOCK_DICT.get(sid, {}).get("industry", "ETF / 債券 / 其他")
+                            )
+                            treemap_pool_df['產業別'] = treemap_pool_df['產業別'].replace('', 'ETF / 債券 / 其他')
+
+                            pool_excluded_etfs = treemap_pool_df[treemap_pool_df['產業別'] == 'ETF / 債券 / 其他'].sort_values(by='代號').copy()
+                            treemap_pool_df = treemap_pool_df[treemap_pool_df['產業別'] != 'ETF / 債券 / 其他']
+
+                            if not treemap_pool_df.empty:
+                                treemap_pool_df['計數'] = 1 
+                                today_counts = treemap_pool_df['產業別'].value_counts().to_dict()
+
+                                def format_industry_label(industry):
+                                    t_count = today_counts.get(industry, 0)
+                                    return f"<b>{industry}</b><br><span style='font-size: 13px;'>{t_count}檔</span>"
+                                treemap_pool_df['產業別'] = treemap_pool_df['產業別'].apply(format_industry_label)
+
+                                treemap_pool_df['總分_格式化'] = treemap_pool_df['數值_總分'].apply(lambda x: f"{x:.1f}")
+                                treemap_pool_df['△_格式化'] = treemap_pool_df['數值_△'].apply(lambda x: f"+{x:.2f}" if x > 0 else f"{x:.2f}")
+
+                                def format_clean_stock_label(row):
+                                    name = row.get('名稱', '')
+                                    score = row.get('總分_格式化', '0.0')
+                                    return f"<b>{name}</b><br><span style='font-size: 11px; color: #E5E7EB;'>{score}分</span>"
+                                treemap_pool_df['顯示名稱'] = treemap_pool_df.apply(format_clean_stock_label, axis=1)
+
+                                hover_columns = ['代號', '總分_格式化', '▼明細', '△_格式化', '最新動態', '大股東動向'] 
+
+                                custom_dark_colors = [
+                                    "rgba(60, 84, 62, 0.85)",     "rgba(78, 34, 28, 0.85)",     "rgba(81, 81, 168, 0.85)",    "rgba(167, 77, 110, 0.85)", 
+                                    "rgba(67, 38, 58, 0.85)",     "rgba(244, 124, 35, 0.85)",   "rgba(177, 128, 236, 0.85)",  "rgba(13, 82, 89, 0.85)", 
+                                    "rgba(111, 97, 94, 0.85)",    "rgba(196, 8, 28, 0.85)",     "rgba(30, 41, 59, 0.85)",     "rgba(77, 83, 60, 0.85)", 
+                                    "rgba(107, 29, 47, 0.85)",    "rgba(70, 130, 180, 0.85)",   "rgba(133, 100, 4, 0.85)",    "rgba(30, 27, 75, 0.85)", 
+                                    "rgba(6, 78, 59, 0.85)",      "rgba(154, 52, 18, 0.85)",    "rgba(112, 26, 117, 0.85)",   "rgba(51, 65, 85, 0.85)"
+                                ]
+
+                                import plotly.express as px
+                                fig = px.treemap(
+                                    treemap_pool_df,
+                                    path=[px.Constant("板塊資金聚落"), '產業別', '顯示名稱'], 
+                                    values='計數',
+                                    color='產業別', 
+                                    hover_data=hover_columns, 
+                                    color_discrete_sequence=custom_dark_colors
+                                )
+
+                                fig.update_traces(
+                                    textinfo="label", 
+                                    textfont=dict(color="white", size=15),
+                                    marker=dict(line=dict(color='#0B0F19', width=2), pad=dict(t=35, l=10, r=10, b=10)),
+                                    hovertemplate=(
+                                        '<b>%{label}</b><br>'
+                                        '股票代號: %{customdata[0]}<br>'
+                                        '模型總分: <b>%{customdata[1]} 分</b><br>'
+                                        '▼明細: %{customdata[2]}<br>'
+                                        '△: %{customdata[3]}<br>'
+                                        '最新動態: %{customdata[4]}<br>'
+                                        '大股東動向: %{customdata[5]}<br>'
+                                        '<extra></extra>' 
+                                    )
+                                )
                                 
-                            week_df['區間報酬'] = week_df.apply(calc_price_return, axis=1)
+                                fig.update_layout(
+                                    margin=dict(t=30, l=0, r=0, b=0),
+                                    height=650, 
+                                    plot_bgcolor='rgba(0,0,0,0)',
+                                    paper_bgcolor='rgba(0,0,0,0)',
+                                    font=dict(family="sans-serif") 
+                                )
+                                st.plotly_chart(fig, use_container_width=True)
+                            else:
+                                if not pool_search:
+                                    st.info("⚪ 目前觀察名單中沒有一般產業的股票。")
 
-                            if not res_df.empty:
-                                today_scores = dict(zip(res_df['代號'].astype(str), res_df['總分']))
-                                week_df['今日分數'] = week_df['代號'].astype(str).str.replace(r'\.0$', '', regex=True).map(today_scores).fillna(0)
+                            if not pool_excluded_etfs.empty:
+                                st.write("")
+                                st.markdown("##### 🗑️ 本次已剔除的非一般產業 (ETF / 債券 / 指數)")
+                                st.caption("以下標的已進榜觀察名單，但因非一般企業已從上方產業聚落中剔除。💡 **游標懸停於標籤可查看詳細分數與大股東動向。**")
                                 
-                                def score_diff(row):
-                                    try:
-                                        diff = float(row['今日分數']) - float(row['總分']) 
-                                        if diff > 0: return f"📈 +{diff:.1f}"
-                                        elif diff < 0: return f"📉 {diff:.1f}"
-                                        else: return "-"
-                                    except: return "-"
+                                tags_html = ""
+                                import html
+                                
+                                for _, r in pool_excluded_etfs.iterrows():
+                                    name = str(r.get('名稱', ''))
+                                    sid = str(r.get('代號', ''))
+                                    detail = str(r.get('▼明細', '-'))
+                                    dyn = str(r.get('最新動態', '-'))
+                                    holder = str(r.get('大股東動向', '-'))
                                     
-                                week_df['模型分數變化'] = week_df.apply(score_diff, axis=1)
+                                    d_val = r.get('數值_△', 0.0)
+                                    s_val = r.get('數值_總分', 0.0)
+                                    
+                                    safe_name = html.escape(name, quote=True)
+                                    safe_sid = html.escape(sid, quote=True)
+                                    safe_detail = html.escape(detail, quote=True)
+                                    safe_dyn = html.escape(dyn, quote=True)
+                                    safe_holder = html.escape(holder, quote=True)
+                                    
+                                    if d_val > 0:
+                                        bg_color = "rgba(255, 75, 75, 0.15)"   
+                                        border_color = "rgba(255, 75, 75, 0.4)" 
+                                        text_color = "#FF4B4B"                  
+                                        d_str = f"+{d_val:.2f}"
+                                    elif d_val < 0:
+                                        bg_color = "rgba(0, 230, 118, 0.15)"   
+                                        border_color = "rgba(0, 230, 118, 0.4)" 
+                                        text_color = "#00E676"                  
+                                        d_str = f"{d_val:.2f}"
+                                    else:
+                                        bg_color = "rgba(30, 41, 59, 0.6)"     
+                                        border_color = "#334155"
+                                        text_color = "#94A3B8"
+                                        d_str = "0.00"
+                                        
+                                    tooltip_text = (
+                                        f"【{safe_name}】&#10;"
+                                        f"股票代號: {safe_sid}&#10;"
+                                        f"模型總分: {s_val:.1f} 分&#10;"
+                                        f"單日△: {d_str}&#10;"
+                                        f"▼明細: {safe_detail}&#10;"
+                                        f"最新動態: {safe_dyn}&#10;"
+                                        f"大股東動向: {safe_holder}"
+                                    )
+                                    
+                                    tags_html += f"<div title=\"{tooltip_text}\" style=\"background-color: {bg_color}; color: #E2E8F0; border: 1px solid {border_color}; padding: 6px 14px; border-radius: 20px; margin: 5px; display: inline-flex; align-items: center; font-size: 13px; box-shadow: 0 2px 8px rgba(0,0,0,0.15); cursor: help; transition: transform 0.2s;\">{safe_name} ({safe_sid}) <span style='color: {text_color}; font-weight: bold; margin-left: 8px;'>△ {d_str}</span></div>"
                                 
-                                show_cols = ['鎖定日期', '代號', '名稱', '鎖定收盤價', col_price_name, '區間報酬', '總分', '今日分數', '模型分數變化']
-                                st.dataframe(week_df[[c for c in show_cols if c in week_df.columns]], use_container_width=True, hide_index=True)
+                                st.markdown(f"<div style='margin-top: 5px; line-height: 2.4;'>{tags_html}</div>", unsafe_allow_html=True)
+                                
+                        else:
+                            st.info("⚪ 尚無數據或找不到產業字典，無法繪製產業板塊圖。")
+
+                    elif selected_view == "🔹 歷史分數追蹤表":
+                        try:
+                            if not f_hist_combined.empty:
+                                recent_dates = sorted(f_hist_combined['紀錄日期'].unique(), reverse=True)[:20]
+                                df_h = f_hist_combined[f_hist_combined['紀錄日期'].isin(recent_dates)].copy()
+                                id_col = '代號' if '代號' in df_h.columns else '股票代號' if '股票代號' in df_h.columns else None
+                                if id_col and '總分' in df_h.columns:
+                                    df_h['日期'] = df_h['紀錄日期'].apply(lambda x: f"{x[4:6]}/{x[6:]}" if len(x)==8 else x)
+                                    df_h['代號'] = df_h[id_col].astype(str).str.replace(r'\.0$', '', regex=True).str.replace(r'\D', '', regex=True)
+                                    hist_pivot = df_h[['代號', '總分', '日期']].pivot_table(index='代號', columns='日期', values='總分', aggfunc='first').reset_index()
+                                    sorted_date_columns = sorted([col for col in hist_pivot.columns if col not in ['代號', '名稱']], reverse=True)
+                                    hist_pivot = hist_pivot[['代號'] + sorted_date_columns]
+                                    hist_pivot.insert(1, '名稱', hist_pivot['代號'].map(dict(zip(f_res_df['代號'].astype(str).str.replace(r'\.0$', '', regex=True).str.replace(r'\D', '', regex=True), f_res_df['名稱']))).fillna('-'))
+                                    hist_pivot = hist_pivot[hist_pivot['名稱'] != '-']
+                                    if not hist_pivot.empty and sorted_date_columns[0] in hist_pivot.columns:
+                                        st.dataframe(hist_pivot.sort_values(by=sorted_date_columns[0], ascending=False).reset_index(drop=True), use_container_width=True, hide_index=True)
+                                        st.info("我們也記錄了法人們口袋名單在觀察名單的總分變化，試著學習觀察籌碼動能的延續性與驗證 ▼變量...")
+                                    else:
+                                        st.warning("⚪ 尚無足夠的歷史分數紀錄。")
+                            else: 
+                                st.warning("⚪ 尚無足夠的歷史分數紀錄。")
+                        except Exception as e: 
+                            st.error(f"發生錯誤: {e}")
+
+                    elif selected_view == "🔹 模型驗證：每週 Top 5 追蹤":
+                        st.markdown("### 🏆 嚴選 5 檔模型追蹤")
+                        st.info("💡 我們先排除了法人丟出籌碼警示的標的，並根據總分與當日△選出前 5 名，但是有時候倒貨僅是換手，這個部分還相當困難阿，真是傷腦筋")
+                        if not f_res_df.empty:
+                            safe_df = f_res_df[f_res_df['賣出警示'] == "-"].copy()
+                            if not safe_df.empty:
+                                safe_df['數值△'] = pd.to_numeric(safe_df['△'].astype(str).str.replace('+', '', regex=False).str.replace('%', '', regex=False), errors='coerce').fillna(0)
+                                top5_df = safe_df.sort_values(by=['總分', '數值△'], ascending=[False, False]).head(5).drop(columns=['數值△'])
+                                
+                                cols = st.columns(5)
+                                for idx, (i, row) in enumerate(top5_df.iterrows()):
+                                    with cols[idx]:
+                                        delta_str = str(row['△'])
+                                        delta_color = "#FF4B4B" if "+" in delta_str else ("#00E272" if "-" in delta_str else "#E2E8F0")
+                                        st.markdown(f"""
+                                            <div style="background-color:rgba(0, 210, 255, 0.05); border-top: 3px solid #00D2FF; padding: 10px; border-radius: 5px;">
+                                                <h4 style="margin:0; color:#E2E8F0;">{row['名稱']}</h4>
+                                                <p style="margin:0; font-size:12px; color:#A0AEC0;">{row['代號']}</p>
+                                                <h2 style="margin:10px 0; color:#00D2FF;">{row['總分']:.1f} 分</h2>
+                                                <p style="margin:0; font-size:14px;"><strong>當日△:</strong> <span style="color:{delta_color}; font-weight:bold;">{delta_str}</span></p>
+                                                <p style="margin:5px 0 0 0; font-size:12px; line-height:1.2;">{row['大股東動向']}</p>
+                                            </div>
+                                        """, unsafe_allow_html=True)
+                                
+                                st.write("")
+                                st.dataframe(top5_df[['代號', '名稱', '總分', '▼變量', '△', '最新動態', '▼明細']], use_container_width=True, hide_index=True)
+                                
+                                st.write("---")
+                                c_space, c_main = st.columns([3, 2])
+                                with c_main:
+                                    with st.expander("🔐 站長用寫入追蹤名單", expanded=True):
+                                        track_pw = st.text_input("密碼", type="password", key="track_pw")
+                                        
+                                        if track_pw == "DDong888":
+                                            st.markdown("""
+                                            <style>
+                                            div[data-testid="stButton"] > button { padding: 0.25rem 0.5rem; font-size: 14px; }
+                                            </style>
+                                            """, unsafe_allow_html=True)
+                                            
+                                            if st.button("💾 儲存至 Google 雲端", type="primary", use_container_width=True):
+                                                with st.spinner("正在抓取當前收盤價並寫入雲端..."):
+                                                    import datetime
+                                                    track_date = datetime.datetime.now().strftime("%Y-%m-%d")
+                                                    current_prices = {}
+                                                    import yfinance as yf
+                                                    for sid in top5_df['代號']:
+                                                        try:
+                                                            p_df = yf.download(f"{sid}.TW", period="1d", progress=False)
+                                                            if p_df.empty: p_df = yf.download(f"{sid}.TWO", period="1d", progress=False)
+                                                            if not p_df.empty:
+                                                                val = p_df['Close'].iloc[-1]
+                                                                current_prices[sid] = round(float(val.iloc[0] if isinstance(val, pd.Series) else val), 2)
+                                                            else: current_prices[sid] = 0.0
+                                                        except: current_prices[sid] = 0.0
+                                                    
+                                                    top5_df['鎖定日期'] = track_date
+                                                    top5_df['鎖定收盤價'] = top5_df['代號'].astype(str).map(current_prices)
+                                                    
+                                                    try:
+                                                        try: old_track = conn.read(spreadsheet=SHEET_URL, worksheet="歷史名單回測觀察", ttl=0).dropna(how="all")
+                                                        except: old_track = pd.DataFrame()
+                                                        new_track = pd.concat([old_track, top5_df], ignore_index=True)
+                                                        conn.update(spreadsheet=SHEET_URL, worksheet="歷史名單回測觀察", data=new_track)
+                                                        st.success(f"✅ 已成功將 {track_date} 的名單寫入 Google Sheets！")
+                                                    except Exception as e:
+                                                        st.error(f"❌ 寫入失敗：{e} (請確認 Google Sheets 是否已建立『歷史名單回測觀察』工作表)")
+                                        elif track_pw != "": st.error("密碼錯誤")
+                                            
+                        st.markdown("### 📊 歷史名單回測觀察")
+                        try:
+                            history_track_df = conn.read(spreadsheet=SHEET_URL, worksheet="歷史名單回測觀察", ttl=0).dropna(how="all")
+                            if not history_track_df.empty:
+                                selected_week = st.selectbox("選擇要回顧的鎖定日期", sorted(history_track_df['鎖定日期'].unique(), reverse=True))
+                                week_df = history_track_df[history_track_df['鎖定日期'] == selected_week].copy()
+                                
+                                import datetime
+                                from datetime import timedelta
+                                lock_date_obj = datetime.datetime.strptime(selected_week, "%Y-%m-%d")
+                                days_passed = (datetime.datetime.now() - lock_date_obj).days
+                                
+                                is_expired = days_passed >= 28 
                                 
                                 if is_expired:
-                                    st.info("🔒 此梯次名單已追蹤滿 4 週。為了客觀評估波段策略，此表已凍結於結案當時的收盤價與績效，不再隨每日盤勢波動。")
+                                    status_tag = "🔴 已結案 (凍結在第4週)"
+                                    target_start = lock_date_obj + timedelta(days=28)
+                                    start_str = target_start.strftime("%Y-%m-%d")
+                                    end_str = (target_start + timedelta(days=5)).strftime("%Y-%m-%d")
                                 else:
-                                    st.info("💡 **驗證方法**：觀察鎖定股票的『區間報酬』是否為正，並核對『模型分數變化』是否持續上升。這能印證籌碼集中度與股價的連動性！")
-                    except Exception as e:
-                        st.write("⚪ 尚無歷史追蹤紀錄，請輸入密碼鎖定第一筆，或確認 Google Sheets 已建立工作表。")
+                                    weeks_passed = (days_passed // 7) + 1
+                                    status_tag = f"🟢 追蹤中 (第 {weeks_passed} 週)"
+                                    start_str = None 
 
+                                st.markdown(f"**目前狀態：** `{status_tag}` ｜ **已鎖定：** `{days_passed} 天`")
+
+                                with st.spinner("正在連線抓取檢測價格..."):
+                                    import yfinance as yf
+                                    latest_prices = {}
+                                    for sid in week_df['代號'].astype(str).str.replace(r'\.0$', '', regex=True):
+                                        try:
+                                            ticker_tw = f"{sid}.TW"
+                                            ticker_two = f"{sid}.TWO"
+                                            if start_str: 
+                                                p_df = yf.download(ticker_tw, start=start_str, end=end_str, progress=False)
+                                                if p_df.empty: p_df = yf.download(ticker_two, start=start_str, end=end_str, progress=False)
+                                                if not p_df.empty:
+                                                    val = p_df['Close'].iloc[0] 
+                                                    latest_prices[sid] = round(float(val.iloc[0] if isinstance(val, pd.Series) else val), 2)
+                                                else: latest_prices[sid] = 0.0
+                                            else: 
+                                                p_df = yf.download(ticker_tw, period="1d", progress=False)
+                                                if p_df.empty: p_df = yf.download(ticker_two, period="1d", progress=False)
+                                                if not p_df.empty:
+                                                    val = p_df['Close'].iloc[-1]
+                                                    latest_prices[sid] = round(float(val.iloc[0] if isinstance(val, pd.Series) else val), 2)
+                                                else: latest_prices[sid] = 0.0
+                                        except: latest_prices[sid] = 0.0
+
+                                col_price_name = "結案價格" if is_expired else "最新價格"
+                                week_df[col_price_name] = week_df['代號'].astype(str).str.replace(r'\.0$', '', regex=True).map(latest_prices)
+                                
+                                def calc_price_return(row):
+                                    try:
+                                        lock_p = float(row.get('鎖定收盤價', 0))
+                                        curr_p = float(row.get(col_price_name, 0))
+                                        if lock_p > 0 and curr_p > 0:
+                                            pct = ((curr_p - lock_p) / lock_p) * 100
+                                            if pct > 0: return f"🚀 +{pct:.1f}%"
+                                            elif pct < 0: return f"🩸 {pct:.1f}%"
+                                            else: return "0.0%"
+                                        return "-"
+                                    except: return "-"
+                                    
+                                week_df['區間報酬'] = week_df.apply(calc_price_return, axis=1)
+
+                                if not f_res_df.empty:
+                                    today_scores = dict(zip(f_res_df['代號'].astype(str), f_res_df['總分']))
+                                    week_df['今日分數'] = week_df['代號'].astype(str).str.replace(r'\.0$', '', regex=True).map(today_scores).fillna(0)
+                                    
+                                    def score_diff(row):
+                                        try:
+                                            diff = float(row['今日分數']) - float(row['總分']) 
+                                            if diff > 0: return f"📈 +{diff:.1f}"
+                                            elif diff < 0: return f"📉 {diff:.1f}"
+                                            else: return "-"
+                                        except: return "-"
+                                        
+                                    week_df['模型分數變化'] = week_df.apply(score_diff, axis=1)
+                                    
+                                    show_cols = ['鎖定日期', '代號', '名稱', '鎖定收盤價', col_price_name, '區間報酬', '總分', '今日分數', '模型分數變化']
+                                    st.dataframe(week_df[[c for c in show_cols if c in week_df.columns]], use_container_width=True, hide_index=True)
+                                    
+                                    if is_expired:
+                                        st.info("🔒 此梯次名單已追蹤滿 4 週。為了客觀評估波段策略，此表已凍結於結案當時的收盤價與績效，不再隨每日盤勢波動。")
+                                    else:
+                                        st.info("💡 **驗證方法**：觀察鎖定股票的『區間報酬』是否為正，並核對『模型分數變化』是否持續上升。這能印證籌碼集中度與股價的連動性！")
+                        except Exception as e:
+                            st.write("⚪ 尚無歷史追蹤紀錄，請輸入密碼鎖定第一筆，或確認 Google Sheets 已建立工作表。")
+
+                # 👇 呼叫這個局部渲染魔法函數，把剛剛算好的分數傳進去！
+                render_pool_interactive_ui(res_df, hist_combined)
 # ==========================================
 # ✉️ 獨立分頁：聯絡我們 (完美黑夜派對版)
 # ==========================================
