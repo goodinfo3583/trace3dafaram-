@@ -4939,7 +4939,16 @@ if current_page in ["all", "pool"]:
                 # 區塊 5 (大戶動向，直接用檔名的日期比對，最準確！)
                 elif "大股東" in filename or "神秘金字塔" in filename or "集保" in filename:
                     if file_date > d_b5_share: d_b5_share = file_date
-        #標題及更新時間
+        # ==========================================
+        # 🚀 日期格式化工具與動態標題渲染
+        # ==========================================
+        # 👇 建立防呆日期轉換工具 (把 20260618 變成 06/18，若無資料則顯示 --/--)
+        def fmt_d(date_str):
+            if date_str and len(date_str) >= 8 and date_str != "00000000":
+                return f"{date_str[4:6]}/{date_str[6:8]}"
+            return "--/--"
+
+        # 👇 渲染您專屬的科技風漸層橫幅標題
         st.markdown(f"""
         <div style="background: linear-gradient(90deg, rgba(15,23,42,1) 0%, rgba(14,165,233,0.3) 50%, rgba(15,23,42,1) 100%); 
                     border-top: 1px solid #38bdf8; border-bottom: 1px solid #38bdf8; padding: 15px 20px; border-radius: 10px;
@@ -4948,10 +4957,11 @@ if current_page in ["all", "pool"]:
                 ⛲ 觀察名單
             </h2>
             <div style='font-size:13px; color:#00D2FF; font-weight:500; margin-top:8px;'>
-                 基準日 : 📍區塊1(法人): {fmt_d(d_b1_inst)} ｜ 📍區塊2&3(籌碼): {fmt_d(d_b23_chip)} ｜ 📍區塊4(資券): {fmt_d(d_b4_margin)} ｜ 📍區塊5(大戶): {fmt_d(d_b5_share)}
+                 基準日 : 📍法人持股: {fmt_d(d_b1_inst)} ｜ 📍法人買況: {fmt_d(d_b23_chip)} ｜ 📍資券: {fmt_d(d_b4_margin)} ｜ 📍大腿: {fmt_d(d_b5_share)}
             </div>
         </div>
         """, unsafe_allow_html=True)
+        
         #容器
         with st.container(border=True):
             st.info("💡 我們試著觀察近5/20/60/120日法人持股上升的變化前段班且當天持續買入的標的，搭配其他掃貨、連買、大腿數據等，看看是否能找出藏在法人們口袋裡的標的。(試著參考▼明細)")
