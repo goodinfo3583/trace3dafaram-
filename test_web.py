@@ -4900,12 +4900,13 @@ def render_proxy_buttons():
 
 
 # ==========================================↓↓↓
-# 🔒 觀察名單專屬包廂鎖 (🚨 必須放在計分部分檔案最下方！)
+# 🔒 觀察名單專屬包廂鎖 頂級核心數據分析觀察名單 (🚨 必須放在計分部分檔案最下方！)
 # ==========================================
 if current_page in ["all", "pool"]:
     
-    # 🧙 強制將這個區塊的畫面傳送回網頁最頂端的卡位槽顯示！
-    with top_pool_slot:
+    # 🧙 核心修正：加上 .container()！
+    # 這樣才能把「標題」跟「下方的內容」全部打包裝在一起，避免標題被覆蓋消失！
+    with top_pool_slot.container():
         st.write("---")
         st.markdown("<div id='section-top-pool'></div>", unsafe_allow_html=True)
 
@@ -4919,30 +4920,31 @@ if current_page in ["all", "pool"]:
         anchor_date_str = "00000000"
         d_b1_inst, d_b23_chip, d_b4_margin, d_b5_share = "00000000", "00000000", "00000000", "00000000"
         
-        for f in all_files:
-            filename = os.path.basename(f)
-            match = re.search(r'(202\d{5})', filename)
-            if match:
-                file_date = match.group(1)
-                # 總檔期基準
-                if file_date > anchor_date_str: anchor_date_str = file_date
-                
-                # 區塊 1
-                if "持股排名變化" in filename or "JSON_History" in filename:
-                    if file_date > d_b1_inst: d_b1_inst = file_date
-                # 區塊 2 & 3
-                elif "佔成交比" in filename or "連買" in filename or "買賣超" in filename:
-                    if file_date > d_b23_chip: d_b23_chip = file_date
-                # 區塊 4
-                elif "融資" in filename or "融券" in filename or "借券" in filename or "資券" in filename:
-                    if file_date > d_b4_margin: d_b4_margin = file_date
-                # 區塊 5 (大戶動向，直接用檔名的日期比對，最準確！)
-                elif "大股東" in filename or "神秘金字塔" in filename or "集保" in filename:
-                    if file_date > d_b5_share: d_b5_share = file_date
+        if all_files: # 防呆：確保資料夾內真的有檔案
+            for f in all_files:
+                filename = os.path.basename(f)
+                match = re.search(r'(202\d{5})', filename)
+                if match:
+                    file_date = match.group(1)
+                    # 總檔期基準
+                    if file_date > anchor_date_str: anchor_date_str = file_date
+                    
+                    # 區塊 1
+                    if "持股排名變化" in filename or "JSON_History" in filename:
+                        if file_date > d_b1_inst: d_b1_inst = file_date
+                    # 區塊 2 & 3
+                    elif "佔成交比" in filename or "連買" in filename or "買賣超" in filename:
+                        if file_date > d_b23_chip: d_b23_chip = file_date
+                    # 區塊 4
+                    elif "融資" in filename or "融券" in filename or "借券" in filename or "資券" in filename:
+                        if file_date > d_b4_margin: d_b4_margin = file_date
+                    # 區塊 5
+                    elif "大股東" in filename or "神秘金字塔" in filename or "集保" in filename:
+                        if file_date > d_b5_share: d_b5_share = file_date
+
         # ==========================================
         # 🚀 日期格式化工具與動態標題渲染
         # ==========================================
-        # 👇 建立防呆日期轉換工具 (把 20260618 變成 06/18，若無資料則顯示 --/--)
         def fmt_d(date_str):
             if date_str and len(date_str) >= 8 and date_str != "00000000":
                 return f"{date_str[4:6]}/{date_str[6:8]}"
@@ -4962,7 +4964,7 @@ if current_page in ["all", "pool"]:
         </div>
         """, unsafe_allow_html=True)
         
-        #容器
+        # 容器
         with st.container(border=True):
             st.info("💡 我們試著觀察近5/20/60/120日法人持股上升的變化前段班且當天持續買入的標的，搭配其他掃貨、連買、大腿數據等，看看是否能找出藏在法人們口袋裡的標的。(試著參考▼明細)")
 
@@ -4978,6 +4980,10 @@ if current_page in ["all", "pool"]:
                 render_proxy_buttons()
                 
                 st.stop() #  絕對停止！不准用舊的 0 分往下算！
+            
+            # --- 以下保留您原本的正式運算數據分析邏輯 ---
+            # df_b1 = st.session_state.get('my_final_df', pd.DataFrame()).copy()
+            # ...
 
             # ---------------- 開始正式運算數據分析觀察名單打底及積分 ----------------
             df_b1 = st.session_state.get('my_final_df', pd.DataFrame()).copy()
