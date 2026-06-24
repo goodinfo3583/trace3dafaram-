@@ -98,34 +98,6 @@ def set_background(image_path):
         st.markdown(css, unsafe_allow_html=True)
     except FileNotFoundError:
         st.warning(f"⚠️ 找不到背景圖片檔：{image_path}，請確認檔名與路徑是否完全正確。")
-# ==========================================
-import streamlit_authenticator as stauth
-# ==========================================
-# 🔒 VIP 會員系統初始化 (大腦引擎)
-# ==========================================
-credentials = {
-    "usernames": {
-        "vipuser": {
-            "email": "vip@yourdomain.com",
-            "name": "尊爵大腿",
-            "password": "8888" # 直接寫明文即可
-        }
-    }
-}
-
-# 2. 🚀 新版套件專用語法：讓系統自動把上方的所有密碼變成加密亂碼！
-stauth.Hasher.hash_passwords(credentials)
-
-# 3. 建立驗證器物件
-authenticator = stauth.Authenticate(
-    credentials,
-    "my_dashboard_cookie",  
-    "secret_signature_key", 
-    30  
-)
-
-# ❌ 記得！這裡絕對不要呼叫 authenticator.login()
-
 
 # ==========================================
 # 🖼️ 網站圖片資料夾路徑初始化
@@ -5770,44 +5742,7 @@ if current_page == "contact":
     # 🛑 最核心的魔法：渲染完聯絡表單後，直接強制停止後續程式！完全不讀取底下的大數據！
     st.stop()
     
-# ==========================================
-# 💎 獨立分頁 區塊 7：VIP 專區 (故事劇情與專屬功能)
-# ==========================================
-with tab_vip:
-    st.markdown("### 登入：隱藏的故事")
-    
-    # 🌟 在這裡呼叫登入，登入框就會乖乖待在這個分頁裡！
-    try:
-        authenticator.login("main") # 新版語法，在主畫面顯示登入框
-    except Exception as e:
-        pass # 容錯處理
-
-    # 判斷登入狀態
-    if st.session_state.get("authentication_status"):
-        # 🟢 已經成功登入
-        st.success(f"歡迎回來，{st.session_state['name']}！您已解鎖權限。")
         
-        # 👇 這裡開始放您的故事劇情
-        st.markdown("#### 📜 關於這段故事")
-        st.write("冒險者，這個市場充滿了各種未知的風險，直到開發了這套系統...")
-        
-        # 登出按鈕
-        authenticator.logout("登出 VIP 專區", "main")
-        
-    elif st.session_state.get("authentication_status") is False:
-        # 🔴 密碼輸入錯誤
-        st.error("帳號或密碼錯誤！請重新輸入。")
-        
-    elif st.session_state.get("authentication_status") is None:
-        # ⚪ 尚未登入
-        st.warning("請先在上方登入框輸入帳號密碼，即可解鎖隱藏劇情。")
-# ==========================================
-# 🚀 終極分頁導航系統 (記得把 tab_vip 加在最後面！)
-# ==========================================
-tab_pool, tab_search, tab_b1, tab_b2, tab_b3, tab_b4, tab_b5, tab_b6, tab_vip = st.tabs([
-    "🏆 觀察名單", "🔍 籌碼快搜", "👑 區塊1：三大法人", "🎯 區塊2：淨買佔比", 
-    "📅 區塊3：連續買超", "🔄 區塊4：融資券", "💰 區塊5：大股東", "💸 區塊6：鉅額交易", "💎 VIP 專區"
-])          
 # ==========================================
 # 🧪 測試區：Google Sheets 連線測試
 # ==========================================
