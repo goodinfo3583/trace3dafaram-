@@ -510,7 +510,7 @@ if (!parentDoc.getElementById('custom-sticky-header')) {
         .disclaimer-title { color: #64748B; font-size: 13px; font-weight: 500; text-decoration: none; text-shadow: 1px 1px 4px rgba(0,0,0,1), -1px -1px 4px rgba(0,0,0,1); }
         .disclaimer-item:hover .disclaimer-title { color: #FFD700; text-shadow: 0 0 8px rgba(255, 215, 0, 0.8); }
         
-        /* 💎 VIP 專屬樣式 (閃亮亮的登入按鈕) */
+        /* 閃亮亮的登入按鈕*/
         .vip-login-btn { color: #FFD700 !important; font-weight: bold; text-shadow: 0 0 5px rgba(255, 215, 0, 0.5); transition: all 0.3s; }
         .vip-login-btn:hover { text-shadow: 0 0 12px rgba(255, 215, 0, 1); transform: scale(1.05); }
 
@@ -553,8 +553,8 @@ if (!parentDoc.getElementById('custom-sticky-header')) {
             <div class="disclaimer-item"><a href="#" data-target="NavToContact" class="disclaimer-title internal-nav" style="cursor: pointer;">聯絡我們</a></div>
             
             <div class="disclaimer-item">
-                <a href="#" data-target="VIP 專區" class="disclaimer-title internal-nav vip-login-btn" style="cursor: pointer; display: flex; align-items: center;">
-                    <span style="font-size: 13px; margin-right: 3px;"></span> 登入
+                <a href="#" data-target="登入專區" class="disclaimer-title internal-nav vip-login-btn" style="cursor: pointer; display: flex; align-items: center;">
+                    <span style="font-size: 13px; margin-right: 3px;"></span> 登入🛠️
                 </a>
             </div>
            
