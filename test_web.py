@@ -67,6 +67,27 @@ DATA_DIR = "./Goodinfo_Rankings"
 SCORE_HISTORY_DIR = os.path.join(DATA_DIR, "ScoreHistory")
 MARKET_HISTORY_DIR = os.path.join(DATA_DIR, "MarketHistory")
 BLOCK_HISTORY_DIR = os.path.join(DATA_DIR, "BlockHistory")
+
+# ==========================================
+# 🧭 1. 狀態初始化 (頁面路由大腦隱藏按鈕及登入)
+# ==========================================
+if 'current_page' not in st.session_state:
+    st.session_state.current_page = 'main' # 預設停留在主控台
+
+# ==========================================
+# 🛑 2. 隱藏的頁面切換引擎 (專門接收 JS 頂部按鈕的指令)
+# ==========================================
+# 這些 st.button 等一下會被 JS 的 CSS 自動隱藏，玩家看不到
+if st.button("NavToMain"): 
+    st.session_state.current_page = 'main'
+    st.rerun()
+if st.button("NavToContact"): 
+    st.session_state.current_page = 'contact'
+    st.rerun()
+if st.button("NavToVIP"): 
+    st.session_state.current_page = 'vip'
+    st.rerun()
+
 # ==========================================
 # 🌌 網站主視覺背景設定引擎
 # ==========================================
@@ -499,6 +520,7 @@ if (!parentDoc.getElementById('custom-sticky-header')) {
     
     const style = parentDoc.createElement('style');
     style.innerHTML = `
+        /* ... (這裡保留您原本所有的 CSS 樣式設定，包含 .nav-icon 等) ... */
         [data-testid="stHeader"] { display: none !important; }
         [data-testid="stToolbar"] { display: none !important; }
         [data-testid="collapsedControl"] { top: 70px !important; z-index: 1000000 !important; background-color: rgba(10, 13, 20, 0.8) !important; border-radius: 50%; }
@@ -510,36 +532,17 @@ if (!parentDoc.getElementById('custom-sticky-header')) {
         .disclaimer-title { color: #64748B; font-size: 13px; font-weight: 500; text-decoration: none; text-shadow: 1px 1px 4px rgba(0,0,0,1), -1px -1px 4px rgba(0,0,0,1); }
         .disclaimer-item:hover .disclaimer-title { color: #FFD700; text-shadow: 0 0 8px rgba(255, 215, 0, 0.8); }
         
-        /* 💎 VIP 專屬樣式 (閃亮亮的登入按鈕) */
         .vip-login-btn { color: #FFD700 !important; font-weight: bold; text-shadow: 0 0 5px rgba(255, 215, 0, 0.5); transition: all 0.3s; }
         .vip-login-btn:hover { text-shadow: 0 0 12px rgba(255, 215, 0, 1); transform: scale(1.05); }
 
-        .disclaimer-content { position: absolute; top: 100%; left: 0; width: 350px; max-width: 90vw; background-color: rgba(17, 22, 34, 0.95); border: 1px solid #1E293B; border-top: none; border-radius: 0 0 8px 8px; padding: 0px 15px; max-height: 0; opacity: 0; overflow: hidden; transition: all 0.3s; font-size: 12px; color: #94A3B8; line-height: 1.6; box-shadow: 0px 8px 20px rgba(0,0,0,0.8); }
-        .disclaimer-item:hover .disclaimer-content { max-height: 400px; opacity: 1; padding: 12px 15px; }
-        
         .nav-btn-container { display: flex; flex-wrap: wrap; justify-content: flex-end; align-items: center; padding: 8px 15px; background: transparent !important; gap: 6px; border: none !important; transition: all 0.3s ease-in-out; }
         .nav-text-link { text-decoration: none !important; color: #94A3B8 !important; font-size: 16px; font-weight: 600; padding: 4px 6px; transition: all 0.2s ease-in-out; text-shadow: 1px 1px 4px rgba(0,0,0,1), -1px -1px 4px rgba(0,0,0,1); cursor: pointer; display: flex; align-items: center; }
         .nav-text-link:hover { color: #FFD700 !important; text-shadow: 0 0 12px rgba(255, 215, 0, 0.8); transform: scale(1.08); }
         .nav-divider { color: #334155; font-size: 16px; user-select: none; }
-        #custom-sidebar-toggle { color: #38BDF8 !important; }
-
-        /* 🎨 自訂圖片圖示的 CSS 樣式 */
-        .nav-icon { 
-            width: 22px; 
-            height: 22px; 
-            margin-right: 5px; 
-            border-radius: 4px; 
-            object-fit: cover;
-            position: relative; 
-            top: -2px;          
-            left: 0px;          
-            transition: all 0.3s ease-in-out;
-        }
-        .nav-text-link:hover .nav-icon {
-            filter: drop-shadow(0px 0px 6px rgba(255, 215, 0, 0.9)) brightness(1.15);
-        }
         
-        @media (max-width: 768px) { .nav-btn-container { padding: 5px 10px; } .nav-divider { display: none; } .nav-text-link { font-size: 14px; margin: 2px; } }
+        .nav-icon { width: 22px; height: 22px; margin-right: 5px; border-radius: 4px; object-fit: cover; position: relative; top: -2px; left: 0px; transition: all 0.3s ease-in-out; }
+        .nav-text-link:hover .nav-icon { filter: drop-shadow(0px 0px 6px rgba(255, 215, 0, 0.9)) brightness(1.15); }
+        div[id^="section-"] { scroll-margin-top: 80px; }
         .stApp { margin-top: 50px !important; }
     `;
     parentDoc.head.appendChild(style);
@@ -548,94 +551,64 @@ if (!parentDoc.getElementById('custom-sticky-header')) {
     headerDiv.id = 'custom-sticky-header';
     headerDiv.innerHTML = `
         <div class="disclaimer-bar">
-            <div class="disclaimer-item"><span class="disclaimer-title">使用聲明</span><div class="disclaimer-content">本平台僅供教育研究與籌碼觀察，絕不構成任何實質投資建議、勸誘或要約。所有資料源自公開數據，受限於網路技術，可能有延遲或錯誤。<br><br>投資必有風險，依本平台資訊所做之任何決策與損益，均須由使用者自行負責，本平台不負擔任何法律賠償責任。</div></div>
-            <div class="disclaimer-item"><span class="disclaimer-title">隱私權政策</span><div class="disclaimer-content"><b>1. 蒐集目的與範圍：</b><br>本平台依個資法蒐集您的識別資料僅供維持系統安全與優化服務使用。<br><b>2. 資料利用：</b><br>您的資料絕不向第三方洩露。<br><b>3. 資料刪除：</b><br>您可透過「聯絡我們」請求刪除資料。<br><b>4. 政策修訂：</b><br>本站保留修改政策之權利，繼續使用即視為同意。</div></div>
-            <div class="disclaimer-item"><a href="#" data-target="NavToContact" class="disclaimer-title internal-nav" style="cursor: pointer;">聯絡我們</a></div>
+            <div class="disclaimer-item"><a href="#" data-type="page" data-target="NavToContact" class="disclaimer-title internal-nav" style="cursor: pointer;">聯絡我們</a></div>
             
             <div class="disclaimer-item">
-                <a href="#" data-target="VIP 專區" class="disclaimer-title internal-nav vip-login-btn" style="cursor: pointer; display: flex; align-items: center;">
-                    <span style="font-size: 13px; margin-right: 3px;"></span> 登入
+                <a href="#" data-type="page" data-target="NavToVIP" class="disclaimer-title internal-nav vip-login-btn" style="cursor: pointer; display: flex; align-items: center;">
+                    <span style="font-size: 15px; margin-right: 3px;">💎</span> 會員登入
                 </a>
             </div>
-           
             <div style="flex-grow: 1;"></div>
-            <div class="disclaimer-item" id="mobile-nav-toggle" title="收起選單" style="cursor: pointer; padding-right: 5px;">
-                <span id="nav-toggle-icon" style="font-size: 18px; color: #38BDF8;">📜</span>
-            </div>
         </div>
         <div class="nav-btn-container" id="nav-btn-container">
-            <a href="#" id="custom-sidebar-toggle" class="nav-text-link"><img src="app/static/iconarrow1.png" class="nav-icon" alt="icon">呼叫側邊欄</a><span class="nav-divider">|</span>
-            <a href="#" data-target="NavToNews" class="nav-text-link internal-nav"><img src="app/static/magicbook2.png" class="nav-icon" alt="icon">市場消息</a><span class="nav-divider">|</span>
-            <a href="#" data-target="NavToPool" class="nav-text-link internal-nav"><img src="app/static/magicbookfire2.png" class="nav-icon" alt="icon">觀察名單</a><span class="nav-divider">|</span>
-            <a href="#" data-target="NavToB1" class="nav-text-link internal-nav"><img src="app/static/magicbookleaf.png" class="nav-icon" alt="icon">法人持股</a><span class="nav-divider">|</span>
-            <a href="#" data-target="NavToB2" class="nav-text-link internal-nav"><img src="app/static/magicbookwind.png" class="nav-icon" alt="icon">法人掃貨</a><span class="nav-divider">|</span>
-            <a href="#" data-target="NavToB3" class="nav-text-link internal-nav"><img src="app/static/magicbookwater.png" class="nav-icon" alt="icon">法人連買</a><span class="nav-divider">|</span>
-            <a href="#" data-target="NavToB4" class="nav-text-link internal-nav"><img src="app/static/magicbookground.png" class="nav-icon" alt="icon">資券軋空</a><span class="nav-divider">|</span>
-            <a href="#" data-target="NavToB5" class="nav-text-link internal-nav"><img src="app/static/wirtleg.png" class="nav-icon" alt="icon">大腿動向</a><span class="nav-divider">|</span>
-            <a href="#" data-target="NavToB6" class="nav-text-link internal-nav"><img src="app/static/magicbookfire.png" class="nav-icon" alt="icon">鉅額交易</a>
+            <a href="#" data-type="page" data-target="NavToMain" class="nav-text-link internal-nav">🏠 返回主控台</a><span class="nav-divider">|</span>
+            
+            <a href="#" data-type="scroll" data-target="section-1" class="nav-text-link internal-nav"><img src="app/static/magicbookleaf.png" class="nav-icon" alt="icon">法人持股</a><span class="nav-divider">|</span>
+            <a href="#" data-type="scroll" data-target="section-2-1" class="nav-text-link internal-nav"><img src="app/static/magicbookwind.png" class="nav-icon" alt="icon">法人掃貨</a><span class="nav-divider">|</span>
+            <a href="#" data-type="scroll" data-target="section-3" class="nav-text-link internal-nav"><img src="app/static/magicbookwater.png" class="nav-icon" alt="icon">法人連買</a><span class="nav-divider">|</span>
+            <a href="#" data-type="scroll" data-target="section-4-1" class="nav-text-link internal-nav"><img src="app/static/magicbookground.png" class="nav-icon" alt="icon">資券軋空</a><span class="nav-divider">|</span>
+            <a href="#" data-type="scroll" data-target="section-5" class="nav-text-link internal-nav"><img src="app/static/wirtleg.png" class="nav-icon" alt="icon">大腿動向</a><span class="nav-divider">|</span>
+            <a href="#" data-type="scroll" data-target="section-6" class="nav-text-link internal-nav"><img src="app/static/magicbookfire.png" class="nav-icon" alt="icon">鉅額交易</a>
         </div>
     `;
     parentDoc.body.insertBefore(headerDiv, parentDoc.body.firstChild);
 
     setTimeout(() => {
-        // 🚀 主按鈕切換邏輯
+        // 🚀 雙引擎切換邏輯 (支援跨頁面切換 + 同頁面滑動)
         const navLinks = parentDoc.querySelectorAll('.internal-nav');
         navLinks.forEach(link => {
             link.onclick = (e) => {
                 e.preventDefault(); 
-                const targetName = link.getAttribute('data-target');
-                const btns = Array.from(parentDoc.querySelectorAll('button'));
+                const navType = link.getAttribute('data-type');
+                const targetVal = link.getAttribute('data-target');
                 
-                // 💡 終極殺招：使用 textContent 取代 innerText，保證隱藏按鈕也能被找到！
-                const targetBtn = btns.find(b => b.textContent.includes(targetName));
-                if (targetBtn) targetBtn.click();
-            };
-        });
-
-        // 🚀 收闔邏輯：只改變 title 與 icon 內容
-        const menuToggle = parentDoc.getElementById('mobile-nav-toggle');
-        const navContainer = parentDoc.getElementById('nav-btn-container');
-        const iconSpan = parentDoc.getElementById('nav-toggle-icon');
-        
-        if (menuToggle && navContainer && iconSpan) {
-            menuToggle.onclick = (e) => {
-                e.preventDefault();
-                if (navContainer.style.display === 'none') {
-                    navContainer.style.display = 'flex';
-                    menuToggle.title = "收起選單";
-                    iconSpan.innerText = '📜';
-                    iconSpan.style.color = '#38BDF8';
-                } else {
-                    navContainer.style.display = 'none';
-                    menuToggle.title = "展開選單";
-                    iconSpan.innerText = '📙';
-                    iconSpan.style.color = '#FFD700';
-                }
-            };
-        }
-
-        // 側邊欄開關邏輯
-        const toggleBtn = parentDoc.getElementById('custom-sidebar-toggle');
-        if (toggleBtn) {
-            toggleBtn.onclick = (e) => {
-                e.preventDefault();
-                const expandBtn = parentDoc.querySelector('[data-testid="collapsedControl"]');
-                if (expandBtn) expandBtn.click();
-                else {
-                    const sidebar = parentDoc.querySelector('[data-testid="stSidebar"]');
-                    if (sidebar) {
-                        const closeBtn = sidebar.querySelector('button');
-                        if (closeBtn) closeBtn.click();
+                if (navType === 'page') {
+                    // 📁 執行【跨頁面切換】：去找隱藏的 Python 按鈕點擊
+                    const btns = Array.from(parentDoc.querySelectorAll('button'));
+                    const targetBtn = btns.find(b => b.textContent.includes(targetVal));
+                    if (targetBtn) targetBtn.click();
+                } 
+                else if (navType === 'scroll') {
+                    // 🛹 執行【畫面滑動】：去找 id="section-x" 的區塊
+                    const targetDiv = parentDoc.getElementById(targetVal);
+                    if (targetDiv) {
+                        // 如果在首頁，瞬間滑動過去！
+                        targetDiv.scrollIntoView({ behavior: 'smooth', block: 'start' });
+                    } else {
+                        // 🌟 防呆機制：如果找不到區塊 (代表玩家在 VIP 頁面)，強制切換回主畫面！
+                        const btns = Array.from(parentDoc.querySelectorAll('button'));
+                        const homeBtn = btns.find(b => b.textContent.includes('NavToMain'));
+                        if (homeBtn) homeBtn.click();
                     }
                 }
             };
-        }
-        
-        // 🛡️ 隱藏守護員：可以安心使用 display: none 了
+        });
+
+        // 🛡️ 隱藏守護員：把 Python 隱藏按鈕藏好
         setInterval(() => {
             const allBtns = Array.from(parentDoc.querySelectorAll('button'));
             allBtns.forEach(b => {
-                if(b.textContent.includes('NavTo')) { // 這裡也要用 textContent
+                if(b.textContent.includes('NavTo')) { 
                     const wrapper = b.closest('div[data-testid="stElementContainer"]');
                     if (wrapper) wrapper.style.display = 'none';
                 }
@@ -645,8 +618,6 @@ if (!parentDoc.getElementById('custom-sticky-header')) {
 }
 </script>
 """
-
-# 透過隱藏的 iframe 執行上述的 JavaScript 注入
 components.html(inject_js, height=0, width=0)
 # 👆👆👆 ========================================================== 👆👆👆
 import time  # 引入時間模組來做快取破壞器開始市場消息
@@ -5742,7 +5713,57 @@ if current_page == "contact":
     # 🛑 最核心的魔法：渲染完聯絡表單後，直接強制停止後續程式！完全不讀取底下的大數據！
     st.stop()
     
+# ==========================================
+# 🗺️ 3. 場景路由分發器 (控制畫面顯示什麼)
+# ==========================================
+
+# ----------------- 【場景 A：主控台】 -----------------
+if st.session_state.current_page == 'main':
+    # 🌟 這裡放您原本所有的瀑布流看盤程式碼 (區塊 1 ~ 區塊 6)
+    st.markdown("<div id='section-1'></div>", unsafe_allow_html=True)
+    st.write("這裡是主畫面區塊1...")
+    # ... (請將您原本龐大的看盤程式碼都縮排放在這裡)
+
+# ----------------- 【場景 B：聯絡我們】 -----------------
+elif st.session_state.current_page == 'contact':
+    st.markdown("## 📞 聯絡站長")
+    st.write("---")
+    
+    # 🧚‍♀️ 召喚 NPC 圖片 (您可以放自己的 Canva 圖片)
+    col1, col2 = st.columns([1, 3])
+    with col1:
+        # 假設您的 static 資料夾有這張 NPC 圖片
+        st.image("app/static/npc_kikyo.png", caption="引導精靈 桔梗") 
+    with col2:
+        st.info("你好，旅行者！使用上遇到什麼 Bug 嗎？請填寫下列表單告訴我們...")
+        # 這裡可以放您的 Google 表單連結或是 st.text_input
+
+# ----------------- 【場景 C：VIP 登入】 -----------------
+elif st.session_state.current_page == 'vip':
+    st.markdown("## 💎 VIP 會員專區")
+    st.write("---")
+    
+    # 🧙‍♂️ 召喚 VIP 看門 NPC 圖片
+    col1, col2 = st.columns([1, 3])
+    with col1:
+        st.image("app/static/npc_guard.png", caption="VIP 守門員") 
+    with col2:
+        st.warning("前方是專屬大腿的神秘領域，請出示您的通行證！")
         
+        # 👇 將高資安的 authenticator 登入框放在這裡！
+        try:
+            authenticator.login("main")
+        except Exception as e:
+            pass
+        
+        # 判斷登入狀態 (跟之前的邏輯一樣)
+        if st.session_state.get("authentication_status"):
+            st.success(f"歡迎回來，{st.session_state['name']}！結界已為您開啟。")
+            st.write("📜 [這裡可以放隱藏的 VIP 專屬故事或是私密大腿名單...]")
+            authenticator.logout("登出", "main")
+            
+        elif st.session_state.get("authentication_status") is False:
+            st.error("通行證錯誤！請重新輸入。")        
 # ==========================================
 # 🧪 測試區：Google Sheets 連線測試
 # ==========================================
