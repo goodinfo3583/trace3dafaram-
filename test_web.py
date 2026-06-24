@@ -98,21 +98,24 @@ def set_background(image_path):
         st.markdown(css, unsafe_allow_html=True)
     except FileNotFoundError:
         st.warning(f"⚠️ 找不到背景圖片檔：{image_path}，請確認檔名與路徑是否完全正確。")
+# ==========================================
+import streamlit_authenticator as stauth
 
 import streamlit_authenticator as stauth
 
 # ==========================================
 # 🔒 VIP 會員系統初始化 (大腦引擎)
 # ==========================================
-# 這是您的會員資料庫。為了資安，密碼必須經過加密 (Hash)。
-# 這裡我先幫您預設了一組帳號：帳號 vipuser / 密碼 8888 
-# (那串亂碼就是 8888 加密後的結果，即使外流別人也不知道密碼是 8888)
+# 💡 
+passwords_to_hash = ['8888']
+hashed_passwords = stauth.Hasher(passwords_to_hash).generate()
+
 credentials = {
     "usernames": {
         "vipuser": {
             "email": "vip@yourdomain.com",
             "name": "尊爵大腿",
-            "password": "$2b$12$R.U9C1yV1/8OaB9g8xO.P.P3w8YjE.M2a/6qW8d0rJ2B2lV5X8L.a" # 這是 8888 的加密值
+            "password": hashed_passwords[0]  # 直接使用系統剛剛算出來的加密密碼！
         }
     }
 }
@@ -120,17 +123,10 @@ credentials = {
 # 建立驗證器物件
 authenticator = stauth.Authenticate(
     credentials,
-    "my_dashboard_cookie",  # Cookie 名稱
-    "secret_signature_key", # 隨便打一串密鑰，用於加密 Cookie
-    30  # 登入狀態保持天數
+    "my_dashboard_cookie",  
+    "secret_signature_key", 
+    30  
 )
-
-# 執行驗證邏輯 (這行會自動產生 session_state 狀態)
-# 注意：新版 streamlit-authenticator 語法是 login()
-try:
-    authenticator.login()
-except Exception as e:
-    pass # 避免舊版/新版語法衝突報錯
 
 
 # ==========================================
@@ -5775,22 +5771,25 @@ if current_page == "contact":
 # ==========================================
 # 💎 區塊 7：VIP 專區 (故事劇情與專屬功能)
 # ==========================================
-# 假設您有建立一個 with tab_vip: 的分頁 (記得要在上面的 st.tabs 裡加上 "💎 VIP 專區")
-
-with tab_vip: # 或者放在您想放的任何最下方區塊
+with tab_vip:
     st.markdown("### 💎 VIP 專區：隱藏的故事與彩蛋")
     
+    # 🌟 在這裡呼叫登入，登入框就會乖乖待在這個分頁裡！
+    try:
+        authenticator.login("main") # 新版語法，在主畫面顯示登入框
+    except Exception as e:
+        pass # 容錯處理
+
     # 判斷登入狀態
     if st.session_state.get("authentication_status"):
         # 🟢 已經成功登入
-        st.success(f"歡迎回來，{st.session_state['name']}！您已解鎖權限。")
+        st.success(f"歡迎回來，{st.session_state['name']}！您已解鎖最高權限。")
         
-        # 👇 這裡開始放您的故事劇情或專屬功能
+        # 👇 這裡開始放您的故事劇情
         st.markdown("#### 📜 關於站長的隱藏故事")
-        st.write("冒險家，這個市場充滿了各種未知的風險，直到開發了這套系統...")
-        # ... 可以放圖片、音樂、專屬資料表 ...
+        st.write("冒險者，這個市場充滿了各種未知的風險，直到開發了這套系統...")
         
-        # 登出按鈕 (套件內建)
+        # 登出按鈕
         authenticator.logout("登出 VIP 專區", "main")
         
     elif st.session_state.get("authentication_status") is False:
@@ -5799,8 +5798,7 @@ with tab_vip: # 或者放在您想放的任何最下方區塊
         
     elif st.session_state.get("authentication_status") is None:
         # ⚪ 尚未登入
-        st.warning("請先在上方登入框輸入帳號密碼，即可解鎖隱藏劇情與未來的專屬功能。")
-        # 提示：登入框已經由套件在頁面上方或側邊欄自動生成了！
+        st.warning("請先在上方登入框輸入帳號密碼，即可解鎖隱藏劇情。")
 # ==========================================
 # 🧪 測試區：Google Sheets 連線測試
 # ==========================================
