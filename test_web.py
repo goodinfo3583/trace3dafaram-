@@ -554,10 +554,10 @@ if (!parentDoc.getElementById('custom-sticky-header')) {
             
             <div class="disclaimer-item">
                 <a href="#" data-target="VIP 專區" class="disclaimer-title internal-nav vip-login-btn" style="cursor: pointer; display: flex; align-items: center;">
-                    <span style="font-size: 15px; margin-right: 3px;"></span> 登入
+                    <span style="font-size: 13px; margin-right: 3px;"></span> 登入
                 </a>
             </div>
-            #===
+           
             <div style="flex-grow: 1;"></div>
             <div class="disclaimer-item" id="mobile-nav-toggle" title="收起選單" style="cursor: pointer; padding-right: 5px;">
                 <span id="nav-toggle-icon" style="font-size: 18px; color: #38BDF8;">📜</span>
