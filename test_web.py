@@ -100,33 +100,31 @@ def set_background(image_path):
         st.warning(f"⚠️ 找不到背景圖片檔：{image_path}，請確認檔名與路徑是否完全正確。")
 # ==========================================
 import streamlit_authenticator as stauth
-
-import streamlit_authenticator as stauth
-
 # ==========================================
 # 🔒 VIP 會員系統初始化 (大腦引擎)
 # ==========================================
-# 💡 
-passwords_to_hash = ['8888']
-hashed_passwords = stauth.Hasher(passwords_to_hash).generate()
-
 credentials = {
     "usernames": {
         "vipuser": {
             "email": "vip@yourdomain.com",
             "name": "尊爵大腿",
-            "password": hashed_passwords[0]  # 直接使用系統剛剛算出來的加密密碼！
+            "password": "8888" # 直接寫明文即可
         }
     }
 }
 
-# 建立驗證器物件
+# 2. 🚀 新版套件專用語法：讓系統自動把上方的所有密碼變成加密亂碼！
+stauth.Hasher.hash_passwords(credentials)
+
+# 3. 建立驗證器物件
 authenticator = stauth.Authenticate(
     credentials,
     "my_dashboard_cookie",  
     "secret_signature_key", 
     30  
 )
+
+# ❌ 記得！這裡絕對不要呼叫 authenticator.login()
 
 
 # ==========================================
