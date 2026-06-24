@@ -6,3 +6,4 @@ yfinance
 st-gsheets-connection
 lxml
 requests
+streamlit-authenticator
