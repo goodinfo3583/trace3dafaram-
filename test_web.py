@@ -537,37 +537,35 @@ if (!parentDoc.getElementById('custom-sticky-header')) {
         .disclaimer-item { position: relative; padding: 6px 15px; cursor: help; background: transparent !important; }
         .disclaimer-title { color: #64748B; font-size: 13px; font-weight: 500; text-decoration: none; text-shadow: 1px 1px 4px rgba(0,0,0,1), -1px -1px 4px rgba(0,0,0,1); }
         .disclaimer-item:hover .disclaimer-title { color: #FFD700; text-shadow: 0 0 8px rgba(255, 215, 0, 0.8); }
+        
+        /* 💎 VIP 專屬樣式 (閃亮亮的登入按鈕) */
+        .vip-login-btn { color: #FFD700 !important; font-weight: bold; text-shadow: 0 0 5px rgba(255, 215, 0, 0.5); transition: all 0.3s; }
+        .vip-login-btn:hover { text-shadow: 0 0 12px rgba(255, 215, 0, 1); transform: scale(1.05); }
+
         .disclaimer-content { position: absolute; top: 100%; left: 0; width: 350px; max-width: 90vw; background-color: rgba(17, 22, 34, 0.95); border: 1px solid #1E293B; border-top: none; border-radius: 0 0 8px 8px; padding: 0px 15px; max-height: 0; opacity: 0; overflow: hidden; transition: all 0.3s; font-size: 12px; color: #94A3B8; line-height: 1.6; box-shadow: 0px 8px 20px rgba(0,0,0,0.8); }
         .disclaimer-item:hover .disclaimer-content { max-height: 400px; opacity: 1; padding: 12px 15px; }
         
         .nav-btn-container { display: flex; flex-wrap: wrap; justify-content: flex-end; align-items: center; padding: 8px 15px; background: transparent !important; gap: 6px; border: none !important; transition: all 0.3s ease-in-out; }
-        .nav-text-link { text-decoration: none !important; color: #94A3B8 !important; font-size: 16px; font-weight: 600; padding: 4px 6px; transition: all 0.2s ease-in-out; text-shadow: 1px 1px 4px rgba(0,0,0,1), -1px -1px 4px rgba(0,0,0,1); cursor: pointer; }
+        .nav-text-link { text-decoration: none !important; color: #94A3B8 !important; font-size: 16px; font-weight: 600; padding: 4px 6px; transition: all 0.2s ease-in-out; text-shadow: 1px 1px 4px rgba(0,0,0,1), -1px -1px 4px rgba(0,0,0,1); cursor: pointer; display: flex; align-items: center; }
         .nav-text-link:hover { color: #FFD700 !important; text-shadow: 0 0 12px rgba(255, 215, 0, 0.8); transform: scale(1.08); }
         .nav-divider { color: #334155; font-size: 16px; user-select: none; }
         #custom-sidebar-toggle { color: #38BDF8 !important; }
 
-
-        /* 🎨 新增：自訂圖片圖示的 CSS 樣式 */
+        /* 🎨 自訂圖片圖示的 CSS 樣式 */
         .nav-icon { 
             width: 22px; 
             height: 22px; 
             margin-right: 5px; 
-            border-radius: 4px; /* 如果您想要圖示稍微圓角，可以保留這行 */
+            border-radius: 4px; 
             object-fit: cover;
-            /* 🚀 微調參數區 */
-            position: relative; /* 啟用相對定位 */
-            top: -2px;          /* 負值往上移，正值往下移。可試試 -1px, -2px, 1px */
-            left: 0px;          /* 負值往左移，正值往右移 */
-            /* 🚀 1. 讓圖片發光時有滑順的漸變動畫 */
+            position: relative; 
+            top: -2px;          
+            left: 0px;          
             transition: all 0.3s ease-in-out;
-        
         }
-        /* 🚀 2. 當滑鼠滑過外層連結時，連帶讓裡面的圖片發光！ */
         .nav-text-link:hover .nav-icon {
-            /* 加上與文字同款的黃色光暈，並稍微調亮圖片 */
             filter: drop-shadow(0px 0px 6px rgba(255, 215, 0, 0.9)) brightness(1.15);
         }
-
         
         @media (max-width: 768px) { .nav-btn-container { padding: 5px 10px; } .nav-divider { display: none; } .nav-text-link { font-size: 14px; margin: 2px; } }
         .stApp { margin-top: 50px !important; }
@@ -582,6 +580,12 @@ if (!parentDoc.getElementById('custom-sticky-header')) {
             <div class="disclaimer-item"><span class="disclaimer-title">隱私權政策</span><div class="disclaimer-content"><b>1. 蒐集目的與範圍：</b><br>本平台依個資法蒐集您的識別資料僅供維持系統安全與優化服務使用。<br><b>2. 資料利用：</b><br>您的資料絕不向第三方洩露。<br><b>3. 資料刪除：</b><br>您可透過「聯絡我們」請求刪除資料。<br><b>4. 政策修訂：</b><br>本站保留修改政策之權利，繼續使用即視為同意。</div></div>
             <div class="disclaimer-item"><a href="#" data-target="NavToContact" class="disclaimer-title internal-nav" style="cursor: pointer;">聯絡我們</a></div>
             
+            <div class="disclaimer-item">
+                <a href="#" data-target="VIP 專區" class="disclaimer-title internal-nav vip-login-btn" style="cursor: pointer; display: flex; align-items: center;">
+                    <span style="font-size: 15px; margin-right: 3px;"></span> 登入
+                </a>
+            </div>
+            #===
             <div style="flex-grow: 1;"></div>
             <div class="disclaimer-item" id="mobile-nav-toggle" title="收起選單" style="cursor: pointer; padding-right: 5px;">
                 <span id="nav-toggle-icon" style="font-size: 18px; color: #38BDF8;">📜</span>
@@ -5676,7 +5680,7 @@ if current_page in ["all", "pool"]:
                 # 👇 呼叫這個局部渲染魔法函數，把剛剛算好的分數傳進去！
                 render_pool_interactive_ui(res_df, hist_combined)
 # ==========================================
-# ✉️ 獨立分頁：聯絡我們 (完美黑夜派對版)
+# ✉️ 獨立分頁：聯絡我們 
 # ==========================================
 if current_page == "contact":
     # 標題也換成一致的藍色科技光暈
@@ -5767,10 +5771,10 @@ if current_page == "contact":
     st.stop()
     
 # ==========================================
-# 💎 區塊 7：VIP 專區 (故事劇情與專屬功能)
+# 💎 獨立分頁 區塊 7：VIP 專區 (故事劇情與專屬功能)
 # ==========================================
 with tab_vip:
-    st.markdown("### 💎 VIP 專區：隱藏的故事與彩蛋")
+    st.markdown("### 登入：隱藏的故事")
     
     # 🌟 在這裡呼叫登入，登入框就會乖乖待在這個分頁裡！
     try:
@@ -5781,10 +5785,10 @@ with tab_vip:
     # 判斷登入狀態
     if st.session_state.get("authentication_status"):
         # 🟢 已經成功登入
-        st.success(f"歡迎回來，{st.session_state['name']}！您已解鎖最高權限。")
+        st.success(f"歡迎回來，{st.session_state['name']}！您已解鎖權限。")
         
         # 👇 這裡開始放您的故事劇情
-        st.markdown("#### 📜 關於站長的隱藏故事")
+        st.markdown("#### 📜 關於這段故事")
         st.write("冒險者，這個市場充滿了各種未知的風險，直到開發了這套系統...")
         
         # 登出按鈕
@@ -5797,6 +5801,13 @@ with tab_vip:
     elif st.session_state.get("authentication_status") is None:
         # ⚪ 尚未登入
         st.warning("請先在上方登入框輸入帳號密碼，即可解鎖隱藏劇情。")
+# ==========================================
+# 🚀 終極分頁導航系統 (記得把 tab_vip 加在最後面！)
+# ==========================================
+tab_pool, tab_search, tab_b1, tab_b2, tab_b3, tab_b4, tab_b5, tab_b6, tab_vip = st.tabs([
+    "🏆 觀察名單", "🔍 籌碼快搜", "👑 區塊1：三大法人", "🎯 區塊2：淨買佔比", 
+    "📅 區塊3：連續買超", "🔄 區塊4：融資券", "💰 區塊5：大股東", "💸 區塊6：鉅額交易", "💎 VIP 專區"
+])          
 # ==========================================
 # 🧪 測試區：Google Sheets 連線測試
 # ==========================================
