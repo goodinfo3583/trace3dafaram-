@@ -551,9 +551,10 @@ if (!parentDoc.getElementById('custom-sticky-header')) {
             <div class="disclaimer-item"><span class="disclaimer-title">使用聲明</span><div class="disclaimer-content">本平台僅供教育研究與籌碼觀察，絕不構成任何實質投資建議、勸誘或要約。所有資料源自公開數據，受限於網路技術，可能有延遲或錯誤。<br><br>投資必有風險，依本平台資訊所做之任何決策與損益，均須由使用者自行負責，本平台不負擔任何法律賠償責任。</div></div>
             <div class="disclaimer-item"><span class="disclaimer-title">隱私權政策</span><div class="disclaimer-content"><b>1. 蒐集目的與範圍：</b><br>本平台依個資法蒐集您的識別資料僅供維持系統安全與優化服務使用。<br><b>2. 資料利用：</b><br>您的資料絕不向第三方洩露。<br><b>3. 資料刪除：</b><br>您可透過「聯絡我們」請求刪除資料。<br><b>4. 政策修訂：</b><br>本站保留修改政策之權利，繼續使用即視為同意。</div></div>
             <div class="disclaimer-item"><a href="#" data-target="NavToContact" class="disclaimer-title internal-nav" style="cursor: pointer;">聯絡我們</a></div>
-            
+     
+            # 這是修正後的登入按鈕 HTML 區塊，請替換掉原本的：
             <div class="disclaimer-item">
-                <a href="#" data-target="登入專區" class="disclaimer-title internal-nav vip-login-btn" style="cursor: pointer; display: flex; align-items: center;">
+                <a href="#" data-target="NavToLogin" class="disclaimer-title internal-nav vip-login-btn" style="cursor: pointer; display: flex; align-items: center;">
                     <span style="font-size: 13px; margin-right: 3px;"></span> 登入🛠️
                 </a>
             </div>
@@ -4900,7 +4901,7 @@ def render_proxy_buttons():
         st.button("NavToB5", on_click=change_page, args=("b5",))
         st.button("NavToB6", on_click=change_page, args=("b6",))
         st.button("NavToContact", on_click=change_page, args=("contact",))
-
+        st.button("NavToLogin", on_click=change_page, args=("Login",))
 
 
 # ==========================================↓↓↓
