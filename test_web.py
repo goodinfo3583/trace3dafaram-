@@ -5750,20 +5750,22 @@ if current_page == "contact":
 # ==========================================
 # 🔐 獨立分頁：系統登入 
 # ==========================================
-if current_page == "login":
-    # 標題也換成一致的藍色科技光暈
+import hashlib
+import streamlit as st
+import os
+# ==========================================
+# 🔐 獨立分頁：系統登入 (資安升級版)
+# ==========================================
+if st.session_state.get("current_page") == "login":
     st.markdown("<h2 style='color: #00D2FF; text-align: center; margin-top: 30px; text-shadow: 0 0 10px rgba(0,210,255,0.5);'>🔐 系統登入</h2>", unsafe_allow_html=True)
     
     with st.container(border=True):
-        # 💡 調整欄位比例：原本是 [1.5, 3.5]，改為 [2, 3] 給予圖片更大的空間
         col_img, col_text = st.columns([2, 3])
         
         with col_img:
-            # 💡 更新為指定的守衛圖片
             npc_image_path = os.path.join(image_folder, "npc_guard1.png")
             try:
                 img_base64 = get_image_base64(npc_image_path)
-                # 💡 圖片最大寬度從 220px 放大至 350px，確保圖片尺寸明顯大於聯絡我們區塊
                 st.markdown(
                     f"""
                     <div style="display: flex; justify-content: center; align-items: center; height: 100%; padding: 10px;">
@@ -5773,11 +5775,9 @@ if current_page == "login":
                     unsafe_allow_html=True
                 )
             except Exception as e:
-                # 圖片讀取失敗的備用顯示
                 st.markdown("<div style='font-size: 100px; text-align: center; color: #00D2FF;'>🛡️</div>", unsafe_allow_html=True)
 
         with col_text:
-            # 💡 對話框保留玻璃藍卡片 (Glassmorphism) 效果，並換成守衛的台詞
             st.markdown(
                 """
                 <div style="background: linear-gradient(135deg, rgba(0, 210, 255, 0.05) 0%, rgba(0, 210, 255, 0.12) 100%); 
@@ -5794,7 +5794,7 @@ if current_page == "login":
                             align-items: center;">
                     <p style="margin: 0; font-size: 17px; color: #E2E8F0; line-height: 1.8; letter-spacing: 0.5px;">
                         「站住，前方的股市冒險家。<br>
-                        這裡是專屬區域，請出示您的通行憑證。<br>
+                        這裡是受最高資安協定保護的區域。<br>
                         輸入您的帳號與密碼，讓我確認您的身分。🛡️」
                     </p>
                 </div>
@@ -5802,36 +5802,45 @@ if current_page == "login":
                 unsafe_allow_html=True
             )
         
-        st.write("") # 留白增加呼吸感
+        st.write("") 
         
-        # 登入表單，通常登入失敗時不應清空輸入，因此 clear_on_submit 設為 False
         with st.form("login_form", clear_on_submit=False):
-            # 登入需要的帳號密碼欄位
             username = st.text_input("👤 帳號 (Username)", placeholder="請輸入您的帳號")
             password = st.text_input("🔑 密碼 (Password)", placeholder="請輸入您的密碼", type="password")
-                
             submit_btn = st.form_submit_button("確認登入 🚪", use_container_width=True)
             
             if submit_btn:
                 if not username.strip() or not password.strip():
                     st.error("⚠️ 守衛擋下了你：通行證不完整，請確實填寫帳號與密碼！")
                 else:
-                    # ==========================================
-                    # 💡 這裡請替換成您自己的「資料庫驗證」或「Session State」邏輯
-                    # ==========================================
-                    if username == "admin" and password == "1234": # 這裡僅為範例
-                        st.toast("驗證通過，大門已為您開啟...", icon="🔓")
-                        st.success("✨ 登入成功！歡迎回來，冒險家。")
+                    # 💡 資安驗證邏輯：將輸入的密碼進行 SHA-256 雜湊後，與 secrets 中的安全碼比對
+                    input_hashed = hashlib.sha256(password.encode()).hexdigest()
+                    
+                    try:
+                        valid_user = st.secrets["credentials"]["admin_username"]
+                        valid_hash = st.secrets["credentials"]["admin_password_hash"]
                         
-                        # 建議在此處加入類似：
-                        # st.session_state["is_logged_in"] = True
-                        # st.rerun() # 重新整理頁面以切換權限畫面
+                        # 使用恆定時間比較 (防止計時攻擊)
+                        import hmac
+                        is_user_correct = hmac.compare_digest(username, valid_user)
+                        is_pass_correct = hmac.compare_digest(input_hashed, valid_hash)
                         
-                    else:
-                        st.error("❌ 驗證失敗：帳號或密碼錯誤，請重新確認！")
+                        if is_user_correct and is_pass_correct:
+                            st.toast("驗證通過，大門已為您開啟...", icon="🔓")
+                            st.success("✨ 登入成功！歡迎回來，冒險家。")
+                            # 發放最高權限通行證
+                            st.session_state["is_logged_in"] = True
+                            st.session_state["current_page"] = "home" # 登入成功後導回主畫面
+                            st.rerun()
+                        else:
+                            st.error("❌ 驗證失敗：帳號或密碼錯誤，請重新確認！")
+                            
+                    except KeyError:
+                        st.error("⚠️ 系統警告：找不到資安設定檔 (secrets.toml)，請聯絡管理員。")
 
-    # 🛑 補上隱藏的傀儡按鈕，避免在登入頁面時頂部導覽列失效網頁卡死！
+    # 🛑 補上隱藏的傀儡按鈕
     render_proxy_buttons()
+    st.stop()
     
     # 🛑 最核心的魔法：渲染完表單後，直接強制停止後續程式！完全不讀取底下的大數據！
     st.stop()
