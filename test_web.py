@@ -552,7 +552,6 @@ if (!parentDoc.getElementById('custom-sticky-header')) {
             <div class="disclaimer-item"><span class="disclaimer-title">隱私權政策</span><div class="disclaimer-content"><b>1. 蒐集目的與範圍：</b><br>本平台依個資法蒐集您的識別資料僅供維持系統安全與優化服務使用。<br><b>2. 資料利用：</b><br>您的資料絕不向第三方洩露。<br><b>3. 資料刪除：</b><br>您可透過「聯絡我們」請求刪除資料。<br><b>4. 政策修訂：</b><br>本站保留修改政策之權利，繼續使用即視為同意。</div></div>
             <div class="disclaimer-item"><a href="#" data-target="NavToContact" class="disclaimer-title internal-nav" style="cursor: pointer;">聯絡我們</a></div>
      
-            # 這是修正後的登入按鈕 HTML 區塊，請替換掉原本的：
             <div class="disclaimer-item">
                 <a href="#" data-target="NavToLogin" class="disclaimer-title internal-nav vip-login-btn" style="cursor: pointer; display: flex; align-items: center;">
                     <span style="font-size: 13px; margin-right: 3px;"></span> 登入🛠️
