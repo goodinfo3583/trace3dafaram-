@@ -5129,7 +5129,7 @@ if current_page in ["all", "pool"]:
         
         # 容器
         with st.container(border=True):
-            st.info("💡 我們試著觀察近5/20/60/120日法人動向持股上升的變化前段班且當天持續買入的標的，搭配其他掃貨、連買、大腿數據等，看看是否能找出藏在法人們口袋裡的標的，然而買盤的延續性、資券及大腿動向也是相當重要的。(試著參考▼明細)")
+            st.info("💡 我們試著觀察近5/20/60/120日法人持股上升的變化前段班且當天持續買入的標的，搭配其他掃貨、連買、大腿數據等，看看是否能找出藏在法人們口袋裡的標的。(試著參考▼明細)")
 
             # 🚨 關鍵阻斷器：確保各區塊都有數據
             if 'df_blk2_1' not in st.session_state or st.session_state['df_blk2_1'].empty or 'df_blk5_1000' not in st.session_state or st.session_state['df_blk5_1000'].empty:
@@ -5453,7 +5453,7 @@ if current_page in ["all", "pool"]:
                         
                         st.write("---")
                         st.markdown("### 🧩 觀察名單中的資金聚落")
-                        st.caption("將上方觀察名單轉換為產業面積大小，觀察法人口袋中持股變化集中的標的，切換顯示 總分 ▼變量  △ 名次 一覽 (我們排除 ETF 與債券)。")
+                        st.caption("將觀察名單轉換為產業面積大小，觀察法人口袋中持股變化集中的標的 (已排除 ETF 與債券)。")
                         
                         if not f_res_df.empty and 'STOCK_DICT' in globals() and STOCK_DICT:
                             st.write("")
