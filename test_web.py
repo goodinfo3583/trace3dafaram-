@@ -59,7 +59,7 @@ st.set_page_config(page_title="股市派對", layout="wide")
 # 👇 啟動 Google Sheets 永久連線引擎 (全域共用)
 from streamlit_gsheets import GSheetsConnection
 conn = st.connection("gsheets", type=GSheetsConnection)
-SHEET_URL = "https://docs.google.com/spreadsheets/d/1TxHDahg8ul6lmUtDN-7X75cBXbkU0jaZ3M9zg6exBgU"
+SHEET_URL = "https://docs.google.com/spreadsheets/d/1TxHDahg8ul6lmUtDN-7X75cBXbkU0jaZ3M9zg6exBgU/edit?usp=sharing"
 
 # 👉 步驟 1：先集中宣告所有的路徑變數
 DATA_DIR = "./Goodinfo_Rankings"
@@ -5419,12 +5419,12 @@ if current_page in ["all", "pool"]:
                     save_df.insert(0, '紀錄日期', anchor_date_str)
                     if st.session_state.get('last_gsheet_save_date') != anchor_date_str:
                         try:
-                            old_df = conn.read(spreadsheet=SHEET_URL, worksheet="StockHistory", ttl=0).dropna(how="all")
+                            old_df = conn.read(spreadsheet=SHEET_URL, worksheet="選股歷史", ttl=0).dropna(how="all")
                             if not old_df.empty and '紀錄日期' in old_df.columns:
                                 old_df['紀錄日期'] = old_df['紀錄日期'].astype(str).str.replace(r'\.0$', '', regex=True).str.zfill(8)
                                 final_save_df = pd.concat([old_df[old_df['紀錄日期'] != anchor_date_str], save_df], ignore_index=True)
                             else: final_save_df = save_df
-                            conn.update(spreadsheet=SHEET_URL, worksheet="StockHistory", data=final_save_df)
+                            conn.update(spreadsheet=SHEET_URL, worksheet="選股歷史", data=final_save_df)
                             st.session_state['last_gsheet_save_date'] = anchor_date_str
                             hist_combined = final_save_df.copy()
                         except Exception as e: st.warning(f"⚠️ 歷史同步暫緩({e})")
@@ -5880,7 +5880,7 @@ if current_page == "contact":
                     try:
                         import datetime
                         try:
-                            old_contact_df = conn.read(spreadsheet=SHEET_URL, worksheet="Contact", ttl=0)
+                            old_contact_df = conn.read(spreadsheet=SHEET_URL, worksheet="聯絡我們", ttl=0)
                             old_contact_df = old_contact_df.dropna(how="all")
                         except:
                             old_contact_df = pd.DataFrame(columns=["時間", "稱呼", "信箱", "內容"])
@@ -5889,7 +5889,7 @@ if current_page == "contact":
                         new_data = pd.DataFrame([{"時間": now_str, "稱呼": sender_name.strip() if sender_name else "匿名使用者", "信箱": sender_email.strip() if sender_email else "-", "內容": message_body.strip()}])
                         
                         final_contact_df = pd.concat([old_contact_df, new_data], ignore_index=True)
-                        conn.update(spreadsheet=SHEET_URL, worksheet="Contact", data=final_contact_df)
+                        conn.update(spreadsheet=SHEET_URL, worksheet="聯絡我們", data=final_contact_df)
                         
                         st.toast("您的訊息已悄悄送達派對後台...", icon="🦇")
                         st.success("✨ 感謝回報！您的建議是盛宴最棒的點綴。")
