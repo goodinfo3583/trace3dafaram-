@@ -1436,64 +1436,62 @@ def render_kline_fragment(pure_stock_id):
 # ==========================================
 from collections import defaultdict
 
-
 @st.cache_data(ttl=3600)
 def load_foreign_ratio_data(data_dir="./Goodinfo_Rankings"):
     """
     掃描資料夾中所有外資持股比例的 CSV 檔案。
-    假設檔名格式包含 '外資持股比例' 與 日期 (如: 20260627外資持股比例1-300名.csv)
+    會自動將同一天(如1-300, 301-600)的檔案先垂直合併，再將不同日期的數據水平合併。
     """
-    # 尋找所有包含「外資持股比例」的 CSV 檔案
     foreign_csvs = glob.glob(os.path.join(data_dir, "*外資持股比例*.csv"))
     
     if not foreign_csvs:
-        return pd.DataFrame() # 找不到檔案就回傳空的
-        
-    df_list = []
-    
-    for f in foreign_csvs:
-        # 從檔名中提取日期 (尋找連續 8 個數字)
-        date_match = re.search(r'(202\d{5})', os.path.basename(f))
-        file_date = date_match.group(1) if date_match else "未知日期"
-        
-        try:
-            # 讀取 CSV
-            temp_df = pd.read_csv(f)
-            
-            # 確保欄位名稱沒有奇怪的空格或換行 (例如 '外資 持股 (%)')
-            temp_df.columns = temp_df.columns.str.replace(r'\s+', '', regex=True)
-            
-            # 只保留我們需要的核心欄位
-            # 假設原始檔案有 '代號', '名稱', '外資持股(%)'
-            # 您提供的範例欄位為: 代號, 名稱, 外資持股(%)
-            cols_to_keep = ['代號', '名稱', '外資持股(%)']
-            temp_df = temp_df[[c for c in cols_to_keep if c in temp_df.columns]]
-            
-            # 統一改名為標準格式，方便後續合併
-            temp_df = temp_df.rename(columns={
-                '代號': '股票代號',
-                '名稱': '股票名稱',
-                '外資持股(%)': f'外資持股_{file_date}'
-            })
-            
-            # 轉換代號為字串格式
-            temp_df['股票代號'] = temp_df['股票代號'].astype(str).str.strip()
-            
-            df_list.append(temp_df)
-            
-        except Exception as e:
-            st.error(f"讀取外資檔案 {f} 失敗: {e}")
-            
-    if not df_list:
         return pd.DataFrame()
         
-    # ======== 魔法合併：將不同日期的資料水平合併 ========
-    # 以股票代號為基準 (Key) 進行 Outer Join 合併
-    final_foreign_df = df_list[0]
-    for i in range(1, len(df_list)):
-        # 由於每一天的表都有 '股票名稱'，我們在合併時將其丟棄，只用代號對應
-        merge_df = df_list[i].drop(columns=['股票名稱'], errors='ignore')
-        final_foreign_df = pd.merge(final_foreign_df, merge_df, on='股票代號', how='outer')
+    # 1. 根據日期將檔案分組 (例如 '20260627': [檔案1, 檔案2...])
+    files_by_date = defaultdict(list)
+    for f in foreign_csvs:
+        date_match = re.search(r'(202\d{5})', os.path.basename(f))
+        if date_match:
+            files_by_date[date_match.group(1)].append(f)
+            
+    daily_dfs = []
+    
+    # 2. 將同一天的所有排名檔案「上下垂直合併」(Concat)
+    for date_str, files in files_by_date.items():
+        chunks = []
+        for f in files:
+            try:
+                temp_df = pd.read_csv(f)
+                temp_df.columns = temp_df.columns.str.replace(r'\s+', '', regex=True)
+                cols_to_keep = ['代號', '名稱', '外資持股(%)']
+                temp_df = temp_df[[c for c in cols_to_keep if c in temp_df.columns]]
+                chunks.append(temp_df)
+            except Exception as e:
+                pass # 忽略毀損檔案
+                
+        if chunks:
+            # 垂直合併拼成一天的完整表
+            day_df = pd.concat(chunks, ignore_index=True)
+            day_df['代號'] = day_df['代號'].astype(str).str.strip()
+            # 移除可能重複爬取的股票代號
+            day_df = day_df.drop_duplicates(subset=['代號'])
+            
+            day_df = day_df.rename(columns={
+                '代號': '股票代號',
+                '名稱': '股票名稱',
+                '外資持股(%)': f'外資持股_{date_str}'
+            })
+            # 丟棄股票名稱，以免後續左右合併時產生大量重複的 名稱_x, 名稱_y
+            day_df = day_df.drop(columns=['股票名稱'], errors='ignore')
+            daily_dfs.append(day_df)
+
+    if not daily_dfs:
+        return pd.DataFrame()
+
+    # 3. 將不同日期的完整日表「左右水平合併」(Merge)
+    final_foreign_df = daily_dfs[0]
+    for i in range(1, len(daily_dfs)):
+        final_foreign_df = pd.merge(final_foreign_df, daily_dfs[i], on='股票代號', how='outer')
         
     # 將遺失的數值填為 0
     final_foreign_df = final_foreign_df.fillna(0.0)
@@ -2906,33 +2904,35 @@ if current_page in ["all", "b1"]:
     else:
         st.info("⚪ 尚無全市場大數據或找不到產業字典，請確認背景掃描引擎已啟動。")
 # ========# ========
-# 讀取外資數據庫
+# 讀取外資數據庫下面
 # ========# ========
-    # ======== 🌟 實驗性功能：內資推估系統 ========讀取外資法人持股
+    # ==========================================
+    # 🕵️‍♂️ [壓軸尋寶] 實驗性功能：內資大腿推估系統 (投信+自營)
+    # ==========================================
+    st.write("---")
+    
+    # 1. 呼叫我們剛剛修好的外資資料庫讀取引擎
     df_foreign = load_foreign_ratio_data(DATA_DIR)
     
-    # ======== 🌟 實驗性功能：內資推估系統 ========
+    # 2. 如果外資資料和總表都存在，就顯示推估系統
     if not df_foreign.empty and final_df is not None and not final_df.empty:
-        with st.expander("🕵️‍♂️ [實驗室] 內資大腿推估系統 (投信+自營)", expanded=False):
-            st.markdown("##### 🔍 尋找「外資沒買，但三大法人持股大增」的內資鎖碼股")
+        with st.expander("🕵️‍♂️ [深潛實驗室] 內資大腿推估系統 (尋找投信鎖碼股)", expanded=False):
+            st.markdown("##### 🔍 尋找「外資沒買，但三大法人持股大增」的標的")
+            st.caption("透過減法運算 (三大法人持股% - 外資持股%)，推估出投信與自營商的隱藏動向。")
             
-            # 1. 抓取最新一天的日期字串 (例如 '20260627')
+            # 抓取最新一天的日期字串 (例如 '20260627')
             date_cols = [c for c in df_foreign.columns if '外資持股_' in c]
             if date_cols:
                 date_cols.sort(reverse=True)
-                latest_foreign_col = date_cols[0] # 例如: 外資持股_20260627
+                latest_foreign_col = date_cols[0] 
                 
-                # 2. 將外資表與您的主表 (final_df) 進行合併
-                # 假設 final_df 裡有 '法人持股' 這個欄位 (最新一天的三大法人持股比例)
+                # 將外資表與您的主表 (final_df) 進行合併
                 df_calc = pd.merge(final_df, df_foreign[['股票代號', latest_foreign_col]], on='股票代號', how='inner')
                 
-                # 3. 執行減法運算： 內資持股 = 法人持股 - 外資持股
-                # 注意：需先將字串的 "%" 去除並轉為 float
+                # 執行減法運算
                 def clean_pct(val):
-                    try:
-                        return float(str(val).replace('%', ''))
-                    except:
-                        return 0.0
+                    try: return float(str(val).replace('%', ''))
+                    except: return 0.0
                         
                 df_calc['總法人%'] = df_calc['法人持股'].apply(clean_pct)
                 df_calc['外資%'] = df_calc[latest_foreign_col].apply(clean_pct)
@@ -2940,11 +2940,11 @@ if current_page in ["all", "b1"]:
                 # 推估內資比例 (若為負數則以 0 計)
                 df_calc['推估內資持股%'] = (df_calc['總法人%'] - df_calc['外資%']).clip(lower=0)
                 
-                # 4. 篩選與排序：找出內資持股最高，且近期有上榜 (有動能) 的股票
+                # 篩選與排序：找出內資持股最高，且今日有上榜的有動能股票
                 df_calc = df_calc[df_calc['今日上榜'].astype(str).str.strip() != ""]
                 df_calc = df_calc.sort_values(by='推估內資持股%', ascending=False).head(30)
                 
-                # 格式化顯示
+                # 格式化顯示，讓表格更美觀
                 df_calc['推估內資持股%'] = df_calc['推估內資持股%'].apply(lambda x: f"{x:.2f}%")
                 df_calc['總法人%'] = df_calc['總法人%'].apply(lambda x: f"{x:.2f}%")
                 df_calc['外資%'] = df_calc['外資%'].apply(lambda x: f"{x:.2f}%")
