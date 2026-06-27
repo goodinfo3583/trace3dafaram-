@@ -5213,7 +5213,7 @@ if current_page in ["all", "pool"]:
                 prev_scores_dict = {}
                 hist_combined = pd.DataFrame() 
                 try:
-                    gs_history = conn.read(spreadsheet=SHEET_URL, worksheet="選股歷史", ttl=10)
+                    gs_history = conn.read(spreadsheet=SHEET_URL, worksheet="stockhistory", ttl=10)
                     gs_history = gs_history.dropna(how="all")
                     if not gs_history.empty and '紀錄日期' in gs_history.columns:
                         gs_history['紀錄日期'] = gs_history['紀錄日期'].astype(str).str.replace(r'\.0$', '', regex=True).str.zfill(8)
@@ -5260,7 +5260,7 @@ if current_page in ["all", "pool"]:
                     save_df.insert(0, '紀錄日期', anchor_date_str)
                     if st.session_state.get('last_gsheet_save_date') != anchor_date_str:
                         try:
-                            old_df = conn.read(spreadsheet=SHEET_URL, worksheet="選股歷史", ttl=0).dropna(how="all")
+                            old_df = conn.read(spreadsheet=SHEET_URL, worksheet="stockhistory", ttl=0).dropna(how="all")
                             if not old_df.empty and '紀錄日期' in old_df.columns:
                                 old_df['紀錄日期'] = old_df['紀錄日期'].astype(str).str.replace(r'\.0$', '', regex=True).str.zfill(8)
                                 final_save_df = pd.concat([old_df[old_df['紀錄日期'] != anchor_date_str], save_df], ignore_index=True)
@@ -5550,10 +5550,10 @@ if current_page in ["all", "pool"]:
                                                     top5_df['鎖定收盤價'] = top5_df['代號'].astype(str).map(current_prices)
                                                     
                                                     try:
-                                                        try: old_track = conn.read(spreadsheet=SHEET_URL, worksheet="歷史名單回測觀察", ttl=0).dropna(how="all")
+                                                        try: old_track = conn.read(spreadsheet=SHEET_URL, worksheet="stockhistory", ttl=0).dropna(how="all")
                                                         except: old_track = pd.DataFrame()
                                                         new_track = pd.concat([old_track, top5_df], ignore_index=True)
-                                                        conn.update(spreadsheet=SHEET_URL, worksheet="歷史名單回測觀察", data=new_track)
+                                                        conn.update(spreadsheet=SHEET_URL, worksheet="stockhistory", data=new_track)
                                                         st.success(f"✅ 已成功將 {track_date} 的名單寫入 Google Sheets！")
                                                     except Exception as e:
                                                         st.error(f"❌ 寫入失敗：{e} (請確認 Google Sheets 是否已建立『歷史名單回測觀察』工作表)")
@@ -5561,7 +5561,7 @@ if current_page in ["all", "pool"]:
                                             
                         st.markdown("### 📊 歷史名單回測觀察")
                         try:
-                            history_track_df = conn.read(spreadsheet=SHEET_URL, worksheet="歷史名單回測觀察", ttl=0).dropna(how="all")
+                            history_track_df = conn.read(spreadsheet=SHEET_URL, worksheet="stockhistory", ttl=0).dropna(how="all")
                             if not history_track_df.empty:
                                 selected_week = st.selectbox("選擇要回顧的鎖定日期", sorted(history_track_df['鎖定日期'].unique(), reverse=True))
                                 week_df = history_track_df[history_track_df['鎖定日期'] == selected_week].copy()
@@ -5721,7 +5721,7 @@ if current_page == "contact":
                     try:
                         import datetime
                         try:
-                            old_contact_df = conn.read(spreadsheet=SHEET_URL, worksheet="聯絡我們", ttl=0)
+                            old_contact_df = conn.read(spreadsheet=SHEET_URL, worksheet="contact", ttl=0)
                             old_contact_df = old_contact_df.dropna(how="all")
                         except:
                             old_contact_df = pd.DataFrame(columns=["時間", "稱呼", "信箱", "內容"])
