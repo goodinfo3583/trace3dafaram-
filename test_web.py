@@ -1436,6 +1436,74 @@ def render_kline_fragment(pure_stock_id):
 # ==========================================
 from collections import defaultdict
 
+
+@st.cache_data(ttl=3600)
+def load_foreign_ratio_data(data_dir="./Goodinfo_Rankings"):
+    """
+    掃描資料夾中所有外資持股比例的 CSV 檔案。
+    假設檔名格式包含 '外資持股比例' 與 日期 (如: 20260627外資持股比例1-300名.csv)
+    """
+    # 尋找所有包含「外資持股比例」的 CSV 檔案
+    foreign_csvs = glob.glob(os.path.join(data_dir, "*外資持股比例*.csv"))
+    
+    if not foreign_csvs:
+        return pd.DataFrame() # 找不到檔案就回傳空的
+        
+    df_list = []
+    
+    for f in foreign_csvs:
+        # 從檔名中提取日期 (尋找連續 8 個數字)
+        date_match = re.search(r'(202\d{5})', os.path.basename(f))
+        file_date = date_match.group(1) if date_match else "未知日期"
+        
+        try:
+            # 讀取 CSV
+            temp_df = pd.read_csv(f)
+            
+            # 確保欄位名稱沒有奇怪的空格或換行 (例如 '外資 持股 (%)')
+            temp_df.columns = temp_df.columns.str.replace(r'\s+', '', regex=True)
+            
+            # 只保留我們需要的核心欄位
+            # 假設原始檔案有 '代號', '名稱', '外資持股(%)'
+            # 您提供的範例欄位為: 代號, 名稱, 外資持股(%)
+            cols_to_keep = ['代號', '名稱', '外資持股(%)']
+            temp_df = temp_df[[c for c in cols_to_keep if c in temp_df.columns]]
+            
+            # 統一改名為標準格式，方便後續合併
+            temp_df = temp_df.rename(columns={
+                '代號': '股票代號',
+                '名稱': '股票名稱',
+                '外資持股(%)': f'外資持股_{file_date}'
+            })
+            
+            # 轉換代號為字串格式
+            temp_df['股票代號'] = temp_df['股票代號'].astype(str).str.strip()
+            
+            df_list.append(temp_df)
+            
+        except Exception as e:
+            st.error(f"讀取外資檔案 {f} 失敗: {e}")
+            
+    if not df_list:
+        return pd.DataFrame()
+        
+    # ======== 魔法合併：將不同日期的資料水平合併 ========
+    # 以股票代號為基準 (Key) 進行 Outer Join 合併
+    final_foreign_df = df_list[0]
+    for i in range(1, len(df_list)):
+        # 由於每一天的表都有 '股票名稱'，我們在合併時將其丟棄，只用代號對應
+        merge_df = df_list[i].drop(columns=['股票名稱'], errors='ignore')
+        final_foreign_df = pd.merge(final_foreign_df, merge_df, on='股票代號', how='outer')
+        
+    # 將遺失的數值填為 0
+    final_foreign_df = final_foreign_df.fillna(0.0)
+    
+    return final_foreign_df
+
+    # ======== 以上外資持股 ========
+
+
+
 @st.cache_data(ttl=3600)
 def fetch_github_json_all():
     days_list = [5, 20, 60, 120]
@@ -2840,70 +2908,6 @@ if current_page in ["all", "b1"]:
 # ========# ========
 # 讀取外資數據庫
 # ========# ========
-@st.cache_data(ttl=3600)
-def load_foreign_ratio_data(data_dir="./Goodinfo_Rankings"):
-    """
-    掃描資料夾中所有外資持股比例的 CSV 檔案。
-    假設檔名格式包含 '外資持股比例' 與 日期 (如: 20260627外資持股比例1-300名.csv)
-    """
-    # 尋找所有包含「外資持股比例」的 CSV 檔案
-    foreign_csvs = glob.glob(os.path.join(data_dir, "*外資持股比例*.csv"))
-    
-    if not foreign_csvs:
-        return pd.DataFrame() # 找不到檔案就回傳空的
-        
-    df_list = []
-    
-    for f in foreign_csvs:
-        # 從檔名中提取日期 (尋找連續 8 個數字)
-        date_match = re.search(r'(202\d{5})', os.path.basename(f))
-        file_date = date_match.group(1) if date_match else "未知日期"
-        
-        try:
-            # 讀取 CSV
-            temp_df = pd.read_csv(f)
-            
-            # 確保欄位名稱沒有奇怪的空格或換行 (例如 '外資 持股 (%)')
-            temp_df.columns = temp_df.columns.str.replace(r'\s+', '', regex=True)
-            
-            # 只保留我們需要的核心欄位
-            # 假設原始檔案有 '代號', '名稱', '外資持股(%)'
-            # 您提供的範例欄位為: 代號, 名稱, 外資持股(%)
-            cols_to_keep = ['代號', '名稱', '外資持股(%)']
-            temp_df = temp_df[[c for c in cols_to_keep if c in temp_df.columns]]
-            
-            # 統一改名為標準格式，方便後續合併
-            temp_df = temp_df.rename(columns={
-                '代號': '股票代號',
-                '名稱': '股票名稱',
-                '外資持股(%)': f'外資持股_{file_date}'
-            })
-            
-            # 轉換代號為字串格式
-            temp_df['股票代號'] = temp_df['股票代號'].astype(str).str.strip()
-            
-            df_list.append(temp_df)
-            
-        except Exception as e:
-            st.error(f"讀取外資檔案 {f} 失敗: {e}")
-            
-    if not df_list:
-        return pd.DataFrame()
-        
-    # ======== 魔法合併：將不同日期的資料水平合併 ========
-    # 以股票代號為基準 (Key) 進行 Outer Join 合併
-    final_foreign_df = df_list[0]
-    for i in range(1, len(df_list)):
-        # 由於每一天的表都有 '股票名稱'，我們在合併時將其丟棄，只用代號對應
-        merge_df = df_list[i].drop(columns=['股票名稱'], errors='ignore')
-        final_foreign_df = pd.merge(final_foreign_df, merge_df, on='股票代號', how='outer')
-        
-    # 將遺失的數值填為 0
-    final_foreign_df = final_foreign_df.fillna(0.0)
-    
-    return final_foreign_df
-
-
     # ======== 🌟 實驗性功能：內資推估系統 ========讀取外資法人持股
     df_foreign = load_foreign_ratio_data(DATA_DIR)
     
