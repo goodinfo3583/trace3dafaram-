@@ -2907,18 +2907,17 @@ if current_page in ["all", "b1"]:
 # 讀取外資數據庫下面
 # ========# ========
 # ==========================================
-    # 🕵️‍♂️ [壓軸尋寶] 實驗性功能：內資大腿推估系統 (投信+自營 歷史軌跡版)
+    # 🕵️‍♂️ [壓軸尋寶] 實驗性功能：雙引擎籌碼歷史軌跡 (內資推估 vs 外資大腿)
     # ==========================================
     st.write("---")
     
     # 1. 呼叫外資資料庫讀取引擎
     df_foreign = load_foreign_ratio_data(DATA_DIR)
     
-    # 2. 如果外資資料和總表都存在，就顯示推估系統
+    # 2. 如果外資資料和總表都存在，就啟動雙引擎分析系統
     if not df_foreign.empty and final_df is not None and not final_df.empty:
-        with st.expander("🕵️‍♂️ [深潛實驗室] 內資大腿推估系統 (尋找投信鎖碼股)", expanded=False):
-            st.markdown("##### 🔍 尋找「外資沒買，但三大法人持股大增」的標的")
-            st.caption("透過減法運算 (總法人持股% - 外資持股%)，推估出內資(投信+自營)近 20 個交易日的隱藏動向。")
+        with st.expander("🕵️‍♂️ [深潛實驗室] 籌碼 20 日歷史軌跡透視鏡 (內資推估 vs 外資)", expanded=False):
+            st.caption("透過 20 日的持股比例變化，精準透視法人是在「短線洗盤」還是「長線階梯式建倉」。")
             
             # 💡 抓取所有日期：找出主表與外資表共有的日期
             foreign_dates = {c.replace('外資持股_', '') for c in df_foreign.columns if '外資持股_' in c}
@@ -2931,7 +2930,7 @@ if current_page in ["all", "b1"]:
                 # 將外資表需要的欄位拿出來 (代號 + 所有共有的日期欄位)
                 f_need_cols = ['股票代號'] + [f'外資持股_{d}' for d in common_dates]
                 
-                # 將外資表與您的主表 (final_df) 進行合併
+                # 進行合併
                 df_calc = pd.merge(final_df, df_foreign[f_need_cols], on='股票代號', how='inner')
                 
                 # 清洗百分比字串的函數
@@ -2939,40 +2938,56 @@ if current_page in ["all", "b1"]:
                     try: return float(str(val).replace('%', '').replace(',', ''))
                     except: return 0.0
                 
-                # 準備用來存放顯示欄位名稱的清單
-                history_display_cols = []
+                # 準備存放顯示欄位名稱的清單
+                dom_display_cols = []
+                for_display_cols = []
                 
-                # 💡 利用迴圈，一口氣計算這 20 天的內資持股比例
+                # 💡 利用單一迴圈，同時計算「內資」與格式化「外資」的 20 天數據
                 for d in common_dates:
                     tot_col = f'{d}持股%'
                     for_col = f'外資持股_{d}'
-                    # 為了讓表格標題不要太長，擷取日期的後四碼 (例如 0626)
+                    
                     dom_col = f'內資_{d[-4:]}' 
+                    for_out_col = f'外資_{d[-4:]}'
                     
                     # 取出數值
                     tot_val = df_calc[tot_col].apply(clean_pct)
                     for_val = df_calc[for_col].apply(clean_pct)
                     
-                    # 執行減法運算並處理負數
+                    # 【內資計算】：總法人 - 外資
                     df_calc[f'{dom_col}_raw'] = (tot_val - for_val).clip(lower=0)
-                    
-                    # 格式化加上 %
                     df_calc[dom_col] = df_calc[f'{dom_col}_raw'].apply(lambda x: f"{x:.2f}%")
-                    history_display_cols.append(dom_col)
+                    dom_display_cols.append(dom_col)
+                    
+                    # 【外資格式化】：直接取用外資數值
+                    df_calc[f'{for_out_col}_raw'] = for_val
+                    df_calc[for_out_col] = df_calc[f'{for_out_col}_raw'].apply(lambda x: f"{x:.2f}%")
+                    for_display_cols.append(for_out_col)
                 
-                # 篩選：只看今天有上榜的有動能股票
+                # 基礎篩選：只看今天有上榜的有動能股票
                 df_calc = df_calc[df_calc['今日上榜'].astype(str).str.strip() != ""]
                 
-                # 排序：以最新一天的內資持股數值 (raw 數值) 作為最高排序依據
-                latest_raw_col = f'內資_{common_dates[0][-4:]}_raw'
-                df_calc = df_calc.sort_values(by=latest_raw_col, ascending=False).head(40) # 展開到 40 檔
+                # 🌟 建立兩個分頁
+                tab_dom, tab_for = st.tabs(["🕵️‍♂️ 內資 (投信+自營) 20日軌跡", "🌎 外資大腿 20日軌跡"])
                 
-                # 準備顯示欄位 (基礎資訊 + 動態產生的 20 天歷史欄位)
+                # 共通的基礎欄位
                 base_cols = ['股票代號', '股票名稱', '今日上榜', '△']
-                display_cols = base_cols + history_display_cols
                 
-                # 顯示表格
-                st.dataframe(df_calc[display_cols], use_container_width=True, hide_index=True)
+                with tab_dom:
+                    st.markdown("##### 🔍 尋找「投信/自營商」連續鎖碼股")
+                    st.caption("內資常專注於中小型爆發股，若連續多日比例上升，代表投信作帳行情啟動。")
+                    # 以最新一天的內資持股排序
+                    latest_dom_col = f'內資_{common_dates[0][-4:]}_raw'
+                    df_dom_sorted = df_calc.sort_values(by=latest_dom_col, ascending=False).head(40)
+                    st.dataframe(df_dom_sorted[base_cols + dom_display_cols], use_container_width=True, hide_index=True)
+                    
+                with tab_for:
+                    st.markdown("##### 🔍 尋找「外資大腿」長線階梯建倉股")
+                    st.caption("外資資金龐大，若發現持股比例連續 1~2 週穩步增長，代表真正的長線資金進駐。")
+                    # 以最新一天的外資持股排序
+                    latest_for_col = f'外資_{common_dates[0][-4:]}_raw'
+                    df_for_sorted = df_calc.sort_values(by=latest_for_col, ascending=False).head(40)
+                    st.dataframe(df_for_sorted[base_cols + for_display_cols], use_container_width=True, hide_index=True)
                 
             else:
                 st.warning("⚠️ 找不到主表與外資表的共通日期，請確認資料是否已同步。")
