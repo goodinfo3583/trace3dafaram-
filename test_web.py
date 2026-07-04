@@ -5793,8 +5793,23 @@ if current_page in ["all", "pool"]:
                                         
                                     week_df['模型分數變化'] = week_df.apply(score_diff, axis=1)
                                     
-                                    show_cols = ['鎖定日期', '代號', '名稱', '鎖定收盤價', col_price_name, '區間報酬', '總分', '今日分數', '模型分數變化']
-                                    st.dataframe(week_df[[c for c in show_cols if c in week_df.columns]], use_container_width=True, hide_index=True)
+                                    # 1. 在顯示清單的 '鎖定日期' 後面，插入 '▼明細' 欄位
+                                    show_cols = ['鎖定日期', '▼明細', '代號', '名稱', '鎖定收盤價', col_price_name, '區間報酬', '總分', '今日分數', '模型分數變化']
+
+                                    # 2. 為了避免長串的權重文字把版面撐壞，套用跟首頁一樣的 TextColumn 設定，讓它變成滑鼠懸停顯示
+                                    st.dataframe(
+                                        week_df[[c for c in show_cols if c in week_df.columns]], 
+                                        use_container_width=True, 
+                                        hide_index=True,
+                                        column_config={
+                                            "▼明細": st.column_config.TextColumn(
+                                                "▼明細", 
+                                                help="滑鼠游標停留在這裡，查看鎖定當時的各項權重分數", 
+                                                width="small", 
+                                                max_chars=4
+                                            )
+                                        }
+                                    )
                                     
                                     if is_expired:
                                         st.info("🔒 此梯次名單已追蹤滿 4 週。為了客觀評估波段策略，此表已凍結於結案當時的收盤價與績效，不再隨每日盤勢波動。")
