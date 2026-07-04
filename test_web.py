@@ -484,7 +484,7 @@ st.markdown(
 # 🚦 網頁路由控制中心 (極速切換引擎)
 # ==========================================
 # 【修改 1】：把預設值改成 "news"，這樣一進網站就會是最新消息！
-current_page = st.query_params.get("page", "news")
+current_page = st.query_params.get("page", "b1")
 import streamlit as st
 import streamlit.components.v1 as components
 
