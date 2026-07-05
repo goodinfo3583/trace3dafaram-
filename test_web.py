@@ -419,17 +419,9 @@ components.html(inject_js, height=0, width=0)
 # 🔗 隱形傳送門：讓頂部 JS 按鈕可以切換實體分頁
 # ==========================================
 if st.button("NavToNews", key="nav_news"):
-    import os
     try:
-        # 1. 讓 Python 自己去讀取 pages 資料夾
-        pages_files = os.listdir("pages")
-        
-        # 2. 啟動鎖定系統：只要檔名裡面有「市場消息」四個中文字，就直接抓取它的完整檔名！
-        target_file = [f for f in pages_files if "市場消息" in f][0]
-        
-        # 3. 組合出 100% 正確的路徑並傳送
-        st.switch_page(f"pages/{target_file}")
-        
+        # 直接指定沒有 Emoji 的純淨檔名！
+        st.switch_page("pages/1_市場消息.py")
     except Exception as e:
         st.error(f"⚠️ 傳送失敗，系統回報的錯誤細節：{e}")
 
