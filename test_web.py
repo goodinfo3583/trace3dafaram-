@@ -420,7 +420,7 @@ components.html(inject_js, height=0, width=0)
 # ==========================================
 # 當 JS 點擊了這個隱藏按鈕，Streamlit 就會把使用者強制傳送到該分頁
 if st.button("NavToNews", key="nav_news"):
-    st.switch_page("pages/1_📰_市場消息.py")
+    st.switch_page("pages/1_📰_市場消息")
 # ==========================================
 # 🌟 觀察名單專屬工具函數區 (補回遺失的計分工具)
 # ==========================================
