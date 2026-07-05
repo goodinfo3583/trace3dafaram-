@@ -6,6 +6,53 @@ import plotly.graph_objects as go
 from plotly.subplots import make_subplots
 import re
 import os
+import glob
+# ==========================================
+# 🌟 補回讀取 CSV 的小精靈 (給側邊欄專用)
+# ==========================================
+DATA_DIR = "./Goodinfo_Rankings"
+
+@st.cache_data(ttl=60)
+def get_latest_csv(keyword):
+    if not os.path.exists(DATA_DIR): return None, "未知"
+    files = glob.glob(os.path.join(DATA_DIR, f"*{keyword}*csv"))
+    if not files: return None, "未知"
+    files.sort(reverse=True)
+    try: 
+        df = pd.read_csv(files[0])
+        for col in ['股票代號', '代號', '證券代號']:
+            if col in df.columns:
+                df[col] = df[col].astype(str).str.replace(r'\.0$', '', regex=True).str.strip()
+                df[col] = df[col].apply(lambda x: x.zfill(4) if x.isdigit() else x)
+        return df, os.path.basename(files[0])[:8]
+    except: return None, "未知"
+
+@st.cache_data(ttl=60)
+def get_prev_csv(keyword, current_date):
+    if not os.path.exists(DATA_DIR): return None
+    files = glob.glob(os.path.join(DATA_DIR, f"*{keyword}*csv"))
+    past_files = [f for f in files if os.path.basename(f)[:8] < current_date]
+    if not past_files: return None
+    past_files.sort(reverse=True)
+    try: 
+        df = pd.read_csv(past_files[0])
+        for col in ['股票代號', '代號', '證券代號']:
+            if col in df.columns:
+                df[col] = df[col].astype(str).str.replace(r'\.0$', '', regex=True).str.strip()
+                df[col] = df[col].apply(lambda x: x.zfill(4) if x.isdigit() else x)
+        return df
+    except: return None
+
+def get_diff_ui(today_val, prev_val):
+    if prev_val is None or pd.isna(prev_val): return ""
+    try:
+        diff = int(today_val) - int(prev_val)
+        if diff == 0: return ""
+        sign = "+" if diff > 0 else ""
+        color = "#FF4B4B" if diff > 0 else "#00E272" 
+        return f"<br><span style='color:{color}; font-size:11px;'>({sign}{diff:,})</span>"
+    except: return ""
+
 # ==========================================
 # 🌟 所有側邊欄專屬工具函數區 (🚨 必須放在 with st.sidebar 的最上方！)
 # ==========================================
