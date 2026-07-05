@@ -1557,7 +1557,7 @@ def build_block1_master_df():
     j_dfs, l_all_df = fetch_github_json_all()
 
     if sorted_dates:
-        for i, date_label in enumerate(sorted_dates[:30]): 
+        for i, date_label in enumerate(sorted_dates[:14]): 
             day_dfs = []
             if date_files[date_label]['csv']:
                 df = pd.read_csv(date_files[date_label]['csv'][0], encoding='utf-8-sig')
