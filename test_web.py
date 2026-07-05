@@ -2499,7 +2499,7 @@ if current_page in ["all", "b1"]:
         latest_d = sorted_dates[0]
         fmt_date = f"{latest_d[:4]}/{latest_d[4:6]}/{latest_d[6:]}"
         st.markdown(
-            f"<h2 style='margin-bottom: 0px;'>👑 區塊1：三大法人短中長線持股比追蹤 "
+            f"<h2 style='margin-bottom: 0px;'>👑 法人動向：三大法人短中長線持股比追蹤 "
             f"<span style='color:#00D2FF; font-size:16px; font-weight:500; margin-left:12px;'>基準日：{fmt_date}</span></h2>", 
             unsafe_allow_html=True
         )
