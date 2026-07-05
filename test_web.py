@@ -148,11 +148,9 @@ def get_diff_ui(today_val, prev_val):
         return f"<br><span style='color:{color}; font-size:11px;'>({sign}{diff:,})</span>"
     except: return ""
 
-
-
-# ==========================================
-# 🗂️ 台股代號與名稱產業類別 萬用字典引擎 (後台靜默運作)
-# ==========================================
+# ===================================================================
+# 🗂 核心共用工具-台股代號與名稱產業類別 萬用字典引擎 (後台靜默運作)
+# ===================================================================
 @st.cache_data(ttl=3600)
 def get_stock_dictionary():
     """讀取證交所 ISIN 檔案，在後台安靜地建立雙向對照表"""
@@ -209,9 +207,9 @@ def get_stock_dictionary():
 STOCK_DICT = get_stock_dictionary()
 
 
-# ==========================================
+# ================
 # 🌌 網頁風格設計
-# ==========================================
+# ================
 st.markdown(
     """
     <style>
@@ -257,7 +255,7 @@ st.markdown(
 # ==========================================
 # 🚦 網頁路由控制中心 (極速切換引擎)
 # ==========================================
-# 【首頁顯示預設】：把預設值改成 "news"，這樣一進網站就會是最新消息！
+# 【首頁顯示預設】：把預設值改成 "news"，這樣一進網站就會是最新消息！(現在首頁改成區塊1)
 current_page = st.query_params.get("page", "b1")
 import streamlit as st
 import streamlit.components.v1 as components
@@ -422,7 +420,7 @@ if (!parentDoc.getElementById('custom-sticky-header')) {
 
 # 透過隱藏的頂部按鈕導航 iframe 執行上述的 JavaScript 注入
 components.html(inject_js, height=0, width=0)
-# 👆👆👆 ========================================================== 👆👆👆
+
 # ==========================================
 # 🔗 市場消息隱形傳送門：讓頂部 JS 按鈕可以切換實體分頁
 # ==========================================
@@ -498,8 +496,9 @@ def robust_read_csv_pool(file_path):
         except: continue
     return pd.read_csv(file_path, encoding='cp950', errors='ignore')
 
-
-
+# 🛑 test_web.py 目前到這裡結束！ 🛑*****
+# 🛑 test_web.py 目前到這裡結束！ 🛑*****
+# 🛑 test_web.py 目前到這裡結束！ 🛑*****
 
 # =======================================================
 # 側邊欄：戰情指揮中心 (內建個股快搜 + 大盤總經)
@@ -791,7 +790,6 @@ def render_b4_panorama(view_title, keys_and_labels, query):
     
     st.markdown(f"<h5 style='color: #E2E8F0;'>{view_title}</h5>", unsafe_allow_html=True)
     st.dataframe(df_panorama[final_cols], use_container_width=True, hide_index=True)
-
 
 # =======================================================
 # 🚀 終極局部渲染魔法：將整個側邊欄獨立為「不閃爍區塊」
