@@ -28,6 +28,8 @@ ui.setup_all_effects()
 import data_engine
 data_engine.init_all_data()
 
+# 👇 告訴主程式，我們有一個側邊欄工具箱可以使用
+import left_panel
 # ==========================================
 # 3. 資料庫連線與路徑初始化
 # ==========================================
@@ -1019,10 +1021,10 @@ def render_sidebar_war_room():
         tab1, tab2, tab3 = st.tabs(["🔹 大盤籌碼", "🔹 選擇權", "🔹 總經導航🛠️"])
         
         with tab1:
-            actual_data_date = render_sidebar_market_summary()
+            actual_data_date = left_panel.render_sidebar_market_summary()
             
         with tab2:
-            render_options_dashboard()
+            left_panel.render_options_dashboard()
             
         with tab3:
             macro_data = fetch_macro_indicators()
