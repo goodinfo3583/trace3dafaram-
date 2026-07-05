@@ -1027,7 +1027,7 @@ def render_sidebar_war_room():
             left_panel.render_options_dashboard()
             
         with tab3:
-            macro_data = fetch_macro_indicators()
+            macro_data = left_panel.fetch_macro_indicators()
             
             vix_val = macro_data["vix"]["value"]
             vix_color = "#a1a1aa" 
