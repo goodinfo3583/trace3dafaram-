@@ -416,30 +416,26 @@ if (!parentDoc.getElementById('custom-sticky-header')) {
 components.html(inject_js, height=0, width=0)
 # 👆👆👆 ========================================================== 👆👆👆
 # ==========================================
-# 🕵️‍♂️ 終極除錯雷達：讓系統印出它看到的真實檔名
-# ==========================================
-import os
-st.markdown("### 🕵️‍♂️ 系統檔案路徑偵測")
-try:
-    # 讓 Python 去掃描 pages 資料夾裡面到底有哪些檔案
-    pages_files = os.listdir("pages")
-    st.write("伺服器在 `pages` 資料夾內實際看到的檔案列表：")
-    st.code(pages_files)  # 用 code 區塊顯示，連隱藏的空白都無所遁形
-except Exception as e:
-    st.error(f"慘了，系統連 `pages` 資料夾都找不到！錯誤：{e}")
-
-
-
-# ==========================================
 # 🔗 隱形傳送門：讓頂部 JS 按鈕可以切換實體分頁
 # ==========================================
-# 當 JS 點擊了這個隱藏按鈕，Streamlit 就會把使用者強制傳送到該分頁
 if st.button("NavToNews", key="nav_news"):
+    import os
     try:
-        st.switch_page("pages/1_📰_市場消息.py")
+        # 1. 讓 Python 自己去讀取 pages 資料夾
+        pages_files = os.listdir("pages")
+        
+        # 2. 啟動鎖定系統：只要檔名裡面有「市場消息」四個中文字，就直接抓取它的完整檔名！
+        target_file = [f for f in pages_files if "市場消息" in f][0]
+        
+        # 3. 組合出 100% 正確的路徑並傳送
+        st.switch_page(f"pages/{target_file}")
+        
     except Exception as e:
-        # 如果找不到檔案，只會顯示溫和的紅色警告，不會讓整個網頁崩潰死機！
-        st.error("⚠️ 傳送失敗：找不到『pages/1_📰_市場消息.py』。請檢查 GitHub 上是否已存在此檔案，且檔名完全一致。")
+        st.error(f"⚠️ 傳送失敗，系統回報的錯誤細節：{e}")
+
+
+
+
 # ==========================================
 # 🌟 觀察名單專屬工具函數區 (補回遺失的計分工具)
 # ==========================================
