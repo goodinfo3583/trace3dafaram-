@@ -416,7 +416,7 @@ if (!parentDoc.getElementById('custom-sticky-header')) {
 components.html(inject_js, height=0, width=0)
 # 👆👆👆 ========================================================== 👆👆👆
 # ==========================================
-# 市場消息隱形傳送門：讓頂部 JS 按鈕可以切換實體分頁
+# 🔗 市場消息隱形傳送門：讓頂部 JS 按鈕可以切換實體分頁
 # ==========================================
 if st.button("NavToNews", key="nav_news"):
     try:
@@ -489,12 +489,13 @@ def robust_read_csv_pool(file_path):
             return df
         except: continue
     return pd.read_csv(file_path, encoding='cp950', errors='ignore')
-
 # =======================================================
-# 👇 在這裡加入這兩行，啟動運算數據引擎 data_engine
+# 👇 在這裡加入這兩行，啟動data_engine引擎！
 import data_engine
 data_engine.init_all_data()
 # =======================================================
+
+
 
 # =======================================================
 # 側邊欄：戰情指揮中心 (內建個股快搜 + 大盤總經)
