@@ -22,6 +22,12 @@ st.set_page_config(page_title="股市派對", layout="wide")
 import ui
 ui.setup_all_effects()
 
+# =======================================================
+## 👇2.01-在這裡加入這兩行，啟動data_engine引擎！
+# =======================================================
+import data_engine
+data_engine.init_all_data()
+
 # ==========================================
 # 3. 資料庫連線與路徑初始化
 # ==========================================
@@ -489,11 +495,7 @@ def robust_read_csv_pool(file_path):
             return df
         except: continue
     return pd.read_csv(file_path, encoding='cp950', errors='ignore')
-# =======================================================
-# 👇 在這裡加入這兩行，啟動data_engine引擎！
-import data_engine
-data_engine.init_all_data()
-# =======================================================
+
 
 
 
