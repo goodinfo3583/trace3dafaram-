@@ -415,7 +415,27 @@ if (!parentDoc.getElementById('custom-sticky-header')) {
 # 透過隱藏的頂部按鈕導航 iframe 執行上述的 JavaScript 注入
 components.html(inject_js, height=0, width=0)
 # 👆👆👆 ========================================================== 👆👆👆
+# ==========================================
+# 🕵️‍♂️ 終極除錯雷達：讓系統印出它看到的真實檔名
+# ==========================================
+import os
+st.markdown("### 🕵️‍♂️ 系統檔案路徑偵測")
+try:
+    # 讓 Python 去掃描 pages 資料夾裡面到底有哪些檔案
+    pages_files = os.listdir("pages")
+    st.write("伺服器在 `pages` 資料夾內實際看到的檔案列表：")
+    st.code(pages_files)  # 用 code 區塊顯示，連隱藏的空白都無所遁形
+except Exception as e:
+    st.error(f"慘了，系統連 `pages` 資料夾都找不到！錯誤：{e}")
 
+# ==========================================
+# 🔗 隱形傳送門：讓頂部 JS 按鈕可以切換實體分頁
+# ==========================================
+if st.button("NavToNews", key="nav_news"):
+    try:
+        st.switch_page("pages/1_📰_市場消息.py")
+    except Exception as e:
+        st.error(f"⚠️ 傳送失敗，系統回報的錯誤細節：{e}")
 
 # ==========================================
 # 🔗 隱形傳送門：讓頂部 JS 按鈕可以切換實體分頁
