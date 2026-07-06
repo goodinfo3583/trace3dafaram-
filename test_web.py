@@ -420,17 +420,25 @@ if (!parentDoc.getElementById('custom-sticky-header')) {
 
 # 透過隱藏的頂部按鈕導航 iframe 執行上述的 JavaScript 注入
 components.html(inject_js, height=0, width=0)
+<<<<<<< HEAD
 
+=======
+# 👆👆👆 ========================================================== 👆👆👆
+>>>>>>> parent of 68fbf7a (Update test_web.py)
 # ==========================================
 # 🔗 市場消息隱形傳送門：讓頂部 JS 按鈕可以切換實體分頁
 # ==========================================
 if st.button("NavToNews", key="nav_news"):
+<<<<<<< HEAD
     try:
         # 直接指定沒有 Emoji 的純淨檔名！
         st.switch_page("pages/1_市場消息.py")
     except Exception as e:
         st.error(f"⚠️ 傳送失敗，系統回報的錯誤細節：{e}")
 
+=======
+    st.switch_page("pages/1_📰_市場消息.py")
+>>>>>>> parent of 68fbf7a (Update test_web.py)
 # ==========================================
 # 🌟 觀察名單專屬工具函數區 (補回遺失的計分工具)
 # ==========================================
