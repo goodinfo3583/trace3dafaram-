@@ -270,7 +270,48 @@ def render_sidebar_market_summary():
         
     st.markdown(html, unsafe_allow_html=True)
     return date_spot
-
+# ==========================================
+# 📊 區塊 4 專屬工具：券資全景圖
+# ==========================================
+def render_b4_panorama(view_title, keys_and_labels, query):
+    display_list = []
+    display_id, display_name = query, "-"
+    
+    # 先找股票代號與名稱
+    for label, key in keys_and_labels:
+        if key in st.session_state:
+            res = robust_search_engine(st.session_state[key], query)
+            if not res.empty:
+                display_id = res.iloc[0].get('股票代號', query)
+                display_name = res.iloc[0].get('股票名稱', '-')
+                break
+                
+    # 組合各個榜單的結果
+    for label, key in keys_and_labels:
+        if key in st.session_state:
+            res = robust_search_engine(st.session_state[key], query)
+            if not res.empty:
+                row_data = res.iloc[0].to_dict()
+                new_row = {'榜單類型': label}
+                new_row.update(row_data)
+                display_list.append(new_row)
+            else: 
+                display_list.append({'榜單類型': label, '股票代號': display_id, '股票名稱': display_name, '進榜狀態': '⚪ 未進榜'})
+        else: 
+            display_list.append({'榜單類型': label, '股票代號': display_id, '股票名稱': display_name, '進榜狀態': '⚠️ 尚未載入'})
+            
+    # 畫出最終 DataFrame
+    df_panorama = pd.DataFrame(display_list).fillna('-')
+    front_cols = ['榜單類型', '股票代號', '股票名稱', '進榜狀態']
+    data_cols = [c for c in df_panorama.columns if c not in front_cols]
+    final_cols = [c for c in front_cols if c in df_panorama.columns] + data_cols
+    
+    for c in final_cols: 
+        df_panorama[c] = df_panorama[c].apply(lambda x: str(x)[:-2] if str(x).endswith('.0') else x)
+    
+    st.markdown(f"<h5 style='color: #E2E8F0;'>{view_title}</h5>", unsafe_allow_html=True)
+    st.dataframe(df_panorama[final_cols], use_container_width=True, hide_index=True)
+    
 def render_options_dashboard():
     df_opt, date_opt = get_latest_csv("臺指選擇權行情簡表")
     df_pcr, _ = get_latest_csv("臺指選擇權PC比")
