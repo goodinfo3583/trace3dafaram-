@@ -438,3 +438,29 @@ def build_block1_master_df():
             return f_df, sorted_dates, d_cols, col_ref
     
     return pd.DataFrame(), [], [], {}
+# ==========================================
+# 🌟 全域股票字典讀取引擎
+# ==========================================
+@st.cache_data(ttl=86400)
+def load_stock_dict():
+    STOCK_DICT = {}
+    # 這裡預設讀取您資料夾中的產業類別表，若有特定檔名請自行替換
+    search_pattern = os.path.join("./Goodinfo_Rankings", "*上市櫃*csv")
+    files = glob.glob(search_pattern)
+    if files:
+        try:
+            df = pd.read_csv(files[0])
+            for col in ['股票代號', '代號', '證券代號']:
+                if col in df.columns:
+                    df[col] = df[col].astype(str).str.replace(r'\.0$', '', regex=True).str.strip()
+                    df[col] = df[col].apply(lambda x: x.zfill(4) if x.isdigit() else x)
+                    
+            for _, row in df.iterrows():
+                sid = str(row.get('股票代號', row.get('代號', ''))).strip()
+                name = str(row.get('股票名稱', row.get('名稱', ''))).strip()
+                ind = str(row.get('產業別', row.get('產業', 'ETF / 債券 / 其他'))).strip()
+                if sid:
+                    STOCK_DICT[sid] = {"id": sid, "name": name, "industry": ind}
+        except Exception as e:
+            st.error(f"字典讀取錯誤: {e}")
+    return STOCK_DICT
