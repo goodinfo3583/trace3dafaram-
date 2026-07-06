@@ -972,12 +972,9 @@ json_dfs, latest_all_df = fetch_github_json_all()
 final_df, sorted_dates, date_cols, color_ref = build_block1_master_df()
 st.session_state['my_final_df'] = final_df
 # 👆👆👆 ======================================================================👆👆👆
-# ==========================================
-# 區塊1頁面
-# ==========================================
 import streamlit as st
 import pandas as pd
-import ui_components
+import ui  # 👈 沒錯，換回您精心打造的 ui.py！
 import left_panel
 import data_engine
 import page_b1  # 引入我們剛剛做的分頁模組
@@ -985,16 +982,15 @@ import page_b1  # 引入我們剛剛做的分頁模組
 st.set_page_config(page_title="台股籌碼戰情室", page_icon="👑", layout="wide")
 
 # ==========================================
-# 1. 啟動 UI 與全域字典 (解決沒有螢火蟲與沒資料的問題)
+# 1. 啟動 UI 與全域字典 (真正的高級螢火蟲與跑馬燈回來了！)
 # ==========================================
-ui_components.render_custom_css()
+ui.setup_all_effects()  # 👈 呼叫您原本的一鍵召喚視覺魔法
 STOCK_DICT = data_engine.load_stock_dict()
 
 # ==========================================
-# 2. 側邊欄與 SPA 無縫導航選單 (解決側邊欄無法使用與閃爍問題)
+# 2. 側邊欄與 SPA 無縫導航選單 (不閃爍的核心)
 # ==========================================
 with st.sidebar:
-    # 使用 Radio Button 建立無縫切換選單
     st.markdown("### 🧭 系統導航")
     current_page = st.radio(
         "選擇功能區塊", 
@@ -1016,8 +1012,8 @@ if current_page == "法人動向 (五大區塊)":
 
 elif current_page == "市場總經與消息":
     st.title("📰 市場消息與總經看板")
-    st.write("這是您的另一個區塊（目前您尚未提供，後續可在此建立 `page_news.py` 並呼叫）")
-
+    st.write("（這裡未來可以呼叫您另一個 page_news.py）")
+    
 # ==========================================
 # 🔒 區塊 2 專屬包廂鎖 (2-1 到 2-4 所有畫面渲染包進這裡)
 # ==========================================
