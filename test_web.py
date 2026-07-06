@@ -972,6 +972,51 @@ json_dfs, latest_all_df = fetch_github_json_all()
 final_df, sorted_dates, date_cols, color_ref = build_block1_master_df()
 st.session_state['my_final_df'] = final_df
 # 👆👆👆 ======================================================================👆👆👆
+# ==========================================
+# 區塊1頁面
+# ==========================================
+import streamlit as st
+import pandas as pd
+import ui_components
+import left_panel
+import data_engine
+import page_b1  # 引入我們剛剛做的分頁模組
+
+st.set_page_config(page_title="台股籌碼戰情室", page_icon="👑", layout="wide")
+
+# ==========================================
+# 1. 啟動 UI 與全域字典 (解決沒有螢火蟲與沒資料的問題)
+# ==========================================
+ui_components.render_custom_css()
+STOCK_DICT = data_engine.load_stock_dict()
+
+# ==========================================
+# 2. 側邊欄與 SPA 無縫導航選單 (解決側邊欄無法使用與閃爍問題)
+# ==========================================
+with st.sidebar:
+    # 使用 Radio Button 建立無縫切換選單
+    st.markdown("### 🧭 系統導航")
+    current_page = st.radio(
+        "選擇功能區塊", 
+        ["市場總經與消息", "法人動向 (五大區塊)"], 
+        label_visibility="collapsed"
+    )
+    
+    st.markdown("<hr style='border-color: #334155; margin: 10px 0;'>", unsafe_allow_html=True)
+    
+    # 無論切換到哪個畫面，側邊戰情室永遠存在、永遠可用！
+    left_panel.render_sidebar_war_room()
+
+# ==========================================
+# 3. 根據選單，動態載入畫面 (無縫切換，不再重整閃爍！)
+# ==========================================
+if current_page == "法人動向 (五大區塊)":
+    # 呼叫 page_b1 的渲染函數，並把字典傳進去
+    page_b1.render_page(STOCK_DICT)
+
+elif current_page == "市場總經與消息":
+    st.title("📰 市場消息與總經看板")
+    st.write("這是您的另一個區塊（目前您尚未提供，後續可在此建立 `page_news.py` 並呼叫）")
 
 # ==========================================
 # 🔒 區塊 2 專屬包廂鎖 (2-1 到 2-4 所有畫面渲染包進這裡)
