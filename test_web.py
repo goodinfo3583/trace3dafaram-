@@ -582,7 +582,7 @@ def render_sidebar_war_room():
             delta_val = 0.0
 
             if not pool_df.empty:
-                match = robust_search_engine(pool_df, current_stock_id) if current_stock_id else robust_search_engine(pool_df, search_query)
+                match = left_panel.robust_search_engine(pool_df, current_stock_id) if current_stock_id else left_panel.robust_search_engine(pool_df, search_query)
                 if not match.empty:
                     target_score = match.iloc[0].get('總分', 0)
                     delta_val = match.iloc[0].get('Delta (日變動)', 0.0) 
@@ -632,7 +632,7 @@ def render_sidebar_war_room():
             
             if 'my_final_df' in st.session_state:
                 df_b1 = st.session_state['my_final_df']
-                res_b1 = robust_search_engine(df_b1, search_query)
+                res_b1 = left_panel.robust_search_engine(df_b1, search_query)
                 
                 if not res_b1.empty:
                     date_cols = [c for c in res_b1.columns if '持股%' in c or c.isdigit()]
@@ -683,17 +683,17 @@ def render_sidebar_war_room():
             st.markdown("<hr style='border-color: #334155;'>", unsafe_allow_html=True)
             st.markdown("<h4 style='color: #FCD34D;'>🎯 區塊 2：法人買超診斷</h4>", unsafe_allow_html=True)
             c1, c2 = st.columns(2)
-            with c1: scan_and_display("🌐 外資 5 日淨買佔成交量", 'df_blk2_1', search_query)
-            with c2: scan_and_display("🏦 投信 5 日淨買佔成交量", 'df_blk2_2', search_query)
+            with c1: left_panel.scan_and_display("🌐 外資 5 日淨買佔成交量", 'df_blk2_1', search_query)
+            with c2: left_panel.scan_and_display("🏦 投信 5 日淨買佔成交量", 'df_blk2_2', search_query)
             c3, c4 = st.columns(2)
-            with c3: scan_and_display("🌐 外資 5 日淨買佔發行量", 'df_blk2_3', search_query)
-            with c4: scan_and_display("🏦 投信 5 日淨買佔發行量", 'df_blk2_4', search_query)
+            with c3: left_panel.scan_and_display("🌐 外資 5 日淨買佔發行量", 'df_blk2_3', search_query)
+            with c4: left_panel.scan_and_display("🏦 投信 5 日淨買佔發行量", 'df_blk2_4', search_query)
 
             st.markdown("<hr style='border-color: #334155;'>", unsafe_allow_html=True)
             st.markdown("<h4 style='color: #FCD34D;'>📅 區塊 3：法人連買診斷 (日/週)</h4>", unsafe_allow_html=True)
             if 'df_blk3_main' in st.session_state:
                 df_b3 = st.session_state['df_blk3_main']
-                res_b3 = robust_search_engine(df_b3, search_query)
+                res_b3 = left_panel.robust_search_engine(df_b3, search_query)
                 display_id = res_b3.iloc[0]['股票代號'] if not res_b3.empty else search_query
                 display_name = res_b3.iloc[0]['股票名稱'] if not res_b3.empty else "-"
                 
@@ -709,16 +709,16 @@ def render_sidebar_war_room():
             st.markdown("<hr style='border-color: #334155;'>", unsafe_allow_html=True)
             st.markdown("<h4 style='color: #FCD34D;'>🔄 區塊 4：券資有利排名</h4>", unsafe_allow_html=True)
             
-            render_b4_panorama("5日幅度變動排名", [('📉 融資減少', 'df_margin_pct'), ('📉 借券減少', 'df_short_pct'), ('📈 融券增加', 'df_margin_plus_pct')], search_query)
+            left_panel.render_b4_panorama("5日幅度變動排名", [('📉 融資減少', 'df_margin_pct'), ('📉 借券減少', 'df_short_pct'), ('📈 融券增加', 'df_margin_plus_pct')], search_query)
             st.write("") 
-            render_b4_panorama("5日張數變動排名", [('📉 融資減少', 'df_margin_vol'), ('📉 借券減少', 'df_short_vol'), ('📈 融券增加', 'df_margin_plus_vol')], search_query)
+            left_panel.render_b4_panorama("5日張數變動排名", [('📉 融資減少', 'df_margin_vol'), ('📉 借券減少', 'df_short_vol'), ('📈 融券增加', 'df_margin_plus_vol')], search_query)
 
             st.markdown("<hr style='border-color: #334155;'>", unsafe_allow_html=True)
             st.markdown("<h4 style='color: #FCD34D;'>💰 區塊 5：大戶動向診斷</h4>", unsafe_allow_html=True)
             
             col_400, col_1000 = st.columns(2)
-            with col_400: scan_and_display("💎 400張以上大戶動向", 'df_blk5', search_query)
-            with col_1000: scan_and_display("🐳 1000張以上超級大戶動向", 'df_blk5_1000', search_query)
+            with col_400: left_panel.scan_and_display("💎 400張以上大戶動向", 'df_blk5', search_query)
+            with col_1000: left_panel.scan_and_display("🐳 1000張以上超級大戶動向", 'df_blk5_1000', search_query)
 
     # 💡 當搜尋列「沒有內容」時，顯示大盤總經 (隱藏下方 Tabs)
     if not search_query:
