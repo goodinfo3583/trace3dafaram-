@@ -623,7 +623,7 @@ def render_sidebar_war_room():
                     
                     with st.spinner(f"正在擷取 {pure_stock_id} 的最新數據..."):
                         all_mas = ["5MA", "10MA", "20MA", "60MA", "120MA", "240MA"]
-                        render_technical_chart(pure_stock_id, kline_period, all_mas, chk_rsi, chk_macd, chk_kd)
+                        left_panel.render_technical_chart(pure_stock_id, kline_period, all_mas, chk_rsi, chk_macd, chk_kd)
                 else:
                     st.warning("⚠️ 技術 K 線圖目前僅支援代號查詢。")
 
