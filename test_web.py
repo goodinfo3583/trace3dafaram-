@@ -974,37 +974,35 @@ st.session_state['my_final_df'] = final_df
 # 👆👆👆 ======================================================================👆👆👆
 import streamlit as st
 import pandas as pd
-import ui  # 👈 沒錯，換回您精心打造的 ui.py！
+import ui 
 import left_panel
 import data_engine
-import page_b1  # 引入我們剛剛做的分頁模組
+import page_b1 
 
-st.set_page_config(page_title="台股籌碼戰情室", page_icon="👑", layout="wide")
+# 👑 標題正名：股市派對！
+st.set_page_config(page_title="股市派對", page_icon="🎉", layout="wide")
 
 # ==========================================
-# 1. 啟動 UI 與全域字典 (真正的高級螢火蟲與跑馬燈回來了！)
+# 1. 啟動 UI 與全域字典 (魔法陣與螢火蟲)
 # ==========================================
-ui.setup_all_effects()  # 👈 呼叫您原本的一鍵召喚視覺魔法
+ui.setup_all_effects()  
 STOCK_DICT = data_engine.load_stock_dict()
 
 # ==========================================
-# 2. 側邊欄與 SPA 無縫導航選單 (不閃爍的核心)
+# 2. 頂部無縫導航選單 (拒絕 Sidebar，絕對不閃爍)
 # ==========================================
-with st.sidebar:
-    st.markdown("### 🧭 系統導航")
-    current_page = st.radio(
-        "選擇功能區塊", 
-        ["市場總經與消息", "法人動向 (五大區塊)"], 
-        label_visibility="collapsed"
-    )
-    
-    st.markdown("<hr style='border-color: #334155; margin: 10px 0;'>", unsafe_allow_html=True)
-    
-    # 無論切換到哪個畫面，側邊戰情室永遠存在、永遠可用！
-    left_panel.render_sidebar_war_room()
+st.markdown("### 🧭 派對導航")
+current_page = st.radio(
+    "選擇功能區塊", 
+    ["市場總經與消息", "法人動向 (五大區塊)"], 
+    horizontal=True,  # 👈 橫向排列，俐落美觀
+    label_visibility="collapsed"
+)
+
+st.markdown("<hr style='border-color: #334155; margin: 10px 0;'>", unsafe_allow_html=True)
 
 # ==========================================
-# 3. 根據選單，動態載入畫面 (無縫切換，不再重整閃爍！)
+# 3. 根據選單，動態載入畫面 (SPA 單頁無縫切換)
 # ==========================================
 if current_page == "法人動向 (五大區塊)":
     # 呼叫 page_b1 的渲染函數，並把字典傳進去
@@ -1012,7 +1010,7 @@ if current_page == "法人動向 (五大區塊)":
 
 elif current_page == "市場總經與消息":
     st.title("📰 市場消息與總經看板")
-    st.write("（這裡未來可以呼叫您另一個 page_news.py）")
+    st.write("（此區塊為預留空間，未來可在此呼叫您的另一個分頁模組）")
     
 # ==========================================
 # 🔒 區塊 2 專屬包廂鎖 (2-1 到 2-4 所有畫面渲染包進這裡)
