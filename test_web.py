@@ -4540,12 +4540,15 @@ if current_page in ["all", "b5"]:
                 base_df = df_1k[cond_1k][['股票代號', '股票名稱', '▼6周增減', latest_col_1k]].copy()
                 base_df = base_df.rename(columns={'▼6周增減': '6周增減(一千)', latest_col_1k: f"{latest_col_1k}(一千)"})
                 
-                # 3. 執行 400 張中實戶過濾：▼6周增減 > 0 且 最新週 > 0
-                cond_400 = (pd.to_numeric(df_400['▼6周增減'], errors='coerce').fillna(0) > 0) & \
-                           (pd.to_numeric(df_400[latest_col_400], errors='coerce').fillna(0) > 0)
-                
+                # 3. 執行過濾前，先將基底資料去重，防止 Merge 產生笛卡爾積 (記憶體溢出)
+                base_df = df_1k[cond_1k][['股票代號', '股票名稱', '▼6周增減', latest_col_1k]].copy()
+                base_df = base_df.drop_duplicates(subset=['股票代號'], keep='first') # 👈 提早去重
+                base_df = base_df.rename(columns={'▼6周增減': '6周增減(一千)', latest_col_1k: f"{latest_col_1k}(一千)"})
+
                 df_400_filtered = df_400[cond_400][['股票代號', '▼6周增減', latest_col_400]].copy()
+                df_400_filtered = df_400_filtered.drop_duplicates(subset=['股票代號'], keep='first') # 👈 提早去重
                 df_400_filtered = df_400_filtered.rename(columns={'▼6周增減': '6周增減(四百)', latest_col_400: f"{latest_col_400}(四百)"})
+
                 
                 # 4. 🚀 核心靈魂：Inner Join 交集 (只保留兩邊都過關的資優生)
                 resonance_df = pd.merge(base_df, df_400_filtered, on='股票代號', how='inner')
