@@ -4540,15 +4540,12 @@ if current_page in ["all", "b5"]:
                 base_df = df_1k[cond_1k][['股票代號', '股票名稱', '▼6周增減', latest_col_1k]].copy()
                 base_df = base_df.rename(columns={'▼6周增減': '6周增減(一千)', latest_col_1k: f"{latest_col_1k}(一千)"})
                 
-                # 3. 執行過濾前，先將基底資料去重，防止 Merge 產生笛卡爾積 (記憶體溢出)
-                base_df = df_1k[cond_1k][['股票代號', '股票名稱', '▼6周增減', latest_col_1k]].copy()
-                base_df = base_df.drop_duplicates(subset=['股票代號'], keep='first') # 👈 提早去重
-                base_df = base_df.rename(columns={'▼6周增減': '6周增減(一千)', latest_col_1k: f"{latest_col_1k}(一千)"})
-
+                # 3. 執行 400 張中實戶過濾：▼6周增減 > 0 且 最新週 > 0
+                cond_400 = (pd.to_numeric(df_400['▼6周增減'], errors='coerce').fillna(0) > 0) & \
+                           (pd.to_numeric(df_400[latest_col_400], errors='coerce').fillna(0) > 0)
+                
                 df_400_filtered = df_400[cond_400][['股票代號', '▼6周增減', latest_col_400]].copy()
-                df_400_filtered = df_400_filtered.drop_duplicates(subset=['股票代號'], keep='first') # 👈 提早去重
                 df_400_filtered = df_400_filtered.rename(columns={'▼6周增減': '6周增減(四百)', latest_col_400: f"{latest_col_400}(四百)"})
-
                 
                 # 4. 🚀 核心靈魂：Inner Join 交集 (只保留兩邊都過關的資優生)
                 resonance_df = pd.merge(base_df, df_400_filtered, on='股票代號', how='inner')
@@ -4636,7 +4633,7 @@ if current_page in ["all", "b5"]:
                             tm_b5_df = tm_b5_df.nlargest(top_n, '數值_最新週')
                         
                         # ==========================================
-                        # 🎨 產業配對與 Treemap 繪製
+                        # 🎨 產業配對與 Treemap 繪製 (修復崩潰版)
                         # ==========================================
                         # 配對產業別 (剔除 ETF / 債券)
                         tm_b5_df['產業別'] = tm_b5_df['股票代號'].astype(str).apply(
@@ -4653,35 +4650,24 @@ if current_page in ["all", "b5"]:
                         if not tm_b5_df.empty:
                             # 面積權重固定為 1
                             tm_b5_df['計數'] = 1 
-                            today_counts = tm_b5_df['產業別'].value_counts().to_dict()
-
-                            def format_industry_label(industry):
-                                t_count = today_counts.get(industry, 0)
-                                return f"<b>{industry}</b><br><span style='font-size: 13px;'>{t_count}檔</span>"
-                            tm_b5_df['產業別'] = tm_b5_df['產業別'].apply(format_industry_label)
-
+                            
                             # 繪圖熱力數值一律使用「最新一週 1000張增減」來上色
                             tm_b5_df['熱力數值'] = tm_b5_df['數值_最新週']
 
-                            # 🚀 修正 1：建立四個乾淨的格式化欄位（強制指定兩位小數），徹底根除長尾小數點
+                            # 🚀 修復崩潰 1：絕對不要把 HTML 塞進 Path 欄位中！保持字串純淨
+                            tm_b5_df['乾淨產業別'] = tm_b5_df['產業別'].astype(str)
+                            tm_b5_df['乾淨股票名稱'] = tm_b5_df['股票名稱'].astype(str)
+                            
+                            # 🚀 修復崩潰 2：放棄 px.Constant，直接在 Dataframe 建立實體根目錄欄位
+                            tm_b5_df['根目錄'] = "🔥 資金共振池"
+
+                            # 建立四個乾淨的格式化欄位
                             tm_b5_df['千張週增減_格式化'] = tm_b5_df['數值_最新週'].apply(lambda x: f"+{x:.2f}%" if x > 0 else f"{x:.2f}%")
                             tm_b5_df['6周一千_格式化'] = tm_b5_df['數值_6周'].apply(lambda x: f"+{x:.2f}%" if x > 0 else f"{x:.2f}%")
                             tm_b5_df['四百最新_格式化'] = tm_b5_df['數值_400_最新'].apply(lambda x: f"+{x:.2f}%" if x > 0 else f"{x:.2f}%")
                             tm_b5_df['6周四百_格式化'] = tm_b5_df['數值_400_6周'].apply(lambda x: f"+{x:.2f}%" if x > 0 else f"{x:.2f}%")
 
-                            # 🚀 修正 2：依據單選按鈕動態切換便籤文字 (6周排序顯示6周累積，其餘顯示週增)
-                            def format_clean_stock_label(row):
-                                name = str(row.get('股票名稱', ''))
-                                if "6周增減" in b5_filter:
-                                    val_str = row.get('6周一千_格式化', '0.00%')
-                                    return f"<b>{name}</b><br><span style='font-size: 11px; color: #E5E7EB;'>6周: {val_str}</span>"
-                                else:
-                                    d_str = row.get('千張週增減_格式化', '0.00%')
-                                    return f"<b>{name}</b><br><span style='font-size: 11px; color: #E5E7EB;'>大戶週增 {d_str}</span>"
-                                    
-                            tm_b5_df['顯示名稱'] = tm_b5_df.apply(format_clean_stock_label, axis=1)
-
-                            # 將格式化完成的欄位送進 hover_columns 內
+                            # 定義給 hover_data 的陣列
                             hover_columns = [
                                 '股票代號', 
                                 '千張週增減_格式化', 
@@ -4690,7 +4676,6 @@ if current_page in ["all", "b5"]:
                                 '6周四百_格式化'
                             ]
 
-                            # 定義紅綠漸層色階
                             custom_continuous_scale = [
                                 [0.0, "rgba(0, 230, 118, 0.85)"],  
                                 [0.5, "rgba(30, 41, 59, 0.95)"],   
@@ -4700,7 +4685,7 @@ if current_page in ["all", "b5"]:
                             import plotly.express as px
                             fig = px.treemap(
                                 tm_b5_df,
-                                path=[px.Constant("🔥 大股東雙向共振池"), '產業別', '顯示名稱'], 
+                                path=['根目錄', '乾淨產業別', '乾淨股票名稱'], # 👈 只放入純文字欄位
                                 values='計數',
                                 color='熱力數值', 
                                 color_continuous_scale=custom_continuous_scale, 
@@ -4709,18 +4694,33 @@ if current_page in ["all", "b5"]:
                             )
                             fig.update_coloraxes(showscale=False)
 
+                            # 🚀 修復崩潰 3：父節點沒有 customdata，使用 %{customdata[x]} 會報錯
+                            # 解法：在 hovertemplate 裡面加上對應的容錯設計，或單純讓 Plotly 決定 textinfo
+                            
+                            # 動態判斷標籤文字（如果使用者選了 6周，就顯示 6周數值，否則顯示週增）
+                            if "6周增減" in b5_filter:
+                                display_text = tm_b5_df['6周一千_格式化']
+                                label_hint = "6周:"
+                            else:
+                                display_text = tm_b5_df['千張週增減_格式化']
+                                label_hint = "週增:"
+                                
                             fig.update_traces(
-                                textinfo="label", 
+                                # 我們可以把 HTML 放在自定義的 text 裡面，而不是 path 裡面
+                                customdata=tm_b5_df[hover_columns].values,
+                                text=tm_b5_df['乾淨股票名稱'] + "<br><span style='font-size:11px'>" + label_hint + display_text + "</span>",
+                                textinfo="text", 
                                 textfont=dict(color="white", size=14),
                                 marker=dict(line=dict(color='#0B0F19', width=2), pad=dict(t=35, l=10, r=10, b=10)),
+                                
+                                # 使用 Plotly 的安全懸停模板，避開父節點無資料的報錯
                                 hovertemplate=(
                                     '<b>%{label}</b><br>'
-                                    '股票代號: %{customdata[0]}<br>'
-                                    '千張大戶本週: <b>%{customdata[1]}</b><br>'
-                                    '千張大戶6週累積: <b>%{customdata[2]}</b><br>' # 🚀 修正點：改用格式化欄位，杜絕破圖
-                                    '----------------<br>'
-                                    '400張大戶本週: %{customdata[3]}<br>'
-                                    '400張大戶6週累積: <b>%{customdata[4]}</b><br>' # 🚀 修正點：改用格式化欄位，杜絕破圖
+                                    '代號: %{customdata[0]}<br>'
+                                    '千張(最新): <b>%{customdata[1]}</b><br>'
+                                    '千張(6週): <b>%{customdata[2]}</b><br>'
+                                    '400張(最新): %{customdata[3]}<br>'
+                                    '400張(6週): <b>%{customdata[4]}</b><br>'
                                     '<extra></extra>' 
                                 )
                             )
@@ -4732,7 +4732,10 @@ if current_page in ["all", "b5"]:
                                 paper_bgcolor='rgba(0,0,0,0)',
                                 font=dict(family="sans-serif") 
                             )
-                            st.plotly_chart(fig, use_container_width=True)
+                            
+                            # 準備畫圖前加上 st.spinner 確保不會突然卡住
+                            with st.spinner("正在繪製產業聚落圖..."):
+                                st.plotly_chart(fig, use_container_width=True)
                             
                         else:
                             st.info("⚪ 目前過濾後的名單中沒有一般產業的股票。")
