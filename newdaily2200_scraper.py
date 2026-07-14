@@ -45,14 +45,29 @@ options.add_argument('--headless=new')             # 啟用新版無頭模式（
 options.add_argument('--no-sandbox')               # 停用沙盒環境限制，避免 Linux 權限出錯
 options.add_argument('--disable-dev-shm-usage')    # 限制記憶體資源佔用，防止雲端環境崩潰
 options.add_argument('--disable-gpu')              # 停用硬體加速
-# 偽裝 User-Agent，降低被 Goodinfo 偵測為機器人的機率
-options.add_argument('--user-agent=Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36')
+
+# ==========================================
+# 🌟 需要修改的地方 1：補齊所有防機器人特徵！
+# ==========================================
+# 1. 更新為較新版本的 Chrome User-Agent
+options.add_argument('--user-agent=Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/126.0.0.0 Safari/537.36')
+# 2. 假裝你有一個真實的大螢幕 (沒有這行，無頭模式預設是很小的長方形，立刻被抓包)
+options.add_argument('--window-size=1920,1080')
+# 3. 隱藏瀏覽器上的「自動化控制」標籤
+options.add_argument('--disable-blink-features=AutomationControlled')
 
 try:
     driver = webdriver.Chrome(options=options)
 except Exception as e:
     print(f"啟動 Chrome 失敗！錯誤細節: {e}")
     exit()
+
+# ==========================================
+# 🌟 需要修改的地方 2：透過底層指令，抹除 webdriver 指紋！
+# ==========================================
+driver.execute_cdp_cmd("Page.addScriptToEvaluateOnNewDocument", {
+    "source": "Object.defineProperty(navigator, 'webdriver', {get: () => undefined})"
+})
 
 # ==========================================
 # 3. 執行抓取與表格解析
@@ -137,7 +152,13 @@ for index, (name_suffix, url) in enumerate(TARGETS.items()):
             target_df.to_csv(file_path, index=False, encoding='utf-8-sig')
             print(f" └─ ✅ 資料已成功儲存至: {file_path}")
         else:
+            # ==========================================
+            # 🌟 需要修改的地方 3：加入盲測雷達，隨時監控 Cloudflare 狀態
+            # ==========================================
+            current_title = driver.title
             print(f" └─ ❌ 失敗！等了 60 秒還是沒有看到股票資料。")
+            print(f" └─ 🔍 盲測診斷：當前網頁標題是【{current_title}】")
+            
             screenshot_name = f"error_shot_{index+1}.png"
             driver.save_screenshot(screenshot_name)
             print(f" └─ 📸 已拍下錯誤截圖：'{screenshot_name}'。")
