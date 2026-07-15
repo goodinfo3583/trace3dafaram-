@@ -4,9 +4,9 @@ import pandas as pd
 import os
 from io import StringIO
 from datetime import datetime
-from selenium import webdriver
-from selenium.webdriver.chrome.options import Options
 from selenium.webdriver.common.by import By
+# 🌟 匯入終極突破武器 🌟
+import undetected_chromedriver as uc 
 
 # ==========================================
 # 1. 設定區塊
@@ -15,12 +15,10 @@ SAVE_DIR = "Goodinfo_Rankings"
 if not os.path.exists(SAVE_DIR):
     os.makedirs(SAVE_DIR)
 
-# 自動取得今天的日期，格式為 YYYYMMDD
 today = datetime.now().strftime("%Y%m%d")
 
-# ⭐ 任務清單：已將 TWSE 移至第 1 順位方便測試 ⭐
 TARGETS = {
-    "融資融券餘額(TWSE)": "https://www.twse.com.tw/zh/trading/margin/mi-margn.html", # 第一個執行！
+    "融資融券餘額(TWSE)": "https://www.twse.com.tw/zh/trading/margin/mi-margn.html", 
     "借券賣出減少張數(5日累計排名)": "https://goodinfo.tw/tw/StockList.asp?RPT_TIME=&MARKET_CAT=%E7%86%B1%E9%96%80%E6%8E%92%E8%A1%8C&INDUSTRY_CAT=%E5%80%9F%E5%88%B8%E8%B3%A3%E5%87%BA%E6%B8%9B%E5%B0%91%E5%BC%B5%E6%95%B8+%285%E6%97%A5%29%40%40%E5%80%9F%E5%88%B8%E8%B3%A3%E5%87%BA%E5%A2%9E%E6%B8%9B%E5%BC%B5%E6%95%B8%40%40%E6%B8%9B%E5%B0%91%E5%BC%B5%E6%95%B8+%E2%80%93+5%E6%97%A5",
     "融資減少張數(5日累計排名)": "https://goodinfo.tw/tw/StockList.asp?RPT_TIME=&MARKET_CAT=%E7%86%B1%E9%96%80%E6%8E%92%E8%A1%8C&INDUSTRY_CAT=%E8%9E%8D%E8%B3%87%E6%B8%9B%E5%B0%91%E5%BC%B5%E6%95%B8+%285%E6%97%A5%29%40%40%E8%9E%8D%E8%B3%87%E5%A2%9E%E6%B8%9B%E5%BC%B5%E6%95%B8%40%40%E6%B8%9B%E5%B0%91%E5%BC%B5%E6%95%B8+%E2%80%93+5%E6%97%A5",
     "融券增加張數(5日累計排名)": "https://goodinfo.tw/tw/StockList.asp?RPT_TIME=&MARKET_CAT=%E7%86%B1%E9%96%80%E6%8E%92%E8%A1%8C&INDUSTRY_CAT=%E8%9E%8D%E5%88%B8%E5%A2%9E%E5%8A%A0%E5%BC%B5%E6%95%B8+%285%E6%97%A5%29%40%40%E8%9E%8D%E5%88%B8%E5%A2%9E%E6%B8%9B%E5%BC%B5%E6%95%B8%40%40%E5%A2%9E%E5%8A%A0%E5%BC%B5%E6%95%B8+%E2%80%93+5%E6%97%A5",
@@ -32,42 +30,25 @@ TARGETS = {
 }
 
 # ==========================================
-# 2. 啟動瀏覽器
+# 2. 啟動瀏覽器 (undetected-chromedriver 模式)
 # ==========================================
-print("正在啟動 Google Chrome 瀏覽器...")
-options = Options()
-options.add_experimental_option("excludeSwitches", ["enable-automation"])
-options.add_experimental_option('useAutomationExtension', False)
-options.page_load_strategy = 'eager' 
+print("正在啟動 Google Chrome 瀏覽器 (使用 undetected_chromedriver 破甲版)...")
+options = uc.ChromeOptions()
 
-# 🌟 為了在 GitHub Actions 雲端環境執行，必須加上以下設定 🌟
-options.add_argument('--headless=new')             # 啟用新版無頭模式（沒有實體螢幕也能跑）
-options.add_argument('--no-sandbox')               # 停用沙盒環境限制，避免 Linux 權限出錯
-options.add_argument('--disable-dev-shm-usage')    # 限制記憶體資源佔用，防止雲端環境崩潰
-options.add_argument('--disable-gpu')              # 停用硬體加速
-
-# ==========================================
-# 🌟 需要修改的地方 1：補齊所有防機器人特徵！
-# ==========================================
-# 1. 更新為較新版本的 Chrome User-Agent
-options.add_argument('--user-agent=Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/126.0.0.0 Safari/537.36')
-# 2. 假裝你有一個真實的大螢幕 (沒有這行，無頭模式預設是很小的長方形，立刻被抓包)
+# 🌟 GitHub Actions 專用設定
+options.add_argument('--headless=new')
+options.add_argument('--no-sandbox')
+options.add_argument('--disable-dev-shm-usage')
+options.add_argument('--disable-gpu')
 options.add_argument('--window-size=1920,1080')
-# 3. 隱藏瀏覽器上的「自動化控制」標籤
-options.add_argument('--disable-blink-features=AutomationControlled')
+options.add_argument('--user-agent=Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/126.0.0.0 Safari/537.36')
 
 try:
-    driver = webdriver.Chrome(options=options)
+    # 這裡直接用 uc.Chrome 啟動，它會自動處理底層的指紋抹除
+    driver = uc.Chrome(options=options)
 except Exception as e:
     print(f"啟動 Chrome 失敗！錯誤細節: {e}")
     exit()
-
-# ==========================================
-# 🌟 需要修改的地方 2：透過底層指令，抹除 webdriver 指紋！
-# ==========================================
-driver.execute_cdp_cmd("Page.addScriptToEvaluateOnNewDocument", {
-    "source": "Object.defineProperty(navigator, 'webdriver', {get: () => undefined})"
-})
 
 # ==========================================
 # 3. 執行抓取與表格解析
@@ -120,12 +101,11 @@ for index, (name_suffix, url) in enumerate(TARGETS.items()):
                     
                     df.columns = [str(col).strip() for col in df.columns]
                     
-                    # ⭐ 升級：雙模辨識！涵蓋 Goodinfo 股票表 與 TWSE 總表 ⭐
+                    # 雙模辨識
                     has_goodinfo_cols = any('代號' in col or '名稱' in col for col in df.columns)
                     has_twse_cols = any('項目' in col or '今日餘額' in col for col in df.columns)
                     
                     if has_goodinfo_cols or has_twse_cols:
-                        # 證交所的總表列數比較少(大約只有3列資料)，所以條件放寬到 > 2
                         if len(df) >= 2:  
                             target_df = df
                             break 
@@ -143,7 +123,6 @@ for index, (name_suffix, url) in enumerate(TARGETS.items()):
         # 4. 儲存檔案
         # ==========================================
         if target_df is not None:
-            # 清除 Goodinfo 表格中重複的標題列 (安全檢查，不會影響 TWSE)
             for col in target_df.columns:
                 if '代號' in col:
                     target_df = target_df[target_df[col] != col]
@@ -152,9 +131,6 @@ for index, (name_suffix, url) in enumerate(TARGETS.items()):
             target_df.to_csv(file_path, index=False, encoding='utf-8-sig')
             print(f" └─ ✅ 資料已成功儲存至: {file_path}")
         else:
-            # ==========================================
-            # 🌟 需要修改的地方 3：加入盲測雷達，隨時監控 Cloudflare 狀態
-            # ==========================================
             current_title = driver.title
             print(f" └─ ❌ 失敗！等了 60 秒還是沒有看到股票資料。")
             print(f" └─ 🔍 盲測診斷：當前網頁標題是【{current_title}】")
