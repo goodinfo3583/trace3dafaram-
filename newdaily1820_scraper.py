@@ -5,9 +5,9 @@ import os
 import requests
 from io import StringIO
 from datetime import datetime
-from selenium import webdriver
-from selenium.webdriver.chrome.options import Options
 from selenium.webdriver.common.by import By
+# 🌟 匯入終極突破武器 🌟
+import undetected_chromedriver as uc 
 
 # ==========================================
 # 1. 基本設定區塊
@@ -110,7 +110,6 @@ for url in tpex_urls:
         res = session.get(url, headers=headers, timeout=10, verify=False)
         if res.status_code == 200:
             res_json = res.json()
-            # 💡 關鍵修復：改成讀取新版 API 的 tables 結構
             if "tables" in res_json and len(res_json["tables"]) > 0 and "data" in res_json["tables"][0]:
                 data_list = res_json["tables"][0]["data"]
                 if len(data_list) > 0:
@@ -125,6 +124,7 @@ for url in tpex_urls:
 
 if not tpex_success:
     print(f"    ❌ 伺服器回傳無資料 (可能是非交易日或伺服器異常)。")
+
 # ==========================================
 # 🚀 階段二：TAIFEX 期交所 HTML 扒表術
 # ==========================================
@@ -160,10 +160,9 @@ try:
             break
 except Exception as e: print(f"    ⚠️ 失敗: {e}")
 
-# 3. 臺指選擇權行情簡表 (⭐ 終極暴力找表法 + 精準導彈版 ⭐)
+# 3. 臺指選擇權行情簡表
 print(" └─ 📡 正在抓取: 臺指選擇權行情簡表...")
 try:
-    # 🔑 關鍵修復：補上 "commodity_id": "TXO"，明確告訴期交所我們要抓「臺指選擇權」！
     payload = {
         "queryDate": taifex_date, 
         "MarketCode": "0", 
@@ -174,7 +173,6 @@ try:
     from bs4 import BeautifulSoup
     soup = BeautifulSoup(res.text, 'html.parser')
     
-    # 暴力破解：找出網頁中所有的 table，只要裡面有「履約價」三個字，就是我們要的！
     tables = soup.find_all('table')
     target_table = None
     for tb in tables:
@@ -185,7 +183,6 @@ try:
     if target_table:
         df = pd.read_html(StringIO(target_table))[0]
         
-        # 🔑 智慧合併多層表頭 (過濾 Unnamed 與重複字眼)
         if isinstance(df.columns, pd.MultiIndex):
             new_cols = []
             for c in df.columns:
@@ -197,7 +194,6 @@ try:
                 new_cols.append("_".join(valid_parts))
             df.columns = new_cols
         
-        # 🔑 過濾掉網頁中的「小計」列，只保留真正的數字資料
         strike_col = next((col for col in df.columns if '履約價' in col), None)
         if strike_col:
             df[strike_col] = pd.to_numeric(df[strike_col], errors='coerce')
@@ -213,9 +209,8 @@ try:
 except Exception as e: 
     print(f"    ⚠️ 失敗: {e}")
 
-
 # ==========================================
-# 🐢 階段三：Goodinfo 模擬點擊瀏覽器
+# 🐢 階段三：Goodinfo 模擬點擊瀏覽器 (終極破甲版)
 # ==========================================
 GOODINFO_TARGETS = {
     "外資賣出佔成交比(3日累計排名)": "https://goodinfo.tw/tw/StockList.asp?RPT_TIME=&MARKET_CAT=%E7%86%B1%E9%96%80%E6%8E%92%E8%A1%8C&INDUSTRY_CAT=%E5%A4%96%E8%B3%87%E8%B3%A3%E5%87%BA%E4%BD%94%E6%88%90%E4%BA%A4%E6%AF%94+%E2%80%93+3%E6%97%A5%40%40%E5%A4%96%E8%B3%87%E8%B3%A3%E5%87%BA%E4%BD%94%E6%88%90%E4%BA%A4%E6%AF%94%40%40%E5%A4%96%E8%B3%87+%E2%80%93+3%E6%97%A5",
@@ -244,33 +239,23 @@ GOODINFO_TARGETS = {
     "三大法人買超佔成交比(5日累計排名)":"https://goodinfo.tw/tw/StockList.asp?RPT_TIME=&MARKET_CAT=%E7%86%B1%E9%96%80%E6%8E%92%E8%A1%8C&INDUSTRY_CAT=%E4%B8%89%E5%A4%A7%E6%B3%95%E4%BA%BA%E8%B2%B7%E8%B6%85%E4%BD%94%E6%88%90%E4%BA%A4%E6%AF%94+%E2%80%93+5%E6%97%A5%40%40%E4%B8%89%E5%A4%A7%E6%B3%95%E4%BA%BA%E8%B2%B7%E8%B6%85%E4%BD%94%E6%88%90%E4%BA%A4%E6%AF%94%40%40%E4%B8%89%E5%A4%A7%E6%B3%95%E4%BA%BA+%E2%80%93+5%E6%97%A5",
 }
 
-print("\n>> [階段三] 啟動 Google Chrome 瀏覽器 (針對 Goodinfo)...")
-options = Options()
-options.add_experimental_option("excludeSwitches", ["enable-automation"])
-options.add_experimental_option('useAutomationExtension', False)
-options.page_load_strategy = 'eager' 
+print("\n>> [階段三] 啟動 Google Chrome 瀏覽器 (針對 Goodinfo, 破甲版)...")
+options = uc.ChromeOptions()
 
-# 👇 為了在 GitHub Actions 運行，這四行絕對不能少！ 👇
+# 🌟 為了在 GitHub Actions 運行，這幾行絕對不能少！
 options.add_argument('--headless=new')             
 options.add_argument('--no-sandbox')               
 options.add_argument('--disable-dev-shm-usage')    
 options.add_argument('--disable-gpu')              
-# 👆 ------------------------------------------- 👆
-
-# 🌟 極致偽裝：讓 Chrome 看起來像是真人在操作
 options.add_argument('--user-agent=Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/126.0.0.0 Safari/537.36')
 options.add_argument('--window-size=1920,1080')
-options.add_argument('--disable-blink-features=AutomationControlled')
 
 try:
-    driver = webdriver.Chrome(options=options)
+    # 這裡直接用 uc.Chrome 啟動，自動處理底層的指紋抹除
+    driver = uc.Chrome(options=options)
 except Exception as e:
     print(f"啟動 Chrome 失敗！錯誤細節: {e}")
     exit()
-
-driver.execute_cdp_cmd("Page.addScriptToEvaluateOnNewDocument", {
-    "source": "Object.defineProperty(navigator, 'webdriver', {get: () => undefined})"
-})
 
 print(f"開始執行 Goodinfo 下載任務，共計 {len(GOODINFO_TARGETS)} 個檔案。\n" + "-"*40)
 
@@ -336,7 +321,6 @@ for index, (name_suffix, url) in enumerate(GOODINFO_TARGETS.items()):
             target_df.to_csv(file_path, index=False, encoding='utf-8-sig')
             print(f" └─ ✅ 成功存檔！")
         else:
-            # 🌟 盲測診斷與截圖
             current_title = driver.title
             print(f" └─ ❌ 失敗！等了 60 秒還是沒有看到股票資料。")
             print(f" └─ 🔍 盲測診斷：當前網頁標題是【{current_title}】")
