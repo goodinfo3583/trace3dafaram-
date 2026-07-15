@@ -4377,33 +4377,66 @@ if current_page in ["all", "b5"]:
             files = sorted(files, key=os.path.basename, reverse=True)
             master = None
             all_dates = set()
+            
             for f in files:
                 try:
-                    df = pd.read_csv(f, encoding='utf-8-sig')
-                    df.columns = [str(c).strip() for c in df.columns]
+                    # 1. 自動容錯編碼讀取 (防止 Excel 另存後變成 Big5 導致讀取崩潰)
+                    df = None
+                    for enc in ['utf-8-sig', 'big5', 'cp950', 'utf-8']:
+                        try:
+                            df = pd.read_csv(f, encoding=enc)
+                            break
+                        except: pass
                     
-                    # 自動將 8 碼轉 4 碼
+                    if df is None or df.empty: continue
+                    
+                    # 2. 清洗隱形空白與換行符號
+                    df.columns = [re.sub(r'\s+', '', str(c)).replace('\ufeff', '') for c in df.columns]
+                    
+                    # 3. 智慧對接「代號」與「名稱」(相容 Goodinfo 各種不同版本的欄位名稱)
+                    c_code = next((c for c in df.columns if '代號' in c or '代碼' in c), None)
+                    c_name = next((c for c in df.columns if '名稱' in c), None)
+                    
+                    if '股票代號/名稱' in df.columns:
+                        df['股票代號'] = df['股票代號/名稱'].astype(str).str.extract(r'(\d+)', expand=False)
+                        df['股票名稱'] = df['股票代號/名稱'].astype(str).str.replace(r'^\d+', '', regex=True)
+                    elif c_code and c_name:
+                        df['股票代號'] = df[c_code].astype(str).str.extract(r'(\d+)', expand=False)
+                        df['股票名稱'] = df[c_name].astype(str).str.strip()
+                    else:
+                        continue # 找不到代號欄位，跳過此檔案
+                        
+                    # 去除沒抓到代號的空行
+                    df = df.dropna(subset=['股票代號'])
+                    
+                    # ⭐ 終極記憶體保護：強制去除重複列，防止 set_index 與 combine_first 引發記憶體爆炸當機！
+                    df = df.drop_duplicates(subset=['股票代號', '股票名稱'])
+                    
+                    # 4. 日期欄位 8 碼轉 4 碼 (例如 20260714 -> 0714)
                     new_cols = []
                     for c in df.columns:
-                        if re.match(r'202\d{5}', c): new_cols.append(c[-4:])
-                        elif re.match(r'\d{4}', c): new_cols.append(c)
+                        if re.match(r'^202\d{5}$', c): new_cols.append(c[-4:])
+                        elif re.match(r'^\d{4}$', c): new_cols.append(c)
                         else: new_cols.append(c)
                     df.columns = new_cols
                     
-                    if '股票代號/名稱' in df.columns:
-                        df['股票代號'] = df['股票代號/名稱'].astype(str).str.extract(r'(\d+)', expand=False)# ✅ 修正觀察名單讀取不到
-                        df['股票名稱'] = df['股票代號/名稱'].astype(str).str.replace(r'^\d+', '', regex=True)
-                    
+                    # 設定 Index 並蒐集所有日期欄位
                     df = df.set_index(['股票代號', '股票名稱'])
                     date_cols = [c for c in df.columns if re.match(r'^\d{4}$', c)]
                     all_dates.update(date_cols)
                     
+                    # 疊加合併
                     master = df.combine_first(master) if master is not None else df
-                except: continue
+                    
+                except Exception as e:
+                    # 避免單一檔案的錯誤導致整個 400 張分頁崩潰
+                    # print(f"處理檔案 {f} 發生錯誤: {e}") 
+                    continue
             
-            if master is not None:
+            if master is not None and not master.empty:
                 master = master.reset_index()
                 sorted_dates = sorted(list(all_dates), reverse=True)
+                
                 if sorted_dates:
                     newest = sorted_dates[0]
                     prev = sorted_dates[1] if len(sorted_dates) >= 2 else newest
@@ -4420,6 +4453,7 @@ if current_page in ["all", "b5"]:
                         if diff == 0: return "🔄 持平"
                         if diff > -0.5: return "↘️ 微減"
                         return "🚨 減/大減"
+                        
                     master['週動態'] = master.apply(get_trend_400, axis=1) if len(sorted_dates) >= 2 else "持平"
                     
                     # 重新命名：只給最新增減加 ▼
@@ -4433,6 +4467,7 @@ if current_page in ["all", "b5"]:
                     if '▼6周增減' in master.columns: cols_order.append('▼6周增減')
                     if f"{newest}持有%" in master.columns: cols_order.append(f"{newest}持有%")
                     cols_order.append(f"▼{newest}")
+                    
                     for d in sorted_dates[1:]:
                         if d in master.columns: cols_order.append(d)
                     
@@ -4442,7 +4477,10 @@ if current_page in ["all", "b5"]:
                     filtered_400_df = apply_b5_market_filters(final_df, show_etf, show_bond)
                     st.dataframe(filtered_400_df, use_container_width=True, hide_index=True)
                     st.session_state['df_blk5'] = filtered_400_df
-
+            else:
+                st.info("⚪ 找不到符合格式的 400 張大戶資料。")
+        else:
+            st.info("⚪ 尚未下載 400 張神秘金字塔資料，請先執行爬蟲。")
     # ================= TAB 5: 雙引擎共振 =================
     with tab_resonance:
         if not filtered_1000_df.empty and not filtered_400_df.empty:
