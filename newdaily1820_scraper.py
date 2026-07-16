@@ -8,6 +8,8 @@ from datetime import datetime
 from selenium.webdriver.common.by import By
 # 🌟 匯入終極突破武器 🌟
 import undetected_chromedriver as uc 
+import subprocess
+import re
 
 # ==========================================
 # 1. 基本設定區塊
@@ -239,20 +241,15 @@ GOODINFO_TARGETS = {
     "三大法人買超佔成交比(5日累計排名)":"https://goodinfo.tw/tw/StockList.asp?RPT_TIME=&MARKET_CAT=%E7%86%B1%E9%96%80%E6%8E%92%E8%A1%8C&INDUSTRY_CAT=%E4%B8%89%E5%A4%A7%E6%B3%95%E4%BA%BA%E8%B2%B7%E8%B6%85%E4%BD%94%E6%88%90%E4%BA%A4%E6%AF%94+%E2%80%93+5%E6%97%A5%40%40%E4%B8%89%E5%A4%A7%E6%B3%95%E4%BA%BA%E8%B2%B7%E8%B6%85%E4%BD%94%E6%88%90%E4%BA%A4%E6%AF%94%40%40%E4%B8%89%E5%A4%A7%E6%B3%95%E4%BA%BA+%E2%80%93+5%E6%97%A5",
 }
 
-# ...(前面的網址字典 GOODINFO_TARGETS 保持不變)...
-
 print("\n>> [階段三] 啟動 Google Chrome 瀏覽器 (針對 Goodinfo, 破甲版)...")
 options = uc.ChromeOptions()
 
-# 🌟 關鍵升級：把 --headless=new 刪除了！因為我們現在有 Xvfb 虛擬螢幕
+# 🌟 我們現在有 Xvfb 虛擬螢幕，所以不需要 --headless
 options.add_argument('--no-sandbox')               
 options.add_argument('--disable-dev-shm-usage')    
 options.add_argument('--disable-gpu')              
 options.add_argument('--user-agent=Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/126.0.0.0 Safari/537.36')
 options.add_argument('--window-size=1920,1080')
-
-import subprocess
-import re
 
 # 🌟 關鍵修復：自動偵測 GitHub 虛擬機的 Chrome 版本，防止 ChromeDriver 版本暴衝不匹配
 version_main = None
@@ -277,8 +274,6 @@ except Exception as e:
     exit()
 
 print(f"開始執行 Goodinfo 下載任務，共計 {len(GOODINFO_TARGETS)} 個檔案。\n" + "-"*40)
-
-# ...(後面的爬蟲迴圈保持不變，直接讓它執行即可)...
 
 for index, (name_suffix, url) in enumerate(GOODINFO_TARGETS.items()):
     file_name = f"{today}{name_suffix}.csv"
