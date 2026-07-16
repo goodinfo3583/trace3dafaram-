@@ -251,9 +251,27 @@ options.add_argument('--disable-gpu')
 options.add_argument('--user-agent=Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/126.0.0.0 Safari/537.36')
 options.add_argument('--window-size=1920,1080')
 
+import subprocess
+import re
+
+# 🌟 關鍵修復：自動偵測 GitHub 虛擬機的 Chrome 版本，防止 ChromeDriver 版本暴衝不匹配
+version_main = None
 try:
-    # 這裡直接用 uc.Chrome 啟動，因為拿掉了 headless，Cloudflare 將判定我們為真實電腦
-    driver = uc.Chrome(options=options)
+    # 透過指令查詢系統內的 Chrome 版本 (例如輸出 "Google Chrome 150.0.7871.0")
+    out = subprocess.check_output(['google-chrome', '--version']).decode('utf-8')
+    match = re.search(r'(\d+)\.', out)
+    if match:
+        version_main = int(match.group(1))
+        print(f" └─ 🔍 自動偵測到伺服器 Chrome 主版本為: {version_main}")
+except Exception as e:
+    print(f" └─ ⚠️ 無法自動偵測 Chrome 版本，將使用預設設定。")
+
+try:
+    # 🎯 這裡加上 version_main 參數，強迫驅動程式與瀏覽器版本同步！
+    if version_main:
+        driver = uc.Chrome(options=options, version_main=version_main)
+    else:
+        driver = uc.Chrome(options=options)
 except Exception as e:
     print(f"啟動 Chrome 失敗！錯誤細節: {e}")
     exit()
