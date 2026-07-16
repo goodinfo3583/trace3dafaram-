@@ -312,6 +312,14 @@ for index, (name_suffix, url) in enumerate(GOODINFO_TARGETS.items()):
         for i in range(60): 
             try:
                 html = driver.page_source
+                
+                # 💡 改善 1：防卡死機制。如果等了 30 秒還是白畫面，強制重新整理 (Refresh)！
+                if i == 30:
+                    print(" └─ 🔄 網頁似乎載入卡住，嘗試強制重新整理...")
+                    driver.refresh()
+                    time.sleep(3)
+                    continue
+                    
                 tables = pd.read_html(StringIO(html))
                 
                 for df in tables:
@@ -320,7 +328,8 @@ for index, (name_suffix, url) in enumerate(GOODINFO_TARGETS.items()):
                     df.columns = [str(col).strip() for col in df.columns]
                     
                     if '代號' in df.columns or '名稱' in df.columns:
-                        if len(df) > 5:
+                        # 💡 改善 2：放寬限制！有時候投信賣出只有 1~2 檔，從 >5 改成 >=1 即可。
+                        if len(df) >= 1: 
                             target_df = df
                             break 
                 if target_df is not None:
@@ -343,6 +352,10 @@ for index, (name_suffix, url) in enumerate(GOODINFO_TARGETS.items()):
             
             if "Just a moment" in current_title or "Cloudflare" in current_title or "Attention" in current_title:
                 print(" └─ 🚨 確診：你的爬蟲被 Cloudflare 的防機器人驗證機制擋在外面了！")
+            elif "goodinfo.tw" in current_title.lower() or current_title.strip() == "":
+                print(" └─ 🚨 確診：網頁白畫面或網路連線異常。")
+            else:
+                print(" └─ 🚨 確診：可能該排行榜今日【無符合條件之股票】(資料庫為空)。")
             
             driver.save_screenshot(f"error_shot_{index+1}.png")
             
