@@ -7,7 +7,8 @@ from datetime import datetime
 from selenium.webdriver.common.by import By
 # 🌟 匯入終極突破武器 🌟
 import undetected_chromedriver as uc 
-
+import subprocess
+import re
 # ==========================================
 # 1. 設定區塊
 # ==========================================
@@ -32,20 +33,34 @@ TARGETS = {
 # ==========================================
 # 2. 啟動瀏覽器 (undetected-chromedriver 模式)
 # ==========================================
-print("正在啟動 Google Chrome 瀏覽器 (使用 undetected_chromedriver 破甲版)...")
+print("\n>> 正在啟動 Google Chrome 瀏覽器 (使用 undetected_chromedriver 破甲版)...")
 options = uc.ChromeOptions()
 
-# 🌟 GitHub Actions 專用設定
-options.add_argument('--headless=new')
-options.add_argument('--no-sandbox')
-options.add_argument('--disable-dev-shm-usage')
-options.add_argument('--disable-gpu')
-options.add_argument('--window-size=1920,1080')
+# 🌟 我們現在有 Xvfb 虛擬螢幕，所以不需要 --headless
+options.add_argument('--no-sandbox')               
+options.add_argument('--disable-dev-shm-usage')    
+options.add_argument('--disable-gpu')              
 options.add_argument('--user-agent=Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/126.0.0.0 Safari/537.36')
+options.add_argument('--window-size=1920,1080')
+
+# 🌟 關鍵修復：自動偵測 GitHub 虛擬機的 Chrome 版本，防止 ChromeDriver 版本暴衝不匹配
+version_main = None
+try:
+    # 透過指令查詢系統內的 Chrome 版本
+    out = subprocess.check_output(['google-chrome', '--version']).decode('utf-8')
+    match = re.search(r'(\d+)\.', out)
+    if match:
+        version_main = int(match.group(1))
+        print(f" └─ 🔍 自動偵測到伺服器 Chrome 主版本為: {version_main}")
+except Exception as e:
+    print(f" └─ ⚠️ 無法自動偵測 Chrome 版本，將使用預設設定。")
 
 try:
-    # 這裡直接用 uc.Chrome 啟動，它會自動處理底層的指紋抹除
-    driver = uc.Chrome(options=options)
+    # 🎯 這裡加上 version_main 參數，強迫驅動程式與瀏覽器版本同步！
+    if version_main:
+        driver = uc.Chrome(options=options, version_main=version_main)
+    else:
+        driver = uc.Chrome(options=options)
 except Exception as e:
     print(f"啟動 Chrome 失敗！錯誤細節: {e}")
     exit()
