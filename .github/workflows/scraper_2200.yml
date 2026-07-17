@@ -37,7 +37,24 @@ jobs:
     - name: 執行 Python 爬蟲程式
       run: |
         xvfb-run --auto-servernum --server-args="-screen 0 1920x1080x24" python "newdaily2200_scraper.py" 
+    # ========================================================
+    # 🌟 2-1核心新增步驟：爬蟲完立刻呼叫雷達程式，把熱騰騰的資料算成精華 JSON
+    # ========================================================
+    - name: 執行主力囤貨雷達分析
+      run: |
+        python "find_smart_money.py"
+      continue-on-error: true # 萬一某天券商檔案有髒資料，不至於讓整個工作流卡死
 
+    - name: 更新遠端進度 (避免衝突)
+      run: |
+        git pull --rebase --autostash origin main
+
+    - name: 自動將更新的 CSV 與 主力 JSON 資料推回 GitHub
+      uses: stefanzweifel/git-auto-commit-action@v5
+      with:
+        commit_message: "自動更新 22:05 籌碼與主力囤貨JSON"
+        # 修改這裡，讓它同時允許儲存 CSV 與 docs 資料夾底下的 JSON
+        file_pattern: 'Goodinfo_Rankings/* docs/data/*'
     # 🌟 升級點 3：推播前自動同步 GitHub 最新狀態，防止衝突
     - name: 更新遠端進度 (避免衝突)
       run: |
