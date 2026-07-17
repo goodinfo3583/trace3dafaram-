@@ -7,7 +7,7 @@ st.title("🎯 主力連續收購 (鎖碼) 飆股雷達")
 st.markdown("這裡顯示最近 10 天內，被單一券商分點**「連續大買、且幾乎不賣」**的籌碼集中標的。")
 
 # 這裡填寫你 GitHub 上的 JSON Raw 網址
-TARGET_URL = "https://raw.githubusercontent.com/你的帳號/你的專案/main/docs/data/smart_money_targets.json"
+TARGET_URL = "https://raw.githubusercontent.com/goodifo3583/trace3dafaram-/main/docs/data/smart_money_targets.json"
 
 @st.cache_data(ttl=3600)
 def load_smart_money():
