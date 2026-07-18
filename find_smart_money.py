@@ -1,63 +1,93 @@
 import pandas as pd
-import glob
-import json
+import requests
+import io
+from datetime import datetime, timedelta
 import os
 
-print("============= 🕵️‍♂️ 籌碼雷達運算中心啟動 =============")
+print("============= 🕵️‍♂️ 主力籌碼雷達運算中心啟動 (遠端直連版) =============")
 
-# 1. 檢查資料夾檔案
-# 💡 請特別注意：請確認你的 CSV 檔名與路徑到底在哪裡！
-# 如果是跟著前面 Goodinfo 爬蟲走，路徑應該是 "Goodinfo_Rankings/*"
-search_path = "Goodinfo_Rankings/*.csv" 
-file_paths = sorted(glob.glob(search_path), reverse=True)
-print(f" ├─ 📂 目標路徑: {search_path}")
-print(f" ├─ 📊 共搜集到 {len(file_paths)} 個歷史資料檔。")
+# 1. 自動往前推算日期，去對方 GitHub 抓取最近 10 個交易日的 CSV
+df_list = []
+days_collected = 0
+current_date = datetime.now()
 
-# 篩選出大戶分點明細的檔案 (這裡可依你實際的檔名關鍵字調整)
-broker_files = [f for f in file_paths if "成交價" in f or "持股比例" in f][:10]
-print(f" ├─ 🔍 篩選出最近 10 個分點交易檔: {[os.path.basename(f) for f in broker_files]}")
+# 嘗試往前找 20 天，湊滿 10 個有交易的日子
+for i in range(20):
+    if days_collected >= 10:
+        break
+        
+    date_str = (current_date - timedelta(days=i)).strftime("%Y-%m-%d")
+    url = f"https://raw.githubusercontent.com/voidful/tw-institutional-stocker/main/data/broker/broker_trades_{date_str}.csv"
+    
+    try:
+        res = requests.get(url, timeout=10)
+        if res.status_code == 200:
+            print(f" ├─ 📥 成功下載遠端資料: broker_trades_{date_str}.csv")
+            # 讀取 CSV 並加上日期標籤
+            df = pd.read_csv(io.StringIO(res.text))
+            df['交易日期'] = date_str
+            df_list.append(df)
+            days_collected += 1
+        elif res.status_code == 404:
+            # 假日沒有開盤，或是對方還沒上傳
+            pass
+    except Exception as e:
+        print(f" ├─ ⚠️ 網路錯誤 {date_str}: {e}")
 
-if not broker_files:
-    print(" ❌ 🚨 致命錯誤：找不到任何分點交易 CSV 檔案！請確認爬蟲是否有成功存檔。")
-    # 就算失敗也生出一個空 json，避免網頁端讀取 404
-    os.makedirs("docs/data", exist_ok=True)
-    with open("docs/data/smart_money_targets.json", "w") as f: f.write("[]")
+# =====================================================================
+# 確保 JSON 檔案一定會被建立 (防止 GitHub Actions 當機)
+output_dir = "docs/data"
+os.makedirs(output_dir, exist_ok=True)
+json_path = f"{output_dir}/smart_money_targets.json"
+
+if not df_list:
+    print(" ❌ 🚨 致命錯誤：無法從遠端取得任何券商交易 CSV。")
+    with open(json_path, "w") as f: f.write("[]")
     exit()
 
-df_list = []
-for f in broker_files:
-    try:
-        temp_df = pd.read_csv(f)
-        print(f" ├─ 📖 讀取成功: {os.path.basename(f)} | 資料筆數: {len(temp_df)}")
-        df_list.append(temp_df)
-    except Exception as e:
-        print(f" ├─ ⚠️ 讀取失敗: {os.path.basename(f)} | 原因: {e}")
-
+# 2. 合併所有資料
 all_trades = pd.concat(df_list, ignore_index=True)
-print(f" ├─ 💥 籌碼矩陣合併完成！總列數: {len(all_trades)}")
-print(f" ├─ 📋 欄位名稱清單: {list(all_trades.columns)}")
-
-# 💡 這裡加上防呆：防止欄位名稱跟對方的專案不一樣
-# 假設你的欄位叫 '代號', '名稱', '買進張數' 等，請在這裡對齊
-# 如果發現欄位不對，可以在這裡用 rename 改名
+print(f" ├─ 💥 籌碼矩陣合併完成！總計分析了 {len(all_trades)} 筆交易紀錄。")
+print(f" ├─ 📋 遠端 CSV 欄位名稱為: {list(all_trades.columns)}")
 
 try:
-    # 進行群組計算
-    # 這裡先用最寬鬆的條件統計
-    grouped = all_trades.groupby(by=lambda x: True) # 暫時的語法佔位
+    # 3. 欄位容錯對位 (因為我們不知道對方的欄位確切叫什麼)
+    col_stock = next((c for c in all_trades.columns if '股票' in c or 'stock' in c.lower() or c == '代號'), None)
+    col_broker = next((c for c in all_trades.columns if '券商' in c or 'broker' in c.lower()), None)
+    col_buy = next((c for c in all_trades.columns if '買進' in c or 'buy' in c.lower()), None)
+    col_sell = next((c for c in all_trades.columns if '賣出' in c or 'sell' in c.lower()), None)
+    col_net = next((c for c in all_trades.columns if '買賣超' in c or 'net' in c.lower()), None)
+
+    if not all([col_stock, col_broker, col_buy, col_sell, col_net]):
+        print(" ❌ 找不到關鍵對應欄位，請檢查日誌印出的欄位名稱。")
+        with open(json_path, "w") as f: f.write("[]")
+        exit()
+
+    # 4. 核心魔法：將「股票」與「券商」群組，計算這幾天的總買賣超
+    grouped = all_trades.groupby([col_stock, col_broker]).agg(
+        十日總買進=(col_buy, 'sum'),
+        十日總賣出=(col_sell, 'sum'),
+        十日買賣超=(col_net, 'sum'),
+        交易天數=('交易日期', 'nunique')
+    ).reset_index()
+
+    # 5. 主力篩選條件 (這裡我設定為：總買進>500張 且 買進是賣出的 3 倍以上)
+    smart_money = grouped[
+        (grouped['十日總買進'] > 500) & 
+        (grouped['十日總買進'] > grouped['十日總賣出'] * 3) & 
+        (grouped['交易天數'] >= 3)
+    ]
+
+    # 6. 排序並輸出最精華的前 50 名
+    smart_money = smart_money.sort_values(by='十日買賣超', ascending=False).head(50)
     
-    # 由於不知道你實際抓進來的 CSV 內部欄位，我們先印出前三行樣品在 GitHub Actions 日誌裡
-    print(" ├─ 🧪 CSV 內容樣品預覽:")
-    print(all_trades.head(3).to_string())
-    
-    # 【改為超寬鬆條件】先確保一定有資料輸出
-    smart_money = all_trades.head(20) # 先拿前 20 筆試水溫
-    
-    output_dir = "docs/data"
-    os.makedirs(output_dir, exist_ok=True)
-    smart_money.to_json(f"{output_dir}/smart_money_targets.json", orient='records', force_ascii=False)
-    print(f" ✅ 順利導出 JSON！共計 {len(smart_money)} 筆資料。")
+    # 為了配合前端，把動態找到的股票欄位名稱改為統一的「股票代號」
+    smart_money = smart_money.rename(columns={col_stock: '股票代號', col_broker: '券商分點'})
+
+    # 存檔
+    smart_money.to_json(json_path, orient='records', force_ascii=False)
+    print(f" ✅ 順利導出主力名單 JSON！共計 {len(smart_money)} 檔鎖碼飆股。")
 
 except Exception as e:
     print(f" ❌ 🚨 計算過程中崩潰: {e}")
-    with open("docs/data/smart_money_targets.json", "w") as f: f.write("[]")
+    with open(json_path, "w") as f: f.write("[]")
