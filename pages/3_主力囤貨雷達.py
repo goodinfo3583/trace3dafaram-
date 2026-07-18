@@ -81,7 +81,7 @@ with st.spinner(f"📡 正在下載遠端歷史資料庫，並即時運算近 {l
     df, info = fetch_and_calculate_smart_money(lookback)
 
 if df is not None and not df.empty:
-    st.success(f"🎉 運算完成！資料已推進至最新交易日: **{info}** | 總共抓到 {len(df)} 檔鎖碼標的。")
+    st.success(f"資料最新交易日: **{info}** | 總共抓到 {len(df)} 檔鎖碼標的。")
     
     st.dataframe(
         df,
