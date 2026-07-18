@@ -2,11 +2,10 @@ import streamlit as st
 import pandas as pd
 import requests
 
-st.set_page_config(page_title="券商分點追蹤", page_icon="🕵️‍♂️", layout="wide")
-st.title("🕵️‍♂️ 頂級券商分點買賣超追蹤")
-st.markdown("直接解析 60 日歷史總表，動態查詢**特定券商分點 (如凱基-台北)** 的近期買賣超排行！")
+st.set_page_config(page_title="籌碼雙向透視鏡", page_icon="🕵️‍♂️", layout="wide")
+st.title("🕵️‍♂️ 籌碼雙向透視鏡")
+st.markdown("直接解析 60 日歷史總表，提供 **「特定券商進出追蹤」** 與 **「個股主力溯源矩陣」** 兩大核心功能！")
 
-# 🌟 統一使用這份每天都會更新的 2.6MB 歷史原始檔
 TARGET_URL = "https://raw.githubusercontent.com/voidful/tw-institutional-stocker/main/data/broker/broker_history.csv"
 
 # ========================================================
@@ -23,7 +22,7 @@ def get_stock_names_dict():
         return {}
 
 # ========================================================
-# 讀取 CSV 並將資料依照「券商」視角進行彙整
+# 讀取 CSV 歷史總表
 # ========================================================
 @st.cache_data(ttl=3600)
 def fetch_broker_data(lookback_days=10):
@@ -41,73 +40,107 @@ def fetch_broker_data(lookback_days=10):
             exact_cutoff = unique_dates[lookback_days - 1]
             recent_df = recent_df[recent_df['trade_date'] >= exact_cutoff]
             
-        # 核心群組運算：這次的視角是「這個分點，對這檔股票買賣了多少」
-        grouped = recent_df.groupby(['broker_id', 'broker_name', 'stock_code']).agg(
-            總買進=('buy_vol', 'sum'),
-            總賣出=('sell_vol', 'sum'),
-            淨買超=('net_vol', 'sum'),
-            交易天數=('trade_date', 'nunique')
-        ).reset_index()
-
-        return grouped, latest_date.strftime("%Y-%m-%d")
+        recent_df['stock_code'] = recent_df['stock_code'].astype(str)
+        recent_df['券商全名'] = recent_df['broker_id'].astype(str) + " " + recent_df['broker_name']
+        
+        return recent_df, latest_date.strftime("%Y-%m-%d"), [d.strftime("%Y-%m-%d") for d in unique_dates[:lookback_days]]
         
     except Exception as e:
-        return None, str(e)
+        return None, str(e), []
 
-# --- 網頁 UI 顯示區 ---
+# --- 網頁 UI 共用設定區 ---
 col_slider, col_empty = st.columns([1, 1])
 with col_slider:
     lookback = st.slider("選擇要分析的最近交易天數", min_value=3, max_value=60, value=10)
 
 with st.spinner(f"📡 正在載入近 {lookback} 日籌碼資料..."):
-    df, info = fetch_broker_data(lookback)
-
-if df is not None and not df.empty:
-    # 建立「券商代號 + 名稱」的選單清單
-    df['券商全名'] = df['broker_id'].astype(str) + " " + df['broker_name']
-    broker_list = sorted(df['券商全名'].unique())
-    
-    st.success(f"✅ 資料載入成功！最新交易日: **{info}** | 共收錄 {len(broker_list)} 家分點資料。")
-    
-    # 下拉選單讓使用者指定券商
-    selected_broker = st.selectbox("請選擇要進行『X光透視』的券商分點:", broker_list)
-    
-    # 篩選出該券商的所有交易紀錄
-    broker_data = df[df['券商全名'] == selected_broker].copy()
-    
-    # 映射股票名稱
+    df_raw, info, date_list = fetch_broker_data(lookback)
     stock_dict = get_stock_names_dict()
-    broker_data['股票名稱'] = broker_data['stock_code'].astype(str).map(lambda x: stock_dict.get(x, "-"))
-    broker_data['股票代號'] = broker_data['stock_code'].astype(str)
-    
-    col1, col2 = st.columns(2)
-    
-    with col1:
-        st.subheader("🔥 買超前 10 名")
-        # 篩選淨買超大於 0，並由大到小排序
-        buy_df = broker_data[broker_data['淨買超'] > 0].sort_values(by='淨買超', ascending=False).head(10)
-        
-        if not buy_df.empty:
-            st.dataframe(
-                buy_df[['股票代號', '股票名稱', '總買進', '總賣出', '淨買超', '交易天數']],
-                column_config={"淨買超": st.column_config.NumberColumn(format="%d 📈")},
-                hide_index=True, use_container_width=True
-            )
-        else:
-            st.info("該期間內無買超紀錄。")
 
-    with col2:
-        st.subheader("📉 賣超前 10 名")
-        # 篩選淨買超小於 0，並由小到大(負越多越上面)排序
-        sell_df = broker_data[broker_data['淨買超'] < 0].sort_values(by='淨買超', ascending=True).head(10)
+if df_raw is not None and not df_raw.empty:
+    st.success(f"✅ 資料載入成功！最新交易日: **{info}** | 分析區間共 {len(date_list)} 天。")
+    
+    # 建立雙標籤頁
+    tab1, tab2 = st.tabs(["🏦 視角一：特定券商進出追蹤 (以券商找股)", "🎯 視角二：個股主力籌碼溯源 (以股找券商)"])
+    
+    # ==========================================
+    # Tab 1: 以券商找股 (你原本的功能)
+    # ==========================================
+    with tab1:
+        broker_list = sorted(df_raw['券商全名'].unique())
+        selected_broker = st.selectbox("請選擇要進行『X光透視』的券商分點:", broker_list, key="broker_select")
         
-        if not sell_df.empty:
+        # 將原始資料依股票群組加總
+        broker_data = df_raw[df_raw['券商全名'] == selected_broker].groupby('stock_code').agg(
+            總買進=('buy_vol', 'sum'),
+            總賣出=('sell_vol', 'sum'),
+            淨買超=('net_vol', 'sum'),
+            交易天數=('trade_date', 'nunique')
+        ).reset_index()
+        
+        broker_data['股票名稱'] = broker_data['stock_code'].map(lambda x: stock_dict.get(x, "-"))
+        broker_data['股票代號'] = broker_data['stock_code']
+        
+        col1, col2 = st.columns(2)
+        with col1:
+            st.subheader("🔥 區間買超排行")
+            buy_df = broker_data[broker_data['淨買超'] > 0].sort_values(by='淨買超', ascending=False).head(15)
+            if not buy_df.empty:
+                st.dataframe(buy_df[['股票代號', '股票名稱', '總買進', '總賣出', '淨買超', '交易天數']], hide_index=True, use_container_width=True)
+            else:
+                st.info("該期間內無買超紀錄。")
+
+        with col2:
+            st.subheader("📉 區間賣超排行")
+            sell_df = broker_data[broker_data['淨買超'] < 0].sort_values(by='淨買超', ascending=True).head(15)
+            if not sell_df.empty:
+                st.dataframe(sell_df[['股票代號', '股票名稱', '總買進', '總賣出', '淨買超', '交易天數']], hide_index=True, use_container_width=True)
+            else:
+                st.info("該期間內無賣超紀錄。")
+
+    # ==========================================
+    # Tab 2: 以股找券商 (全新時間序列矩陣)
+    # ==========================================
+    with tab2:
+        # 整理出該資料庫中「有紀錄」的股票清單供選擇
+        available_stocks = sorted(df_raw['stock_code'].unique())
+        stock_options = [f"{code} {stock_dict.get(code, '-')}" for code in available_stocks]
+        
+        selected_stock_display = st.selectbox("請選擇要查詢的主力溯源標的 (僅列出資料庫有紀錄之股票):", stock_options, key="stock_select")
+        selected_stock_code = selected_stock_display.split(" ")[0]
+        
+        # 篩選該檔股票的所有交易紀錄
+        stock_data = df_raw[df_raw['stock_code'] == selected_stock_code].copy()
+        
+        if not stock_data.empty:
+            # 將日期轉為字串作為欄位名稱
+            stock_data['日期字串'] = stock_data['trade_date'].dt.strftime("%m/%d")
+            
+            # ⭐ 核心魔法：製作時間序列樞紐分析表 (Pivot Table)
+            pivot_df = stock_data.pivot_table(
+                index='券商全名', 
+                columns='日期字串', 
+                values='net_vol', 
+                aggfunc='sum', 
+                fill_value=0
+            )
+            
+            # 計算該區間的「總淨買超」，並以此排序找出最大主力
+            pivot_df['區間總淨買超'] = pivot_df.sum(axis=1)
+            pivot_df = pivot_df.sort_values(by='區間總淨買超', ascending=False)
+            
+            # 將 DataFrame 格式化顯示 (標記紅綠色)
+            st.markdown(f"### 📊 {selected_stock_display} - 券商進出時間序列矩陣")
+            st.caption("正數代表買超，負數代表賣超。數值由左至右為時間推進。")
+            
+            # 使用 Streamlit 內建的樣式設定，讓表格顯示得更專業
             st.dataframe(
-                sell_df[['股票代號', '股票名稱', '總買進', '總賣出', '淨買超', '交易天數']],
-                column_config={"淨買超": st.column_config.NumberColumn(format="%d 📉")},
-                hide_index=True, use_container_width=True
+                pivot_df,
+                use_container_width=True,
+                height=600  # 讓表格高一點，方便上下滾動看 700 多家券商
             )
         else:
-            st.info("該期間內無賣超紀錄。")
+            st.info("這檔股票近期沒有大型券商進出紀錄。")
+
 else:
     st.error(f"🚨 無法取得資料，錯誤訊息: {info}")
