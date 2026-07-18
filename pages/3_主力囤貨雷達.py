@@ -1,76 +1,80 @@
 import streamlit as st
 import pandas as pd
-import requests
 
 st.set_page_config(page_title="主力囤貨雷達", page_icon="🎯", layout="wide")
 st.title("🎯 主力連續收購 (鎖碼) 飆股雷達")
-st.markdown("直接解析開源巨量數據庫，抓出近期**「連續大買、只進不出」**的籌碼集中標的！")
+st.markdown("直接剖析開源專案 **60 日歷史總表 (`broker_history.csv`)**，精準抓出只進不出的鎖碼大戶！")
 
-# 🌟 這裡直接對準那位大神的 GitHub JSON 檔案！
-TARGET_URL = "https://raw.githubusercontent.com/voidful/tw-institutional-stocker/main/docs/data/broker_stats.json"
+# 🌟 直接對準那份 2.6MB 的歷史大補帖！
+TARGET_URL = "https://raw.githubusercontent.com/voidful/tw-institutional-stocker/main/data/broker/broker_history.csv"
 
-@st.cache_data(ttl=3600)
-def fetch_and_filter_smart_money():
+@st.cache_data(ttl=3600)  # 快取一小時
+def fetch_and_calculate_smart_money(lookback_days=10):
     try:
-        # 下載大神的 JSON
-        res = requests.get(TARGET_URL, timeout=10)
-        res.raise_for_status()
-        data = res.json()
+        # 1. 瞬間下載並讀取 2.6MB 的 CSV
+        df = pd.read_csv(TARGET_URL)
         
-        # 準備一個空串列來裝我們篩選出來的「飆股」
-        smart_money_list = []
+        # 2. 確保日期格式正確，並找出最新的交易日
+        df['trade_date'] = pd.to_datetime(df['trade_date'])
+        latest_date = df['trade_date'].max()
         
-        # 解析大神的 JSON 結構
-        results = data.get("results", [])
+        # 3. 根據你想要的回測天數，切出「最近 N 天」的資料
+        cutoff_date = latest_date - pd.Timedelta(days=lookback_days * 1.5) # 乘以1.5是為了包含假日
+        recent_df = df[df['trade_date'] >= cutoff_date]
         
-        for broker in results:
-            broker_name = f"{broker['broker_id']} {broker['broker_name']}"
+        # 如果切出來的天數大於我們設定的，就精確取最後 N 個交易日
+        unique_dates = sorted(recent_df['trade_date'].unique(), reverse=True)
+        if len(unique_dates) > lookback_days:
+            exact_cutoff = unique_dates[lookback_days - 1]
+            recent_df = recent_df[recent_df['trade_date'] >= exact_cutoff]
             
-            # 檢查這個券商買超前 10 名的股票
-            for stock in broker.get("top_buy_stocks", []):
-                
-                # 🎯 我們的核心鎖碼過濾條件：
-                buy_vol = stock.get("total_buy_vol", 0)
-                sell_vol = stock.get("total_sell_vol", 0)
-                net_vol = stock.get("total_net_vol", 0)
-                days = stock.get("trading_days", 0)
-                
-                # 條件：總買進大於 500 張 + 買進是賣出的 3 倍以上 + 至少買了 3 天
-                # (因為有時候賣出是 0，為了避免除以 0 報錯，用乘法檢查)
-                if net_vol > 500 and buy_vol > (sell_vol * 3) and days >= 3:
-                    smart_money_list.append({
-                        "券商分點": broker_name,
-                        "股票代號": str(stock.get("stock_code")),
-                        "股票名稱": stock.get("stock_name"),
-                        "交易天數": f"{days} 天",
-                        "總買進(張)": buy_vol,
-                        "總賣出(張)": sell_vol,
-                        "淨買超(張)": net_vol
-                    })
-                    
-        return pd.DataFrame(smart_money_list), data.get("updated", "未知")
+        # 4. 核心群組運算 (找出同一家券商對同一檔股票的總買賣)
+        grouped = recent_df.groupby(['stock_code', 'broker_name', 'broker_id']).agg(
+            十日總買進=('buy_vol', 'sum'),
+            十日總賣出=('sell_vol', 'sum'),
+            十日買賣超=('net_vol', 'sum'),
+            交易天數=('trade_date', 'nunique')
+        ).reset_index()
+
+        # 5. 主力鎖碼嚴格條件：淨買超 > 500，買進大於賣出的 3 倍，且至少買了 3 天
+        smart_money = grouped[
+            (grouped['十日買賣超'] > 500) & 
+            (grouped['十日總買進'] > grouped['十日總賣出'] * 3) & 
+            (grouped['交易天數'] >= 3)
+        ]
+        
+        # 排序與美化欄位名稱
+        smart_money = smart_money.sort_values(by='十日買賣超', ascending=False).head(50)
+        smart_money['券商分點'] = smart_money['broker_id'].astype(str) + " " + smart_money['broker_name']
+        smart_money = smart_money[['stock_code', '券商分點', '交易天數', '十日總買進', '十日總賣出', '十日買賣超']]
+        smart_money = smart_money.rename(columns={'stock_code': '股票代號'})
+        
+        return smart_money, latest_date.strftime("%Y-%m-%d")
         
     except Exception as e:
-        st.error(f"🚨 抓取遠端資料失敗！錯誤細節: {e}")
-        return pd.DataFrame(), "未知"
+        return pd.DataFrame(), str(e)
 
-# 執行抓取與過濾
-df, update_time = fetch_and_filter_smart_money()
+# --- 網頁 UI 顯示區 ---
+# 加上一個滑桿，讓你隨時可以動態調整要看「最近幾天」的主力
+lookback = st.slider("選擇要分析的最近交易天數 (尋找短/中/長線主力)", min_value=3, max_value=30, value=10)
 
-if not df.empty:
-    st.success(f"🎉 成功攔截開源數據！資料更新時間: {update_time} | 共抓到 {len(df)} 檔鎖碼標的。")
+with st.spinner(f"📡 正在下載遠端歷史資料庫，並即時運算近 {lookback} 日籌碼..."):
+    df, info = fetch_and_calculate_smart_money(lookback)
+
+if df is not None and not df.empty:
+    st.success(f"🎉 運算完成！資料已推進至最新交易日: **{info}** | 總共抓到 {len(df)} 檔鎖碼標的。")
     
-    # 按照淨買超張數，由高到低排序
-    df = df.sort_values(by="淨買超(張)", ascending=False)
-    
-    # 顯示漂亮的表格
     st.dataframe(
         df,
         column_config={
-            "淨買超(張)": st.column_config.NumberColumn("10日淨買超", format="%d 📈"),
+            "股票代號": st.column_config.TextColumn("代號"),
+            "十日買賣超": st.column_config.NumberColumn("淨買超(張)", format="%d 📈"),
+            "交易天數": st.column_config.NumberColumn("出手天數", format="%d 天"),
         },
         use_container_width=True,
         hide_index=True
     )
+elif df is not None and df.empty:
+    st.warning(f"目前沒有符合嚴格條件的標的。(最新資料日期: {info})")
 else:
-    st.warning(f"目前沒有符合「主力鎖碼」嚴格條件的標的。(資料更新時間: {update_time})")
+    st.error(f"🚨 無法取得遠端資料，錯誤訊息: {info}")
