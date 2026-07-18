@@ -4,49 +4,73 @@ import requests
 
 st.set_page_config(page_title="主力囤貨雷達", page_icon="🎯", layout="wide")
 st.title("🎯 主力連續收購 (鎖碼) 飆股雷達")
+st.markdown("直接解析開源巨量數據庫，抓出近期**「連續大買、只進不出」**的籌碼集中標的！")
 
-# ⚠️ 請確保這裡的網址是點擊 GitHub 檔案右大角的 "Raw" 按鈕後複製的網址！
-TARGET_URL = "https://raw.githubusercontent.com/goodinfo3583/trace3dafaram-/main/docs/data/smart_money_targets.json"
+# 🌟 這裡直接對準那位大神的 GitHub JSON 檔案！
+TARGET_URL = "https://raw.githubusercontent.com/voidful/tw-institutional-stocker/main/docs/data/broker_stats.json"
 
-st.info("🔍 正在啟動後台連線與資料流盲測...")
-
-# 1. 測試網路連線與檔案是否存在
-try:
-    res = requests.get(TARGET_URL, timeout=10)
-    st.write(f"📡 伺服器回應狀態碼: `{res.status_code}`")
-    
-    if res.status_code == 404:
-        st.error("🚨 錯誤：GitHub 雲端找不到該 JSON 檔案！請確認 `find_smart_money.py` 是否有成功在雲端執行並生成檔案，或確認分支名稱是否為 `main`。")
-    elif res.status_code == 200:
-        raw_text = res.text
-        st.write(f"📦 成功下載資料！檔案大小: `{len(raw_text)}` 字元。")
+@st.cache_data(ttl=3600)
+def fetch_and_filter_smart_money():
+    try:
+        # 下載大神的 JSON
+        res = requests.get(TARGET_URL, timeout=10)
+        res.raise_for_status()
+        data = res.json()
         
-        # 顯示前 200 個字元看長怎樣
-        with st.expander("👀 點開檢視雲端原始數據 (前 200 字)"):
-            st.code(raw_text[:200])
+        # 準備一個空串列來裝我們篩選出來的「飆股」
+        smart_money_list = []
+        
+        # 解析大神的 JSON 結構
+        results = data.get("results", [])
+        
+        for broker in results:
+            broker_name = f"{broker['broker_id']} {broker['broker_name']}"
             
-        # 2. 嘗試解析 JSON
-        try:
-            json_data = res.json()
-            df = pd.DataFrame(json_data)
-            
-            if df.empty:
-                st.warning("⚠️ 雲端檔案存在，但經過『主力篩選條件』過濾後，結果為 0 筆！請調鬆 `find_smart_money.py` 的篩選標準。")
-            else:
-                st.success(f"🎉 成功解碼籌碼矩陣！共抓取到 `{len(df)}` 檔主力鎖碼標的。")
+            # 檢查這個券商買超前 10 名的股票
+            for stock in broker.get("top_buy_stocks", []):
                 
-                # 顯示表格
-                st.dataframe(
-                    df,
-                    column_config={
-                        "股票代號": st.column_config.TextColumn("代號"),
-                        "十日買賣超": st.column_config.NumberColumn("10日淨買超(張)", format="%d 📈"),
-                    },
-                    use_container_width=True,
-                    hide_index=True
-                )
-        except Exception as json_err:
-            st.error(f"🚨 JSON 解析失敗！可能檔案格式被寫壞了。錯誤細節: {json_err}")
-            
-except Exception as net_err:
-    st.error(f"🚨 核心網路連線崩潰！無法連接到 GitHub。錯誤細節: {net_err}")
+                # 🎯 我們的核心鎖碼過濾條件：
+                buy_vol = stock.get("total_buy_vol", 0)
+                sell_vol = stock.get("total_sell_vol", 0)
+                net_vol = stock.get("total_net_vol", 0)
+                days = stock.get("trading_days", 0)
+                
+                # 條件：總買進大於 500 張 + 買進是賣出的 3 倍以上 + 至少買了 3 天
+                # (因為有時候賣出是 0，為了避免除以 0 報錯，用乘法檢查)
+                if net_vol > 500 and buy_vol > (sell_vol * 3) and days >= 3:
+                    smart_money_list.append({
+                        "券商分點": broker_name,
+                        "股票代號": str(stock.get("stock_code")),
+                        "股票名稱": stock.get("stock_name"),
+                        "交易天數": f"{days} 天",
+                        "總買進(張)": buy_vol,
+                        "總賣出(張)": sell_vol,
+                        "淨買超(張)": net_vol
+                    })
+                    
+        return pd.DataFrame(smart_money_list), data.get("updated", "未知")
+        
+    except Exception as e:
+        st.error(f"🚨 抓取遠端資料失敗！錯誤細節: {e}")
+        return pd.DataFrame(), "未知"
+
+# 執行抓取與過濾
+df, update_time = fetch_and_filter_smart_money()
+
+if not df.empty:
+    st.success(f"🎉 成功攔截開源數據！資料更新時間: {update_time} | 共抓到 {len(df)} 檔鎖碼標的。")
+    
+    # 按照淨買超張數，由高到低排序
+    df = df.sort_values(by="淨買超(張)", ascending=False)
+    
+    # 顯示漂亮的表格
+    st.dataframe(
+        df,
+        column_config={
+            "淨買超(張)": st.column_config.NumberColumn("10日淨買超", format="%d 📈"),
+        },
+        use_container_width=True,
+        hide_index=True
+    )
+else:
+    st.warning(f"目前沒有符合「主力鎖碼」嚴格條件的標的。(資料更新時間: {update_time})")
