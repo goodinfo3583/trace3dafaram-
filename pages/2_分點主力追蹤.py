@@ -111,18 +111,32 @@ if df_raw is not None and not df_raw.empty:
         
         # 篩選該檔股票的所有交易紀錄
         stock_data = df_raw[df_raw['stock_code'] == selected_stock_code].copy()
-        
+    # ... (保留前面相同的讀取邏輯) ...
+
+        # 在 Tab 2 中，進行日期欄位的強制排序
         if not stock_data.empty:
-            # 將日期轉為字串作為欄位名稱
-            stock_data['日期字串'] = stock_data['trade_date'].dt.strftime("%m/%d")
+            # 1. 取得所有日期並進行正確排序
+            date_cols = sorted([c for c in stock_data['trade_date'].dt.strftime("%m/%d").unique()])
             
-            # ⭐ 核心魔法：製作時間序列樞紐分析表 (Pivot Table)
+            # 2. 製作 Pivot Table (並強制指定欄位順序)
             pivot_df = stock_data.pivot_table(
                 index='券商全名', 
-                columns='日期字串', 
+                columns='trade_date', 
                 values='net_vol', 
                 aggfunc='sum', 
                 fill_value=0
+            )
+            # 轉回 MM/DD 格式並強制排序
+            pivot_df.columns = [d.strftime("%m/%d") for d in pivot_df.columns]
+            pivot_df = pivot_df[sorted(pivot_df.columns)]
+            
+            # 3. 計算籌碼集中度：統計「區間淨買超」與「總成交量比例」
+            pivot_df['總淨買超'] = pivot_df.sum(axis=1)
+            
+            # 4. 顯示
+            st.dataframe(
+                pivot_df.sort_values(by='總淨買超', ascending=False),
+                use_container_width=True
             )
             
             # 計算該區間的「總淨買超」，並以此排序找出最大主力
