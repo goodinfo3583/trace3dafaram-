@@ -2200,9 +2200,8 @@ def build_block1_master_df():
     
     return pd.DataFrame(), [], [], {}
 
-
 # ==========================================
-# 🛡️ 背景守護程式 (強制維持記憶體熱度，解決歸零與 KeyError 問題)不確定是哪一部分的工具
+# 區塊1背景預載引擎 (強制維持記憶體熱度，解決歸零與 KeyError 問題)
 # ==========================================
 def preload_all_csv_data():
     import os, glob
@@ -2263,7 +2262,6 @@ if 'my_final_df' not in st.session_state or st.session_state['my_final_df'].empt
         st.session_state['my_final_df'] = final_df
         preload_all_csv_data()  # 💡 啟動預載雷達
         st.session_state['force_reload'] = False
-
 
 # ==========================================
 # 🌟 區塊 1 專屬工具函數區 (必須放在 if 鎖外面，供應全站數據)
@@ -2430,7 +2428,6 @@ json_dfs, latest_all_df = fetch_github_json_all()
 final_df, sorted_dates, date_cols, color_ref = build_block1_master_df()
 st.session_state['my_final_df'] = final_df
 # 👆👆👆 ======================================================================👆👆👆
-
 
 # ==========================================
 # 🔒 區塊 1 專屬包廂鎖 (畫面渲染與站長工具包進這裡)
