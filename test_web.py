@@ -958,6 +958,9 @@ def render_b4_panorama(view_title, keys_and_labels, query):
 # ==========================================
 # 📈 繪製 K 線圖與技術分析引擎 (加入快取與側邊欄窄版優化)
 # ==========================================
+# ==========================================
+# 📈 側邊雙視窗專屬：K線圖與技術分析引擎 (整合為單一最新版)
+# ==========================================
 @st.cache_data(ttl=900)
 def fetch_yfinance_data(ticker, period="3y"):
     import yfinance as yf
@@ -992,7 +995,9 @@ def render_technical_chart(stock_id, timeframe="日線", selected_mas=[], show_r
     else: df.index = df.index.tz_localize('UTC').tz_convert('Asia/Taipei')
 
     daily_df = df.copy()
-#
+########################
+# --- AI 技術訊號判斷 ---
+########################
     if timeframe == "週線":
         daily_df = daily_df.resample('W-FRI').agg({'Open': 'first', 'High': 'max', 'Low': 'min', 'Close': 'last', 'Volume': 'sum'}).dropna()
     elif timeframe == "月線":
@@ -1118,7 +1123,8 @@ def render_technical_chart(stock_id, timeframe="日線", selected_mas=[], show_r
     else: df.index = df.index.tz_localize('UTC').tz_convert('Asia/Taipei')
 
     daily_df = df.copy()
-
+##########
+    # --- AI 技術訊號判斷 ---
     def generate_technical_signals(df_sig):
         signals = []
         if df_sig.empty or len(df_sig) < 20: return signals
@@ -1151,7 +1157,7 @@ def render_technical_chart(stock_id, timeframe="日線", selected_mas=[], show_r
             signal_html += f"<p style='color: #E2E8F0; margin: 5px 0px; font-size: 15px;'>{sig}</p>"
         signal_html += "</div>"
         st.markdown(signal_html, unsafe_allow_html=True)
-
+    # --- 週期處理與指標計算 ---
     if timeframe == "週線":
         daily_df = daily_df.resample('W-FRI').agg({'Open': 'first', 'High': 'max', 'Low': 'min', 'Close': 'last', 'Volume': 'sum'}).dropna()
     elif timeframe == "月線":
