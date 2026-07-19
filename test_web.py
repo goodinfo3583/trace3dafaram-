@@ -41,16 +41,7 @@ st.markdown("""
     #</style>
 #""", unsafe_allow_html=True)
 #除錯紅色框
-st.markdown("""
-    <style>
-    /* 縮小頁面頂部的留白 */
-    .block-container {
-        padding-top: 0rem; /* 預設通常是 3rem，您可以調整成 0.5rem 或 0rem */
-    }
-    </style>
-""", unsafe_allow_html=True)
 
-#除錯紅色框
 # ==========================================
 # 1. 網頁基本設定 & 目錄路徑初始化
 # ==========================================
@@ -681,7 +672,7 @@ def fetch_historical_news(days_to_load=3):
         return [], []
 
 # ========================================================== 
-# 📰 定義：市場消息主畫面分頁 (極速分頁版)
+# 市場消息
 # ========================================================== 
 def show_news_page():
     st.title("市場消息")
@@ -706,58 +697,7 @@ def show_news_page():
     date_range_str = f"{loaded_dates[-1]} ~ {loaded_dates[0]}" if len(loaded_dates) > 1 else loaded_dates[0]
     
     
-    # ==========================================
-    # 🎨 注入 CSS 樣式
-    # ==========================================
-    glass_css = """
-    <style>
-    .glass-card {
-        background: rgba(255, 255, 255, 0.15); 
-        backdrop-filter: blur(10px);          
-        -webkit-backdrop-filter: blur(10px);
-        border: 1px solid rgba(255, 255, 255, 0.08); 
-        border-radius: 12px;
-        padding: 16px 20px;
-        margin-bottom: 12px;
-        box-shadow: 0 4px 15px rgba(0, 0, 0, 0.2);   
-        transition: all 0.2s ease-in-out;
-    }
-    .glass-card:hover {
-        background: rgba(255, 255, 255, 0.09);     
-        transform: translateY(-2px);
-    }
-    .news-title {
-        font-size: 16px; 
-        font-weight: 400;
-        color: #E0E0E0;  
-        text-decoration: none;
-        line-height: 1.4;
-        display: block;
-        margin-bottom: 8px;
-    }
-    .news-title:hover {
-        color: 	#FFE153;  
-    }
-    .news-info {
-        font-size: 13px;
-        color: #94A3B8;
-        display: flex;
-        justify-content: space-between;
-        align-items: center;
-    }
-    .code-tag {
-        background: rgba(59, 130, 246, 0.15); 
-        color: #60A5FA;
-        padding: 3px 8px;
-        border-radius: 6px;
-        font-size: 12px;
-        margin-left: 5px;
-        font-weight: 600;
-        border: 1px solid rgba(59, 130, 246, 0.3);
-    }
-    </style>
-    """
-    st.markdown(glass_css, unsafe_allow_html=True)
+    
     
     # ==========================================
     # 🔍 步驟一：先執行全域過濾與排序 (不急著顯示)
@@ -842,12 +782,12 @@ def show_news_page():
         </div>
         """
         st.markdown(card_html, unsafe_allow_html=True)        
-# ==========================================
+
 # 🚦 執行路由：判斷要顯示哪個畫面 (這裡才是讓畫面出現的關鍵)
-# ==========================================
 if current_page == "news":
     # 【修改 3】：如果使用者點擊了新聞按鈕，或者剛進站 (預設為news)，就執行這個函數
     show_news_page()
+    
 # ==========================================
 # 🌟 觀察名單專屬工具函數區 (補回遺失的計分工具)
 # ==========================================
