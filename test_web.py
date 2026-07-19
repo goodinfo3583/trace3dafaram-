@@ -859,7 +859,6 @@ def robust_read_csv_pool(file_path):
 # ==========================================
 # 🌟 所有"側邊雙視窗"專屬工具函數區 
 # ==========================================
-
 # --- 1. 快搜專屬工具 ---
 def robust_search_engine(df, query):
     if df is None or df.empty: return pd.DataFrame()
@@ -904,7 +903,7 @@ def scan_and_display(title, session_key, query):
         st.dataframe(res, use_container_width=True, hide_index=True)
     else:
         st.write("⚪ 未進榜")
-
+############上面重複
 def generate_stock_commentary(row):
     score = row.get('總分', 0)
     warns = str(row.get('賣出警示', ''))
@@ -1230,9 +1229,9 @@ def fetch_macro_indicators():
     except: pass
 
     return data
-
+#以上是後插入融資融券大盤總經
 # ==========================================
-# 📈 繪製 K 線圖與技術分析引擎 (加入快取與側邊欄窄版優化)
+# 📈 繪製 K 線圖與技術分析引擎 (加入快取與側邊欄窄版優化)重覆到這裡開始
 # ==========================================
 @st.cache_data(ttl=900)
 def fetch_yfinance_data(ticker, period="3y"):
@@ -1268,7 +1267,7 @@ def render_technical_chart(stock_id, timeframe="日線", selected_mas=[], show_r
     else: df.index = df.index.tz_localize('UTC').tz_convert('Asia/Taipei')
 
     daily_df = df.copy()
-
+#以上重複 以下後來新增
     if timeframe == "週線":
         daily_df = daily_df.resample('W-FRI').agg({'Open': 'first', 'High': 'max', 'Low': 'min', 'Close': 'last', 'Volume': 'sum'}).dropna()
     elif timeframe == "月線":
@@ -1663,7 +1662,7 @@ if 'my_final_df' not in st.session_state or st.session_state['my_final_df'].empt
         st.session_state['force_reload'] = False
 
 # =======================================================
-# 側邊欄：戰情指揮中心 (內建個股快搜 + 大盤總經)
+# 側邊雙視窗 - (內建個股快搜 + 大盤總經)
 # =======================================================
 # ==========================================
 # 🌟 所有側邊欄專屬工具函數區 (放在最外層，提升效能)
@@ -2250,11 +2249,7 @@ def render_sidebar_war_room():
                 </div>
                 """, unsafe_allow_html=True)
 
-# =======================================================
-# 側邊欄：實際呼叫魔法渲染區塊 (放在這裡即可)
-# =======================================================
-with st.sidebar:
-    render_sidebar_war_room()
+
 
 # ==========================================
 # 📍 預留給底層「觀察名單」傳送上來的隱形卡位槽
