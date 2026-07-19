@@ -859,7 +859,70 @@ def robust_read_csv_pool(file_path):
 # ==========================================
 # 🌟 所有"側邊雙視窗"專屬工具函數區 
 # ==========================================
+# --- 1. 快搜專屬工具 ---
+def robust_search_engine(df, query):
+    if df is None or df.empty: return pd.DataFrame()
+    df = df.loc[:, ~df.columns.duplicated()].copy()
+    query = str(query).strip()
+    mask = pd.Series(False, index=df.index)
+    if '股票代號' in df.columns:
+        df['股票代號'] = df['股票代號'].astype(str).str.strip()
+        mask = mask | (df['股票代號'] == query)
+    if '股票名稱' in df.columns:
+        df['股票名稱'] = df['股票名稱'].astype(str).str.strip()
+        mask = mask | df['股票名稱'].str.contains(query, na=False, case=False)
+    return df[mask]
 
+def scan_and_display(title, session_key, query):
+    st.markdown(f"<h6 style='color: #E2E8F0; margin-bottom: 5px;'>{title}</h6>", unsafe_allow_html=True)
+    if session_key not in st.session_state:
+        st.write("⚪ 尚未載入資料表")
+        return
+    df = st.session_state[session_key]
+    if df is None or df.empty:
+        st.write("⚪ 該榜單無任何資料")
+        return
+    res = robust_search_engine(df, query)
+    if not res.empty:
+        pct_cols = [c for c in res.columns if '持股' in c or '佔' in c or '%' in c]
+        if pct_cols:
+            all_zero = True
+            for c in pct_cols:
+                val = res.iloc[0][c]
+                if pd.isna(val): continue
+                val_str = str(val).strip().replace('%', '')
+                if val_str.lower() in ['', '-', 'nan', 'none', 'null']: continue
+                try:
+                    if abs(float(val_str)) > 0.0001:
+                        all_zero = False
+                        break
+                except ValueError: continue
+            if all_zero:
+                st.write("⚪ 未進榜")
+                return
+        st.dataframe(res, use_container_width=True, hide_index=True)
+    else:
+        st.write("⚪ 未進榜")
+
+def generate_stock_commentary(row):
+    score = row.get('總分', 0)
+    warns = str(row.get('賣出警示', ''))
+    b5_trend = str(row.get('大股東動向', ''))
+    has_warning = "⚠️" in warns or "🚨" in warns
+    high_score = score >= 3
+    if has_warning and high_score:
+        return f"⚔️ 【激烈換手】系統偵測到法人分歧 ({warns})，但該股依然獲得 {score} 分的高評估！這代表『一方的倒貨正被大戶強勢吃下』。若能維持強勢，代表承接方實力極強，需嚴設停損。"
+    if has_warning and not high_score:
+        return f"🚨 【風險警示】法人正在進行倒貨調節 ({warns})，且無強大買盤承接，籌碼結構面臨鬆動。建議暫避風頭。"
+    if "大減" in b5_trend:
+        return "⚠️ 【大戶撤退】400張以上大戶出現明顯減碼跡象，主力籌碼渙散，建議先行觀望。"
+    if score >= 6:
+        base_comment = "🔥 【強勢噴發】籌碼面極度優異！內外資法人與大戶同步共振做多，具備強大的波段上攻潛力。"
+        if "大增" in b5_trend: base_comment += "大股東籌碼大幅集中，是不可多得的強勢防守標的。"
+        return base_comment
+    elif score >= 3: return "📈 【偏多佈局】主力籌碼持續進駐，法人買盤給予一定支撐。具備穩健的波段潛力。"
+    elif score >= 1: return "🔄 【中性觀望】籌碼表現較為平淡，雖有零星買盤但缺乏明確連續性。建議多看少做。"
+    else: return "❄️ 【弱勢整理】籌碼處於流失或無主力認養狀態。建議暫不考量。"
     
 #分頁1-大盤總體經濟
 def render_sidebar_market_summary():
