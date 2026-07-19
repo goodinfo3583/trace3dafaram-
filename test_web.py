@@ -924,6 +924,35 @@ def generate_stock_commentary(row):
     elif score >= 1: return "🔄 【中性觀望】籌碼表現較為平淡，雖有零星買盤但缺乏明確連續性。建議多看少做。"
     else: return "❄️ 【弱勢整理】籌碼處於流失或無主力認養狀態。建議暫不考量。"
     
+def render_b4_panorama(view_title, keys_and_labels, query):
+    display_list = []
+    display_id, display_name = query, "-"
+    for label, key in keys_and_labels:
+        if key in st.session_state:
+            res = robust_search_engine(st.session_state[key], query)
+            if not res.empty:
+                display_id = res.iloc[0].get('股票代號', query)
+                display_name = res.iloc[0].get('股票名稱', '-')
+                break
+                
+    for label, key in keys_and_labels:
+        if key in st.session_state:
+            res = robust_search_engine(st.session_state[key], query)
+            if not res.empty:
+                row_data = res.iloc[0].to_dict()
+                new_row = {'榜單類型': label}; new_row.update(row_data); display_list.append(new_row)
+            else: display_list.append({'榜單類型': label, '股票代號': display_id, '股票名稱': display_name, '進榜狀態': '⚪ 未進榜'})
+        else: display_list.append({'榜單類型': label, '股票代號': display_id, '股票名稱': display_name, '進榜狀態': '⚠️ 尚未載入'})
+            
+    df_panorama = pd.DataFrame(display_list).fillna('-')
+    front_cols = ['榜單類型', '股票代號', '股票名稱', '進榜狀態']
+    data_cols = [c for c in df_panorama.columns if c not in front_cols]
+    final_cols = [c for c in front_cols if c in df_panorama.columns] + data_cols
+    for c in final_cols: df_panorama[c] = df_panorama[c].apply(lambda x: str(x)[:-2] if str(x).endswith('.0') else x)
+    
+    st.markdown(f"<h5 style='color: #E2E8F0;'>{view_title}</h5>", unsafe_allow_html=True)
+    st.dataframe(df_panorama[final_cols], use_container_width=True, hide_index=True)
+    
 #分頁1-大盤總體經濟
 def render_sidebar_market_summary():
     df_spot, date_spot = get_latest_csv("三大法人買賣超金額")
@@ -1570,38 +1599,10 @@ def render_technical_chart(stock_id, timeframe="日線", selected_mas=[], show_r
     plotly_config = {'scrollZoom': True, 'displaylogo': False, 'modeBarButtonsToRemove': ['zoom2d', 'zoomIn2d', 'zoomOut2d', 'autoScale2d', 'select2d', 'lasso2d', 'hoverClosestCartesian', 'hoverCompareCartesian', 'toggleSpikelines']}
     st.plotly_chart(fig, use_container_width=True, key=f"kline_{stock_id}_{timeframe}_{len(selected_mas)}_{show_rsi}_{show_macd}_{show_kd}", config=plotly_config)
 
-def render_b4_panorama(view_title, keys_and_labels, query):
-    display_list = []
-    display_id, display_name = query, "-"
-    for label, key in keys_and_labels:
-        if key in st.session_state:
-            res = robust_search_engine(st.session_state[key], query)
-            if not res.empty:
-                display_id = res.iloc[0].get('股票代號', query)
-                display_name = res.iloc[0].get('股票名稱', '-')
-                break
-                
-    for label, key in keys_and_labels:
-        if key in st.session_state:
-            res = robust_search_engine(st.session_state[key], query)
-            if not res.empty:
-                row_data = res.iloc[0].to_dict()
-                new_row = {'榜單類型': label}; new_row.update(row_data); display_list.append(new_row)
-            else: display_list.append({'榜單類型': label, '股票代號': display_id, '股票名稱': display_name, '進榜狀態': '⚪ 未進榜'})
-        else: display_list.append({'榜單類型': label, '股票代號': display_id, '股票名稱': display_name, '進榜狀態': '⚠️ 尚未載入'})
-            
-    df_panorama = pd.DataFrame(display_list).fillna('-')
-    front_cols = ['榜單類型', '股票代號', '股票名稱', '進榜狀態']
-    data_cols = [c for c in df_panorama.columns if c not in front_cols]
-    final_cols = [c for c in front_cols if c in df_panorama.columns] + data_cols
-    for c in final_cols: df_panorama[c] = df_panorama[c].apply(lambda x: str(x)[:-2] if str(x).endswith('.0') else x)
-    
-    st.markdown(f"<h5 style='color: #E2E8F0;'>{view_title}</h5>", unsafe_allow_html=True)
-    st.dataframe(df_panorama[final_cols], use_container_width=True, hide_index=True)
 
 
 # =======================================================
-# 🚀 終極局部渲染魔法：將整個側邊欄獨立為「不閃爍區塊」
+# 🚀 終極局部渲染魔法：將整個側邊視窗獨立為「不閃爍區塊」(以下核對完畢)
 # =======================================================
 @st.fragment
 def render_sidebar_war_room():
@@ -1622,9 +1623,9 @@ def render_sidebar_war_room():
 # 使用預設的帶邊框容器把圖表和表格包起來
     with st.container(border=True):
         
-        # ==========================================
+        # =================
         # 🎯 搜尋輸入框
-        # ==========================================
+        # =================
         def clear_search():
             st.session_state['global_search_final'] = ""
 
@@ -1673,9 +1674,7 @@ def render_sidebar_war_room():
                 import re
                 match_num = re.search(r'\d+', query_clean)
                 if match_num: pure_stock_id = match_num.group(0)
-#這裡原本有系統綜合評分
-
-            
+#這裡原本有系統綜合假評分
             # ==========================================
             # 📊 優化：K 線控制台 (利用 Fragment 特性，無須 rerun)
             # ==========================================
