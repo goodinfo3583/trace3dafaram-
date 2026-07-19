@@ -1558,7 +1558,7 @@ def render_sidebar_war_room():
             # ==========================================
             # 📊 優化：K 線控制台 (利用 Fragment 特性，無須 rerun)
             # ==========================================
-            show_kline = st.toggle("📊 展開技術 K 線圖", value=st.session_state.get('show_kline', False), key="toggle_kline")
+            show_kline = st.toggle("📊 展開技術 K 線圖 (雙擊縮放)", value=st.session_state.get('show_kline', False), key="toggle_kline")
             st.session_state.show_kline = show_kline
 
             if show_kline:
