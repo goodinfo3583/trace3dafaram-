@@ -857,12 +857,9 @@ def robust_read_csv_pool(file_path):
 
 
 # ==========================================
-# 🌟 側邊雙視窗專屬：基礎工具函數區
+# 🌟 所有"側邊雙視窗"專屬工具函數區 
 # ==========================================
-import streamlit as st
-import pandas as pd
-import requests
-
+# --- 1. 快搜專屬工具 ---
 def robust_search_engine(df, query):
     if df is None or df.empty: return pd.DataFrame()
     df = df.loc[:, ~df.columns.duplicated()].copy()
@@ -913,7 +910,6 @@ def generate_stock_commentary(row):
     b5_trend = str(row.get('大股東動向', ''))
     has_warning = "⚠️" in warns or "🚨" in warns
     high_score = score >= 3
-    
     if has_warning and high_score:
         return f"⚔️ 【激烈換手】系統偵測到法人分歧 ({warns})，但該股依然獲得 {score} 分的高評估！這代表『一方的倒貨正被大戶強勢吃下』。若能維持強勢，代表承接方實力極強，需嚴設停損。"
     if has_warning and not high_score:
@@ -924,272 +920,18 @@ def generate_stock_commentary(row):
         base_comment = "🔥 【強勢噴發】籌碼面極度優異！內外資法人與大戶同步共振做多，具備強大的波段上攻潛力。"
         if "大增" in b5_trend: base_comment += "大股東籌碼大幅集中，是不可多得的強勢防守標的。"
         return base_comment
-    elif score >= 3: 
-        return "📈 【偏多佈局】主力籌碼持續進駐，法人買盤給予一定支撐。具備穩健的波段潛力。"
-    elif score >= 1: 
-        return "🔄 【中性觀望】籌碼表現較為平淡，雖有零星買盤但缺乏明確連續性。建議多看少做。"
-    else: 
-        return "❄️ 【弱勢整理】籌碼處於流失或無主力認養狀態。建議暫不考量。"
-
-def render_b4_panorama(view_title, keys_and_labels, query):
-    display_list = []
-    display_id, display_name = query, "-"
-    for label, key in keys_and_labels:
-        if key in st.session_state:
-            res = robust_search_engine(st.session_state[key], query)
-            if not res.empty:
-                display_id = res.iloc[0].get('股票代號', query)
-                display_name = res.iloc[0].get('股票名稱', '-')
-                break
-                
-    for label, key in keys_and_labels:
-        if key in st.session_state:
-            res = robust_search_engine(st.session_state[key], query)
-            if not res.empty:
-                row_data = res.iloc[0].to_dict()
-                new_row = {'榜單類型': label}
-                new_row.update(row_data)
-                display_list.append(new_row)
-            else: 
-                display_list.append({'榜單類型': label, '股票代號': display_id, '股票名稱': display_name, '進榜狀態': '⚪ 未進榜'})
-        else: 
-            display_list.append({'榜單類型': label, '股票代號': display_id, '股票名稱': display_name, '進榜狀態': '⚠️ 尚未載入'})
-            
-    df_panorama = pd.DataFrame(display_list).fillna('-')
-    front_cols = ['榜單類型', '股票代號', '股票名稱', '進榜狀態']
-    data_cols = [c for c in df_panorama.columns if c not in front_cols]
-    final_cols = [c for c in front_cols if c in df_panorama.columns] + data_cols
-    for c in final_cols: 
-        df_panorama[c] = df_panorama[c].apply(lambda x: str(x)[:-2] if str(x).endswith('.0') else x)
+    elif score >= 3: return "📈 【偏多佈局】主力籌碼持續進駐，法人買盤給予一定支撐。具備穩健的波段潛力。"
+    elif score >= 1: return "🔄 【中性觀望】籌碼表現較為平淡，雖有零星買盤但缺乏明確連續性。建議多看少做。"
+    else: return "❄️ 【弱勢整理】籌碼處於流失或無主力認養狀態。建議暫不考量。"
     
-    st.markdown(f"<h5 style='color: #E2E8F0;'>{view_title}</h5>", unsafe_allow_html=True)
-    st.dataframe(df_panorama[final_cols], use_container_width=True, hide_index=True)
-
-
-# ==========================================
-# 📈 側邊雙視窗專屬：K線圖與技術分析引擎 (整合為單一最新版)
-# ==========================================
-@st.cache_data(ttl=900)
-def fetch_yfinance_data(ticker, period="5y"):
-    import yfinance as yf
-    try:
-        df = yf.download(ticker, period=period, progress=False)
-        return df
-    except:
-        return pd.DataFrame()
-
-def render_technical_chart(stock_id, timeframe="日線", selected_mas=[], show_rsi=False, show_macd=False, show_kd=False):
-    import plotly.graph_objects as go
-    from plotly.subplots import make_subplots
-
-    ticker_tw = f"{stock_id}.TW"
-    ticker_two = f"{stock_id}.TWO"
-    
-    df = fetch_yfinance_data(ticker_tw)
-    if df is None or df.empty:
-        df = fetch_yfinance_data(ticker_two)
-        
-    if df is None or df.empty:
-        st.warning(f"⚠️ 無法取得 {stock_id} 的即時報價。")
-        return
-
-    if isinstance(df.columns, pd.MultiIndex):
-        df.columns = df.columns.get_level_values(0)
-    df = df.loc[:, ~df.columns.duplicated()]
-
-    if df.index.tz is not None: df.index = df.index.tz_convert('Asia/Taipei')
-    else: df.index = df.index.tz_localize('UTC').tz_convert('Asia/Taipei')
-
-    daily_df = df.copy()
-
-    # --- AI 技術訊號判斷 ---
-    def generate_technical_signals(df_sig):
-        signals = []
-        if df_sig.empty or len(df_sig) < 20: return signals
-        latest_close = df_sig['Close'].iloc[-1]
-        latest_vol = df_sig['Volume'].iloc[-1]
-        
-        vol_20ma = df_sig['Volume'].rolling(window=20).mean().iloc[-2] 
-        if pd.notna(vol_20ma) and vol_20ma > 0 and latest_vol > (vol_20ma * 2.5):
-            signals.append(f"🧨 爆量出擊：今日成交量達 20 日均量的 {latest_vol/vol_20ma:.1f} 倍！")
-
-        mas = {'5MA': 5, '10MA': 10, '20MA': 20, '60MA': 60, '120MA': 120, '240MA': 240}
-        for ma_name, period in mas.items():
-            if len(df_sig) >= period:
-                ma_val = df_sig['Close'].rolling(window=period).mean().iloc[-1]
-                if 0 < (latest_close - ma_val) / ma_val < 0.015:
-                    signals.append(f"🎯 回測支撐：股價目前極度貼近 {ma_name} ({ma_val:.2f}) 關鍵支撐線。")
-
-        if len(df_sig) >= 60:
-            highest_60d = df_sig['High'].iloc[-60:].max()
-            if df_sig['High'].iloc[-1] >= highest_60d:
-                signals.append("🚀 波段創高：今日股價突破 60 日 (約一季) 以來新高點，上攻動能極強！")
-        return signals
-
-    tech_signals = generate_technical_signals(daily_df)
-
-    if tech_signals:
-        signal_html = "<div style='background-color: rgba(0, 210, 255, 0.1); border-left: 4px solid #00D2FF; padding: 10px; border-radius: 5px; margin-bottom: 15px;'>"
-        signal_html += "<h5 style='color: #00D2FF; margin-top:0px; margin-bottom: 10px;'>📡 AI 盤中技術型態雷達</h5>"
-        for sig in tech_signals:
-            signal_html += f"<p style='color: #E2E8F0; margin: 5px 0px; font-size: 15px;'>{sig}</p>"
-        signal_html += "</div>"
-        st.markdown(signal_html, unsafe_allow_html=True)
-
-    # --- 週期處理與指標計算 ---
-    if timeframe == "週線":
-        daily_df = daily_df.resample('W-FRI').agg({'Open': 'first', 'High': 'max', 'Low': 'min', 'Close': 'last', 'Volume': 'sum'}).dropna()
-    elif timeframe == "月線":
-        daily_df = daily_df.resample('ME').agg({'Open': 'first', 'High': 'max', 'Low': 'min', 'Close': 'last', 'Volume': 'sum'}).dropna()
-
-    for ma in [5, 10, 20, 60, 120, 240]:
-        daily_df[f'{ma}MA'] = daily_df['Close'].rolling(window=ma).mean()
-
-    close_series = daily_df['Close'].squeeze()
-    
-    if show_rsi:
-        delta = close_series.diff()
-        gain = delta.clip(lower=0); loss = -delta.clip(upper=0)
-        ema_gain = gain.ewm(com=13, adjust=False).mean(); ema_loss = loss.ewm(com=13, adjust=False).mean()
-        rs = ema_gain / ema_loss.replace(0, 1e-9)
-        daily_df['RSI'] = 100 - (100 / (1 + rs))
-
-    if show_macd:
-        ema12 = close_series.ewm(span=12, adjust=False).mean(); ema26 = close_series.ewm(span=26, adjust=False).mean()
-        daily_df['DIF'] = ema12 - ema26
-        daily_df['MACD_Sign'] = daily_df['DIF'].ewm(span=9, adjust=False).mean()
-        daily_df['MACD_Hist'] = daily_df['DIF'] - daily_df['MACD_Sign']
-        
-    if show_kd:
-        low_9 = daily_df['Low'].rolling(window=9).min(); high_9 = daily_df['High'].rolling(window=9).max()
-        rsv = (close_series - low_9) / (high_9 - low_9).replace(0, 1e-9) * 100
-        daily_df['K'] = rsv.ewm(com=2, adjust=False).mean()
-        daily_df['D'] = daily_df['K'].ewm(com=2, adjust=False).mean()
-
-    def get_latest_price(col):
-        valid_data = daily_df[col].dropna()
-        if not valid_data.empty:
-            val = valid_data.iloc[-1]
-            if isinstance(val, pd.Series): val = val.iloc[0]
-            return f"{float(val):.2f}"
-        return "-"
-
-    # --- Plotly 繪圖區 ---
-    rows = 2
-    row_heights = [0.5, 0.15]
-    if show_rsi: rows += 1; row_heights.append(0.12)
-    if show_macd: rows += 1; row_heights.append(0.14)
-    if show_kd: rows += 1; row_heights.append(0.14)
-
-    fig = make_subplots(rows=rows, cols=1, shared_xaxes=True, vertical_spacing=0.02, row_heights=row_heights)
-                                        
-    up_color = 'rgb(240, 90, 90)'     
-    down_color = 'rgb(80, 200, 120)'  
-
-    fig.add_trace(go.Candlestick(
-        x=daily_df.index, open=daily_df['Open'].squeeze(), high=daily_df['High'].squeeze(), 
-        low=daily_df['Low'].squeeze(), close=daily_df['Close'].squeeze(), name='K線', 
-        increasing=dict(line=dict(color=up_color, width=1.5), fillcolor=up_color),
-        decreasing=dict(line=dict(color=down_color, width=1.5), fillcolor=down_color),
-        hovertemplate="日期：%{x|%Y-%m-%d}<br>開：%{open:.2f}<br>高：%{high:.2f}<br>低：%{low:.2f}<br>收：%{close:.2f}<extra></extra>"
-    ), row=1, col=1)
-    
-    fig.update_yaxes(title_text="股價 (TWD)", row=1, col=1, title_font=dict(size=12, color="#E2E8F0"), rangemode="nonnegative")
-
-    if not daily_df.empty:
-        max_price = daily_df['High'].max()
-        max_date = daily_df['High'].idxmax()
-        fig.add_hline(y=max_price, line_dash="dot", line_color="rgba(255, 215, 0, 0.4)", row=1, col=1)
-        fig.add_annotation(
-            x=max_date, y=max_price, text=f"<b>前高: {max_price:.2f}</b>",
-            showarrow=True, arrowhead=2, arrowsize=1, arrowwidth=1.5, arrowcolor="#FFD700", ax=0, ay=-40, 
-            font=dict(size=13, color="#FFD700"), bgcolor="rgba(17, 22, 34, 0.85)", bordercolor="#FFD700", borderwidth=1, borderpad=4, row=1, col=1
-        )
-
-    ma_config = {
-        '5MA': {'color': '#FFFF37'}, '10MA': {'color': '#00FFFF'},
-        '20MA': {'color': '#921AFF'}, '60MA': {'color': '#D0D0D0'},
-        '120MA': {'color': '#D200D2'}, '240MA': {'color': '#BB3D00'}
-    }
-    for ma_name in selected_mas:
-        if ma_name in daily_df.columns:
-            latest_val = get_latest_price(ma_name)
-            fig.add_trace(go.Scatter(
-                x=daily_df.index, y=daily_df[ma_name].squeeze(), mode='lines', 
-                name=f'{ma_name} ({latest_val})', line=dict(color=ma_config[ma_name]['color'], width=1.3),
-                hovertemplate=f"<b>{ma_name}</b>： %{{y:.2f}}<extra></extra>"
-            ), row=1, col=1)
-
-    vol_colors = [up_color if c >= o else down_color for c, o in zip(daily_df['Close'].squeeze(), daily_df['Open'].squeeze())]
-    fig.add_trace(go.Bar(
-        x=daily_df.index, y=daily_df['Volume'].squeeze(), name='成交量', 
-        marker_color=vol_colors, showlegend=False, hovertemplate="<b>成交量</b>： %{y}<extra></extra>"
-    ), row=2, col=1)
-    fig.update_yaxes(title_text="成交量", row=2, col=1, title_font=dict(size=12, color="#E2E8F0"), rangemode="nonnegative")
-
-    current_row = 3
-    if show_kd:
-        fig.add_trace(go.Scatter(x=daily_df.index, y=daily_df['K'].squeeze(), mode='lines', name='K (9)', line=dict(color='#00CCFF', width=1.2), hovertemplate="<b>K</b>: %{y:.2f}<extra></extra>"), row=current_row, col=1)
-        fig.add_trace(go.Scatter(x=daily_df.index, y=daily_df['D'].squeeze(), mode='lines', name='D (3)', line=dict(color='#FFCC00', width=1.2), hovertemplate="<b>D</b>: %{y:.2f}<extra></extra>"), row=current_row, col=1)
-        fig.add_hline(y=80, line_dash="dash", line_color="rgba(240,90,90,0.4)", row=current_row, col=1)
-        fig.add_hline(y=20, line_dash="dash", line_color="rgba(80,200,120,0.4)", row=current_row, col=1)
-        fig.update_yaxes(title_text="KD(9,3,3)", row=current_row, col=1, title_font=dict(size=11, color="#E2E8F0"))
-        current_row += 1
-        
-    if show_rsi:
-        fig.add_trace(go.Scatter(x=daily_df.index, y=daily_df['RSI'].squeeze(), mode='lines', name='RSI (14)', line=dict(color='#E1BEE7', width=1.5), hovertemplate="<b>RSI</b>: %{y:.2f}<extra></extra>"), row=current_row, col=1)
-        fig.add_hline(y=80, line_dash="dash", line_color="rgba(240,90,90,0.4)", row=current_row, col=1)
-        fig.add_hline(y=20, line_dash="dash", line_color="rgba(80,200,120,0.4)", row=current_row, col=1)
-        fig.update_yaxes(title_text="RSI(14)", row=current_row, col=1, title_font=dict(size=11, color="#E2E8F0"))
-        current_row += 1
-
-    if show_macd:
-        fig.add_trace(go.Scatter(x=daily_df.index, y=daily_df['DIF'].squeeze(), mode='lines', name='DIF', line=dict(color='#FFF', width=1)), row=current_row, col=1)
-        fig.add_trace(go.Scatter(x=daily_df.index, y=daily_df['MACD_Sign'].squeeze(), mode='lines', name='MACD', line=dict(color='#FFCC00', width=1)), row=current_row, col=1)
-        hist_colors = [up_color if h >= 0 else down_color for h in daily_df['MACD_Hist'].squeeze()]
-        fig.add_trace(go.Bar(x=daily_df.index, y=daily_df['MACD_Hist'].squeeze(), name='柱狀圖', marker_color=hist_colors), row=current_row, col=1)
-        fig.update_yaxes(title_text="MACD", row=current_row, col=1, title_font=dict(size=11, color="#E2E8F0"))
-        current_row += 1
-
-    fig.update_layout(
-        xaxis_rangeslider_visible=False, height=500 + (rows - 1) * 110, 
-        template='plotly_dark', paper_bgcolor='rgba(0,0,0,0)', plot_bgcolor='rgba(0,0,0,0)',  
-        margin=dict(l=10, r=65, t=30, b=10), hovermode='x unified',
-        hoverlabel=dict(bgcolor="#1A202C", font_size=15, font_color="#FFFFFF"),
-        legend=dict(orientation="h", yanchor="bottom", y=1.01, xanchor="left", x=0.01, font=dict(color='#E2E8F0', size=16), itemsizing='constant'),
-        dragmode='pan' 
-    )
-    
-    fig.update_xaxes(showspikes=True, spikecolor="rgba(255, 235, 100, 0.5)", spikesnap="cursor", spikemode="across", spikethickness=0.5, spikedash="dash", gridcolor="rgba(255, 255, 255, 0.05)")
-    fig.update_yaxes(showspikes=True, spikecolor="rgba(255, 235, 100, 0.5)", spikesnap="cursor", spikemode="across", spikethickness=0.5, spikedash="dash", side="right", gridcolor="rgba(255, 255, 255, 0.05)")
-    
-    for r in range(1, rows + 1): fig.update_xaxes(hoverformat="%Y-%m-%d", tickformat="%Y-%m-%d", row=r, col=1)
-    
-    if not daily_df.empty:
-        latest_date = daily_df.index[-1] 
-        start_date = latest_date - pd.Timedelta(days=140) 
-        zoom_range = [start_date.strftime('%Y-%m-%d'), latest_date.strftime('%Y-%m-%d')]
-        for r in range(1, rows + 1): fig.update_xaxes(range=zoom_range, row=r, col=1)
-    
-    if timeframe == "日線":
-        all_days = pd.date_range(start=daily_df.index.min().normalize(), end=daily_df.index.max().normalize(), freq='D')
-        actual_days = daily_df.index.normalize()
-        missing_days = all_days.difference(actual_days).strftime('%Y-%m-%d').tolist()
-        for r in range(1, rows + 1): fig.update_xaxes(rangebreaks=[dict(values=missing_days)], row=r, col=1)
-    
-    plotly_config = {'scrollZoom': True, 'displaylogo': False, 'modeBarButtonsToRemove': ['zoom2d', 'zoomIn2d', 'zoomOut2d', 'autoScale2d', 'select2d', 'lasso2d', 'hoverClosestCartesian', 'hoverCompareCartesian', 'toggleSpikelines']}
-    st.plotly_chart(fig, use_container_width=True, key=f"kline_{stock_id}_{timeframe}_{len(selected_mas)}_{show_rsi}_{show_macd}_{show_kd}", config=plotly_config)
-
-# ==========================================
-# 📊 分頁功能渲染區 (大盤、選擇權、總經)
-# ==========================================
+#分頁1-大盤總體經濟
 def render_sidebar_market_summary():
     df_spot, date_spot = get_latest_csv("三大法人買賣超金額")
     df_fut, _ = get_latest_csv("三大法人期貨多空")
     df_fut_prev = get_prev_csv("三大法人期貨多空", date_spot)
     df_margin, margin_csv_name = get_latest_csv("融資融券餘額")
     
-    # 📥 讀取上市與上櫃成交量資料
+    # 📥 新增：讀取上市與上櫃成交量資料
     df_twse, _ = get_latest_csv("大盤上市成交量")
     df_tpex, _ = get_latest_csv("大盤上櫃成交量")
     
@@ -1255,6 +997,7 @@ def render_sidebar_market_summary():
     twse_vol_today, twse_diff = 0.0, 0.0
     if df_twse is not None and len(df_twse) >= 2:
         try:
+            # 上市單位是「元」，除以 100,000,000 變成億
             v_today = float(str(df_twse.iloc[-1]['成交金額']).replace(',', '')) / 100000000
             v_yest = float(str(df_twse.iloc[-2]['成交金額']).replace(',', '')) / 100000000
             twse_vol_today = v_today
@@ -1264,6 +1007,7 @@ def render_sidebar_market_summary():
     tpex_vol_today, tpex_diff = 0.0, 0.0
     if df_tpex is not None and len(df_tpex) >= 2:
         try:
+            # 上櫃單位是「千元」，只要除以 100,000 就變成億
             v_today = float(str(df_tpex.iloc[-1]['成交金額(千元)']).replace(',', '')) / 100000
             v_yest = float(str(df_tpex.iloc[-2]['成交金額(千元)']).replace(',', '')) / 100000
             tpex_vol_today = v_today
@@ -1288,6 +1032,7 @@ def render_sidebar_market_summary():
     too_c, too_os = get_color(total_oi, False)
     m_c, m_s = get_color(margin_diff_yi)
     
+    # 成交量增減顏色
     tw_c, tw_s = get_color(twse_diff)
     tp_c, tp_s = get_color(tpex_diff)
     tot_c, tot_s = get_color(total_diff)
@@ -1307,7 +1052,7 @@ def render_sidebar_market_summary():
     html += f"<tr style='border-top: 1px solid #555; font-weight: bold;'><td style='padding: 4px;'> 合計</td><td style='color: {to_c}; vertical-align: middle;'>{to_s}</td><td style='color: {too_c}; vertical-align: middle; padding-bottom: 6px;'>{too_os}{get_diff_ui(total_oi, tot_prev)}</td></tr>"
     html += "</table>"
     
-    # 區塊 2: 市場成交量
+    # 🌟 區塊 2 (新增): 市場成交量 (完美安插在中間)
     if total_vol_today > 0:
         html += "<div style='margin-top: 8px; padding: 6px; background-color: #1e1e24; border: 1px solid #555; border-radius: 5px; font-size: 13px;'>"
         html += "<div style='font-weight: bold; margin-bottom: 4px;'>市場成交量 (億)</div>"
@@ -1328,7 +1073,7 @@ def render_sidebar_market_summary():
         
     st.markdown(html, unsafe_allow_html=True)
     return date_spot
-
+#分頁2
 def render_options_dashboard():
     df_opt, date_opt = get_latest_csv("臺指選擇權行情簡表")
     df_pcr, _ = get_latest_csv("臺指選擇權PC比")
@@ -1425,7 +1170,7 @@ def render_options_dashboard():
         
     html_opt += "</table>"
     st.markdown(html_opt, unsafe_allow_html=True)
-
+#分頁3
 @st.cache_data(ttl=1200) 
 def fetch_macro_indicators():
     import yfinance as yf
@@ -1435,6 +1180,7 @@ def fetch_macro_indicators():
         "fng": {"score": None, "rating": "無法取得"}
     }
     
+    # 1. 抓取美股 VIX (^VIX)
     try:
         hist_vix = yf.Ticker("^VIX").history(period="2d")
         if len(hist_vix) >= 2:
@@ -1444,6 +1190,7 @@ def fetch_macro_indicators():
             data["vix"]["pct"] = (latest - prev) / prev * 100
     except: pass
 
+    # 2. 抓取台股 VIX (玩股網 / 期交所雙重備援)
     try:
         headers = {"User-Agent": "Mozilla/5.0"}
         url_wantgoo = "https://www.wantgoo.com/global/vixtwn"
@@ -1464,6 +1211,7 @@ def fetch_macro_indicators():
                 data["vixtwn"]["pct"] = 0.0 
     except: pass
 
+    # 3. 抓取 CNN 恐懼貪婪指數
     try:
         headers = {"User-Agent": "Mozilla/5.0"}
         url = "https://production.dataviz.cnn.io/index/fearandgreed/graphdata"
@@ -1482,15 +1230,405 @@ def fetch_macro_indicators():
     except: pass
 
     return data
+#以上是後插入融資融券大盤總經
+# ==========================================
+# 📈 繪製 K 線圖與技術分析引擎 (加入快取與側邊欄窄版優化)
+# ==========================================
+@st.cache_data(ttl=900)
+def fetch_yfinance_data(ticker, period="3y"):
+    import yfinance as yf
+    import pandas as pd
+    try:
+        df = yf.download(ticker, period=period, progress=False)
+        return df
+    except:
+        return pd.DataFrame()
+
+def render_technical_chart(stock_id, timeframe="日線", selected_mas=[], show_rsi=False, show_macd=False, show_kd=False):
+    import plotly.graph_objects as go
+    from plotly.subplots import make_subplots
+    import pandas as pd
+
+    ticker_tw = f"{stock_id}.TW"
+    ticker_two = f"{stock_id}.TWO"
+    
+    df = fetch_yfinance_data(ticker_tw)
+    if df is None or df.empty:
+        df = fetch_yfinance_data(ticker_two)
+        
+    if df is None or df.empty:
+        st.warning(f"⚠️ 無法取得 {stock_id} 的即時報價。")
+        return
+
+    if isinstance(df.columns, pd.MultiIndex):
+        df.columns = df.columns.get_level_values(0)
+    df = df.loc[:, ~df.columns.duplicated()]
+
+    if df.index.tz is not None: df.index = df.index.tz_convert('Asia/Taipei')
+    else: df.index = df.index.tz_localize('UTC').tz_convert('Asia/Taipei')
+
+    daily_df = df.copy()
+#
+    if timeframe == "週線":
+        daily_df = daily_df.resample('W-FRI').agg({'Open': 'first', 'High': 'max', 'Low': 'min', 'Close': 'last', 'Volume': 'sum'}).dropna()
+    elif timeframe == "月線":
+        daily_df = daily_df.resample('ME').agg({'Open': 'first', 'High': 'max', 'Low': 'min', 'Close': 'last', 'Volume': 'sum'}).dropna()
+
+    for ma in [5, 10, 20, 60]:
+        daily_df[f'{ma}MA'] = daily_df['Close'].rolling(window=ma).mean()
+
+    close_series = daily_df['Close'].squeeze()
+    
+    if show_rsi:
+        delta = close_series.diff()
+        gain = delta.clip(lower=0); loss = -delta.clip(upper=0)
+        ema_gain = gain.ewm(com=13, adjust=False).mean(); ema_loss = loss.ewm(com=13, adjust=False).mean()
+        rs = ema_gain / ema_loss.replace(0, 1e-9)
+        daily_df['RSI'] = 100 - (100 / (1 + rs))
+
+    if show_macd:
+        ema12 = close_series.ewm(span=12, adjust=False).mean(); ema26 = close_series.ewm(span=26, adjust=False).mean()
+        daily_df['DIF'] = ema12 - ema26
+        daily_df['MACD_Sign'] = daily_df['DIF'].ewm(span=9, adjust=False).mean()
+        daily_df['MACD_Hist'] = daily_df['DIF'] - daily_df['MACD_Sign']
+        
+    if show_kd:
+        low_9 = daily_df['Low'].rolling(window=9).min(); high_9 = daily_df['High'].rolling(window=9).max()
+        rsv = (close_series - low_9) / (high_9 - low_9).replace(0, 1e-9) * 100
+        daily_df['K'] = rsv.ewm(com=2, adjust=False).mean()
+        daily_df['D'] = daily_df['K'].ewm(com=2, adjust=False).mean()
+
+    rows = 2
+    row_heights = [0.5, 0.15]
+    if show_rsi: rows += 1; row_heights.append(0.15)
+    if show_macd: rows += 1; row_heights.append(0.15)
+    if show_kd: rows += 1; row_heights.append(0.15)
+
+    fig = make_subplots(rows=rows, cols=1, shared_xaxes=True, vertical_spacing=0.03, row_heights=row_heights)
+    up_color = 'rgb(240, 90, 90)'; down_color = 'rgb(80, 200, 120)'
+
+    # 💡 修復點：加入 hovertemplate 強制使用中文顯示 開/高/低/收
+    fig.add_trace(go.Candlestick(
+        x=daily_df.index, open=daily_df['Open'].squeeze(), high=daily_df['High'].squeeze(), 
+        low=daily_df['Low'].squeeze(), close=daily_df['Close'].squeeze(), name='K線', 
+        increasing=dict(line=dict(color=up_color, width=1), fillcolor=up_color),
+        decreasing=dict(line=dict(color=down_color, width=1), fillcolor=down_color),
+        hovertemplate="<b>日期</b>: %{x|%Y-%m-%d}<br><b>開</b>: %{open:.2f}<br><b>高</b>: %{high:.2f}<br><b>低</b>: %{low:.2f}<br><b>收</b>: %{close:.2f}<extra></extra>"
+    ), row=1, col=1)
+
+    ma_colors = {'5MA': '#FFFF37', '10MA': '#00FFFF', '20MA': '#921AFF', '60MA': '#D0D0D0'}
+    for ma in selected_mas:
+        if ma in daily_df.columns:
+            fig.add_trace(go.Scatter(x=daily_df.index, y=daily_df[ma].squeeze(), mode='lines', name=ma, line=dict(color=ma_colors[ma], width=1)), row=1, col=1)
+
+    vol_colors = [up_color if c >= o else down_color for c, o in zip(daily_df['Close'].squeeze(), daily_df['Open'].squeeze())]
+    fig.add_trace(go.Bar(x=daily_df.index, y=daily_df['Volume'].squeeze(), name='成交量', marker_color=vol_colors), row=2, col=1)
+
+    current_row = 3
+    if show_kd:
+        fig.add_trace(go.Scatter(x=daily_df.index, y=daily_df['K'].squeeze(), mode='lines', name='K', line=dict(color='#00CCFF', width=1)), row=current_row, col=1)
+        fig.add_trace(go.Scatter(x=daily_df.index, y=daily_df['D'].squeeze(), mode='lines', name='D', line=dict(color='#FFCC00', width=1)), row=current_row, col=1)
+        current_row += 1
+    if show_rsi:
+        fig.add_trace(go.Scatter(x=daily_df.index, y=daily_df['RSI'].squeeze(), mode='lines', name='RSI', line=dict(color='#E1BEE7', width=1)), row=current_row, col=1)
+        current_row += 1
+    if show_macd:
+        # 💡 修復點：將 go.Scatter(type='bar') 正確改寫為 go.Bar 以解決 ValueError
+        fig.add_trace(go.Bar(
+            x=daily_df.index, y=daily_df['MACD_Hist'].squeeze(), name='MACD', 
+            marker_color=[up_color if h >= 0 else down_color for h in daily_df['MACD_Hist'].squeeze()]
+        ), row=current_row, col=1)
+
+    fig.update_layout(
+        xaxis_rangeslider_visible=False, height=400 + (rows - 2) * 100, 
+        template='plotly_dark', paper_bgcolor='rgba(0,0,0,0)', plot_bgcolor='rgba(0,0,0,0)', 
+        margin=dict(l=5, r=40, t=20, b=5), showlegend=False, hovermode='x unified'
+    )
+    
+    if timeframe == "日線":
+        all_days = pd.date_range(start=daily_df.index.min().normalize(), end=daily_df.index.max().normalize(), freq='D')
+        missing_days = all_days.difference(daily_df.index.normalize()).strftime('%Y-%m-%d').tolist()
+        fig.update_xaxes(rangebreaks=[dict(values=missing_days)])
+
+    st.plotly_chart(fig, use_container_width=True, config={'displayModeBar': False})
+# ==========================================
+# 🌀 局部渲染魔法：K線圖控制台 (主畫面不會閃爍！)
+# ==========================================
+@st.fragment
+def render_kline_fragment(pure_stock_id):
+    # 改用優雅的切換按鈕，取代需要 rerun 的 button
+    show_kline = st.toggle("📊 展開技術 K 線圖", value=False)
+    
+    if show_kline and pure_stock_id != "":
+        # 改用 radio button 切換週期，自然連動無須 rerun
+        kline_period = st.radio("選擇週期", ["日線", "週線", "月線"], horizontal=True, label_visibility="collapsed")
+        
+        ind_c1, ind_c2, ind_c3 = st.columns(3)
+        chk_kd = ind_c1.checkbox("KD", value=False)
+        chk_macd = ind_c2.checkbox("MACD", value=False)
+        chk_rsi = ind_c3.checkbox("RSI", value=False)
+        
+        with st.spinner("載入線圖中..."):
+            all_mas = ["5MA", "10MA", "20MA", "60MA"]
+            render_technical_chart(pure_stock_id, kline_period, all_mas, chk_rsi, chk_macd, chk_kd)
+
+#
+            
+# =======================================================
+# 側邊雙視窗 - (內建個股快搜 + 大盤總經)
+# =======================================================
+# ==========================================
+# 🌟 所有側邊欄專屬工具函數區 (放在最外層，提升效能)
+# ==========================================
+
+@st.cache_data(ttl=900)
+def fetch_yfinance_data(ticker, period="5y"):
+    import yfinance as yf
+    import pandas as pd
+    try:
+        df = yf.download(ticker, period=period, progress=False)
+        return df
+    except:
+        return pd.DataFrame()
+
+def render_technical_chart(stock_id, timeframe="日線", selected_mas=[], show_rsi=False, show_macd=False, show_kd=False):
+    import plotly.graph_objects as go
+    from plotly.subplots import make_subplots
+    import pandas as pd
+
+    ticker_tw = f"{stock_id}.TW"
+    ticker_two = f"{stock_id}.TWO"
+    
+    df = fetch_yfinance_data(ticker_tw)
+    if df is None or df.empty:
+        df = fetch_yfinance_data(ticker_two)
+        
+    if df is None or df.empty:
+        st.warning(f"⚠️ 無法取得 {stock_id} 的即時報價。")
+        return
+
+    if isinstance(df.columns, pd.MultiIndex):
+        df.columns = df.columns.get_level_values(0)
+    df = df.loc[:, ~df.columns.duplicated()]
+
+    if df.index.tz is not None: df.index = df.index.tz_convert('Asia/Taipei')
+    else: df.index = df.index.tz_localize('UTC').tz_convert('Asia/Taipei')
+
+    daily_df = df.copy()
+
+    def generate_technical_signals(df_sig):
+        signals = []
+        if df_sig.empty or len(df_sig) < 20: return signals
+        latest_close = df_sig['Close'].iloc[-1]
+        latest_vol = df_sig['Volume'].iloc[-1]
+        
+        vol_20ma = df_sig['Volume'].rolling(window=20).mean().iloc[-2] 
+        if pd.notna(vol_20ma) and vol_20ma > 0 and latest_vol > (vol_20ma * 2.5):
+            signals.append(f"🧨 爆量出擊：今日成交量達 20 日均量的 {latest_vol/vol_20ma:.1f} 倍！")
+
+        mas = {'5MA': 5, '10MA': 10, '20MA': 20, '60MA': 60, '120MA': 120, '240MA': 240}
+        for ma_name, period in mas.items():
+            if len(df_sig) >= period:
+                ma_val = df_sig['Close'].rolling(window=period).mean().iloc[-1]
+                if 0 < (latest_close - ma_val) / ma_val < 0.015:
+                    signals.append(f"🎯 回測支撐：股價目前極度貼近 {ma_name} ({ma_val:.2f}) 關鍵支撐線。")
+
+        if len(df_sig) >= 60:
+            highest_60d = df_sig['High'].iloc[-60:].max()
+            if df_sig['High'].iloc[-1] >= highest_60d:
+                signals.append("🚀 波段創高：今日股價突破 60 日 (約一季) 以來新高點，上攻動能極強！")
+        return signals
+
+    tech_signals = generate_technical_signals(daily_df)
+
+    if tech_signals:
+        signal_html = "<div style='background-color: rgba(0, 210, 255, 0.1); border-left: 4px solid #00D2FF; padding: 10px; border-radius: 5px; margin-bottom: 15px;'>"
+        signal_html += "<h5 style='color: #00D2FF; margin-top:0px; margin-bottom: 10px;'>📡 AI 盤中技術型態雷達</h5>"
+        for sig in tech_signals:
+            signal_html += f"<p style='color: #E2E8F0; margin: 5px 0px; font-size: 15px;'>{sig}</p>"
+        signal_html += "</div>"
+        st.markdown(signal_html, unsafe_allow_html=True)
+
+    if timeframe == "週線":
+        daily_df = daily_df.resample('W-FRI').agg({'Open': 'first', 'High': 'max', 'Low': 'min', 'Close': 'last', 'Volume': 'sum'}).dropna()
+    elif timeframe == "月線":
+        daily_df = daily_df.resample('ME').agg({'Open': 'first', 'High': 'max', 'Low': 'min', 'Close': 'last', 'Volume': 'sum'}).dropna()
+
+    for ma in [5, 10, 20, 60, 120, 240]:
+        daily_df[f'{ma}MA'] = daily_df['Close'].rolling(window=ma).mean()
+
+    close_series = daily_df['Close'].squeeze()
+    
+    if show_rsi:
+        delta = close_series.diff()
+        gain = delta.clip(lower=0); loss = -delta.clip(upper=0)
+        ema_gain = gain.ewm(com=13, adjust=False).mean(); ema_loss = loss.ewm(com=13, adjust=False).mean()
+        rs = ema_gain / ema_loss.replace(0, 1e-9)
+        daily_df['RSI'] = 100 - (100 / (1 + rs))
+
+    if show_macd:
+        ema12 = close_series.ewm(span=12, adjust=False).mean(); ema26 = close_series.ewm(span=26, adjust=False).mean()
+        daily_df['DIF'] = ema12 - ema26
+        daily_df['MACD_Sign'] = daily_df['DIF'].ewm(span=9, adjust=False).mean()
+        daily_df['MACD_Hist'] = daily_df['DIF'] - daily_df['MACD_Sign']
+        
+    if show_kd:
+        low_9 = daily_df['Low'].rolling(window=9).min(); high_9 = daily_df['High'].rolling(window=9).max()
+        rsv = (close_series - low_9) / (high_9 - low_9).replace(0, 1e-9) * 100
+        daily_df['K'] = rsv.ewm(com=2, adjust=False).mean()
+        daily_df['D'] = daily_df['K'].ewm(com=2, adjust=False).mean()
+
+    def get_latest_price(col):
+        valid_data = daily_df[col].dropna()
+        if not valid_data.empty:
+            val = valid_data.iloc[-1]
+            if isinstance(val, pd.Series): val = val.iloc[0]
+            return f"{float(val):.2f}"
+        return "-"
+
+    rows = 2
+    row_heights = [0.5, 0.15]
+    if show_rsi: rows += 1; row_heights.append(0.12)
+    if show_macd: rows += 1; row_heights.append(0.14)
+    if show_kd: rows += 1; row_heights.append(0.14)
+
+    fig = make_subplots(rows=rows, cols=1, shared_xaxes=True, vertical_spacing=0.02, row_heights=row_heights)
+                                        
+    up_color = 'rgb(240, 90, 90)'     
+    down_color = 'rgb(80, 200, 120)'  
+
+    fig.add_trace(go.Candlestick(
+        x=daily_df.index, open=daily_df['Open'].squeeze(), high=daily_df['High'].squeeze(), 
+        low=daily_df['Low'].squeeze(), close=daily_df['Close'].squeeze(), name='K線', 
+        increasing=dict(line=dict(color=up_color, width=1.5), fillcolor=up_color),
+        decreasing=dict(line=dict(color=down_color, width=1.5), fillcolor=down_color),
+        hovertemplate="開：%{open:.2f}<br>高：%{high:.2f}<br>低：%{low:.2f}<br>收：%{close:.2f}<extra></extra>"
+    ), row=1, col=1)
+    
+    fig.update_yaxes(title_text="股價 (TWD)", row=1, col=1, title_font=dict(size=12, color="#E2E8F0"), rangemode="nonnegative")
+
+    if not daily_df.empty:
+        max_price = daily_df['High'].max()
+        max_date = daily_df['High'].idxmax()
+        fig.add_hline(y=max_price, line_dash="dot", line_color="rgba(255, 215, 0, 0.4)", row=1, col=1)
+        fig.add_annotation(
+            x=max_date, y=max_price, text=f"<b>前高: {max_price:.2f}</b>",
+            showarrow=True, arrowhead=2, arrowsize=1, arrowwidth=1.5, arrowcolor="#FFD700", ax=0, ay=-40, 
+            font=dict(size=13, color="#FFD700"), bgcolor="rgba(17, 22, 34, 0.85)", bordercolor="#FFD700", borderwidth=1, borderpad=4, row=1, col=1
+        )
+
+    ma_config = {
+        '5MA': {'color': '#FFFF37'}, '10MA': {'color': '#00FFFF'},
+        '20MA': {'color': '#921AFF'}, '60MA': {'color': '#D0D0D0'},
+        '120MA': {'color': '#D200D2'}, '240MA': {'color': '#BB3D00'}
+    }
+    for ma_name in selected_mas:
+        if ma_name in daily_df.columns:
+            latest_val = get_latest_price(ma_name)
+            fig.add_trace(go.Scatter(
+                x=daily_df.index, y=daily_df[ma_name].squeeze(), mode='lines', 
+                name=f'{ma_name} ({latest_val})', line=dict(color=ma_config[ma_name]['color'], width=1.3),
+                hovertemplate=f"<b>{ma_name}</b>： %{{y:.2f}}<extra></extra>"
+            ), row=1, col=1)
+
+    vol_colors = [up_color if c >= o else down_color for c, o in zip(daily_df['Close'].squeeze(), daily_df['Open'].squeeze())]
+    fig.add_trace(go.Bar(
+        x=daily_df.index, y=daily_df['Volume'].squeeze(), name='成交量', 
+        marker_color=vol_colors, showlegend=False, hovertemplate="<b>成交量</b>： %{y}<extra></extra>"
+    ), row=2, col=1)
+    fig.update_yaxes(title_text="成交量", row=2, col=1, title_font=dict(size=12, color="#E2E8F0"), rangemode="nonnegative")
+
+    current_row = 3
+    if show_kd:
+        fig.add_trace(go.Scatter(x=daily_df.index, y=daily_df['K'].squeeze(), mode='lines', name='K (9)', line=dict(color='#00CCFF', width=1.2), hovertemplate="<b>K</b>: %{y:.2f}<extra></extra>"), row=current_row, col=1)
+        fig.add_trace(go.Scatter(x=daily_df.index, y=daily_df['D'].squeeze(), mode='lines', name='D (3)', line=dict(color='#FFCC00', width=1.2), hovertemplate="<b>D</b>: %{y:.2f}<extra></extra>"), row=current_row, col=1)
+        fig.add_hline(y=80, line_dash="dash", line_color="rgba(240,90,90,0.4)", row=current_row, col=1)
+        fig.add_hline(y=20, line_dash="dash", line_color="rgba(80,200,120,0.4)", row=current_row, col=1)
+        fig.update_yaxes(title_text="KD(9,3,3)", row=current_row, col=1, title_font=dict(size=11, color="#E2E8F0"))
+        current_row += 1
+        
+    if show_rsi:
+        fig.add_trace(go.Scatter(x=daily_df.index, y=daily_df['RSI'].squeeze(), mode='lines', name='RSI (14)', line=dict(color='#E1BEE7', width=1.5), hovertemplate="<b>RSI</b>: %{y:.2f}<extra></extra>"), row=current_row, col=1)
+        fig.add_hline(y=80, line_dash="dash", line_color="rgba(240,90,90,0.4)", row=current_row, col=1)
+        fig.add_hline(y=20, line_dash="dash", line_color="rgba(80,200,120,0.4)", row=current_row, col=1)
+        fig.update_yaxes(title_text="RSI(14)", row=current_row, col=1, title_font=dict(size=11, color="#E2E8F0"))
+        current_row += 1
+
+    if show_macd:
+        fig.add_trace(go.Scatter(x=daily_df.index, y=daily_df['DIF'].squeeze(), mode='lines', name='DIF', line=dict(color='#FFF', width=1)), row=current_row, col=1)
+        fig.add_trace(go.Scatter(x=daily_df.index, y=daily_df['MACD_Sign'].squeeze(), mode='lines', name='MACD', line=dict(color='#FFCC00', width=1)), row=current_row, col=1)
+        hist_colors = [up_color if h >= 0 else down_color for h in daily_df['MACD_Hist'].squeeze()]
+        fig.add_trace(go.Bar(x=daily_df.index, y=daily_df['MACD_Hist'].squeeze(), name='柱狀圖', marker_color=hist_colors), row=current_row, col=1)
+        fig.update_yaxes(title_text="MACD", row=current_row, col=1, title_font=dict(size=11, color="#E2E8F0"))
+        current_row += 1
+
+    fig.update_layout(
+        xaxis_rangeslider_visible=False, height=500 + (rows - 1) * 110, 
+        template='plotly_dark', paper_bgcolor='rgba(0,0,0,0)', plot_bgcolor='rgba(0,0,0,0)',  
+        margin=dict(l=10, r=65, t=30, b=10), hovermode='x unified',
+        hoverlabel=dict(bgcolor="#1A202C", font_size=15, font_color="#FFFFFF"),
+        legend=dict(orientation="h", yanchor="bottom", y=1.01, xanchor="left", x=0.01, font=dict(color='#E2E8F0', size=16), itemsizing='constant'),
+        dragmode='pan' 
+    )
+    
+    fig.update_xaxes(showspikes=True, spikecolor="rgba(255, 235, 100, 0.5)", spikesnap="cursor", spikemode="across", spikethickness=0.5, spikedash="dash", gridcolor="rgba(255, 255, 255, 0.05)")
+    fig.update_yaxes(showspikes=True, spikecolor="rgba(255, 235, 100, 0.5)", spikesnap="cursor", spikemode="across", spikethickness=0.5, spikedash="dash", side="right", gridcolor="rgba(255, 255, 255, 0.05)")
+    
+    for r in range(1, rows + 1): fig.update_xaxes(hoverformat="%Y-%m-%d", tickformat="%Y-%m-%d", row=r, col=1)
+    
+    if not daily_df.empty:
+        latest_date = daily_df.index[-1] 
+        start_date = latest_date - pd.Timedelta(days=140) 
+        zoom_range = [start_date.strftime('%Y-%m-%d'), latest_date.strftime('%Y-%m-%d')]
+        for r in range(1, rows + 1): fig.update_xaxes(range=zoom_range, row=r, col=1)
+    
+    if timeframe == "日線":
+        all_days = pd.date_range(start=daily_df.index.min().normalize(), end=daily_df.index.max().normalize(), freq='D')
+        actual_days = daily_df.index.normalize()
+        missing_days = all_days.difference(actual_days).strftime('%Y-%m-%d').tolist()
+        for r in range(1, rows + 1): fig.update_xaxes(rangebreaks=[dict(values=missing_days)], row=r, col=1)
+    
+    plotly_config = {'scrollZoom': True, 'displaylogo': False, 'modeBarButtonsToRemove': ['zoom2d', 'zoomIn2d', 'zoomOut2d', 'autoScale2d', 'select2d', 'lasso2d', 'hoverClosestCartesian', 'hoverCompareCartesian', 'toggleSpikelines']}
+    st.plotly_chart(fig, use_container_width=True, key=f"kline_{stock_id}_{timeframe}_{len(selected_mas)}_{show_rsi}_{show_macd}_{show_kd}", config=plotly_config)
+
+def render_b4_panorama(view_title, keys_and_labels, query):
+    display_list = []
+    display_id, display_name = query, "-"
+    for label, key in keys_and_labels:
+        if key in st.session_state:
+            res = robust_search_engine(st.session_state[key], query)
+            if not res.empty:
+                display_id = res.iloc[0].get('股票代號', query)
+                display_name = res.iloc[0].get('股票名稱', '-')
+                break
+                
+    for label, key in keys_and_labels:
+        if key in st.session_state:
+            res = robust_search_engine(st.session_state[key], query)
+            if not res.empty:
+                row_data = res.iloc[0].to_dict()
+                new_row = {'榜單類型': label}; new_row.update(row_data); display_list.append(new_row)
+            else: display_list.append({'榜單類型': label, '股票代號': display_id, '股票名稱': display_name, '進榜狀態': '⚪ 未進榜'})
+        else: display_list.append({'榜單類型': label, '股票代號': display_id, '股票名稱': display_name, '進榜狀態': '⚠️ 尚未載入'})
+            
+    df_panorama = pd.DataFrame(display_list).fillna('-')
+    front_cols = ['榜單類型', '股票代號', '股票名稱', '進榜狀態']
+    data_cols = [c for c in df_panorama.columns if c not in front_cols]
+    final_cols = [c for c in front_cols if c in df_panorama.columns] + data_cols
+    for c in final_cols: df_panorama[c] = df_panorama[c].apply(lambda x: str(x)[:-2] if str(x).endswith('.0') else x)
+    
+    st.markdown(f"<h5 style='color: #E2E8F0;'>{view_title}</h5>", unsafe_allow_html=True)
+    st.dataframe(df_panorama[final_cols], use_container_width=True, hide_index=True)
 
 
 # =======================================================
-# 🚀 終極局部渲染魔法：整個側邊欄獨立為「不閃爍區塊」
+# 🚀 終極局部渲染魔法：將整個側邊欄獨立為「不閃爍區塊」
 # =======================================================
 @st.fragment
 def render_sidebar_war_room():
     st.markdown("<div id='section-search'></div>", unsafe_allow_html=True)
 
+    # 🌟 使用 100% 絕對生效的 Inline HTML 設計超高質感橫幅
     st.markdown("""
     <div style="background: linear-gradient(90deg, rgba(15,23,42,1) 0%, rgba(14,165,233,0.3) 50%, rgba(15,23,42,1) 100%); 
                 border-top: 1px solid #38bdf8; border-bottom: 1px solid #38bdf8; padding: 20px 20px; 
@@ -1502,8 +1640,12 @@ def render_sidebar_war_room():
     </div>
     """, unsafe_allow_html=True)
 
+# 使用預設的帶邊框容器把圖表和表格包起來
     with st.container(border=True):
         
+        # ==========================================
+        # 🎯 搜尋輸入框 (🚀 升級版：透明幽靈按鈕)
+        # ==========================================
         def clear_search():
             st.session_state['global_search_final'] = ""
 
@@ -1520,14 +1662,18 @@ def render_sidebar_war_room():
             )
         
         with c_btn_go:
+            # 🚀 關鍵修正：加入 type="tertiary" 拔除底色與邊框
             st.button("→", key="btn_go", type="tertiary", use_container_width=True, help="送出搜尋")
             
         with c_btn_clear:
+            # 🚀 關鍵修正：加入 type="tertiary" 拔除底色與邊框
             st.button("×", key="btn_clear", type="tertiary", on_click=clear_search, use_container_width=True, help="清空欄位")
 
         pure_stock_id = ""
         display_name = search_query
         
+        # ... (以下保留你原本的 pure_stock_id 解析邏輯與排版) ...
+
         if search_query:
             query_clean = search_query.strip()
             industry_label = "未分類"
@@ -1579,13 +1725,16 @@ def render_sidebar_war_room():
 
             st.markdown("<hr style='border-color: #334155;'>", unsafe_allow_html=True)
             
-            # --- 優化：K 線控制台 ---
+            # ==========================================
+            # 📊 優化：K 線控制台 (利用 Fragment 特性，無須 rerun)
+            # ==========================================
             show_kline = st.toggle("📊 展開技術 K 線圖", value=st.session_state.get('show_kline', False), key="toggle_kline")
             st.session_state.show_kline = show_kline
 
             if show_kline:
                 if 'pure_stock_id' in locals() and pure_stock_id != "":          
                     st.markdown("##### ⚙️ 技術線圖與指標配置面板")
+                    
                     kline_period = st.radio("選擇週期", ["日線", "週線", "月線"], horizontal=True, label_visibility="collapsed", key="kline_radio_period")
                     
                     ind_c1, ind_c2, ind_c3 = st.columns(3)
@@ -1693,9 +1842,9 @@ def render_sidebar_war_room():
             with col_400: scan_and_display("💎 400張以上大戶動向", 'df_blk5', search_query)
             with col_1000: scan_and_display("🐳 1000張以上超級大戶動向", 'df_blk5_1000', search_query)
 
-    # 💡 當沒有輸入搜尋條件時，顯示下方的大盤/總經 Tabs
+    # 💡 當搜尋列「沒有內容」時，顯示大盤總經 (隱藏下方 Tabs)
     if not search_query:
-        st.write("---") 
+        st.write("---") # 側邊欄快搜與三大導航 Tab 的分隔線
         tab1, tab2, tab3 = st.tabs(["🔹 大盤籌碼", "🔹 選擇權", "🔹 總經導航🛠️"])
         
         with tab1:
@@ -1767,12 +1916,16 @@ def render_sidebar_war_room():
                 </div>
                 """, unsafe_allow_html=True)
 
-
 # =======================================================
-# 主程式呼叫：在主程式中執行這段即可顯示側邊欄
+# 實際呼叫 按鈕 "呼叫側邊欄" 雙視窗指令
 # =======================================================
 with st.sidebar:
     render_sidebar_war_room()
+
+# ==========================================
+# 📍 預留給底層「觀察名單」傳送上來的隱形卡位槽
+# ==========================================
+top_pool_slot = st.empty()
 # ==========================================
 # 🏠 核心五大區塊
 # ==========================================
