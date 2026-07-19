@@ -954,12 +954,8 @@ def render_b4_panorama(view_title, keys_and_labels, query):
     st.dataframe(df_panorama[final_cols], use_container_width=True, hide_index=True)
   #以上核對完畢
     
-
 # ==========================================
-# 📈 繪製 K 線圖與技術分析引擎 (加入快取與側邊欄窄版優化)
-# ==========================================
-# ==========================================
-# 📈 側邊雙視窗專屬：K線圖與技術分析引擎 (整合為單一最新版)
+# 📈 側邊雙視窗 K 線圖與技術分析引擎 (整合版)
 # ==========================================
 @st.cache_data(ttl=900)
 def fetch_yfinance_data(ticker, period="3y"):
@@ -996,7 +992,7 @@ def render_technical_chart(stock_id, timeframe="日線", selected_mas=[], show_r
 
     daily_df = df.copy()
 ########################
-# --- AI 技術訊號判斷 ---版本新版以前做的K線圖
+# --- AI 技術訊號判斷 ---版本新版做的K線圖
 ########################
     if timeframe == "週線":
         daily_df = daily_df.resample('W-FRI').agg({'Open': 'first', 'High': 'max', 'Low': 'min', 'Close': 'last', 'Volume': 'sum'}).dropna()
