@@ -1651,7 +1651,7 @@ def render_sidebar_war_room():
         pure_stock_id = ""
         display_name = search_query
         
-        # ... (以下保留你原本的 pure_stock_id 解析邏輯與排版) ...
+        # 以下保留你原本的 pure_stock_id 解析邏輯與排版
         if search_query:
             query_clean = search_query.strip()
             industry_label = "未分類"
@@ -1673,7 +1673,7 @@ def render_sidebar_war_room():
                 import re
                 match_num = re.search(r'\d+', query_clean)
                 if match_num: pure_stock_id = match_num.group(0)
-
+#這裡原本有系統綜合評分
 
             
             # ==========================================
@@ -1699,7 +1699,7 @@ def render_sidebar_war_room():
                         render_technical_chart(pure_stock_id, kline_period, all_mas, chk_rsi, chk_macd, chk_kd)
                 else:
                     st.warning("⚠️ 技術 K 線圖目前僅支援代號查詢。")
-
+            #顯示在側欄搜尋股票或標的的各區塊資訊-法人動向
             st.markdown("<hr style='border-color: #334155;'>", unsafe_allow_html=True)
             st.markdown("<h4 style='color: #FCD34D;'>👑 區塊 1：短中長線三大法人持股變化</h4>", unsafe_allow_html=True)
             
@@ -1752,7 +1752,7 @@ def render_sidebar_war_room():
                         st.plotly_chart(fig_b1, use_container_width=True, config={'displayModeBar': False})
                 else: st.write("⚪ 未進榜")
             else: st.info("⚪ 尚未載入資料表")
-
+            #顯示在側欄搜尋股票或標的的各區塊資訊-法人掃貨
             st.markdown("<hr style='border-color: #334155;'>", unsafe_allow_html=True)
             st.markdown("<h4 style='color: #FCD34D;'>🎯 區塊 2：法人買超診斷</h4>", unsafe_allow_html=True)
             c1, c2 = st.columns(2)
@@ -1778,16 +1778,16 @@ def render_sidebar_war_room():
                     else: display_list.append({'連買類型': b_type, '股票代號': display_id, '股票名稱': display_name, '狀態動態': '⚪ 未進榜', '連買週期數': '-'})
                 st.dataframe(pd.DataFrame(display_list), use_container_width=True, hide_index=True)
             else: st.info("⚪ 區塊 3：尚未載入資料表")
-
+            #顯示在側欄搜尋股票或標的的各區塊資訊-券資動向
             st.markdown("<hr style='border-color: #334155;'>", unsafe_allow_html=True)
             st.markdown("<h4 style='color: #FCD34D;'>🔄 區塊 4：券資有利排名</h4>", unsafe_allow_html=True)
             
             render_b4_panorama("5日幅度變動排名", [('📉 融資減少', 'df_margin_pct'), ('📉 借券減少', 'df_short_pct'), ('📈 融券增加', 'df_margin_plus_pct')], search_query)
             st.write("") 
             render_b4_panorama("5日張數變動排名", [('📉 融資減少', 'df_margin_vol'), ('📉 借券減少', 'df_short_vol'), ('📈 融券增加', 'df_margin_plus_vol')], search_query)
-
+            #顯示在側欄搜尋股票或標的的各區塊資訊-大腿動向
             st.markdown("<hr style='border-color: #334155;'>", unsafe_allow_html=True)
-            st.markdown("<h4 style='color: #FCD34D;'>💰 區塊 5：大戶動向診斷</h4>", unsafe_allow_html=True)
+            st.markdown("<h4 style='color: #FCD34D;'>💰 區塊 5：大腿動向</h4>", unsafe_allow_html=True)
             
             col_400, col_1000 = st.columns(2)
             with col_400: scan_and_display("💎 400張以上大戶動向", 'df_blk5', search_query)
