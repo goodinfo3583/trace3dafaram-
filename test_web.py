@@ -100,6 +100,51 @@ def set_background(image_path):
         st.warning(f"⚠️ 找不到背景圖片檔：{image_path}，請確認檔名與路徑是否完全正確。")
 
 # ==========================================
+# 🌌 網頁風格設計
+# ==========================================
+st.markdown(
+    """
+    <style>
+    /* 1. 變更全站主背景色 */
+    .stApp { background-color: #0A0D14 !important; }
+    
+    /* 2. 強制標題與內文變成明亮的灰白 */
+    h1, h2, h3, h4, h5, h6, p, label, .stMarkdown, .stText { color: #E2E8F0 !important; }
+    
+    /* 3. 隱藏預設的通知背景 */
+    [data-testid="stAlert"] { background-color: transparent !important; border: 1px solid #2D3748 !important; }
+    
+    /* 4. 側邊欄背景色與邊框 */
+    [data-testid="stSidebar"] { background-color: #111622 !important; border-right: 1px solid #1E293B; }
+    
+    /* 5. 輸入框等元件 */
+    .stTextInput>div>div>input { background-color: #1A202C !important; color: #FFFFFF !important; border: 1px solid #4A5568 !important; }
+    
+    /* 6. 表格深色化修正 */
+    div[data-testid="stDataFrame"] { background-color: #111622 !important; border: 1px solid #1E293B !important; border-radius: 6px; }
+
+    /* 7. 超連結優化 */
+    [data-testid="stSidebar"] a { color: #00D2FF !important; text-decoration: none !important; font-weight: 500 !important; letter-spacing: 0.5px; transition: all 0.3s ease; }
+    [data-testid="stSidebar"] a:hover { color: #FFD700 !important; text-shadow: 0px 0px 8px rgba(255, 215, 0, 0.5); }
+    
+    /* 8. 🔴 全局按鈕與連結按鈕護眼暗黑化 (解決刺眼問題) */
+    .stButton > button, .stLinkButton > a {
+        background-color: #1E293B !important; /* 深石板灰 */
+        color: #94A3B8 !important; /* 低調灰字 */
+        border: 1px solid #334155 !important;
+        transition: all 0.2s ease-in-out;
+    }
+    /* 滑鼠懸停時才亮起科技藍 */
+    .stButton > button:hover, .stLinkButton > a:hover {
+        border-color: #00D2FF !important;
+        color: #00D2FF !important;
+        box-shadow: 0 0 8px rgba(0, 210, 255, 0.2);
+    }
+    </style>
+    """,
+    unsafe_allow_html=True
+)
+# ==========================================
 # 🖼️ 網站圖片資料夾路徑初始化
 # ==========================================
 # 👉 宣告專門存放網頁圖片素材的資料夾
@@ -435,51 +480,6 @@ def get_stock_dictionary():
 STOCK_DICT = get_stock_dictionary()
 
 
-# ==========================================
-# 🌌 網頁風格設計
-# ==========================================
-st.markdown(
-    """
-    <style>
-    /* 1. 變更全站主背景色 */
-    .stApp { background-color: #0A0D14 !important; }
-    
-    /* 2. 強制標題與內文變成明亮的灰白 */
-    h1, h2, h3, h4, h5, h6, p, label, .stMarkdown, .stText { color: #E2E8F0 !important; }
-    
-    /* 3. 隱藏預設的通知背景 */
-    [data-testid="stAlert"] { background-color: transparent !important; border: 1px solid #2D3748 !important; }
-    
-    /* 4. 側邊欄背景色與邊框 */
-    [data-testid="stSidebar"] { background-color: #111622 !important; border-right: 1px solid #1E293B; }
-    
-    /* 5. 輸入框等元件 */
-    .stTextInput>div>div>input { background-color: #1A202C !important; color: #FFFFFF !important; border: 1px solid #4A5568 !important; }
-    
-    /* 6. 表格深色化修正 */
-    div[data-testid="stDataFrame"] { background-color: #111622 !important; border: 1px solid #1E293B !important; border-radius: 6px; }
-
-    /* 7. 超連結優化 */
-    [data-testid="stSidebar"] a { color: #00D2FF !important; text-decoration: none !important; font-weight: 500 !important; letter-spacing: 0.5px; transition: all 0.3s ease; }
-    [data-testid="stSidebar"] a:hover { color: #FFD700 !important; text-shadow: 0px 0px 8px rgba(255, 215, 0, 0.5); }
-    
-    /* 8. 🔴 全局按鈕與連結按鈕護眼暗黑化 (解決刺眼問題) */
-    .stButton > button, .stLinkButton > a {
-        background-color: #1E293B !important; /* 深石板灰 */
-        color: #94A3B8 !important; /* 低調灰字 */
-        border: 1px solid #334155 !important;
-        transition: all 0.2s ease-in-out;
-    }
-    /* 滑鼠懸停時才亮起科技藍 */
-    .stButton > button:hover, .stLinkButton > a:hover {
-        border-color: #00D2FF !important;
-        color: #00D2FF !important;
-        box-shadow: 0 0 8px rgba(0, 210, 255, 0.2);
-    }
-    </style>
-    """,
-    unsafe_allow_html=True
-)
 # ==========================================
 # 🚦 網頁路由控制中心 (極速切換引擎)
 # ==========================================
