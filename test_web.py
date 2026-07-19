@@ -1623,7 +1623,7 @@ def render_sidebar_war_room():
     with st.container(border=True):
         
         # ==========================================
-        # 🎯 搜尋輸入框 (🚀 升級版：透明幽靈按鈕)
+        # 🎯 搜尋輸入框
         # ==========================================
         def clear_search():
             st.session_state['global_search_final'] = ""
@@ -1641,18 +1641,17 @@ def render_sidebar_war_room():
             )
         
         with c_btn_go:
-            # 🚀 關鍵修正：加入 type="tertiary" 拔除底色與邊框
+            # 🚀 加入按鈕：拔除底色與邊框
             st.button("→", key="btn_go", type="tertiary", use_container_width=True, help="送出搜尋")
             
         with c_btn_clear:
-            # 🚀 關鍵修正：加入 type="tertiary" 拔除底色與邊框
+            # 🚀 修正按鈕：加入 type="tertiary" 拔除底色與邊框
             st.button("×", key="btn_clear", type="tertiary", on_click=clear_search, use_container_width=True, help="清空欄位")
 
         pure_stock_id = ""
         display_name = search_query
         
         # ... (以下保留你原本的 pure_stock_id 解析邏輯與排版) ...
-
         if search_query:
             query_clean = search_query.strip()
             industry_label = "未分類"
@@ -1675,34 +1674,7 @@ def render_sidebar_war_room():
                 match_num = re.search(r'\d+', query_clean)
                 if match_num: pure_stock_id = match_num.group(0)
 
-            st.markdown(f"### 🎯 綜合診斷標的：<span style='color: #00D2FF;'>{display_name}</span> <span style='font-size:16px; background-color:#1E293B; padding:4px 10px; border-radius:6px; color:#38BDF8; border: 1px solid #38BDF8; margin-left:10px;'>🏷️ {industry_label}</span>", unsafe_allow_html=True)
 
-            pool_df = st.session_state.get('top_pool_df', pd.DataFrame())
-            target_score = None
-            current_stock_id = pure_stock_id 
-            delta_val = 0.0
-
-            if not pool_df.empty:
-                match = robust_search_engine(pool_df, current_stock_id) if current_stock_id else robust_search_engine(pool_df, search_query)
-                if not match.empty:
-                    target_score = match.iloc[0].get('總分', 0)
-                    delta_val = match.iloc[0].get('Delta (日變動)', 0.0) 
-
-            if target_score is not None and current_stock_id != "":
-                delta = delta_val 
-                delta_color = "#FF4B4B" if delta > 0 else "#00CC66" if delta < 0 else "#94A3B8"
-                delta_symbol = "🔥" if delta > 0 else "🚨" if delta < 0 else "🔄"
-                delta_str = f"+{delta}" if delta > 0 else f"{delta}" 
-                
-                st.markdown(f"""
-                #### 🏆 系統綜合評分：<span style='color:#FFD700; font-size:24px; text-shadow: 0 0 10px rgba(255,215,0,0.5);'>**{target_score}**</span> 分 
-                <span style='color:{delta_color}; font-size:16px; margin-left:15px;'>{delta_symbol} Delta變化: **{delta_str}**</span>
-                <span style='color:#94A3B8; font-size:14px; font-weight:normal; margin-left:10px;'>(評分數據僅供參考)</span>
-                """, unsafe_allow_html=True)
-            else:
-                st.markdown("#### 🏆 系統綜合評分：<span style='color:#64748B; font-size:18px;'>未達綜合進榜標準 (0分)</span>", unsafe_allow_html=True)
-
-            st.markdown("<hr style='border-color: #334155;'>", unsafe_allow_html=True)
             
             # ==========================================
             # 📊 優化：K 線控制台 (利用 Fragment 特性，無須 rerun)
