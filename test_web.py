@@ -996,7 +996,7 @@ def render_technical_chart(stock_id, timeframe="日線", selected_mas=[], show_r
 
     daily_df = df.copy()
 ########################
-# --- AI 技術訊號判斷 ---
+# --- AI 技術訊號判斷 ---版本新版以前做的K線圖
 ########################
     if timeframe == "週線":
         daily_df = daily_df.resample('W-FRI').agg({'Open': 'first', 'High': 'max', 'Low': 'min', 'Close': 'last', 'Volume': 'sum'}).dropna()
@@ -1082,7 +1082,182 @@ def render_technical_chart(stock_id, timeframe="日線", selected_mas=[], show_r
     st.plotly_chart(fig, use_container_width=True, config={'displayModeBar': False})
 
             
+##########
+    # --- AI 技術訊號判斷 ---版本舊版以前做的K線圖
+    def generate_technical_signals(df_sig):
+        signals = []
+        if df_sig.empty or len(df_sig) < 20: return signals
+        latest_close = df_sig['Close'].iloc[-1]
+        latest_vol = df_sig['Volume'].iloc[-1]
+        
+        vol_20ma = df_sig['Volume'].rolling(window=20).mean().iloc[-2] 
+        if pd.notna(vol_20ma) and vol_20ma > 0 and latest_vol > (vol_20ma * 2.5):
+            signals.append(f"🧨 爆量出擊：今日成交量達 20 日均量的 {latest_vol/vol_20ma:.1f} 倍！")
 
+        mas = {'5MA': 5, '10MA': 10, '20MA': 20, '60MA': 60, '120MA': 120, '240MA': 240}
+        for ma_name, period in mas.items():
+            if len(df_sig) >= period:
+                ma_val = df_sig['Close'].rolling(window=period).mean().iloc[-1]
+                if 0 < (latest_close - ma_val) / ma_val < 0.015:
+                    signals.append(f"🎯 回測支撐：股價目前極度貼近 {ma_name} ({ma_val:.2f}) 關鍵支撐線。")
+
+        if len(df_sig) >= 60:
+            highest_60d = df_sig['High'].iloc[-60:].max()
+            if df_sig['High'].iloc[-1] >= highest_60d:
+                signals.append("🚀 波段創高：今日股價突破 60 日 (約一季) 以來新高點，上攻動能極強！")
+        return signals
+
+    tech_signals = generate_technical_signals(daily_df)
+
+    if tech_signals:
+        signal_html = "<div style='background-color: rgba(0, 210, 255, 0.1); border-left: 4px solid #00D2FF; padding: 10px; border-radius: 5px; margin-bottom: 15px;'>"
+        signal_html += "<h5 style='color: #00D2FF; margin-top:0px; margin-bottom: 10px;'>📡 AI 盤中技術型態雷達</h5>"
+        for sig in tech_signals:
+            signal_html += f"<p style='color: #E2E8F0; margin: 5px 0px; font-size: 15px;'>{sig}</p>"
+        signal_html += "</div>"
+        st.markdown(signal_html, unsafe_allow_html=True)
+    # --- 週期處理與指標計算 ---
+    if timeframe == "週線":
+        daily_df = daily_df.resample('W-FRI').agg({'Open': 'first', 'High': 'max', 'Low': 'min', 'Close': 'last', 'Volume': 'sum'}).dropna()
+    elif timeframe == "月線":
+        daily_df = daily_df.resample('ME').agg({'Open': 'first', 'High': 'max', 'Low': 'min', 'Close': 'last', 'Volume': 'sum'}).dropna()
+
+    for ma in [5, 10, 20, 60, 120, 240]:
+        daily_df[f'{ma}MA'] = daily_df['Close'].rolling(window=ma).mean()
+
+    close_series = daily_df['Close'].squeeze()
+    
+    if show_rsi:
+        delta = close_series.diff()
+        gain = delta.clip(lower=0); loss = -delta.clip(upper=0)
+        ema_gain = gain.ewm(com=13, adjust=False).mean(); ema_loss = loss.ewm(com=13, adjust=False).mean()
+        rs = ema_gain / ema_loss.replace(0, 1e-9)
+        daily_df['RSI'] = 100 - (100 / (1 + rs))
+
+    if show_macd:
+        ema12 = close_series.ewm(span=12, adjust=False).mean(); ema26 = close_series.ewm(span=26, adjust=False).mean()
+        daily_df['DIF'] = ema12 - ema26
+        daily_df['MACD_Sign'] = daily_df['DIF'].ewm(span=9, adjust=False).mean()
+        daily_df['MACD_Hist'] = daily_df['DIF'] - daily_df['MACD_Sign']
+        
+    if show_kd:
+        low_9 = daily_df['Low'].rolling(window=9).min(); high_9 = daily_df['High'].rolling(window=9).max()
+        rsv = (close_series - low_9) / (high_9 - low_9).replace(0, 1e-9) * 100
+        daily_df['K'] = rsv.ewm(com=2, adjust=False).mean()
+        daily_df['D'] = daily_df['K'].ewm(com=2, adjust=False).mean()
+
+    def get_latest_price(col):
+        valid_data = daily_df[col].dropna()
+        if not valid_data.empty:
+            val = valid_data.iloc[-1]
+            if isinstance(val, pd.Series): val = val.iloc[0]
+            return f"{float(val):.2f}"
+        return "-"
+    # --- Plotly 繪圖區 ---
+    rows = 2
+    row_heights = [0.5, 0.15]
+    if show_rsi: rows += 1; row_heights.append(0.12)
+    if show_macd: rows += 1; row_heights.append(0.14)
+    if show_kd: rows += 1; row_heights.append(0.14)
+
+    fig = make_subplots(rows=rows, cols=1, shared_xaxes=True, vertical_spacing=0.02, row_heights=row_heights)
+                                        
+    up_color = 'rgb(240, 90, 90)'     
+    down_color = 'rgb(80, 200, 120)'  
+
+    fig.add_trace(go.Candlestick(
+        x=daily_df.index, open=daily_df['Open'].squeeze(), high=daily_df['High'].squeeze(), 
+        low=daily_df['Low'].squeeze(), close=daily_df['Close'].squeeze(), name='K線', 
+        increasing=dict(line=dict(color=up_color, width=1.5), fillcolor=up_color),
+        decreasing=dict(line=dict(color=down_color, width=1.5), fillcolor=down_color),
+        hovertemplate="開：%{open:.2f}<br>高：%{high:.2f}<br>低：%{low:.2f}<br>收：%{close:.2f}<extra></extra>"
+    ), row=1, col=1)
+    
+    fig.update_yaxes(title_text="股價 (TWD)", row=1, col=1, title_font=dict(size=12, color="#E2E8F0"), rangemode="nonnegative")
+
+    if not daily_df.empty:
+        max_price = daily_df['High'].max()
+        max_date = daily_df['High'].idxmax()
+        fig.add_hline(y=max_price, line_dash="dot", line_color="rgba(255, 215, 0, 0.4)", row=1, col=1)
+        fig.add_annotation(
+            x=max_date, y=max_price, text=f"<b>前高: {max_price:.2f}</b>",
+            showarrow=True, arrowhead=2, arrowsize=1, arrowwidth=1.5, arrowcolor="#FFD700", ax=0, ay=-40, 
+            font=dict(size=13, color="#FFD700"), bgcolor="rgba(17, 22, 34, 0.85)", bordercolor="#FFD700", borderwidth=1, borderpad=4, row=1, col=1
+        )
+
+    ma_config = {
+        '5MA': {'color': '#FFFF37'}, '10MA': {'color': '#00FFFF'},
+        '20MA': {'color': '#921AFF'}, '60MA': {'color': '#D0D0D0'},
+        '120MA': {'color': '#D200D2'}, '240MA': {'color': '#BB3D00'}
+    }
+    for ma_name in selected_mas:
+        if ma_name in daily_df.columns:
+            latest_val = get_latest_price(ma_name)
+            fig.add_trace(go.Scatter(
+                x=daily_df.index, y=daily_df[ma_name].squeeze(), mode='lines', 
+                name=f'{ma_name} ({latest_val})', line=dict(color=ma_config[ma_name]['color'], width=1.3),
+                hovertemplate=f"<b>{ma_name}</b>： %{{y:.2f}}<extra></extra>"
+            ), row=1, col=1)
+
+    vol_colors = [up_color if c >= o else down_color for c, o in zip(daily_df['Close'].squeeze(), daily_df['Open'].squeeze())]
+    fig.add_trace(go.Bar(
+        x=daily_df.index, y=daily_df['Volume'].squeeze(), name='成交量', 
+        marker_color=vol_colors, showlegend=False, hovertemplate="<b>成交量</b>： %{y}<extra></extra>"
+    ), row=2, col=1)
+    fig.update_yaxes(title_text="成交量", row=2, col=1, title_font=dict(size=12, color="#E2E8F0"), rangemode="nonnegative")
+
+    current_row = 3
+    if show_kd:
+        fig.add_trace(go.Scatter(x=daily_df.index, y=daily_df['K'].squeeze(), mode='lines', name='K (9)', line=dict(color='#00CCFF', width=1.2), hovertemplate="<b>K</b>: %{y:.2f}<extra></extra>"), row=current_row, col=1)
+        fig.add_trace(go.Scatter(x=daily_df.index, y=daily_df['D'].squeeze(), mode='lines', name='D (3)', line=dict(color='#FFCC00', width=1.2), hovertemplate="<b>D</b>: %{y:.2f}<extra></extra>"), row=current_row, col=1)
+        fig.add_hline(y=80, line_dash="dash", line_color="rgba(240,90,90,0.4)", row=current_row, col=1)
+        fig.add_hline(y=20, line_dash="dash", line_color="rgba(80,200,120,0.4)", row=current_row, col=1)
+        fig.update_yaxes(title_text="KD(9,3,3)", row=current_row, col=1, title_font=dict(size=11, color="#E2E8F0"))
+        current_row += 1
+        
+    if show_rsi:
+        fig.add_trace(go.Scatter(x=daily_df.index, y=daily_df['RSI'].squeeze(), mode='lines', name='RSI (14)', line=dict(color='#E1BEE7', width=1.5), hovertemplate="<b>RSI</b>: %{y:.2f}<extra></extra>"), row=current_row, col=1)
+        fig.add_hline(y=80, line_dash="dash", line_color="rgba(240,90,90,0.4)", row=current_row, col=1)
+        fig.add_hline(y=20, line_dash="dash", line_color="rgba(80,200,120,0.4)", row=current_row, col=1)
+        fig.update_yaxes(title_text="RSI(14)", row=current_row, col=1, title_font=dict(size=11, color="#E2E8F0"))
+        current_row += 1
+
+    if show_macd:
+        fig.add_trace(go.Scatter(x=daily_df.index, y=daily_df['DIF'].squeeze(), mode='lines', name='DIF', line=dict(color='#FFF', width=1)), row=current_row, col=1)
+        fig.add_trace(go.Scatter(x=daily_df.index, y=daily_df['MACD_Sign'].squeeze(), mode='lines', name='MACD', line=dict(color='#FFCC00', width=1)), row=current_row, col=1)
+        hist_colors = [up_color if h >= 0 else down_color for h in daily_df['MACD_Hist'].squeeze()]
+        fig.add_trace(go.Bar(x=daily_df.index, y=daily_df['MACD_Hist'].squeeze(), name='柱狀圖', marker_color=hist_colors), row=current_row, col=1)
+        fig.update_yaxes(title_text="MACD", row=current_row, col=1, title_font=dict(size=11, color="#E2E8F0"))
+        current_row += 1
+
+    fig.update_layout(
+        xaxis_rangeslider_visible=False, height=500 + (rows - 1) * 110, 
+        template='plotly_dark', paper_bgcolor='rgba(0,0,0,0)', plot_bgcolor='rgba(0,0,0,0)',  
+        margin=dict(l=10, r=65, t=30, b=10), hovermode='x unified',
+        hoverlabel=dict(bgcolor="#1A202C", font_size=15, font_color="#FFFFFF"),
+        legend=dict(orientation="h", yanchor="bottom", y=1.01, xanchor="left", x=0.01, font=dict(color='#E2E8F0', size=16), itemsizing='constant'),
+        dragmode='pan' 
+    )
+    
+    fig.update_xaxes(showspikes=True, spikecolor="rgba(255, 235, 100, 0.5)", spikesnap="cursor", spikemode="across", spikethickness=0.5, spikedash="dash", gridcolor="rgba(255, 255, 255, 0.05)")
+    fig.update_yaxes(showspikes=True, spikecolor="rgba(255, 235, 100, 0.5)", spikesnap="cursor", spikemode="across", spikethickness=0.5, spikedash="dash", side="right", gridcolor="rgba(255, 255, 255, 0.05)")
+    
+    for r in range(1, rows + 1): fig.update_xaxes(hoverformat="%Y-%m-%d", tickformat="%Y-%m-%d", row=r, col=1)
+    
+    if not daily_df.empty:
+        latest_date = daily_df.index[-1] 
+        start_date = latest_date - pd.Timedelta(days=140) 
+        zoom_range = [start_date.strftime('%Y-%m-%d'), latest_date.strftime('%Y-%m-%d')]
+        for r in range(1, rows + 1): fig.update_xaxes(range=zoom_range, row=r, col=1)
+    
+    if timeframe == "日線":
+        all_days = pd.date_range(start=daily_df.index.min().normalize(), end=daily_df.index.max().normalize(), freq='D')
+        actual_days = daily_df.index.normalize()
+        missing_days = all_days.difference(actual_days).strftime('%Y-%m-%d').tolist()
+        for r in range(1, rows + 1): fig.update_xaxes(rangebreaks=[dict(values=missing_days)], row=r, col=1)
+    
+    plotly_config = {'scrollZoom': True, 'displaylogo': False, 'modeBarButtonsToRemove': ['zoom2d', 'zoomIn2d', 'zoomOut2d', 'autoScale2d', 'select2d', 'lasso2d', 'hoverClosestCartesian', 'hoverCompareCartesian', 'toggleSpikelines']}
+    st.plotly_chart(fig, use_container_width=True, key=f"kline_{stock_id}_{timeframe}_{len(selected_mas)}_{show_rsi}_{show_macd}_{show_kd}", config=plotly_config)
 
 #======================================================
 #分頁功能渲染區:🔹 大盤籌碼🔹 選擇權🔹 總經導航(以下核對完畢)
