@@ -472,15 +472,15 @@ STOCK_DICT = get_stock_dictionary()
 
 
 # ==========================================
-# 🚦 網頁路由控制中心 (極速切換引擎)
+# 🚦 網頁首頁路由控制中心 (極速切換引擎)
 # ==========================================
-# 【首頁預設】！
+# 【首頁預設】
 current_page = st.query_params.get("page", "b1")
 import streamlit as st
 import streamlit.components.v1 as components
 
 # ==========================================
-# 📍 頂部按鈕 (終極無縫切換版 + 懸浮提示收闔浮標)
+# 📍 頂部按鈕 (無縫切換 + 懸浮提示收闔浮標)
 # ==========================================
 inject_js = """
 <script>
@@ -642,9 +642,9 @@ components.html(inject_js, height=0, width=0)
 # 👆👆👆 ========================================================== 👆👆👆
 
 # ========================================================== 
-import time  # 引入時間模組來做快取破壞器開始 - 市場消息
+import time  # 引入時間模組來做快取破壞器開始 - 【市場消息】
 # ========================================================== 
-# 🧠 市場消息背景快取引擎 - 負責去 GitHub 搬運多天份的資料
+# 【市場消息】背景快取引擎工具 - 去 GitHub 搬運多天份的資料
 
 @st.cache_data(ttl=600, show_spinner=False)
 def fetch_historical_news(days_to_load=3):
@@ -1373,59 +1373,12 @@ def render_kline_fragment(pure_stock_id):
 
 #以上側邊雙視窗
             
-
-
 # =======================================================
 # 側邊雙視窗 - (內建個股快搜 + 大盤總經)
 # =======================================================
 # ==========================================
 # 🌟 所有側邊欄專屬工具函數區 (放在最外層，提升效能)
 # ==========================================
-
-def robust_search_engine(df, query):
-    if df is None or df.empty: return pd.DataFrame()
-    df = df.loc[:, ~df.columns.duplicated()].copy()
-    query = str(query).strip()
-    mask = pd.Series(False, index=df.index)
-    if '股票代號' in df.columns:
-        df['股票代號'] = df['股票代號'].astype(str).str.strip()
-        mask = mask | (df['股票代號'] == query)
-    if '股票名稱' in df.columns:
-        df['股票名稱'] = df['股票名稱'].astype(str).str.strip()
-        mask = mask | df['股票名稱'].str.contains(query, na=False, case=False)
-    return df[mask]
-
-def scan_and_display(title, session_key, query):
-    st.markdown(f"<h5 style='color: #E2E8F0;'>{title}</h5>", unsafe_allow_html=True)
-    if session_key not in st.session_state:
-        st.write("⚪ 尚未載入資料表")
-        return
-    df = st.session_state[session_key]
-    if df is None or df.empty:
-        st.write("⚪ 該榜單無任何資料")
-        return
-    res = robust_search_engine(df, query)
-    
-    if not res.empty:
-        pct_cols = [c for c in res.columns if '持股' in c or '佔' in c or '%' in c]
-        if pct_cols:
-            all_zero = True
-            for c in pct_cols:
-                val = res.iloc[0][c]
-                if pd.isna(val): continue
-                val_str = str(val).strip().replace('%', '')
-                if val_str.lower() in ['', '-', 'nan', 'none', 'null']: continue
-                try:
-                    if abs(float(val_str)) > 0.0001:
-                        all_zero = False
-                        break
-                except ValueError: continue
-            if all_zero:
-                st.write("⚪ 未進榜")
-                return
-        st.dataframe(res, use_container_width=True, hide_index=True)
-    else:
-        st.write("⚪ 未進榜")
 
 @st.cache_data(ttl=900)
 def fetch_yfinance_data(ticker, period="5y"):
