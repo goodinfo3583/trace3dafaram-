@@ -1351,28 +1351,7 @@ def render_technical_chart(stock_id, timeframe="日線", selected_mas=[], show_r
         fig.update_xaxes(rangebreaks=[dict(values=missing_days)])
 
     st.plotly_chart(fig, use_container_width=True, config={'displayModeBar': False})
-# ==========================================
-# 🌀 局部渲染魔法：K線圖控制台 (主畫面不會閃爍！)
-# ==========================================
-@st.fragment
-def render_kline_fragment(pure_stock_id):
-    # 改用優雅的切換按鈕，取代需要 rerun 的 button
-    show_kline = st.toggle("📊 展開技術 K 線圖", value=False)
-    
-    if show_kline and pure_stock_id != "":
-        # 改用 radio button 切換週期，自然連動無須 rerun
-        kline_period = st.radio("選擇週期", ["日線", "週線", "月線"], horizontal=True, label_visibility="collapsed")
-        
-        ind_c1, ind_c2, ind_c3 = st.columns(3)
-        chk_kd = ind_c1.checkbox("KD", value=False)
-        chk_macd = ind_c2.checkbox("MACD", value=False)
-        chk_rsi = ind_c3.checkbox("RSI", value=False)
-        
-        with st.spinner("載入線圖中..."):
-            all_mas = ["5MA", "10MA", "20MA", "60MA"]
-            render_technical_chart(pure_stock_id, kline_period, all_mas, chk_rsi, chk_macd, chk_kd)
 
-#
             
 # =======================================================
 # 側邊雙視窗 - (內建個股快搜 + 大盤總經)
