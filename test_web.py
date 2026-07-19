@@ -991,91 +991,7 @@ def render_technical_chart(stock_id, timeframe="日線", selected_mas=[], show_r
     else: df.index = df.index.tz_localize('UTC').tz_convert('Asia/Taipei')
 
     daily_df = df.copy()
-########################
-# --- AI 技術訊號判斷 ---版本新版做的K線圖
-########################
-    if timeframe == "週線":
-        daily_df = daily_df.resample('W-FRI').agg({'Open': 'first', 'High': 'max', 'Low': 'min', 'Close': 'last', 'Volume': 'sum'}).dropna()
-    elif timeframe == "月線":
-        daily_df = daily_df.resample('ME').agg({'Open': 'first', 'High': 'max', 'Low': 'min', 'Close': 'last', 'Volume': 'sum'}).dropna()
 
-    for ma in [5, 10, 20, 60]:
-        daily_df[f'{ma}MA'] = daily_df['Close'].rolling(window=ma).mean()
-
-    close_series = daily_df['Close'].squeeze()
-    
-    if show_rsi:
-        delta = close_series.diff()
-        gain = delta.clip(lower=0); loss = -delta.clip(upper=0)
-        ema_gain = gain.ewm(com=13, adjust=False).mean(); ema_loss = loss.ewm(com=13, adjust=False).mean()
-        rs = ema_gain / ema_loss.replace(0, 1e-9)
-        daily_df['RSI'] = 100 - (100 / (1 + rs))
-
-    if show_macd:
-        ema12 = close_series.ewm(span=12, adjust=False).mean(); ema26 = close_series.ewm(span=26, adjust=False).mean()
-        daily_df['DIF'] = ema12 - ema26
-        daily_df['MACD_Sign'] = daily_df['DIF'].ewm(span=9, adjust=False).mean()
-        daily_df['MACD_Hist'] = daily_df['DIF'] - daily_df['MACD_Sign']
-        
-    if show_kd:
-        low_9 = daily_df['Low'].rolling(window=9).min(); high_9 = daily_df['High'].rolling(window=9).max()
-        rsv = (close_series - low_9) / (high_9 - low_9).replace(0, 1e-9) * 100
-        daily_df['K'] = rsv.ewm(com=2, adjust=False).mean()
-        daily_df['D'] = daily_df['K'].ewm(com=2, adjust=False).mean()
-
-    rows = 2
-    row_heights = [0.5, 0.15]
-    if show_rsi: rows += 1; row_heights.append(0.15)
-    if show_macd: rows += 1; row_heights.append(0.15)
-    if show_kd: rows += 1; row_heights.append(0.15)
-
-    fig = make_subplots(rows=rows, cols=1, shared_xaxes=True, vertical_spacing=0.03, row_heights=row_heights)
-    up_color = 'rgb(240, 90, 90)'; down_color = 'rgb(80, 200, 120)'
-
-    # 💡 修復點：加入 hovertemplate 強制使用中文顯示 開/高/低/收
-    fig.add_trace(go.Candlestick(
-        x=daily_df.index, open=daily_df['Open'].squeeze(), high=daily_df['High'].squeeze(), 
-        low=daily_df['Low'].squeeze(), close=daily_df['Close'].squeeze(), name='K線', 
-        increasing=dict(line=dict(color=up_color, width=1), fillcolor=up_color),
-        decreasing=dict(line=dict(color=down_color, width=1), fillcolor=down_color),
-        hovertemplate="<b>日期</b>: %{x|%Y-%m-%d}<br><b>開</b>: %{open:.2f}<br><b>高</b>: %{high:.2f}<br><b>低</b>: %{low:.2f}<br><b>收</b>: %{close:.2f}<extra></extra>"
-    ), row=1, col=1)
-
-    ma_colors = {'5MA': '#FFFF37', '10MA': '#00FFFF', '20MA': '#921AFF', '60MA': '#D0D0D0'}
-    for ma in selected_mas:
-        if ma in daily_df.columns:
-            fig.add_trace(go.Scatter(x=daily_df.index, y=daily_df[ma].squeeze(), mode='lines', name=ma, line=dict(color=ma_colors[ma], width=1)), row=1, col=1)
-
-    vol_colors = [up_color if c >= o else down_color for c, o in zip(daily_df['Close'].squeeze(), daily_df['Open'].squeeze())]
-    fig.add_trace(go.Bar(x=daily_df.index, y=daily_df['Volume'].squeeze(), name='成交量', marker_color=vol_colors), row=2, col=1)
-
-    current_row = 3
-    if show_kd:
-        fig.add_trace(go.Scatter(x=daily_df.index, y=daily_df['K'].squeeze(), mode='lines', name='K', line=dict(color='#00CCFF', width=1)), row=current_row, col=1)
-        fig.add_trace(go.Scatter(x=daily_df.index, y=daily_df['D'].squeeze(), mode='lines', name='D', line=dict(color='#FFCC00', width=1)), row=current_row, col=1)
-        current_row += 1
-    if show_rsi:
-        fig.add_trace(go.Scatter(x=daily_df.index, y=daily_df['RSI'].squeeze(), mode='lines', name='RSI', line=dict(color='#E1BEE7', width=1)), row=current_row, col=1)
-        current_row += 1
-    if show_macd:
-        # 💡 修復點：將 go.Scatter(type='bar') 正確改寫為 go.Bar 以解決 ValueError
-        fig.add_trace(go.Bar(
-            x=daily_df.index, y=daily_df['MACD_Hist'].squeeze(), name='MACD', 
-            marker_color=[up_color if h >= 0 else down_color for h in daily_df['MACD_Hist'].squeeze()]
-        ), row=current_row, col=1)
-
-    fig.update_layout(
-        xaxis_rangeslider_visible=False, height=400 + (rows - 2) * 100, 
-        template='plotly_dark', paper_bgcolor='rgba(0,0,0,0)', plot_bgcolor='rgba(0,0,0,0)', 
-        margin=dict(l=5, r=40, t=20, b=5), showlegend=False, hovermode='x unified'
-    )
-    
-    if timeframe == "日線":
-        all_days = pd.date_range(start=daily_df.index.min().normalize(), end=daily_df.index.max().normalize(), freq='D')
-        missing_days = all_days.difference(daily_df.index.normalize()).strftime('%Y-%m-%d').tolist()
-        fig.update_xaxes(rangebreaks=[dict(values=missing_days)])
-
-    st.plotly_chart(fig, use_container_width=True, config={'displayModeBar': False})
 
             
 ##########
@@ -1647,7 +1563,7 @@ def render_sidebar_war_room():
 
             if show_kline:
                 if 'pure_stock_id' in locals() and pure_stock_id != "":          
-                    st.markdown("##### ⚙️ 技術線圖與指標配置面板")
+                    st.markdown("##### 技術線圖與指標配置面板")
                     
                     kline_period = st.radio("選擇週期", ["日線", "週線", "月線"], horizontal=True, label_visibility="collapsed", key="kline_radio_period")
                     
