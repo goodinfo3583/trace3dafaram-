@@ -1373,68 +1373,7 @@ def render_kline_fragment(pure_stock_id):
 
 #以上側邊雙視窗
             
-# ==========================================
-# 🛡️ 背景守護程式 (強制維持記憶體熱度，解決歸零與 KeyError 問題)不確定是哪一部分的工具
-# ==========================================
-def preload_all_csv_data():
-    import os, glob
-    import pandas as pd
-    DATA_DIR = "./Goodinfo_Rankings"
-    
-    # 智慧檔案尋找器 (加入終極欄位清洗，解決 KeyError)
-    def safe_load(key, kw1, kw2=""):
-        if key in st.session_state and not st.session_state[key].empty: return
-        files = glob.glob(os.path.join(DATA_DIR, f"*{kw1}*.csv"))
-        if kw2: files = [f for f in files if kw2 in f]
-        if files:
-            for enc in ['cp950', 'utf-8-sig', 'utf-8']:
-                try:
-                    df = pd.read_csv(sorted(files, reverse=True)[0], encoding=enc)
-                    if not df.empty:
-                        # 💡 終極防呆：清洗所有欄位名稱，把亂七八糟的代號統整為「股票代號」
-                        df.columns = [str(c).replace(" ", "").replace("\n", "").replace("\ufeff", "").strip() for c in df.columns]
-                        id_col = next((c for c in df.columns if '代號' in c or 'code' in c.lower()), None)
-                        nm_col = next((c for c in df.columns if '名稱' in c or 'name' in c.lower()), None)
-                        
-                        rename_dict = {}
-                        if id_col and id_col != '股票代號': rename_dict[id_col] = '股票代號'
-                        if nm_col and nm_col != '股票名稱': rename_dict[nm_col] = '股票名稱'
-                        if rename_dict: df = df.rename(columns=rename_dict)
-                        
-                        # 確保股票代號是乾淨的字串
-                        if '股票代號' in df.columns:
-                            df['股票代號'] = df['股票代號'].astype(str).str.replace(r'\.0$', '', regex=True).str.strip()
-                            
-                        st.session_state[key] = df
-                        return
-                except: continue
-        st.session_state[key] = pd.DataFrame()
 
-    # 強制將所有區塊的 CSV 預先載入記憶體
-    safe_load('df_blk2_1', '外資買', '成交')
-    safe_load('df_blk2_2', '投信買', '成交')
-    safe_load('df_blk2_3', '外資買', '發行')
-    safe_load('df_blk2_4', '投信買', '發行')
-    safe_load('df_blk3_main', '連買')
-    safe_load('df_margin_pct', '融資減少幅度')
-    safe_load('df_margin_vol', '融資減少張數')
-    safe_load('df_short_pct', '借券賣出減少幅度')
-    safe_load('df_short_vol', '借券賣出減少張數')
-    safe_load('df_margin_plus_pct', '融券增加幅度')
-    safe_load('df_margin_plus_vol', '融券增加張數')
-    safe_load('df_blk5', '400張')
-    if st.session_state.get('df_blk5', pd.DataFrame()).empty: safe_load('df_blk5', '大股東')
-    safe_load('df_blk5_1000', '1000張')
-    if st.session_state.get('df_blk5_1000', pd.DataFrame()).empty: safe_load('df_blk5_1000', '大股東')
-
-# 👇 確保下方有呼叫它
-if 'my_final_df' not in st.session_state or st.session_state['my_final_df'].empty or st.session_state.get('force_reload', False):
-    with st.spinner("⚡ 背景引擎啟動中，正在載入全市場籌碼數據... (僅需數秒)"):
-        json_dfs, latest_all_df = fetch_github_json_all()
-        final_df, sorted_dates, date_cols, color_ref = build_block1_master_df()
-        st.session_state['my_final_df'] = final_df
-        preload_all_csv_data()  # 💡 啟動預載雷達
-        st.session_state['force_reload'] = False
 
 # =======================================================
 # 側邊雙視窗 - (內建個股快搜 + 大盤總經)
@@ -2038,9 +1977,6 @@ top_pool_slot = st.empty()
 # 🏠 核心五大區塊
 # ==========================================
 # ==========================================
-# 🌟 區塊 1 專屬工具函數區 (必須放在 if 鎖外面，供應全站數據)
-# ==========================================
-# ==========================================
 # 🌟 "區塊 1 法人動向"專屬工具函數與背景預載引擎
 # ==========================================
 from collections import defaultdict
@@ -2264,7 +2200,75 @@ def build_block1_master_df():
     
     return pd.DataFrame(), [], [], {}
 
-#以上區塊1工具函數
+
+# ==========================================
+# 🛡️ 背景守護程式 (強制維持記憶體熱度，解決歸零與 KeyError 問題)不確定是哪一部分的工具
+# ==========================================
+def preload_all_csv_data():
+    import os, glob
+    import pandas as pd
+    DATA_DIR = "./Goodinfo_Rankings"
+    
+    # 智慧檔案尋找器 (加入終極欄位清洗，解決 KeyError)
+    def safe_load(key, kw1, kw2=""):
+        if key in st.session_state and not st.session_state[key].empty: return
+        files = glob.glob(os.path.join(DATA_DIR, f"*{kw1}*.csv"))
+        if kw2: files = [f for f in files if kw2 in f]
+        if files:
+            for enc in ['cp950', 'utf-8-sig', 'utf-8']:
+                try:
+                    df = pd.read_csv(sorted(files, reverse=True)[0], encoding=enc)
+                    if not df.empty:
+                        # 💡 終極防呆：清洗所有欄位名稱，把亂七八糟的代號統整為「股票代號」
+                        df.columns = [str(c).replace(" ", "").replace("\n", "").replace("\ufeff", "").strip() for c in df.columns]
+                        id_col = next((c for c in df.columns if '代號' in c or 'code' in c.lower()), None)
+                        nm_col = next((c for c in df.columns if '名稱' in c or 'name' in c.lower()), None)
+                        
+                        rename_dict = {}
+                        if id_col and id_col != '股票代號': rename_dict[id_col] = '股票代號'
+                        if nm_col and nm_col != '股票名稱': rename_dict[nm_col] = '股票名稱'
+                        if rename_dict: df = df.rename(columns=rename_dict)
+                        
+                        # 確保股票代號是乾淨的字串
+                        if '股票代號' in df.columns:
+                            df['股票代號'] = df['股票代號'].astype(str).str.replace(r'\.0$', '', regex=True).str.strip()
+                            
+                        st.session_state[key] = df
+                        return
+                except: continue
+        st.session_state[key] = pd.DataFrame()
+
+    # 強制將所有區塊的 CSV 預先載入記憶體
+    safe_load('df_blk2_1', '外資買', '成交')
+    safe_load('df_blk2_2', '投信買', '成交')
+    safe_load('df_blk2_3', '外資買', '發行')
+    safe_load('df_blk2_4', '投信買', '發行')
+    safe_load('df_blk3_main', '連買')
+    safe_load('df_margin_pct', '融資減少幅度')
+    safe_load('df_margin_vol', '融資減少張數')
+    safe_load('df_short_pct', '借券賣出減少幅度')
+    safe_load('df_short_vol', '借券賣出減少張數')
+    safe_load('df_margin_plus_pct', '融券增加幅度')
+    safe_load('df_margin_plus_vol', '融券增加張數')
+    safe_load('df_blk5', '400張')
+    if st.session_state.get('df_blk5', pd.DataFrame()).empty: safe_load('df_blk5', '大股東')
+    safe_load('df_blk5_1000', '1000張')
+    if st.session_state.get('df_blk5_1000', pd.DataFrame()).empty: safe_load('df_blk5_1000', '大股東')
+
+# 👇 確保下方有呼叫它
+if 'my_final_df' not in st.session_state or st.session_state['my_final_df'].empty or st.session_state.get('force_reload', False):
+    with st.spinner("⚡ 背景引擎啟動中，正在載入全市場籌碼數據... (僅需數秒)"):
+        json_dfs, latest_all_df = fetch_github_json_all()
+        final_df, sorted_dates, date_cols, color_ref = build_block1_master_df()
+        st.session_state['my_final_df'] = final_df
+        preload_all_csv_data()  # 💡 啟動預載雷達
+        st.session_state['force_reload'] = False
+
+
+# ==========================================
+# 🌟 區塊 1 專屬工具函數區 (必須放在 if 鎖外面，供應全站數據)
+# ==========================================
+
 from collections import defaultdict
 
 @st.cache_data(ttl=3600)
