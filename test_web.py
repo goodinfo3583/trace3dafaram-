@@ -480,7 +480,7 @@ import streamlit as st
 import streamlit.components.v1 as components
 
 # ==========================================
-# 📍 頂部按鈕 (終極無縫切換版 + 懸浮提示收闔浮標 + 修復死鍵Bug)
+# 📍 頂部按鈕 (終極無縫切換版 + 懸浮提示收闔浮標)
 # ==========================================
 inject_js = """
 <script>
@@ -640,10 +640,12 @@ if (!parentDoc.getElementById('custom-sticky-header')) {
 # 透過隱藏的 iframe 執行上述的 JavaScript 注入
 components.html(inject_js, height=0, width=0)
 # 👆👆👆 ========================================================== 👆👆👆
-import time  # 引入時間模組來做快取破壞器開始市場消息
+
 # ========================================================== 
-# 🧠 背景快取引擎：負責去 GitHub 搬運多天份的資料
+import time  # 引入時間模組來做快取破壞器開始 - 市場消息
 # ========================================================== 
+# 🧠 市場消息背景快取引擎 - 負責去 GitHub 搬運多天份的資料
+
 @st.cache_data(ttl=600, show_spinner=False)
 def fetch_historical_news(days_to_load=3):
     base_url = "https://raw.githubusercontent.com/voidful/tw_news_stocker/main/docs/data"
@@ -671,9 +673,9 @@ def fetch_historical_news(days_to_load=3):
     except Exception as e:
         return [], []
 
-# ========================================================== 
-# 市場消息
-# ========================================================== 
+# ================ 
+# 市場消息頁面定義
+# ================
 def show_news_page():
     st.title("市場消息")
     
@@ -695,8 +697,6 @@ def show_news_page():
         return
 
     date_range_str = f"{loaded_dates[-1]} ~ {loaded_dates[0]}" if len(loaded_dates) > 1 else loaded_dates[0]
-    
-    
     
     
     # ==========================================
@@ -787,9 +787,10 @@ def show_news_page():
 if current_page == "news":
     # 【修改 3】：如果使用者點擊了新聞按鈕，或者剛進站 (預設為news)，就執行這個函數
     show_news_page()
+
     
 # ==========================================
-# 🌟 觀察名單專屬工具函數區 (補回遺失的計分工具)
+# 🌟 "觀察名單"專屬工具函數區 (補回遺失的計分工具)
 # ==========================================
 
 def get_df_safe(key): 
@@ -856,7 +857,7 @@ def robust_read_csv_pool(file_path):
 
 
 # ==========================================
-# 🌟 所有側邊欄專屬工具函數區 (🚨 必須放在 with st.sidebar 的最上方！)
+# 🌟 所有"側邊雙視窗"專屬工具函數區 
 # ==========================================
 
 # --- 1. 快搜專屬工具 ---
@@ -1371,8 +1372,10 @@ def render_kline_fragment(pure_stock_id):
             all_mas = ["5MA", "10MA", "20MA", "60MA"]
             render_technical_chart(pure_stock_id, kline_period, all_mas, chk_rsi, chk_macd, chk_kd)
 
+#以上側邊雙視窗
+            
 # ==========================================
-# 🌟 全站命脈：區塊 1 專屬工具函數與背景預載引擎 (一體成型版)
+# 🌟 "區塊 1 法人動向"專屬工具函數與背景預載引擎
 # ==========================================
 from collections import defaultdict
 
@@ -1442,7 +1445,7 @@ def load_foreign_ratio_data(data_dir="./Goodinfo_Rankings"):
 
 
 
-@st.cache_data(ttl=3600)
+@st.cache_data(ttl=600)
 def fetch_github_json_all():
     days_list = [5, 20, 60, 120]
     json_dfs = {}
