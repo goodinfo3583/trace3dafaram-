@@ -859,6 +859,11 @@ def robust_read_csv_pool(file_path):
 # ==========================================
 # 🌟 所有"側邊雙視窗"專屬工具函數區 
 # ==========================================
+import streamlit as st
+import pandas as pd
+import requests
+import re
+
 # --- 1. 快搜專屬工具 ---
 def robust_search_engine(df, query):
     if df is None or df.empty: return pd.DataFrame()
@@ -904,6 +909,7 @@ def scan_and_display(title, session_key, query):
     else:
         st.write("⚪ 未進榜")
 
+# 🤖 [ AI 籌碼訊號]判斷
 def generate_stock_commentary(row):
     score = row.get('總分', 0)
     warns = str(row.get('賣出警示', ''))
@@ -923,6 +929,30 @@ def generate_stock_commentary(row):
     elif score >= 3: return "📈 【偏多佈局】主力籌碼持續進駐，法人買盤給予一定支撐。具備穩健的波段潛力。"
     elif score >= 1: return "🔄 【中性觀望】籌碼表現較為平淡，雖有零星買盤但缺乏明確連續性。建議多看少做。"
     else: return "❄️ 【弱勢整理】籌碼處於流失或無主力認養狀態。建議暫不考量。"
+
+# 🤖  [ AI 技術型態訊號]判斷 (從 K 線抽離出來)
+def generate_technical_signals(df_sig):
+    signals = []
+    if df_sig is None or df_sig.empty or len(df_sig) < 20: return signals
+    latest_close = df_sig['Close'].iloc[-1]
+    latest_vol = df_sig['Volume'].iloc[-1]
+    
+    vol_20ma = df_sig['Volume'].rolling(window=20).mean().iloc[-2] 
+    if pd.notna(vol_20ma) and vol_20ma > 0 and latest_vol > (vol_20ma * 2.5):
+        signals.append(f"🧨 爆量出擊：今日成交量達 20 日均量的 {latest_vol/vol_20ma:.1f} 倍！")
+
+    mas = {'5MA': 5, '10MA': 10, '20MA': 20, '60MA': 60, '120MA': 120, '240MA': 240}
+    for ma_name, period in mas.items():
+        if len(df_sig) >= period:
+            ma_val = df_sig['Close'].rolling(window=period).mean().iloc[-1]
+            if 0 < (latest_close - ma_val) / ma_val < 0.015:
+                signals.append(f"🎯 回測支撐：股價目前極度貼近 {ma_name} ({ma_val:.2f}) 關鍵支撐線。")
+
+    if len(df_sig) >= 60:
+        highest_60d = df_sig['High'].iloc[-60:].max()
+        if df_sig['High'].iloc[-1] >= highest_60d:
+            signals.append("🚀 波段創高：今日股價突破 60 日 (約一季) 以來新高點，上攻動能極強！")
+    return signals
     
 def render_b4_panorama(view_title, keys_and_labels, query):
     display_list = []
@@ -991,43 +1021,7 @@ def render_technical_chart(stock_id, timeframe="日線", selected_mas=[], show_r
     else: df.index = df.index.tz_localize('UTC').tz_convert('Asia/Taipei')
 
     daily_df = df.copy()
-
-
             
-##########
-    # --- AI 技術訊號判斷 ---版本舊版以前做的K線圖
-    def generate_technical_signals(df_sig):
-        signals = []
-        if df_sig.empty or len(df_sig) < 20: return signals
-        latest_close = df_sig['Close'].iloc[-1]
-        latest_vol = df_sig['Volume'].iloc[-1]
-        
-        vol_20ma = df_sig['Volume'].rolling(window=20).mean().iloc[-2] 
-        if pd.notna(vol_20ma) and vol_20ma > 0 and latest_vol > (vol_20ma * 2.5):
-            signals.append(f"🧨 爆量出擊：今日成交量達 20 日均量的 {latest_vol/vol_20ma:.1f} 倍！")
-
-        mas = {'5MA': 5, '10MA': 10, '20MA': 20, '60MA': 60, '120MA': 120, '240MA': 240}
-        for ma_name, period in mas.items():
-            if len(df_sig) >= period:
-                ma_val = df_sig['Close'].rolling(window=period).mean().iloc[-1]
-                if 0 < (latest_close - ma_val) / ma_val < 0.015:
-                    signals.append(f"🎯 回測支撐：股價目前極度貼近 {ma_name} ({ma_val:.2f}) 關鍵支撐線。")
-
-        if len(df_sig) >= 60:
-            highest_60d = df_sig['High'].iloc[-60:].max()
-            if df_sig['High'].iloc[-1] >= highest_60d:
-                signals.append("🚀 波段創高：今日股價突破 60 日 (約一季) 以來新高點，上攻動能極強！")
-        return signals
-
-    tech_signals = generate_technical_signals(daily_df)
-
-    if tech_signals:
-        signal_html = "<div style='background-color: rgba(0, 210, 255, 0.1); border-left: 4px solid #00D2FF; padding: 10px; border-radius: 5px; margin-bottom: 15px;'>"
-        signal_html += "<h5 style='color: #00D2FF; margin-top:0px; margin-bottom: 10px;'>📡 AI 盤中技術型態雷達</h5>"
-        for sig in tech_signals:
-            signal_html += f"<p style='color: #E2E8F0; margin: 5px 0px; font-size: 15px;'>{sig}</p>"
-        signal_html += "</div>"
-        st.markdown(signal_html, unsafe_allow_html=True)
     # --- 週期處理與指標計算 ---
     if timeframe == "週線":
         daily_df = daily_df.resample('W-FRI').agg({'Open': 'first', 'High': 'max', 'Low': 'min', 'Close': 'last', 'Volume': 'sum'}).dropna()
@@ -1430,9 +1424,9 @@ def fetch_macro_indicators():
         "fng": {"score": None, "rating": "無法取得"}
     }
     
-    # 1. 抓取美股 VIX (^VIX)
+    # 1. 抓取美股 VIX (^VIX)  5d 確保跨假日能抓到數值
     try:
-        hist_vix = yf.Ticker("^VIX").history(period="2d")
+        hist_vix = yf.Ticker("^VIX").history(period="5d")
         if len(hist_vix) >= 2:
             latest = hist_vix['Close'].iloc[-1]
             prev = hist_vix['Close'].iloc[-2]
@@ -1440,32 +1434,30 @@ def fetch_macro_indicators():
             data["vix"]["pct"] = (latest - prev) / prev * 100
     except: pass
 
-    # 2. 抓取台股 VIX (玩股網 / 期交所雙重備援)
+# 2. 抓取台股 VIX - 🚀 加入真實瀏覽器 Headers 突破防爬蟲
     try:
-        headers = {"User-Agent": "Mozilla/5.0"}
-        url_wantgoo = "https://www.wantgoo.com/global/vixtwn"
-        res = requests.get(url_wantgoo, headers=headers, timeout=5)
+        headers = {
+            "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/114.0.0.0 Safari/537.36",
+            "Accept-Language": "zh-TW,zh;q=0.9,en-US;q=0.8,en;q=0.7",
+        }
+        res = requests.get("https://www.wantgoo.com/global/vixtwn", headers=headers, timeout=5)
         if res.status_code == 200:
-            import re
             match = re.search(r'"price":\s*([\d\.]+)', res.text)
             if not match: match = re.search(r'臺指VIX.*?(\d+\.\d{2})', res.text)
             if match:
                 data["vixtwn"]["value"] = float(match.group(1))
                 data["vixtwn"]["pct"] = 0.0 
-        if data["vixtwn"]["value"] is None:
-            url_taifex = "https://www.taifex.com.tw/cht/index"
-            res_t = requests.get(url_taifex, headers=headers, timeout=5)
-            match_t = re.search(r'VIX.*?(\d+\.\d{2})', res_t.text, re.IGNORECASE)
-            if match_t:
-                data["vixtwn"]["value"] = float(match_t.group(1))
-                data["vixtwn"]["pct"] = 0.0 
     except: pass
 
-    # 3. 抓取 CNN 恐懼貪婪指數
+    # 3. 抓取 CNN 恐懼貪婪指數 - 🚀 加入 Referer 與強力 Headers
     try:
-        headers = {"User-Agent": "Mozilla/5.0"}
+        headers_cnn = {
+            "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36",
+            "Accept": "application/json",
+            "Referer": "https://edition.cnn.com/"
+        }
         url = "https://production.dataviz.cnn.io/index/fearandgreed/graphdata"
-        res = requests.get(url, headers=headers, timeout=5)
+        res = requests.get(url, headers=headers_cnn, timeout=5)
         if res.status_code == 200:
             fg_data = res.json()
             score = int(fg_data['fear_and_greed']['score'])
@@ -1555,8 +1547,75 @@ def render_sidebar_war_room():
                 match_num = re.search(r'\d+', query_clean)
                 if match_num: pure_stock_id = match_num.group(0)
 #這裡原本有系統綜合假評分
+st.markdown(f"### 🎯 綜合診斷標的：<span style='color: #00D2FF;'>{display_name}</span> <span style='font-size:16px; background-color:#1E293B; padding:4px 10px; border-radius:6px; color:#38BDF8; border: 1px solid #38BDF8; margin-left:10px;'>🏷️ {industry_label}</span>", unsafe_allow_html=True)
+
+            pool_df = st.session_state.get('top_pool_df', pd.DataFrame())
+            target_score = None
+            delta_val = 0.0
+            matched_row = None
+
+            if not pool_df.empty:
+                match = robust_search_engine(pool_df, pure_stock_id if pure_stock_id else search_query)
+                if not match.empty:
+                    matched_row = match.iloc[0]
+                    target_score = matched_row.get('總分', 0)
+                    delta_val = matched_row.get('Delta (日變動)', 0.0) 
+
+            # 🏆 顯示分數
+            if target_score is not None and pure_stock_id != "":
+                delta_color = "#FF4B4B" if delta_val > 0 else "#00CC66" if delta_val < 0 else "#94A3B8"
+                delta_symbol = "🔥" if delta_val > 0 else "🚨" if delta_val < 0 else "🔄"
+                delta_str = f"+{delta_val}" if delta_val > 0 else f"{delta_val}" 
+                
+                st.markdown(f"""
+                #### 🏆 系統綜合評分：<span style='color:#FFD700; font-size:24px; text-shadow: 0 0 10px rgba(255,215,0,0.5);'>**{target_score}**</span> 分 
+                <span style='color:{delta_color}; font-size:16px; margin-left:15px;'>{delta_symbol} Delta變化: **{delta_str}**</span>
+                <span style='color:#94A3B8; font-size:14px; font-weight:normal; margin-left:10px;'>(評分數據僅供參考)</span>
+                """, unsafe_allow_html=True)
+            else:
+                st.markdown("#### 🏆 系統綜合評分：<span style='color:#64748B; font-size:18px;'>未達綜合進榜標準 (0分)</span>", unsafe_allow_html=True)
+
             # ==========================================
-            # 📊 優化：K 線控制台 (利用 Fragment 特性，無須 rerun)
+            # 🚀 融合 AI 訊號區 (搜尋即顯示！)
+            # ==========================================
+            old_ai_msg = ""
+            if matched_row is not None:
+                old_ai_msg = generate_stock_commentary(matched_row)
+                
+            new_ai_msgs = []
+            if pure_stock_id:
+                # 為了即時提供技術訊號，擷取最近一年的資料
+                df_tech = fetch_yfinance_data(f"{pure_stock_id}.TW", period="1y")
+                if df_tech is None or df_tech.empty:
+                    df_tech = fetch_yfinance_data(f"{pure_stock_id}.TWO", period="1y")
+                
+                if df_tech is not None and not df_tech.empty:
+                    if isinstance(df_tech.columns, pd.MultiIndex):
+                        df_tech.columns = df_tech.columns.get_level_values(0)
+                    df_tech = df_tech.loc[:, ~df_tech.columns.duplicated()]
+                    new_ai_msgs = generate_technical_signals(df_tech)
+
+            if old_ai_msg or new_ai_msgs:
+                signal_html = "<div style='background-color: rgba(0, 210, 255, 0.05); border-left: 4px solid #00D2FF; padding: 12px; border-radius: 5px; margin: 10px 0px;'>"
+                signal_html += "<h5 style='color: #00D2FF; margin-top:0px; margin-bottom: 10px;'>📡 AI 綜合籌碼與技術雷達</h5>"
+                
+                if old_ai_msg:
+                    signal_html += f"<p style='color: #FCD34D; margin: 5px 0px; font-size: 15px; font-weight: bold;'>{old_ai_msg}</p>"
+                
+                if old_ai_msg and new_ai_msgs:
+                    signal_html += "<hr style='border-color: rgba(0, 210, 255, 0.15); margin: 8px 0px;'>"
+                    
+                for sig in new_ai_msgs:
+                    signal_html += f"<p style='color: #E2E8F0; margin: 5px 0px; font-size: 14.5px;'>{sig}</p>"
+                    
+                signal_html += "</div>"
+                st.markdown(signal_html, unsafe_allow_html=True)
+
+
+            st.markdown("<hr style='border-color: #334155;'>", unsafe_allow_html=True)
+#這裡原本有系統綜合假評分
+            # ==========================================
+            # 📊 K 線控制台 (利用 Fragment 特性，無須 rerun)
             # ==========================================
             show_kline = st.toggle("📊 展開技術 K 線圖 (雙擊縮放)", value=st.session_state.get('show_kline', False), key="toggle_kline")
             st.session_state.show_kline = show_kline
