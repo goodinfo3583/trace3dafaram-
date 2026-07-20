@@ -3192,7 +3192,7 @@ def read_live_ln_report(file_keyword, strict_type, exact_field_name, prefix_keyw
 if current_page in ["all", "b3"]:
     st.write("---")
     st.markdown("<div id='section-3'></div>", unsafe_allow_html=True)
-    st.header("📅 法人連續買超")
+    st.header("法人連續買超")
 
     # ========================================================
     # 🚀 執行排程與備份邏輯
