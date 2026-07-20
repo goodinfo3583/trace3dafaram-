@@ -3682,7 +3682,7 @@ if current_page in ["all", "b4"]:
     st.write("---")
     st.markdown("<div id='section-4-1'></div>", unsafe_allow_html=True)
     date_41 = peek_data_date("融資減少幅度")
-    st.markdown(f"### 🔄 區塊 4-1：融資減少動向 <span style='font-size: 0.6em; color: #00D2FF;'>({date_41})</span>", unsafe_allow_html=True)
+    st.markdown(f"### 區塊 4-1：融資減少動向 <span style='font-size: 0.6em; color: #00D2FF;'>({date_41})</span>", unsafe_allow_html=True)
 
     f_col1, f_col2, _ = st.columns([1, 1, 2])
     with f_col1: show_etf_41 = st.checkbox("顯示 ETF", value=True, key="margin_show_etf")
@@ -3708,7 +3708,7 @@ if current_page in ["all", "b4"]:
     st.write("---")
     st.markdown("<div id='section-4-2'></div>", unsafe_allow_html=True)
     date_42 = peek_data_date("借券賣出減少幅度")
-    st.markdown(f"### 🔄 區塊 4-2：借券賣出減少動向 <span style='font-size: 0.6em; color: #00D2FF;'>({date_42})</span>", unsafe_allow_html=True)
+    st.markdown(f"### 區塊 4-2：借券賣出減少動向 <span style='font-size: 0.6em; color: #00D2FF;'>({date_42})</span>", unsafe_allow_html=True)
 
     f_col1, f_col2, _ = st.columns([1, 1, 2])
     with f_col1: show_etf_42 = st.checkbox("顯示 ETF", value=True, key="stock_show_etf_42")
@@ -3734,7 +3734,7 @@ if current_page in ["all", "b4"]:
     st.write("---")
     st.markdown("<div id='section-4-3'></div>", unsafe_allow_html=True)
     date_43 = peek_data_date("融券增加幅度")
-    st.markdown(f"### 🔄 區塊 4-3：融券增加動向 <span style='font-size: 0.6em; color: #00D2FF;'>({date_43})</span>", unsafe_allow_html=True)
+    st.markdown(f"### 區塊 4-3：融券增加動向 <span style='font-size: 0.6em; color: #00D2FF;'>({date_43})</span>", unsafe_allow_html=True)
 
     f_col1, f_col2, _ = st.columns([1, 1, 2])
     with f_col1: show_etf_43 = st.checkbox("顯示 ETF", value=True, key="stock_show_etf_43")
@@ -3763,7 +3763,7 @@ if current_page in ["all", "b4"]:
     with st.spinner("⏳ 正在掃描全市場軋空名單..."):
         df_squeeze_radar, msg, radar_date, is_radar_sync = build_squeeze_radar()
 
-    header_html = "🚀 區塊 4-4：可能軋空雷達 "
+    header_html = "區塊 4-4：可能軋空雷達 "
     if radar_date:
         if is_radar_sync:
             header_html += f"<span style='color: #00D2FF; font-size: 0.7em;'>({radar_date})</span>"
@@ -3828,7 +3828,7 @@ if current_page in ["all", "b4"]:
     with st.spinner("⏳ 正在掃描全市場避險名單..."):
         df_risk_radar, msg, radar_date, is_radar_sync = build_risk_radar()
 
-    header_html = "🚨 區塊 4-5：短線套牢名單 "
+    header_html = "區塊 4-5：短線套牢名單 "
     if radar_date:
         if is_radar_sync:
             header_html += f"<span style='color: #00D2FF; font-size: 0.7em;'>({radar_date})</span>"
@@ -4039,7 +4039,7 @@ if current_page in ["all", "b5"]:
                 border-top: 1px solid #38bdf8; border-bottom: 1px solid #38bdf8; padding: 15px 20px; 
                 border-radius: 10px; text-align: center; box-shadow: 0px 0px 20px rgba(56, 189, 248, 0.2); margin-bottom: 20px;">
         <h2 style="color: #e0f2fe; margin: 0; letter-spacing: 2px; text-shadow: 0 0 15px rgba(56, 189, 248, 0.8);">
-            💰 區塊 5：大股東動向
+            大腿動向
         </h2>
         <div style='font-size:13px; color:#00D2FF; font-weight:500; margin-top:8px;'>
             基準日 : {global_latest_date[:2]}/{global_latest_date[2:]} 
@@ -4656,7 +4656,7 @@ if current_page in ["all", "b6"]:
 
     df_block, block_date = get_latest_csv("鉅額交易")
     
-    st.markdown("### 🎣 區塊 6：鉅額交易動向", unsafe_allow_html=True)
+    st.markdown("### 區塊 6：鉅額交易動向", unsafe_allow_html=True)
     st.write("💡 鉅額交易有時為大戶私下換手籌碼，成交價可作為「支撐/壓力」的防守線；如果短線跌破建議嚴設停損。")
 
     tab_today, tab_hist = st.tabs(["🔹 今日最新鉅額交易", "🔹 歷史防守價追蹤表"])
