@@ -1468,41 +1468,64 @@ def render_options_dashboard():
     html_opt += "</table>"
     st.markdown(html_opt, unsafe_allow_html=True)
 #分頁3
+# ======================================================
+# 分頁3 - 總經導航 (🚀 修復台股 VIX 抓不到資料的問題)
+# ======================================================
 @st.cache_data(ttl=900) 
 def fetch_macro_indicators():
     import yfinance as yf
+    import requests
+    import re
+    
     data = {
         "vix": {"value": None, "pct": None},
         "vixtwn": {"value": None, "pct": None},
         "fng": {"score": None, "rating": "無法取得"}
     }
     
-    # 1. 抓取美股 VIX (^VIX)  5d 確保跨假日能抓到數值
+    # 1. 抓取美股 VIX (^VIX) 
     try:
         hist_vix = yf.Ticker("^VIX").history(period="5d")
         if len(hist_vix) >= 2:
             latest = hist_vix['Close'].iloc[-1]
             prev = hist_vix['Close'].iloc[-2]
-            data["vix"]["value"] = latest
-            data["vix"]["pct"] = (latest - prev) / prev * 100
+            data["vix"]["value"] = float(latest)
+            data["vix"]["pct"] = float((latest - prev) / prev * 100)
     except: pass
 
-# 2. 抓取台股 VIX - 🚀 加入真實瀏覽器 Headers 突破防爬蟲
+    # 2. 抓取台股 VIX (VIXTWN) - 🚀 新增雙重備用爬蟲機制 (Wantgoo + TAIFEX)
     try:
         headers = {
             "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/114.0.0.0 Safari/537.36",
             "Accept-Language": "zh-TW,zh;q=0.9,en-US;q=0.8,en;q=0.7",
+            "Referer": "https://www.wantgoo.com/"
         }
-        res = requests.get("https://www.wantgoo.com/global/vixtwn", headers=headers, timeout=5)
+        
+        # 策略 A: 抓取 Wantgoo (網址已改為 index/vixtwn)
+        res = requests.get("https://www.wantgoo.com/index/vixtwn", headers=headers, timeout=5)
         if res.status_code == 200:
-            match = re.search(r'"price":\s*([\d\.]+)', res.text)
-            if not match: match = re.search(r'臺指VIX.*?(\d+\.\d{2})', res.text)
+            # 嘗試找尋網頁中的 臺指選擇權波動率指數 (VIXTWN) 數值
+            match = re.search(r'<title>.*?VIXTWN.*?([\d\.]+)', res.text)
+            if not match: match = re.search(r'臺指選擇權波動率指數\s*\(VIXTWN\)\s*([\d\.]+)', res.text)
+            if not match: match = re.search(r'"price":\s*([\d\.]+)', res.text)
+            
             if match:
                 data["vixtwn"]["value"] = float(match.group(1))
                 data["vixtwn"]["pct"] = 0.0 
-    except: pass
 
-    # 3. 抓取 CNN 恐懼貪婪指數 - 🚀 加入 Referer 與強力 Headers
+        # 策略 B: 如果玩股網抓不到，備用去抓台灣期交所 (TAIFEX) 官網
+        if data["vixtwn"]["value"] is None:
+            res_taifex = requests.get("https://www.taifex.com.tw/cht/index", headers=headers, timeout=5)
+            if res_taifex.status_code == 200:
+                match_taifex = re.search(r'臺指選擇權波動率指數.*?([\d\.]+)', res_taifex.text, re.DOTALL)
+                if match_taifex:
+                    data["vixtwn"]["value"] = float(match_taifex.group(1))
+                    data["vixtwn"]["pct"] = 0.0
+
+    except Exception as e: 
+        print("VIXTWN Error:", e)
+
+    # 3. 抓取 CNN 恐懼貪婪指數
     try:
         headers_cnn = {
             "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36",
