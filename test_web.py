@@ -909,26 +909,79 @@ def scan_and_display(title, session_key, query):
     else:
         st.write("⚪ 未進榜")
 
-# 🤖 [ AI 籌碼訊號]判斷
-def generate_stock_commentary(row):
-    score = row.get('總分', 0)
-    warns = str(row.get('賣出警示', ''))
-    b5_trend = str(row.get('大股東動向', ''))
-    has_warning = "⚠️" in warns or "🚨" in warns
-    high_score = score >= 3
+# 🤖 [AI 籌碼訊號]新版判斷 (直接掃描全榜單)
+def generate_stock_commentary(query):
+    if not query: return ""
+    
+    score = 0
+    warns = []
+    b5_trend_400 = ""
+    b5_trend_1000 = ""
+    
+    # 🎯 掃描 1: 法人買超診斷 (區塊2 - 共4個表)
+    for key in ['df_blk2_1', 'df_blk2_2', 'df_blk2_3', 'df_blk2_4']:
+        if key in st.session_state:
+            res = robust_search_engine(st.session_state[key], query)
+            if not res.empty:
+                score += 1.5  # 出現在法人買超榜，每次加 1.5 分
+
+    # 📅 掃描 2: 法人連買診斷 (區塊3)
+    if 'df_blk3_main' in st.session_state:
+        res = robust_search_engine(st.session_state['df_blk3_main'], query)
+        if not res.empty:
+            score += len(res) * 1.5  # 達成幾項連買條件就加幾次分
+
+    # 🔄 掃描 3: 券資有利排名 (區塊4 - 共6個表)
+    for key in ['df_margin_pct', 'df_short_pct', 'df_margin_plus_pct', 'df_margin_vol', 'df_short_vol', 'df_margin_plus_vol']:
+        if key in st.session_state:
+            res = robust_search_engine(st.session_state[key], query)
+            if not res.empty:
+                score += 0.5  # 券資籌碼權重較輕，每次加 0.5 分
+
+    # 💰 掃描 4: 大戶動向診斷 (區塊5)
+    def check_big_holder(key):
+        if key in st.session_state:
+            res = robust_search_engine(st.session_state[key], query)
+            if not res.empty:
+                # 模糊抓取動向欄位 (因為欄位名可能是'大股東動向'或'狀態動態')
+                for col in res.columns:
+                    if "動向" in col or "狀態" in col or "趨勢" in col:
+                        return str(res.iloc[0][col])
+        return ""
+
+    b5_trend_400 = check_big_holder('df_blk5')
+    if "增" in b5_trend_400: score += 2
+    elif "減" in b5_trend_400: 
+        score -= 2
+        warns.append("400張大戶減碼")
+
+    b5_trend_1000 = check_big_holder('df_blk5_1000')
+    if "增" in b5_trend_1000: score += 2
+    elif "減" in b5_trend_1000: 
+        score -= 2
+        warns.append("千張超級大戶減碼")
+
+    # 💡 綜合判定邏輯
+    has_warning = len(warns) > 0
+    warn_str = "、".join(warns)
+    high_score = score >= 4
+    
     if has_warning and high_score:
-        return f"⚔️ 【激烈換手】系統偵測到法人分歧 ({warns})，但該股依然獲得 {score} 分的高評估！這代表『一方的倒貨正被大戶強勢吃下』。若能維持強勢，代表承接方實力極強，需嚴設停損。"
+        return f"⚔️ 【激烈換手】系統偵測到法人與大戶分歧 ({warn_str})，但籌碼動能依然獲 {score} 分的高評估！代表『倒貨正被強勢吃下』。若能維持強勢，承接方實力極強，需嚴設停損。"
     if has_warning and not high_score:
-        return f"🚨 【風險警示】法人正在進行倒貨調節 ({warns})，且無強大買盤承接，籌碼結構面臨鬆動。建議暫避風頭。"
-    if "大減" in b5_trend:
-        return "⚠️ 【大戶撤退】400張以上大戶出現明顯減碼跡象，主力籌碼渙散，建議先行觀望。"
+        return f"🚨 【風險警示】大戶正在進行倒貨調節 ({warn_str})，且無強大買盤承接，籌碼結構面臨鬆動。建議暫避風頭。"
+    if "大減" in b5_trend_400 or "大減" in b5_trend_1000:
+        return "⚠️ 【大戶撤退】大戶出現明顯『大減』跡象，主力籌碼渙散，建議先行觀望。"
     if score >= 6:
-        base_comment = "🔥 【強勢噴發】籌碼面極度優異！內外資法人與大戶同步共振做多，具備強大的波段上攻潛力。"
-        if "大增" in b5_trend: base_comment += "大股東籌碼大幅集中，是不可多得的強勢防守標的。"
+        base_comment = f"🔥 【強勢噴發】籌碼面極度優異 (積分: {score})！多個法人與大戶榜單同步共振做多，具備強大的波段上攻潛力。"
+        if "大增" in b5_trend_400 or "大增" in b5_trend_1000: base_comment += " 大股東籌碼大幅集中，是極佳的防守標的。"
         return base_comment
-    elif score >= 3: return "📈 【偏多佈局】主力籌碼持續進駐，法人買盤給予一定支撐。具備穩健的波段潛力。"
-    elif score >= 1: return "🔄 【中性觀望】籌碼表現較為平淡，雖有零星買盤但缺乏明確連續性。建議多看少做。"
-    else: return "❄️ 【弱勢整理】籌碼處於流失或無主力認養狀態。建議暫不考量。"
+    elif score >= 3: 
+        return f"📈 【偏多佈局】主力籌碼持續進駐 (積分: {score})，法人與券資數據給予支撐。具備穩健的波段潛力。"
+    elif score >= 1: 
+        return f"🔄 【中性觀望】籌碼表現較為平淡 (積分: {score})，雖有零星榜單出現，但缺乏明確連續性。建議多看少做。"
+    else: 
+        return "❄️ 【弱勢整理】目前未進入任何核心法人與大戶買超榜單，籌碼處於流失或無主力認養狀態。建議暫不考量。"
 
 # 🤖  [ AI 技術型態訊號]判斷 (從 K 線抽離出來)
 def generate_technical_signals(df_sig):
@@ -1552,12 +1605,9 @@ def render_sidebar_war_room():
             # ==========================================
             # 🚀 融合 AI 訊號區 (拔除對評分的依賴，直接搜尋即可顯示)
             # ==========================================
-            old_ai_msg = ""
-            # 1. 自動從全市場資料表搜尋這支股票的法人大戶訊號
-            if 'my_final_df' in st.session_state and not st.session_state['my_final_df'].empty:
-                df_target = robust_search_engine(st.session_state['my_final_df'], pure_stock_id if pure_stock_id else search_query)
-                if not df_target.empty:
-                    old_ai_msg = generate_stock_commentary(df_target.iloc[0])
+            # 1. 綜合掃描各區塊資料庫，動態計算籌碼 AI 訊號 (修改為generate_stock commentary)
+            target_query = pure_stock_id if pure_stock_id else search_query
+            old_ai_msg = generate_stock_commentary(target_query)
 
             # 2. 自動抓取最新 K 線計算技術訊號
             new_ai_msgs = []
