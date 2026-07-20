@@ -1469,7 +1469,7 @@ def render_options_dashboard():
     st.markdown(html_opt, unsafe_allow_html=True)
 #分頁3
 # ======================================================
-# 分頁3 - 總經導航 (🚀 修復台股 VIX 抓不到資料的問題)
+# 分頁3 - 總經導航 (🚀 終極修復台股 VIX 三重備援機制)
 # ======================================================
 @st.cache_data(ttl=900) 
 def fetch_macro_indicators():
@@ -1483,7 +1483,7 @@ def fetch_macro_indicators():
         "fng": {"score": None, "rating": "無法取得"}
     }
     
-    # 1. 抓取美股 VIX (^VIX) 
+    # --- 1. 美股 VIX (^VIX) ---
     try:
         hist_vix = yf.Ticker("^VIX").history(period="5d")
         if len(hist_vix) >= 2:
@@ -1493,39 +1493,50 @@ def fetch_macro_indicators():
             data["vix"]["pct"] = float((latest - prev) / prev * 100)
     except: pass
 
-    # 2. 抓取台股 VIX (VIXTWN) - 🚀 新增雙重備用爬蟲機制 (Wantgoo + TAIFEX)
-    try:
-        headers = {
-            "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/114.0.0.0 Safari/537.36",
-            "Accept-Language": "zh-TW,zh;q=0.9,en-US;q=0.8,en;q=0.7",
-            "Referer": "https://www.wantgoo.com/"
-        }
-        
-        # 策略 A: 抓取 Wantgoo (網址已改為 index/vixtwn)
-        res = requests.get("https://www.wantgoo.com/index/vixtwn", headers=headers, timeout=5)
-        if res.status_code == 200:
-            # 嘗試找尋網頁中的 臺指選擇權波動率指數 (VIXTWN) 數值
-            match = re.search(r'<title>.*?VIXTWN.*?([\d\.]+)', res.text)
-            if not match: match = re.search(r'臺指選擇權波動率指數\s*\(VIXTWN\)\s*([\d\.]+)', res.text)
-            if not match: match = re.search(r'"price":\s*([\d\.]+)', res.text)
-            
-            if match:
-                data["vixtwn"]["value"] = float(match.group(1))
-                data["vixtwn"]["pct"] = 0.0 
+    # --- 2. 🇹🇼 台股 VIX (VIXTWN) 終極多重備援爬蟲 ---
+    headers = {
+        "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/126.0.0.0 Safari/537.36",
+        "Accept-Language": "zh-TW,zh;q=0.9,en-US;q=0.8,en;q=0.7",
+    }
+    
+    # 策略 A: 官方最穩來源 - 臺灣期交所 (TAIFEX)
+    if data["vixtwn"]["value"] is None:
+        try:
+            res = requests.get("https://www.taifex.com.tw/cht/index", headers=headers, timeout=5)
+            if res.status_code == 200:
+                # 尋找 HTML 中的 臺指選擇權波動率指數 數值 (期交所通常會包在 td 或附近)
+                match = re.search(r'臺指選擇權波動率指數.*?<td[^>]*>\s*([\d\.]+)\s*</td>', res.text, re.IGNORECASE | re.DOTALL)
+                if not match:
+                    # 寬鬆備用正則：找 臺指選擇權波動率指數 附近的小數數字
+                    match = re.search(r'臺指選擇權波動率指數.*?([\d]{2}\.[\d]{2})', res.text, re.IGNORECASE | re.DOTALL)
+                
+                if match:
+                    data["vixtwn"]["value"] = float(match.group(1))
+                    data["vixtwn"]["pct"] = None # 確保 UI 顯示「最新數值」
+        except: pass
 
-        # 策略 B: 如果玩股網抓不到，備用去抓台灣期交所 (TAIFEX) 官網
-        if data["vixtwn"]["value"] is None:
-            res_taifex = requests.get("https://www.taifex.com.tw/cht/index", headers=headers, timeout=5)
-            if res_taifex.status_code == 200:
-                match_taifex = re.search(r'臺指選擇權波動率指數.*?([\d\.]+)', res_taifex.text, re.DOTALL)
-                if match_taifex:
-                    data["vixtwn"]["value"] = float(match_taifex.group(1))
-                    data["vixtwn"]["pct"] = 0.0
+    # 策略 B: HiStock 嗨投資 (當官方維修時的強力備援)
+    if data["vixtwn"]["value"] is None:
+        try:
+            res = requests.get("https://histock.tw/stock/tcharti.aspx?no=VIXTWN", headers=headers, timeout=5)
+            if res.status_code == 200:
+                match = re.search(r'id="CPHB1_lblPrice"[^>]*>([\d\.]+)<', res.text)
+                if match:
+                    data["vixtwn"]["value"] = float(match.group(1))
+        except: pass
 
-    except Exception as e: 
-        print("VIXTWN Error:", e)
+    # 策略 C: 玩股網 (Wantgoo) 隱藏 API 或網頁爬蟲
+    if data["vixtwn"]["value"] is None:
+        try:
+            res = requests.get("https://www.wantgoo.com/index/vixtwn", headers=headers, timeout=5)
+            if res.status_code == 200:
+                match = re.search(r'"price":\s*([\d\.]+)', res.text)
+                if not match: match = re.search(r'臺指選擇權波動率指數\s*\(VIXTWN\)[^\d]*([\d\.]+)', res.text)
+                if match:
+                    data["vixtwn"]["value"] = float(match.group(1))
+        except: pass
 
-    # 3. 抓取 CNN 恐懼貪婪指數
+    # --- 3. CNN 恐懼貪婪指數 ---
     try:
         headers_cnn = {
             "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36",
