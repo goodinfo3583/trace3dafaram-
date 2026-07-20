@@ -3250,9 +3250,9 @@ if current_page in ["all", "b3"]:
     # ========================================================
     h_day1, h_day2 = st.columns(2)
     with h_day1:
-        st.markdown(f"<h3 style='margin-top: 0; margin-bottom: 0;'>🌐 外資最新 日連買</h3>", unsafe_allow_html=True)
+        st.markdown(f"<h3 style='margin-top: 0; margin-bottom: 0;'>外資最新 日連買</h3>", unsafe_allow_html=True)
     with h_day2:
-        st.markdown(f"<h3 style='margin-top: 0; margin-bottom: 0;'>🏦 投信最新 日連買</h3>", unsafe_allow_html=True)
+        st.markdown(f"<h3 style='margin-top: 0; margin-bottom: 0;'>投信最新 日連買</h3>", unsafe_allow_html=True)
 
     st.markdown("<div style='color: white; margin-top: 5px; margin-bottom: 18px; font-size: 16px;'>💡 <b>日動態說明：</b> 🔥 波段認養 (連買10天以上)  ⚡ 買盤點火 (連買5~9天)  🆕 試單觀察 (連買1~4天)</div>", unsafe_allow_html=True)
 
@@ -3280,9 +3280,9 @@ if current_page in ["all", "b3"]:
     # ========================================================
     h_wk1, h_wk2 = st.columns(2)
     with h_wk1:
-        st.markdown(f"<h3 style='margin-top: 0; margin-bottom: 0;'>🌐 外資最新 週連買</h3>", unsafe_allow_html=True)
+        st.markdown(f"<h3 style='margin-top: 0; margin-bottom: 0;'>外資最新 週連買</h3>", unsafe_allow_html=True)
     with h_wk2:
-        st.markdown(f"<h3 style='margin-top: 0; margin-bottom: 0;'>🏦 投信最新 週連買</h3>", unsafe_allow_html=True)
+        st.markdown(f"<h3 style='margin-top: 0; margin-bottom: 0;'>投信最新 週連買</h3>", unsafe_allow_html=True)
 
     st.markdown("<div style='color: white; margin-top: 5px; margin-bottom: 18px; font-size: 16px;'>💡 <b>週動態說明：</b> 👑 長線主控 (連買10週以上)  🚀 趨勢加溫 (連買5~9週)  🌱 週線發動 (連買1~4週)</div>", unsafe_allow_html=True)
 
