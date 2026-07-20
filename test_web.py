@@ -47,7 +47,7 @@ st.markdown("""
 # ==========================================
 st.set_page_config(page_title="股市派對", layout="wide")
 
-# 👇 啟動 Google Sheets 永久連線引擎 (全域共用)
+# 👇 啟動 Google Sheets 連線引擎 (全域共用)
 from streamlit_gsheets import GSheetsConnection
 conn = st.connection("gsheets", type=GSheetsConnection)
 SHEET_URL = "https://docs.google.com/spreadsheets/d/1TxHDahg8ul6lmUtDN-7X75cBXbkU0jaZ3M9zg6exBgU"
