@@ -1493,47 +1493,47 @@ def fetch_macro_indicators():
             data["vix"]["pct"] = float((latest - prev) / prev * 100)
     except: pass
 
-    # --- 2. 🇹🇼 台股 VIX (VIXTWN) 終極多重備援爬蟲 ---
+    # --- 2. 🇹🇼 台股 VIX (VIXTWN) 精準修正版 ---
     headers = {
         "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/126.0.0.0 Safari/537.36",
-        "Accept-Language": "zh-TW,zh;q=0.9,en-US;q=0.8,en;q=0.7",
+        "Accept-Language": "zh-TW,zh;q=0.9,en-US;q=0.8,en-US;q=0.7",
+        "Referer": "https://www.wantgoo.com/"
     }
     
-    # 策略 A: 官方最穩來源 - 臺灣期交所 (TAIFEX)
+    # 策略 A: 針對玩股網首創的 JSON 結構或特定標籤抓取
     if data["vixtwn"]["value"] is None:
         try:
-            res = requests.get("https://www.taifex.com.tw/cht/index", headers=headers, timeout=5)
+            res = requests.get("https://www.wantgoo.com/index/vixtwn", headers=headers, timeout=5)
             if res.status_code == 200:
-                # 尋找 HTML 中的 臺指選擇權波動率指數 數值 (期交所通常會包在 td 或附近)
-                match = re.search(r'臺指選擇權波動率指數.*?<td[^>]*>\s*([\d\.]+)\s*</td>', res.text, re.IGNORECASE | re.DOTALL)
+                # 排除小於 5 的錯誤整數，精準尋找兩位數以上的 VIX 數值 (例如 39.49)
+                # 玩股網通常會將即時報價放在 "price": 39.49 或類似的欄位中
+                match = re.search(r'"price":\s*([1-9]\d{1,2}\.\d{2})', res.text)
                 if not match:
-                    # 寬鬆備用正則：找 臺指選擇權波動率指數 附近的小數數字
-                    match = re.search(r'臺指選擇權波動率指數.*?([\d]{2}\.[\d]{2})', res.text, re.IGNORECASE | re.DOTALL)
-                
-                if match:
+                    # 備用：尋找帶有小數點且大於 10 的合理 VIX 數字
+                    matches = re.findall(r'>([1-9]\d{1,2}\.\d{2})<', res.text)
+                    for m in matches:
+                        val = float(m)
+                        if 10.0 <= val <= 99.0: # 台股 VIX 合理區間通常在 10 ~ 90 之間
+                            data["vixtwn"]["value"] = val
+                            break
+                else:
                     data["vixtwn"]["value"] = float(match.group(1))
-                    data["vixtwn"]["pct"] = None # 確保 UI 顯示「最新數值」
+                
+                if data["vixtwn"]["value"] is not None:
+                    data["vixtwn"]["pct"] = 0.0
         except: pass
 
-    # 策略 B: HiStock 嗨投資 (當官方維修時的強力備援)
+    # 策略 B: 如果玩股網失敗，備用 HiStock 專屬標籤
     if data["vixtwn"]["value"] is None:
         try:
             res = requests.get("https://histock.tw/stock/tcharti.aspx?no=VIXTWN", headers=headers, timeout=5)
             if res.status_code == 200:
                 match = re.search(r'id="CPHB1_lblPrice"[^>]*>([\d\.]+)<', res.text)
                 if match:
-                    data["vixtwn"]["value"] = float(match.group(1))
-        except: pass
-
-    # 策略 C: 玩股網 (Wantgoo) 隱藏 API 或網頁爬蟲
-    if data["vixtwn"]["value"] is None:
-        try:
-            res = requests.get("https://www.wantgoo.com/index/vixtwn", headers=headers, timeout=5)
-            if res.status_code == 200:
-                match = re.search(r'"price":\s*([\d\.]+)', res.text)
-                if not match: match = re.search(r'臺指選擇權波動率指數\s*\(VIXTWN\)[^\d]*([\d\.]+)', res.text)
-                if match:
-                    data["vixtwn"]["value"] = float(match.group(1))
+                    val = float(match.group(1))
+                    if val > 5:  # 確保不是異常的 1.00
+                        data["vixtwn"]["value"] = val
+                        data["vixtwn"]["pct"] = 0.0
         except: pass
 
     # --- 3. CNN 恐懼貪婪指數 ---
