@@ -2729,7 +2729,7 @@ if current_page in ["all", "b2"]:
     # ==========================================
     st.write("---")
     st.markdown("<div id='section-2-1'></div>", unsafe_allow_html=True)
-    st.header("🎯 法人掃貨：外資 5 日 買超佔標的成交量")
+    st.header("法人掃貨：外資 5 日 買超佔標的成交量")
 
     csv_pattern = os.path.join(DATA_DIR, "*外資買超佔成交比*.csv")
     all_csv_files = glob.glob(csv_pattern)
@@ -2827,7 +2827,7 @@ if current_page in ["all", "b2"]:
     # ==========================================
     st.write("---")
     st.markdown("<div id='section-2-2'></div>", unsafe_allow_html=True)
-    st.header("🎯 法人掃貨：投信 5 日 買超佔標的成交量")
+    st.header("法人掃貨：投信 5 日 買超佔標的成交量")
 
     csv_pattern_sitc = os.path.join(DATA_DIR, "*投信買超佔成交比*.csv")
     all_files_sitc = glob.glob(csv_pattern_sitc)
@@ -2922,7 +2922,7 @@ if current_page in ["all", "b2"]:
     # ==========================================
     st.write("---")
     st.markdown("<div id='section-2-3'></div>", unsafe_allow_html=True)
-    st.header("🎯 法人掃貨：外資 5 日 買超佔公司發行張數")
+    st.header("法人掃貨：外資 5 日 買超佔公司發行張數")
 
     csv_pattern_fo = os.path.join(DATA_DIR, "*外資買超佔發行張數*.csv")
     all_files_fo = glob.glob(csv_pattern_fo)
@@ -3012,7 +3012,7 @@ if current_page in ["all", "b2"]:
     # ==========================================
     st.write("---")
     st.markdown("<div id='section-2-4'></div>", unsafe_allow_html=True)
-    st.header("🎯 法人掃貨：投信 5 日 買超佔公司發行張數")
+    st.header("法人掃貨：投信 5 日 買超佔公司發行張數")
 
     csv_pattern_sitc2 = os.path.join(DATA_DIR, "*投信買超佔發行張數*.csv")
     all_files_sitc2 = glob.glob(csv_pattern_sitc2)
