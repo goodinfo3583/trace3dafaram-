@@ -4043,7 +4043,8 @@ def process_major_shareholders(target_level):
             
             try:
                 df['股票代號'] = df[c_code].astype(str).str.extract(r'(\d+)', expand=False)
-                df['股票名稱'] = df[c_name].astype(str).str.strip()
+                # 🔥 修正點：強制去除股票名稱前面的數字 (如 '8039台虹' -> '台虹')
+                df['股票名稱'] = df[c_name].astype(str).str.replace(r'^\d+', '', regex=True).str.strip()
                 df['持股%'] = pd.to_numeric(df[c_abs].astype(str).str.replace('%', ''), errors='coerce')
                 df['增減%'] = pd.to_numeric(df[c_delta].astype(str).str.replace('+', '').str.replace('%', ''), errors='coerce')
                 
@@ -4108,10 +4109,7 @@ def process_major_shareholders(target_level):
 if current_page in ["all", "b5"]:
     st.write("---")
 
-
     st.markdown("<div id='section-5'></div>", unsafe_allow_html=True)
-    
-    # ...(以下保留你原本區塊5的 UI 渲染與 Tab 分頁邏輯)...
     
     # 0. 預先掃描最新檔案日期以供標題基準日顯示
     import glob, os, re
@@ -4142,21 +4140,15 @@ if current_page in ["all", "b5"]:
     show_etf = filter_c1.checkbox("顯示 ETF", value=True, key="b5_global_etf")
     show_bond = filter_c2.checkbox("顯示 債券 / 債券 ETF", value=True, key="b5_global_bond")
 
-    # 擴充為 5 個 Tab
-    #tab_1000, tab_800, tab_600, tab_400, tab_sync = st.tabs([
-        #"🔹 1000張大戶", "🔹 800張大戶", "🔹 600張大戶", "🔹 400張大戶", "🔹 雙引擎共振"
-    #])
-    # 🔥 擴充後方分頁，加入「長短線共振」
-    tab_1000, tab_800, tab_600, tab_400, tab_resonance, tab_long_short = st.tabs([
+    # 🔥 修正點：變更分頁順序，將「長短線共振」移至陣列的第一位，即可成為預設優先顯示分頁
+    tab_long_short, tab_1000, tab_800, tab_600, tab_400, tab_resonance = st.tabs([
+        "🔹 長短線共振",  
         "🔹 1000張大戶", 
         "🔹 800張大戶", 
         "🔹 600張大戶", 
         "🔹 400張大戶", 
-        "🔹 雙引擎共振",
-        "🔹 長短線共振"  # 👈 全新新增
+        "🔹 雙引擎共振"
     ])
-
-
 
     filtered_1000_df, filtered_800_df, filtered_600_df, filtered_400_df = pd.DataFrame(), pd.DataFrame(), pd.DataFrame(), pd.DataFrame()
 
@@ -4223,6 +4215,9 @@ if current_page in ["all", "b5"]:
                         
                     # 去除沒抓到代號的空行
                     df = df.dropna(subset=['股票代號'])
+
+                    # 🔥 修正點：徹底過濾掉股票名稱前面附帶的數字，解決例如「8039台虹」與「台虹」重複導致後方資料消失的問題
+                    df['股票名稱'] = df['股票名稱'].astype(str).str.replace(r'^\d+', '', regex=True).str.strip()
                     
                     # ⭐ 終極記憶體保護：強制去除重複列，防止 set_index 與 combine_first 引發記憶體爆炸當機！
                     df = df.drop_duplicates(subset=['股票代號', '股票名稱'])
@@ -4244,8 +4239,6 @@ if current_page in ["all", "b5"]:
                     master = df.combine_first(master) if master is not None else df
                     
                 except Exception as e:
-                    # 避免單一檔案的錯誤導致整個 400 張分頁崩潰
-                    # print(f"處理檔案 {f} 發生錯誤: {e}") 
                     continue
             
             if master is not None and not master.empty:
@@ -4296,6 +4289,7 @@ if current_page in ["all", "b5"]:
                 st.info("⚪ 找不到符合格式的 400 張大戶資料。")
         else:
             st.info("⚪ 尚未下載 400 張神秘金字塔資料，請先執行爬蟲。")
+            
     # ================= TAB 5: 雙引擎共振 =================
     with tab_resonance:
         if not filtered_1000_df.empty and not filtered_400_df.empty:
@@ -4567,10 +4561,10 @@ if current_page in ["all", "b5"]:
                                     '<b>%{label}</b><br>'
                                     '股票代號: %{customdata[0]}<br>'
                                     '千張大戶本週: <b>%{customdata[1]}</b><br>'
-                                    '千張大戶6週累積: <b>%{customdata[2]}</b><br>' # 🚀 修正點：改用格式化欄位，杜絕破圖
+                                    '千張大戶6週累積: <b>%{customdata[2]}</b><br>' 
                                     '----------------<br>'
                                     '400張大戶本週: %{customdata[3]}<br>'
-                                    '400張大戶6週累積: <b>%{customdata[4]}</b><br>' # 🚀 修正點：改用格式化欄位，杜絕破圖
+                                    '400張大戶6週累積: <b>%{customdata[4]}</b><br>' 
                                     '<extra></extra>' 
                                 )
                             )
