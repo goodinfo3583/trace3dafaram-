@@ -1059,7 +1059,7 @@ def render_technical_chart(stock_id, timeframe="日線", selected_mas=[], show_r
             if isinstance(val, pd.Series): val = val.iloc[0]
             return f"{float(val):.2f}"
         return "-"
-    # --- Plotly 繪圖區 ---
+   # --- Plotly 繪圖區 (⚠️ 全部移除 squeeze 確保型別正確) ---
     rows = 2
     row_heights = [0.5, 0.15]
     if show_rsi: rows += 1; row_heights.append(0.12)
@@ -1072,8 +1072,8 @@ def render_technical_chart(stock_id, timeframe="日線", selected_mas=[], show_r
     down_color = 'rgb(80, 200, 120)'  
 
     fig.add_trace(go.Candlestick(
-        x=daily_df.index, open=daily_df['Open'].squeeze(), high=daily_df['High'].squeeze(), 
-        low=daily_df['Low'].squeeze(), close=daily_df['Close'].squeeze(), name='K線', 
+        x=daily_df.index, open=daily_df['Open'], high=daily_df['High'], 
+        low=daily_df['Low'], close=daily_df['Close'], name='K線', 
         increasing=dict(line=dict(color=up_color, width=1.5), fillcolor=up_color),
         decreasing=dict(line=dict(color=down_color, width=1.5), fillcolor=down_color),
         hovertemplate="開：%{open:.2f}<br>高：%{high:.2f}<br>低：%{low:.2f}<br>收：%{close:.2f}<extra></extra>"
@@ -1100,39 +1100,39 @@ def render_technical_chart(stock_id, timeframe="日線", selected_mas=[], show_r
         if ma_name in daily_df.columns:
             latest_val = get_latest_price(ma_name)
             fig.add_trace(go.Scatter(
-                x=daily_df.index, y=daily_df[ma_name].squeeze(), mode='lines', 
+                x=daily_df.index, y=daily_df[ma_name], mode='lines', 
                 name=f'{ma_name} ({latest_val})', line=dict(color=ma_config[ma_name]['color'], width=1.3),
                 hovertemplate=f"<b>{ma_name}</b>： %{{y:.2f}}<extra></extra>"
             ), row=1, col=1)
 
-    vol_colors = [up_color if c >= o else down_color for c, o in zip(daily_df['Close'].squeeze(), daily_df['Open'].squeeze())]
+    vol_colors = [up_color if c >= o else down_color for c, o in zip(daily_df['Close'], daily_df['Open'])]
     fig.add_trace(go.Bar(
-        x=daily_df.index, y=daily_df['Volume'].squeeze(), name='成交量', 
+        x=daily_df.index, y=daily_df['Volume'], name='成交量', 
         marker_color=vol_colors, showlegend=False, hovertemplate="<b>成交量</b>： %{y}<extra></extra>"
     ), row=2, col=1)
     fig.update_yaxes(title_text="成交量", row=2, col=1, title_font=dict(size=12, color="#E2E8F0"), rangemode="nonnegative")
 
     current_row = 3
     if show_kd:
-        fig.add_trace(go.Scatter(x=daily_df.index, y=daily_df['K'].squeeze(), mode='lines', name='K (9)', line=dict(color='#00CCFF', width=1.2), hovertemplate="<b>K</b>: %{y:.2f}<extra></extra>"), row=current_row, col=1)
-        fig.add_trace(go.Scatter(x=daily_df.index, y=daily_df['D'].squeeze(), mode='lines', name='D (3)', line=dict(color='#FFCC00', width=1.2), hovertemplate="<b>D</b>: %{y:.2f}<extra></extra>"), row=current_row, col=1)
+        fig.add_trace(go.Scatter(x=daily_df.index, y=daily_df['K'], mode='lines', name='K (9)', line=dict(color='#00CCFF', width=1.2), hovertemplate="<b>K</b>: %{y:.2f}<extra></extra>"), row=current_row, col=1)
+        fig.add_trace(go.Scatter(x=daily_df.index, y=daily_df['D'], mode='lines', name='D (3)', line=dict(color='#FFCC00', width=1.2), hovertemplate="<b>D</b>: %{y:.2f}<extra></extra>"), row=current_row, col=1)
         fig.add_hline(y=80, line_dash="dash", line_color="rgba(240,90,90,0.4)", row=current_row, col=1)
         fig.add_hline(y=20, line_dash="dash", line_color="rgba(80,200,120,0.4)", row=current_row, col=1)
         fig.update_yaxes(title_text="KD(9,3,3)", row=current_row, col=1, title_font=dict(size=11, color="#E2E8F0"))
         current_row += 1
         
     if show_rsi:
-        fig.add_trace(go.Scatter(x=daily_df.index, y=daily_df['RSI'].squeeze(), mode='lines', name='RSI (14)', line=dict(color='#E1BEE7', width=1.5), hovertemplate="<b>RSI</b>: %{y:.2f}<extra></extra>"), row=current_row, col=1)
+        fig.add_trace(go.Scatter(x=daily_df.index, y=daily_df['RSI'], mode='lines', name='RSI (14)', line=dict(color='#E1BEE7', width=1.5), hovertemplate="<b>RSI</b>: %{y:.2f}<extra></extra>"), row=current_row, col=1)
         fig.add_hline(y=80, line_dash="dash", line_color="rgba(240,90,90,0.4)", row=current_row, col=1)
         fig.add_hline(y=20, line_dash="dash", line_color="rgba(80,200,120,0.4)", row=current_row, col=1)
         fig.update_yaxes(title_text="RSI(14)", row=current_row, col=1, title_font=dict(size=11, color="#E2E8F0"))
         current_row += 1
 
     if show_macd:
-        fig.add_trace(go.Scatter(x=daily_df.index, y=daily_df['DIF'].squeeze(), mode='lines', name='DIF', line=dict(color='#FFF', width=1)), row=current_row, col=1)
-        fig.add_trace(go.Scatter(x=daily_df.index, y=daily_df['MACD_Sign'].squeeze(), mode='lines', name='MACD', line=dict(color='#FFCC00', width=1)), row=current_row, col=1)
-        hist_colors = [up_color if h >= 0 else down_color for h in daily_df['MACD_Hist'].squeeze()]
-        fig.add_trace(go.Bar(x=daily_df.index, y=daily_df['MACD_Hist'].squeeze(), name='柱狀圖', marker_color=hist_colors), row=current_row, col=1)
+        fig.add_trace(go.Scatter(x=daily_df.index, y=daily_df['DIF'], mode='lines', name='DIF', line=dict(color='#FFF', width=1)), row=current_row, col=1)
+        fig.add_trace(go.Scatter(x=daily_df.index, y=daily_df['MACD_Sign'], mode='lines', name='MACD', line=dict(color='#FFCC00', width=1)), row=current_row, col=1)
+        hist_colors = [up_color if h >= 0 else down_color for h in daily_df['MACD_Hist']]
+        fig.add_trace(go.Bar(x=daily_df.index, y=daily_df['MACD_Hist'], name='柱狀圖', marker_color=hist_colors), row=current_row, col=1)
         fig.update_yaxes(title_text="MACD", row=current_row, col=1, title_font=dict(size=11, color="#E2E8F0"))
         current_row += 1
 
