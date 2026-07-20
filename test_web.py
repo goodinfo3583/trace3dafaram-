@@ -1547,33 +1547,6 @@ def render_sidebar_war_room():
                 match_num = re.search(r'\d+', query_clean)
                 if match_num: pure_stock_id = match_num.group(0)
 #這裡原本有系統綜合假評分
-st.markdown(f"### 🎯 綜合診斷標的：<span style='color: #00D2FF;'>{display_name}</span> <span style='font-size:16px; background-color:#1E293B; padding:4px 10px; border-radius:6px; color:#38BDF8; border: 1px solid #38BDF8; margin-left:10px;'>🏷️ {industry_label}</span>", unsafe_allow_html=True)
-
-            pool_df = st.session_state.get('top_pool_df', pd.DataFrame())
-            target_score = None
-            delta_val = 0.0
-            matched_row = None
-
-            if not pool_df.empty:
-                match = robust_search_engine(pool_df, pure_stock_id if pure_stock_id else search_query)
-                if not match.empty:
-                    matched_row = match.iloc[0]
-                    target_score = matched_row.get('總分', 0)
-                    delta_val = matched_row.get('Delta (日變動)', 0.0) 
-
-            # 🏆 顯示分數
-            if target_score is not None and pure_stock_id != "":
-                delta_color = "#FF4B4B" if delta_val > 0 else "#00CC66" if delta_val < 0 else "#94A3B8"
-                delta_symbol = "🔥" if delta_val > 0 else "🚨" if delta_val < 0 else "🔄"
-                delta_str = f"+{delta_val}" if delta_val > 0 else f"{delta_val}" 
-                
-                st.markdown(f"""
-                #### 🏆 系統綜合評分：<span style='color:#FFD700; font-size:24px; text-shadow: 0 0 10px rgba(255,215,0,0.5);'>**{target_score}**</span> 分 
-                <span style='color:{delta_color}; font-size:16px; margin-left:15px;'>{delta_symbol} Delta變化: **{delta_str}**</span>
-                <span style='color:#94A3B8; font-size:14px; font-weight:normal; margin-left:10px;'>(評分數據僅供參考)</span>
-                """, unsafe_allow_html=True)
-            else:
-                st.markdown("#### 🏆 系統綜合評分：<span style='color:#64748B; font-size:18px;'>未達綜合進榜標準 (0分)</span>", unsafe_allow_html=True)
 
             # ==========================================
             # 🚀 融合 AI 訊號區 (搜尋即顯示！)
