@@ -1549,51 +1549,31 @@ def render_sidebar_war_room():
 #這裡原本有系統綜合假評分
             st.markdown(f"### 🎯 綜合診斷標的：<span style='color: #00D2FF;'>{display_name}</span> <span style='font-size:16px; background-color:#1E293B; padding:4px 10px; border-radius:6px; color:#38BDF8; border: 1px solid #38BDF8; margin-left:10px;'>🏷️ {industry_label}</span>", unsafe_allow_html=True)
 
-            pool_df = st.session_state.get('top_pool_df', pd.DataFrame())
-            target_score = None
-            delta_val = 0.0
-            matched_row = None
-
-            if not pool_df.empty:
-                match = robust_search_engine(pool_df, pure_stock_id if pure_stock_id else search_query)
-                if not match.empty:
-                    matched_row = match.iloc[0]
-                    target_score = matched_row.get('總分', 0)
-                    delta_val = matched_row.get('Delta (日變動)', 0.0) 
-
-            # 🏆 顯示分數
-            if target_score is not None and pure_stock_id != "":
-                delta_color = "#FF4B4B" if delta_val > 0 else "#00CC66" if delta_val < 0 else "#94A3B8"
-                delta_symbol = "🔥" if delta_val > 0 else "🚨" if delta_val < 0 else "🔄"
-                delta_str = f"+{delta_val}" if delta_val > 0 else f"{delta_val}" 
-                
-                st.markdown(f"""
-                #### 🏆 系統綜合評分：<span style='color:#FFD700; font-size:24px; text-shadow: 0 0 10px rgba(255,215,0,0.5);'>**{target_score}**</span> 分 
-                <span style='color:{delta_color}; font-size:16px; margin-left:15px;'>{delta_symbol} Delta變化: **{delta_str}**</span>
-                <span style='color:#94A3B8; font-size:14px; font-weight:normal; margin-left:10px;'>(評分數據僅供參考)</span>
-                """, unsafe_allow_html=True)
-            else:
-                st.markdown("#### 🏆 系統綜合評分：<span style='color:#64748B; font-size:18px;'>未達綜合進榜標準 (0分)</span>", unsafe_allow_html=True)
             # ==========================================
-            # 🚀 融合 AI 訊號區 (搜尋即顯示！)
+            # 🚀 融合 AI 訊號區 (拔除對評分的依賴，直接搜尋即可顯示)
             # ==========================================
             old_ai_msg = ""
-            if matched_row is not None:
-                old_ai_msg = generate_stock_commentary(matched_row)
-                
+            # 1. 自動從全市場資料表搜尋這支股票的法人大戶訊號
+            if 'my_final_df' in st.session_state and not st.session_state['my_final_df'].empty:
+                df_target = robust_search_engine(st.session_state['my_final_df'], pure_stock_id if pure_stock_id else search_query)
+                if not df_target.empty:
+                    old_ai_msg = generate_stock_commentary(df_target.iloc[0])
+
+            # 2. 自動抓取最新 K 線計算技術訊號
             new_ai_msgs = []
             if pure_stock_id:
-                # 為了即時提供技術訊號，擷取最近一年的資料
-                df_tech = fetch_yfinance_data(f"{pure_stock_id}.TW", period="1y")
-                if df_tech is None or df_tech.empty:
-                    df_tech = fetch_yfinance_data(f"{pure_stock_id}.TWO", period="1y")
-                
-                if df_tech is not None and not df_tech.empty:
-                    if isinstance(df_tech.columns, pd.MultiIndex):
-                        df_tech.columns = df_tech.columns.get_level_values(0)
-                    df_tech = df_tech.loc[:, ~df_tech.columns.duplicated()]
-                    new_ai_msgs = generate_technical_signals(df_tech)
+                with st.spinner("🧠 AI 雷達掃描中..."):
+                    df_tech = fetch_yfinance_data(f"{pure_stock_id}.TW", period="1y")
+                    if df_tech is None or df_tech.empty:
+                        df_tech = fetch_yfinance_data(f"{pure_stock_id}.TWO", period="1y")
+                    
+                    if df_tech is not None and not df_tech.empty:
+                        if isinstance(df_tech.columns, pd.MultiIndex):
+                            df_tech.columns = df_tech.columns.get_level_values(0)
+                        df_tech = df_tech.loc[:, ~df_tech.columns.duplicated()]
+                        new_ai_msgs = generate_technical_signals(df_tech)
 
+            # 3. 完美組合並顯示兩版 AI 訊號
             if old_ai_msg or new_ai_msgs:
                 signal_html = "<div style='background-color: rgba(0, 210, 255, 0.05); border-left: 4px solid #00D2FF; padding: 12px; border-radius: 5px; margin: 10px 0px;'>"
                 signal_html += "<h5 style='color: #00D2FF; margin-top:0px; margin-bottom: 10px;'>📡 AI 綜合籌碼與技術雷達</h5>"
@@ -1604,12 +1584,14 @@ def render_sidebar_war_room():
                 if old_ai_msg and new_ai_msgs:
                     signal_html += "<hr style='border-color: rgba(0, 210, 255, 0.15); margin: 8px 0px;'>"
                     
-                for sig in new_ai_msgs:
-                    signal_html += f"<p style='color: #E2E8F0; margin: 5px 0px; font-size: 14.5px;'>{sig}</p>"
+                if new_ai_msgs:
+                    for sig in new_ai_msgs:
+                        signal_html += f"<p style='color: #E2E8F0; margin: 5px 0px; font-size: 14.5px;'>{sig}</p>"
                     
                 signal_html += "</div>"
                 st.markdown(signal_html, unsafe_allow_html=True)
-
+            elif pure_stock_id:
+                st.info("📡 AI 雷達：目前尚無強烈技術或籌碼訊號。")
 
             st.markdown("<hr style='border-color: #334155;'>", unsafe_allow_html=True)
 #這裡原本有系統綜合假評分
