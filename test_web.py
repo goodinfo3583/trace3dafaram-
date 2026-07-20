@@ -4877,7 +4877,7 @@ if current_page in ["all", "pool"]:
                     border-top: 1px solid #38bdf8; border-bottom: 1px solid #38bdf8; padding: 15px 20px; border-radius: 10px;
                     text-align: center; box-shadow: 0px 0px 20px rgba(56, 189, 248, 0.2); margin-bottom: 20px;">
             <h2 style="color: #e0f2fe; margin: 0; letter-spacing: 2px; text-shadow: 0 0 15px rgba(56, 189, 248, 0.8);">
-                ⛲ 觀察名單
+                觀察名單
             </h2>
             <div style='font-size:13px; color:#00D2FF; font-weight:500; margin-top:8px;'>
                  基準日 : 📍法人持股: {fmt_d(d_b1_inst)} ｜ 📍法人買況: {fmt_d(d_b23_chip)} ｜ 📍資券: {fmt_d(d_b4_margin)} ｜ 📍大腿: {fmt_d(d_b5_share)}
