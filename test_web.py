@@ -1471,6 +1471,40 @@ def render_options_dashboard():
 # ======================================================
 # 分頁3 - 總經導航 (🚀 終極修復台股 VIX 三重備援機制)
 # ======================================================
+#
+import streamlit as st
+import requests
+
+def debug_wantgoo_vixtwn():
+    st.markdown("### 🐛 玩股網 VIX 爬蟲真實視角測試")
+    url = "https://www.wantgoo.com/index/vixtwn"
+    headers = {
+        "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/126.0.0.0 Safari/537.36",
+        "Accept-Language": "zh-TW,zh;q=0.9,en-US;q=0.8,en;q=0.7",
+        "Referer": "https://www.wantgoo.com/"
+    }
+    
+    try:
+        res = requests.get(url, headers=headers, timeout=5)
+        st.write(f"**HTTP 狀態碼:** {res.status_code}")
+        
+        if res.status_code == 200:
+            # 檢查我們想要的真實數字有沒有在原始碼裡
+            has_value = "39.49" in res.text
+            st.write(f"**網頁原始碼中是否有出現 '39.49'？** : {'✅ 有' if has_value else '❌ 沒有 (代表是 JS 動態載入)'}")
+            
+            # 用文字框把爬蟲真實看到的 HTML 全部印出來供你檢查
+            st.text_area("爬蟲抓到的真實 HTML 原始碼 (可用 Ctrl+F 搜尋關鍵字)", res.text, height=400)
+        else:
+            st.error(f"連線失敗，狀態碼: {res.status_code}")
+            
+    except Exception as e:
+        st.error(f"發生錯誤: {e}")
+
+# 直接呼叫此函數進行測試
+debug_wantgoo_vixtwn()
+
+#
 @st.cache_data(ttl=900) 
 def fetch_macro_indicators():
     import yfinance as yf
