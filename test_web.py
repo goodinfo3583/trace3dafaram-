@@ -1471,40 +1471,9 @@ def render_options_dashboard():
 # ======================================================
 # 分頁3 - 總經導航 (🚀 終極修復台股 VIX 三重備援機制)
 # ======================================================
-#
-import streamlit as st
-import requests
-
-def debug_wantgoo_vixtwn():
-    st.markdown("### 🐛 玩股網 VIX 爬蟲真實視角測試")
-    url = "https://www.wantgoo.com/index/vixtwn"
-    headers = {
-        "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/126.0.0.0 Safari/537.36",
-        "Accept-Language": "zh-TW,zh;q=0.9,en-US;q=0.8,en;q=0.7",
-        "Referer": "https://www.wantgoo.com/"
-    }
-    
-    try:
-        res = requests.get(url, headers=headers, timeout=5)
-        st.write(f"**HTTP 狀態碼:** {res.status_code}")
-        
-        if res.status_code == 200:
-            # 檢查我們想要的真實數字有沒有在原始碼裡
-            has_value = "39.49" in res.text
-            st.write(f"**網頁原始碼中是否有出現 '39.49'？** : {'✅ 有' if has_value else '❌ 沒有 (代表是 JS 動態載入)'}")
-            
-            # 用文字框把爬蟲真實看到的 HTML 全部印出來供你檢查
-            st.text_area("爬蟲抓到的真實 HTML 原始碼 (可用 Ctrl+F 搜尋關鍵字)", res.text, height=400)
-        else:
-            st.error(f"連線失敗，狀態碼: {res.status_code}")
-            
-    except Exception as e:
-        st.error(f"發生錯誤: {e}")
-
-# 直接呼叫此函數進行測試
-debug_wantgoo_vixtwn()
-
-#
+# ======================================================
+# 分頁3 - 總經導航 (🚀 捨棄 403 玩股網，改用嗨投資與期交所)
+# ======================================================
 @st.cache_data(ttl=900) 
 def fetch_macro_indicators():
     import yfinance as yf
@@ -1527,47 +1496,39 @@ def fetch_macro_indicators():
             data["vix"]["pct"] = float((latest - prev) / prev * 100)
     except: pass
 
-    # --- 2. 🇹🇼 台股 VIX (VIXTWN) 精準修正版 ---
-    headers = {
-        "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/126.0.0.0 Safari/537.36",
-        "Accept-Language": "zh-TW,zh;q=0.9,en-US;q=0.8,en-US;q=0.7",
-        "Referer": "https://www.wantgoo.com/"
+    # --- 2. 🇹🇼 台股 VIX (VIXTWN) 雙重火力 ---
+    headers_tw = {
+        "User-Agent": "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/126.0.0.0 Safari/537.36",
     }
     
-    # 策略 A: 針對玩股網首創的 JSON 結構或特定標籤抓取
+    # 策略 A: 嗨投資 (HiStock) - 結構單純且目前無 403 阻擋
     if data["vixtwn"]["value"] is None:
         try:
-            res = requests.get("https://www.wantgoo.com/index/vixtwn", headers=headers, timeout=5)
-            if res.status_code == 200:
-                # 排除小於 5 的錯誤整數，精準尋找兩位數以上的 VIX 數值 (例如 39.49)
-                # 玩股網通常會將即時報價放在 "price": 39.49 或類似的欄位中
-                match = re.search(r'"price":\s*([1-9]\d{1,2}\.\d{2})', res.text)
-                if not match:
-                    # 備用：尋找帶有小數點且大於 10 的合理 VIX 數字
-                    matches = re.findall(r'>([1-9]\d{1,2}\.\d{2})<', res.text)
-                    for m in matches:
-                        val = float(m)
-                        if 10.0 <= val <= 99.0: # 台股 VIX 合理區間通常在 10 ~ 90 之間
-                            data["vixtwn"]["value"] = val
-                            break
-                else:
-                    data["vixtwn"]["value"] = float(match.group(1))
-                
-                if data["vixtwn"]["value"] is not None:
-                    data["vixtwn"]["pct"] = 0.0
-        except: pass
-
-    # 策略 B: 如果玩股網失敗，備用 HiStock 專屬標籤
-    if data["vixtwn"]["value"] is None:
-        try:
-            res = requests.get("https://histock.tw/stock/tcharti.aspx?no=VIXTWN", headers=headers, timeout=5)
-            if res.status_code == 200:
-                match = re.search(r'id="CPHB1_lblPrice"[^>]*>([\d\.]+)<', res.text)
+            res_hi = requests.get("https://histock.tw/stock/tcharti.aspx?no=VIXTWN", headers=headers_tw, timeout=5)
+            if res_hi.status_code == 200:
+                # 尋找 <span id="CPHB1_lblPrice">39.49</span>
+                match = re.search(r'id="CPHB1_lblPrice"[^>]*>([\d\.]+)<', res_hi.text)
                 if match:
                     val = float(match.group(1))
-                    if val > 5:  # 確保不是異常的 1.00
+                    if 10.0 <= val <= 99.0:  # 確保抓到的數值在合理區間，排除異常抓取
                         data["vixtwn"]["value"] = val
                         data["vixtwn"]["pct"] = 0.0
+        except: pass
+
+    # 策略 B: 臺灣期交所 (TAIFEX) 官方資訊表
+    if data["vixtwn"]["value"] is None:
+        try:
+            res_tf = requests.get("https://www.taifex.com.tw/cht/3/vixInfo", headers=headers_tw, timeout=5)
+            if res_tf.status_code == 200:
+                # 官方表格中的數字，尋找符合 兩位整數+兩位小數 的格式 (例如 39.49)
+                matches = re.findall(r'<td[^>]*>\s*([1-9]\d{1}\.\d{2})\s*</td>', res_tf.text)
+                if matches:
+                    for m in matches:
+                        val = float(m)
+                        if 10.0 <= val <= 99.0:
+                            data["vixtwn"]["value"] = val
+                            data["vixtwn"]["pct"] = 0.0
+                            break
         except: pass
 
     # --- 3. CNN 恐懼貪婪指數 ---
