@@ -1469,13 +1469,7 @@ def render_options_dashboard():
     st.markdown(html_opt, unsafe_allow_html=True)
 #分頁3
 # ======================================================
-# 分頁3 - 總經導航 (🚀 終極修復台股 VIX 三重備援機制)
-# ======================================================
-# ======================================================
-# 分頁3 - 總經導航 (🚀 捨棄 403 玩股網，改用嗨投資與期交所)
-# ======================================================
-# ======================================================
-# 分頁3 - 總經導航 (🚀 終極台股 VIX 官方表格暴力破解版)
+# 分頁3 - 總經導航 (🚀 完美對應期交所檔案格式 & CNN 修正版)
 # ======================================================
 @st.cache_data(ttl=900) 
 def fetch_macro_indicators():
@@ -1499,56 +1493,26 @@ def fetch_macro_indicators():
             data["vix"]["pct"] = float((latest - prev) / prev * 100)
     except: pass
 
-    # --- 2. 🇹🇼 台股 VIX (VIXTWN) 官方破解機制 ---
-    headers_tw = {
-        "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/126.0.0.0 Safari/537.36",
-        "Accept": "text/html,application/xhtml+xml,application/xml;q=0.9,image/avif,image/webp,*/*;q=0.8",
-        "Accept-Language": "zh-TW,zh;q=0.8,en-US;q=0.5,en;q=0.3"
-    }
-    
-    # 🌟 策略 A: 臺灣期交所 VIX 歷史資料表 (最穩定的官方來源)
-    if data["vixtwn"]["value"] is None:
-        try:
-            res_tf = requests.get("https://www.taifex.com.tw/cht/3/vixInfo", headers=headers_tw, timeout=5)
-            if res_tf.status_code == 200:
-                # 清除換行，讓 HTML 變成一行方便正則抓取
-                html_clean = res_tf.text.replace('\n', '').replace('\r', '')
-                
-                # 尋找表格結構：<td>2024/07/20</td> <td>39.49</td>
-                # 容許西元年 (2024) 或民國年 (113)，以及 1~3 位數的 VIX 值
-                matches = re.findall(r'<td[^>]*>\s*((?:20\d{2}|1\d{2})/\d{2}/\d{2})\s*</td>\s*<td[^>]*>\s*(\d{1,3}\.\d{2})\s*</td>', html_clean)
-                
+    # --- 2. 🇹🇼 台股 VIX (精準解析你提供的期交所檔案格式) ---
+    try:
+        headers = {"User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64)"}
+        res_csv = requests.post("https://www.taifex.com.tw/cht/7/vixMinNew", data={"down_type": "1"}, headers=headers, timeout=5)
+        
+        if res_csv.status_code == 200:
+            # 策略 A: 若已收盤，抓取檔案最後一行的 "Last 1 min AVG       36.55"
+            match_close = re.search(r'Last 1 min AVG\s+([\d\.]+)', res_csv.text)
+            if match_close:
+                data["vixtwn"]["value"] = float(match_close.group(1))
+                data["vixtwn"]["pct"] = 0.0
+            else:
+                # 策略 B: 若還在盤中，抓取最後一筆時間報價 (例如: 13450000 36.54)
+                matches = re.findall(r'\d{6,8}\s+([1-9]\d{1,2}\.\d{2})', res_csv.text)
                 if matches:
-                    # 將抓到的所有紀錄依據日期由舊到新排序
-                    matches.sort(key=lambda x: x[0])
-                    latest_val = float(matches[-1][1])
-                    
-                    # 嚴格防呆：VIX 歷史以來極少低於 9 或高於 150，過濾掉任何奇怪的 1.00
-                    if 9.0 <= latest_val <= 150.0:
-                        data["vixtwn"]["value"] = latest_val
-                        # 如果有兩天以上的資料，順便計算台股 VIX 漲跌幅！
-                        if len(matches) >= 2:
-                            prev_val = float(matches[-2][1])
-                            data["vixtwn"]["pct"] = (latest_val - prev_val) / prev_val * 100
-                        else:
-                            data["vixtwn"]["pct"] = 0.0
-        except: pass
+                    data["vixtwn"]["value"] = float(matches[-1])
+                    data["vixtwn"]["pct"] = 0.0
+    except: pass
 
-    # 🌟 策略 B: 臺灣期交所 首頁備援
-    if data["vixtwn"]["value"] is None:
-        try:
-            res_idx = requests.get("https://www.taifex.com.tw/cht/index", headers=headers_tw, timeout=5)
-            if res_idx.status_code == 200:
-                html_clean = res_idx.text.replace('\n', '').replace('\r', '')
-                match = re.search(r'波動率指數[^\d]*?(\d{2,3}\.\d{2})', html_clean)
-                if match:
-                    val = float(match.group(1))
-                    if 9.0 <= val <= 150.0:
-                        data["vixtwn"]["value"] = val
-                        data["vixtwn"]["pct"] = 0.0
-        except: pass
-
-    # --- 3. CNN 恐懼貪婪指數 ---
+    # --- 3. CNN 恐懼貪婪指數 (🚀 修正 headers 參數錯誤) ---
     try:
         headers_cnn = {
             "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36",
@@ -1556,6 +1520,7 @@ def fetch_macro_indicators():
             "Referer": "https://edition.cnn.com/"
         }
         url = "https://production.dataviz.cnn.io/index/fearandgreed/graphdata"
+        # 這裡把漏掉的 headers= 加回去了！
         res = requests.get(url, headers=headers_cnn, timeout=5)
         if res.status_code == 200:
             fg_data = res.json()
