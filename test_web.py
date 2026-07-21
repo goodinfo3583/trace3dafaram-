@@ -1471,6 +1471,52 @@ def render_options_dashboard():
 # ======================================================
 # 分頁3 - 總經導航 (🚀 完美對應期交所檔案格式 & CNN 修正版)
 # ======================================================
+import streamlit as st
+import requests
+
+def debug_taifex_vix():
+    st.markdown("### 🐛 期交所 VIX 後台爬蟲真實視角測試")
+    url = "https://www.taifex.com.tw/cht/7/vixMinNew"
+    headers = {
+        "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/126.0.0.0 Safari/537.36",
+        "Accept-Language": "zh-TW,zh;q=0.9,en-US;q=0.8,en;q=0.7",
+        "Referer": "https://www.taifex.com.tw/cht/7/vixMinNew"
+    }
+    payload = {"down_type": "1"}
+    
+    try:
+        # 模擬送出 POST 請求下載檔案
+        res = requests.post(url, data=payload, headers=headers, timeout=5)
+        st.write(f"**HTTP 狀態碼:** {res.status_code}")
+        
+        if res.status_code == 200:
+            # 台灣公家機關的 CSV 通常是 Big5 編碼
+            res.encoding = 'big5' 
+            
+            st.write("**📥 回傳 Headers (檢查是不是真的給了 csv 檔案):**")
+            st.json(dict(res.headers))
+            
+            # 檢查我們想要的特徵字有沒有在原始碼裡
+            has_last_min = "Last 1 min AVG" in res.text
+            has_date = "2026" in res.text
+            
+            st.markdown(f"**內容是否包含 'Last 1 min AVG'？** {'✅ 有' if has_last_min else '❌ 沒有'}")
+            
+            # 用文字框把爬蟲真實看到的內容印出來 (限制長度避免當機)
+            st.text_area(
+                "爬蟲抓到的真實回傳內容 (可用 Ctrl+F 搜尋)", 
+                res.text[:5000] if len(res.text) > 5000 else res.text, 
+                height=400
+            )
+        else:
+            st.error(f"連線失敗，狀態碼: {res.status_code}")
+            
+    except Exception as e:
+        st.error(f"發生錯誤: {e}")
+
+# 直接呼叫此函數進行測試
+debug_taifex_vix()
+
 @st.cache_data(ttl=900) 
 def fetch_macro_indicators():
     import yfinance as yf
