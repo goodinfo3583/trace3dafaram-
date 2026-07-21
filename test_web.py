@@ -1221,14 +1221,14 @@ def render_technical_chart(stock_id, timeframe="日線", selected_mas=[], show_r
 #======================================================
 #分頁功能渲染區:🔹 大盤籌碼🔹 選擇權🔹 總經導航(以下核對完畢)
 #======================================================
-#分頁1-大盤總體經濟
+#大盤總體經濟
 def render_sidebar_market_summary():
     df_spot, date_spot = get_latest_csv("三大法人買賣超金額")
     df_fut, _ = get_latest_csv("三大法人期貨多空")
     df_fut_prev = get_prev_csv("三大法人期貨多空", date_spot)
     df_margin, margin_csv_name = get_latest_csv("融資融券餘額")
     
-    # 📥 讀取上市與上櫃成交量資料
+    # 📥 新增：讀取上市與上櫃成交量資料
     df_twse, _ = get_latest_csv("大盤上市成交量")
     df_tpex, _ = get_latest_csv("大盤上櫃成交量")
     
@@ -1290,7 +1290,7 @@ def render_sidebar_market_summary():
                     break
                 except: pass
 
-    # 📊 計算成交量 (單位轉為億)
+    # 📊 新增：計算成交量 (單位轉為億)
     twse_vol_today, twse_diff = 0.0, 0.0
     if df_twse is not None and len(df_twse) >= 2:
         try:
@@ -1349,7 +1349,7 @@ def render_sidebar_market_summary():
     html += f"<tr style='border-top: 1px solid #555; font-weight: bold;'><td style='padding: 4px;'> 合計</td><td style='color: {to_c}; vertical-align: middle;'>{to_s}</td><td style='color: {too_c}; vertical-align: middle; padding-bottom: 6px;'>{too_os}{get_diff_ui(total_oi, tot_prev)}</td></tr>"
     html += "</table>"
     
-    # 🌟 區塊 2: 市場成交量
+    # 🌟 區塊 2 (新增): 市場成交量 (完美安插在中間)
     if total_vol_today > 0:
         html += "<div style='margin-top: 8px; padding: 6px; background-color: #1e1e24; border: 1px solid #555; border-radius: 5px; font-size: 13px;'>"
         html += "<div style='font-weight: bold; margin-bottom: 4px;'>市場成交量 (億)</div>"
@@ -1370,7 +1370,7 @@ def render_sidebar_market_summary():
         
     st.markdown(html, unsafe_allow_html=True)
     return date_spot
-#分頁2
+
 def render_options_dashboard():
     df_opt, date_opt = get_latest_csv("臺指選擇權行情簡表")
     df_pcr, _ = get_latest_csv("臺指選擇權PC比")
