@@ -1472,68 +1472,13 @@ def render_options_dashboard():
 # ======================================================
 # 分頁3 - 總經導航 (🚀 MIS 即時行情 API 終極通關密語版)
 # ======================================================
-import streamlit as st
-import requests
-
-def debug_mis_taifex_v3():
-    st.markdown("### 🐛 期交所 MIS API 終極透視鏡 (第三代：火力全開不中斷)")
-    
-    headers_mis = {
-        "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36",
-        "Accept": "application/json, text/javascript, */*; q=0.01",
-        "Referer": "https://mis.taifex.com.tw/futures/VolatilityQuotes/",
-        "Origin": "https://mis.taifex.com.tw"
-    }
-    
-    # 測試清單：拔除所有煞車，強制全部印出
-    test_cases = [
-        {
-            "name": "測試 1：getQuoteList (SymbolType 留白)",
-            "url": "https://mis.taifex.com.tw/futures/api/getQuoteList",
-            "payload": {"MarketType":"0", "SymbolType":"", "KindID":"1", "CID":"VIX", "ExpireMonth":"", "RowSize":"全部", "PageNo":"", "SortColumn":"", "AscDesc":"A"}
-        },
-        {
-            "name": "測試 2：getVix (專屬 API 測試 A - 帶 MarketType)",
-            "url": "https://mis.taifex.com.tw/futures/api/getVix",
-            "payload": {"MarketType":"0"}
-        },
-        {
-            "name": "測試 3：getVix (專屬 API 測試 B - 完全空 Payload)",
-            "url": "https://mis.taifex.com.tw/futures/api/getVix",
-            "payload": {}
-        }
-    ]
-    
-    for case in test_cases:
-        st.markdown(f"#### 🔍 {case['name']}")
-        try:
-            res = requests.post(case['url'], json=case['payload'], headers=headers_mis, timeout=5)
-            st.write(f"**HTTP 狀態碼:** `{res.status_code}`")
-            
-            if res.status_code == 200:
-                json_data = res.json()
-                
-                # 直接判斷 RtData 裡面有沒有我們要的資料
-                if "RtData" in json_data and json_data["RtData"]:
-                    st.success("✅ 這裡有資料！")
-                else:
-                    st.warning(f"⚠️ 空包彈 (RtCode: {json_data.get('RtCode')})")
-                    
-                # 這次絕對不 break，強制把所有 JSON 結構印出來
-                st.json(json_data)
-            else:
-                st.error(f"❌ HTTP 失敗，狀態碼：{res.status_code}")
-        except Exception as e:
-            st.error(f"🚨 錯誤: {e}")
-
-# 直接呼叫此函數進行測試
-debug_mis_taifex_v3()
-#
+# ======================================================
+# 分頁3 - 總經導航 (🚀 終極正則表達式 - 網頁暴力拆解版)
+# ======================================================
 @st.cache_data(ttl=300) 
 def fetch_macro_indicators():
     import requests
     import re
-    import datetime
     
     data = {
         "vix": {"value": None, "pct": None},
@@ -1546,7 +1491,7 @@ def fetch_macro_indicators():
         "Accept-Language": "zh-TW,zh;q=0.9"
     }
 
-    # --- 1. 🇺🇸 美股 VIX (^VIX) ---
+    # --- 1. 🇺🇸 美股 VIX (^VIX) - Yahoo 原生 API ---
     try:
         yf_url = "https://query1.finance.yahoo.com/v8/finance/chart/^VIX?interval=1d&range=5d"
         res_us = requests.get(yf_url, headers=headers, timeout=5)
@@ -1561,82 +1506,52 @@ def fetch_macro_indicators():
                 data["vix"]["pct"] = (latest - prev) / prev * 100
     except: pass
 
-    if data["vix"]["value"] is None:
-        try:
-            res_gg = requests.get("https://www.google.com/finance/quote/VIX:INDEXCBOE", headers=headers, timeout=5)
-            match = re.search(r'class="YMlKec fxKbKc">([\d\.]+)', res_gg.text)
-            if match:
-                data["vix"]["value"] = float(match.group(1))
-                data["vix"]["pct"] = 0.0
-        except: pass
-
-
-    # --- 2. 🇹🇼 台股 VIX (VIXTWN) ---
-    # 主力：臺灣期交所 MIS 即時行情 (使用 POST 請求與精準 Payload)
+    # --- 2. 🇹🇼 台股 VIX (VIXTWN) - 暴力拆解官方網頁 ---
+    prev_vix = None
+    
+    # 🌟 策略 A: 先拆解「每日 VIX」網頁，目的是為了拿到昨天的收盤價來算漲跌幅
     try:
-        mis_url = "https://mis.taifex.com.tw/futures/api/getQuoteList"
-        headers_mis = {
-            "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36",
-            "Accept": "application/json, text/javascript, */*; q=0.01",
-            "Referer": "https://mis.taifex.com.tw/futures/VolatilityQuotes/",
-            "Origin": "https://mis.taifex.com.tw"
-        }
-        # 這是向期交所 MIS 索取 VIX 資料的專屬通關密語
-        payload = {
-            "MarketType": "0",
-            "SymbolType": "V",
-            "KindID": "1",
-            "CID": "VIX",
-            "ExpireMonth": "",
-            "RowSize": "全部",
-            "PageNo": "",
-            "SortColumn": "",
-            "AscDesc": "A"
-        }
-        
-        # 必須使用 requests.post() 並帶入 json 參數
-        res_mis = requests.post(mis_url, json=payload, headers=headers_mis, timeout=5)
-        if res_mis.status_code == 200:
-            mis_data = res_mis.json()
-            if "MsgArray" in mis_data and len(mis_data["MsgArray"]) > 0:
-                vix_info = mis_data["MsgArray"][0]
-                
-                # 在 MIS 系統中，「目前指數」對應的是 ClosePrice
-                latest_vix = vix_info.get("ClosePrice")
-                prev_vix = vix_info.get("PreviousClose")
-                
-                if latest_vix and 10.0 <= float(latest_vix) <= 150.0:
-                    data["vixtwn"]["value"] = float(latest_vix)
-                    if prev_vix and float(prev_vix) > 0:
-                        data["vixtwn"]["pct"] = (float(latest_vix) - float(prev_vix)) / float(prev_vix) * 100
-                    else:
-                        data["vixtwn"]["pct"] = 0.0
+        res_daily = requests.get("https://www.taifex.com.tw/cht/3/vixInfo", headers=headers, timeout=5)
+        if res_daily.status_code == 200:
+            # 正規表達式：尋找「日期 (如 113/07/21)」+「中間任意字元」+「數值 (如 35.54)」
+            matches_d = re.findall(r'(\d{3,4}/\d{2}/\d{2})[\s\S]{1,100}?([1-9]\d{1,2}\.\d{2,4})', res_daily.text)
+            if matches_d:
+                data["vixtwn"]["value"] = float(matches_d[-1][1])
+                if len(matches_d) >= 2:
+                    prev_vix = float(matches_d[-2][1])
+                    data["vixtwn"]["pct"] = (data["vixtwn"]["value"] - prev_vix) / prev_vix * 100
     except: pass
 
-    # 備援：FinMind API
+    # 🌟 策略 B: 再拆解「盤中每分鐘 VIX」網頁，取得當下最新報價直接覆蓋
+    try:
+        res_min = requests.get("https://www.taifex.com.tw/cht/7/vixMinNew", headers=headers, timeout=5)
+        if res_min.status_code == 200:
+            # 正規表達式：尋找「時間 (如 13:45:00)」+「中間任意字元」+「數值 (如 35.54)」
+            matches_m = re.findall(r'(\d{2}:\d{2}:\d{2})[\s\S]{1,100}?([1-9]\d{1,2}\.\d{2,4})', res_min.text)
+            if matches_m:
+                latest_vix = float(matches_m[-1][1])
+                data["vixtwn"]["value"] = latest_vix
+                # 結合策略 A 拿到的昨收，算出精準的即時漲跌幅
+                if prev_vix:
+                    data["vixtwn"]["pct"] = (latest_vix - prev_vix) / prev_vix * 100
+    except: pass
+
+    # 🌟 策略 C: HiStock 備援 (若期交所網頁維修時自動啟動)
     if data["vixtwn"]["value"] is None:
         try:
-            start_date = (datetime.datetime.now() - datetime.timedelta(days=10)).strftime("%Y-%m-%d")
-            fm_url = f"https://api.finmindtrade.com/api/v4/data?dataset=TaiwanOptionVIX&start_date={start_date}"
-            res_fm = requests.get(fm_url, headers=headers, timeout=5)
-            if res_fm.status_code == 200:
-                fm_json = res_fm.json()
-                if fm_json.get("msg") == "success" and "data" in fm_json and len(fm_json["data"]) > 0:
-                    latest_vix = fm_json["data"][-1].get("VIX")
-                    if latest_vix and 10.0 <= float(latest_vix) <= 150.0:
-                        data["vixtwn"]["value"] = float(latest_vix)
-                        if len(fm_json["data"]) >= 2:
-                            prev_vix = fm_json["data"][-2].get("VIX")
-                            data["vixtwn"]["pct"] = (float(latest_vix) - float(prev_vix)) / float(prev_vix) * 100
-                        else:
-                            data["vixtwn"]["pct"] = 0.0
+            res_hi = requests.get("https://histock.tw/stock/tcharti.aspx?no=VIXTWN", headers=headers, timeout=5)
+            if res_hi.status_code == 200:
+                match = re.search(r'CPHB1_lblPrice[^>]*>\s*([\d\.]+)\s*<', res_hi.text)
+                if match:
+                    data["vixtwn"]["value"] = float(match.group(1))
+                    data["vixtwn"]["pct"] = 0.0
         except: pass
 
 
     # --- 3. CNN 恐懼貪婪指數 ---
     try:
         headers_cnn = {
-            "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36",
+            "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64)",
             "Accept": "application/json",
             "Referer": "https://edition.cnn.com/"
         }
@@ -1656,7 +1571,6 @@ def fetch_macro_indicators():
     except: pass
 
     return data
-#以上是後插入融資融券大盤總經
 # =======================================================
 # 🚀 終極局部渲染魔法：將整個側邊視窗獨立為「不閃爍區塊」(以下核對完畢)
 # =======================================================
