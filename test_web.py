@@ -1468,62 +1468,11 @@ def render_options_dashboard():
     html_opt += "</table>"
     st.markdown(html_opt, unsafe_allow_html=True)
 #分頁3
-# ======================================================
-# 分頁3 - 總經導航 (🚀 完美對應期交所檔案格式 & CNN 修正版)
-# ======================================================
-import streamlit as st
-import requests
-import re
-
-def debug_all_vix_apis():
-    st.markdown("### 🐛 VIX 終極除錯視角 (純淨 API + Session)")
-    
-    # --- 測試 1: 鉅亨網 JSON API ---
-    st.markdown("#### 1️⃣ 鉅亨網 (Anue) JSON API 測試")
-    try:
-        url_api = "https://ws.api.cnyes.com/ws/api/v1/quote/quotes/TWS:TWVIX:INDEX"
-        res_api = requests.get(url_api, timeout=5)
-        st.write(f"**HTTP 狀態碼:** {res_api.status_code}")
-        if res_api.status_code == 200:
-            st.write("✅ 成功抓取 JSON 原始資料：")
-            st.json(res_api.json())
-        else:
-            st.error(f"連線失敗，狀態碼: {res_api.status_code}")
-    except Exception as e:
-        st.error(f"鉅亨網 API 錯誤: {e}")
-
-    # --- 測試 2: 期交所 Session 破解法 ---
-    st.markdown("#### 2️⃣ 期交所 Session (帶 Cookie) 下載測試")
-    try:
-        session = requests.Session()
-        headers = {
-            "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36",
-            "Referer": "https://www.taifex.com.tw/cht/7/vixMinNew"
-        }
-        
-        # 1. 拿 Cookie
-        res_get = session.get("https://www.taifex.com.tw/cht/7/vixMinNew", headers=headers, timeout=5)
-        st.write(f"**Step 1: GET 狀態碼 (索取 Cookie):** {res_get.status_code}")
-        st.write(f"**成功拿到 Cookies:** `{session.cookies.get_dict()}`")
-        
-        # 2. POST 下載
-        res_post = session.post("https://www.taifex.com.tw/cht/7/vixMinNew", data={"down_type": "1"}, headers=headers, timeout=5)
-        st.write(f"**Step 2: POST 狀態碼 (下載 CSV):** {res_post.status_code}")
-        
-        has_last_min = "Last 1 min AVG" in res_post.text
-        st.markdown(f"**回傳的檔案內是否包含 'Last 1 min AVG'？** {'✅ 有' if has_last_min else '❌ 沒有'}")
-        
-        st.text_area("期交所回傳的真實 CSV 內容 (前 1000 字元)", res_post.text[:1000], height=200)
-    except Exception as e:
-        st.error(f"期交所 Session 錯誤: {e}")
-
-# 在頁面上直接呼叫這個函數來測試
-debug_all_vix_apis()
 
 # ======================================================
-# 分頁3 - 總經導航 (🚀 MIS 即時行情 API + 終極備援版)
+# 分頁3 - 總經導航 (🚀 MIS 即時行情 API 終極通關密語版)
 # ======================================================
-@st.cache_data(ttl=300) # 💡 快取縮短為 5 分鐘，確保資料夠即時又不至於被鎖 IP
+@st.cache_data(ttl=300) 
 def fetch_macro_indicators():
     import requests
     import re
@@ -1541,7 +1490,6 @@ def fetch_macro_indicators():
     }
 
     # --- 1. 🇺🇸 美股 VIX (^VIX) ---
-    # 主力：Yahoo 隱藏底層 API (非 yfinance 套件，不會被鎖)
     try:
         yf_url = "https://query1.finance.yahoo.com/v8/finance/chart/^VIX?interval=1d&range=5d"
         res_us = requests.get(yf_url, headers=headers, timeout=5)
@@ -1556,7 +1504,6 @@ def fetch_macro_indicators():
                 data["vix"]["pct"] = (latest - prev) / prev * 100
     except: pass
 
-    # 備援：Google 財經網頁解析
     if data["vix"]["value"] is None:
         try:
             res_gg = requests.get("https://www.google.com/finance/quote/VIX:INDEXCBOE", headers=headers, timeout=5)
@@ -1568,15 +1515,38 @@ def fetch_macro_indicators():
 
 
     # --- 2. 🇹🇼 台股 VIX (VIXTWN) ---
-    # 主力：臺灣期交所 MIS 即時行情隱藏 API (每 15 秒更新的真正源頭)
+    # 主力：臺灣期交所 MIS 即時行情 (使用 POST 請求與精準 Payload)
     try:
-        mis_url = "https://mis.taifex.com.tw/futures/api/getVix"
-        res_mis = requests.get(mis_url, headers=headers, timeout=5)
+        mis_url = "https://mis.taifex.com.tw/futures/api/getQuoteList"
+        headers_mis = {
+            "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36",
+            "Accept": "application/json, text/javascript, */*; q=0.01",
+            "Referer": "https://mis.taifex.com.tw/futures/VolatilityQuotes/",
+            "Origin": "https://mis.taifex.com.tw"
+        }
+        # 這是向期交所 MIS 索取 VIX 資料的專屬通關密語
+        payload = {
+            "MarketType": "0",
+            "SymbolType": "V",
+            "KindID": "1",
+            "CID": "VIX",
+            "ExpireMonth": "",
+            "RowSize": "全部",
+            "PageNo": "",
+            "SortColumn": "",
+            "AscDesc": "A"
+        }
+        
+        # 必須使用 requests.post() 並帶入 json 參數
+        res_mis = requests.post(mis_url, json=payload, headers=headers_mis, timeout=5)
         if res_mis.status_code == 200:
             mis_data = res_mis.json()
             if "MsgArray" in mis_data and len(mis_data["MsgArray"]) > 0:
-                latest_vix = mis_data["MsgArray"][0].get("ClosePrice")
-                prev_vix = mis_data["MsgArray"][0].get("PreviousClose")
+                vix_info = mis_data["MsgArray"][0]
+                
+                # 在 MIS 系統中，「目前指數」對應的是 ClosePrice
+                latest_vix = vix_info.get("ClosePrice")
+                prev_vix = vix_info.get("PreviousClose")
                 
                 if latest_vix and 10.0 <= float(latest_vix) <= 150.0:
                     data["vixtwn"]["value"] = float(latest_vix)
@@ -1586,7 +1556,7 @@ def fetch_macro_indicators():
                         data["vixtwn"]["pct"] = 0.0
     except: pass
 
-    # 備援：台灣最強開源財經庫 FinMind API (若 MIS 維修則切換)
+    # 備援：FinMind API
     if data["vixtwn"]["value"] is None:
         try:
             start_date = (datetime.datetime.now() - datetime.timedelta(days=10)).strftime("%Y-%m-%d")
@@ -1607,7 +1577,6 @@ def fetch_macro_indicators():
 
 
     # --- 3. CNN 恐懼貪婪指數 ---
-    # 主力：CNN 官方底層 JSON API
     try:
         headers_cnn = {
             "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36",
