@@ -1521,7 +1521,7 @@ def debug_all_vix_apis():
 debug_all_vix_apis()
 
 # ======================================================
-# 分頁3 - 總經導航 (🚀 終極 HTML 解析版 - 專攻期交所網頁)
+# 分頁3 - 總經導航 (🚀 不死鳥多重備援版 - 專治各種反爬蟲與封鎖)
 # ======================================================
 @st.cache_data(ttl=900) 
 def fetch_macro_indicators():
@@ -1535,63 +1535,76 @@ def fetch_macro_indicators():
         "fng": {"score": None, "rating": "無法取得"}
     }
     
-    # --- 1. 美股 VIX (^VIX) ---
+    headers = {
+        "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36",
+        "Accept-Language": "zh-TW,zh;q=0.9"
+    }
+
+    # --- 1. 🇺🇸 美股 VIX (^VIX) ---
+    # 策略 A: 先用 yfinance (如果沒被 Yahoo 封鎖的話)
     try:
         hist_vix = yf.Ticker("^VIX").history(period="5d")
-        if len(hist_vix) >= 2:
+        if not hist_vix.empty and len(hist_vix) >= 2:
             latest = hist_vix['Close'].iloc[-1]
             prev = hist_vix['Close'].iloc[-2]
             data["vix"]["value"] = float(latest)
             data["vix"]["pct"] = float((latest - prev) / prev * 100)
     except: pass
 
-    # --- 2. 🇹🇼 台股 VIX (期交所 HTML 表格精準解析) ---
-    headers = {
-        "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36",
-        "Accept-Language": "zh-TW,zh;q=0.9"
-    }
-    
-    # 🌟 策略 A: 抓取「每日收盤 VIX」表格 (最穩健，能算出漲跌幅)
+    # 策略 B: 如果 yfinance 被鎖，直接去 Google Finance 網頁把數字挖出來
+    if data["vix"]["value"] is None:
+        try:
+            res_us = requests.get("https://www.google.com/finance/quote/VIX:INDEXCBOE", headers=headers, timeout=5)
+            # Google 財經的報價通常包在 class="YMlKec fxKbKc" 裡面
+            match = re.search(r'class="YMlKec fxKbKc">([\d\.]+)', res_us.text)
+            if match:
+                data["vix"]["value"] = float(match.group(1))
+                data["vix"]["pct"] = 0.0 # Google 爬蟲較簡化，僅顯示最新數值
+        except: pass
+
+
+    # --- 2. 🇹🇼 台股 VIX (VIXTWN) ---
+    # 策略 A: 嗨投資 (HiStock) - 結構極度穩定
     try:
-        res_daily = requests.get("https://www.taifex.com.tw/cht/3/vixInfo", headers=headers, timeout=5)
-        if res_daily.status_code == 200:
-            # 清除換行符號，讓 HTML 變成一行，方便正則表達式抓取
-            html = res_daily.text.replace('\n', '').replace('\r', '')
-            
-            # 尋找表格結構：<td>2024/07/21</td> <td>36.55</td>
-            matches = re.findall(r'<td[^>]*>\s*(\d{4}/\d{2}/\d{2})\s*</td>\s*<td[^>]*>\s*([1-9]\d{1,2}\.\d{2})\s*</td>', html)
-            
-            if matches:
-                matches.sort(key=lambda x: x[0])  # 確保依日期由舊到新排序
-                latest_vix = float(matches[-1][1])
-                
-                # 確保 VIX 數值在合理區間，排除異常抓取
-                if 10.0 <= latest_vix <= 150.0:
-                    data["vixtwn"]["value"] = latest_vix
-                    # 計算今日與昨日的漲跌幅
-                    if len(matches) >= 2:
-                        prev_vix = float(matches[-2][1])
-                        data["vixtwn"]["pct"] = (latest_vix - prev_vix) / prev_vix * 100
-                    else:
-                        data["vixtwn"]["pct"] = 0.0
+        res_hi = requests.get("https://histock.tw/stock/tcharti.aspx?no=VIXTWN", headers=headers, timeout=5)
+        if res_hi.status_code == 200:
+            match = re.search(r'id="CPHB1_lblPrice"[^>]*>([\d\.]+)<', res_hi.text)
+            if match:
+                val = float(match.group(1))
+                if 10.0 <= val <= 150.0:
+                    data["vixtwn"]["value"] = val
+                    data["vixtwn"]["pct"] = 0.0
     except: pass
 
-    # 🌟 策略 B: 若日報表抓不到，改抓「盤中每分鐘 VIX」表格 (備用)
+    # 策略 B: StockQ 財經網 - 備用站點
     if data["vixtwn"]["value"] is None:
         try:
-            res_min = requests.get("https://www.taifex.com.tw/cht/7/vixMinNew", headers=headers, timeout=5)
-            if res_min.status_code == 200:
-                html = res_min.text.replace('\n', '').replace('\r', '')
-                
-                # 尋找表格結構：<td>13:45:00</td> <td>36.54</td>
-                matches = re.findall(r'<td[^>]*>\s*(\d{2}:\d{2}:\d{2})\s*</td>\s*<td[^>]*>\s*([1-9]\d{1,2}\.\d{2})\s*</td>', html)
-                
-                if matches:
-                    latest_vix = float(matches[-1][1])  # 陣列最後一個就是最新報價
-                    if 10.0 <= latest_vix <= 150.0:
-                        data["vixtwn"]["value"] = latest_vix
+            res_sq = requests.get("http://www.stockq.org/index/VIXTW.php", headers=headers, timeout=5)
+            if res_sq.status_code == 200:
+                match = re.search(r'台灣VIX.*?<font[^>]*>([\d\.]+)</font>', res_sq.text, re.IGNORECASE | re.DOTALL)
+                if match:
+                    val = float(match.group(1))
+                    if 10.0 <= val <= 150.0:
+                        data["vixtwn"]["value"] = val
                         data["vixtwn"]["pct"] = 0.0
         except: pass
+
+    # 策略 C: 期交所 VIX 日報表 (包容民國年 113/07/21 格式)
+    if data["vixtwn"]["value"] is None:
+        try:
+            res_tf = requests.get("https://www.taifex.com.tw/cht/3/vixInfo", headers=headers, timeout=5)
+            if res_tf.status_code == 200:
+                html = res_tf.text.replace('\n', '')
+                # 兼容 2026/07/21 或 115/07/21
+                matches = re.findall(r'<td[^>]*>\s*(\d{3,4}/\d{2}/\d{2})\s*</td>\s*<td[^>]*>\s*([1-9]\d{1,2}\.\d{2})\s*</td>', html)
+                if matches:
+                    matches.sort(key=lambda x: x[0])
+                    val = float(matches[-1][1])
+                    if 10.0 <= val <= 150.0:
+                        data["vixtwn"]["value"] = val
+                        data["vixtwn"]["pct"] = 0.0
+        except: pass
+
 
     # --- 3. CNN 恐懼貪婪指數 ---
     try:
