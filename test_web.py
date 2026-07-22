@@ -1472,14 +1472,15 @@ def render_options_dashboard():
 # 分頁3 - 總經導航 (🚀 終極正則表達式 - 網頁暴力拆解版)
 # ======================================================
 # ======================================================
-# 分頁3 - 總經導航 (🚀 V3：完美移植你的 Pandas 扒表術)
+# 分頁3 - 總經導航 (🚀 V4：滿血修復 CNN 與台股 VIX)
 # ======================================================
 @st.cache_data(ttl=300) 
-def fetch_macro_indicators_v3(): # 💡 注意：名稱改為 _v3 強制系統重新抓取
+def fetch_macro_indicators_v4(): # 💡 注意：名稱改為 _v4 強制系統重新抓取
     import requests
     import pandas as pd
     from io import StringIO
     import datetime
+    import re
     
     data = {
         "vix": {"value": None, "pct": None},
@@ -1487,13 +1488,11 @@ def fetch_macro_indicators_v3(): # 💡 注意：名稱改為 _v3 強制系統�
         "fng": {"score": None, "rating": "無法取得"}
     }
     
-    # 🎯 完全採用你爬蟲中成功的極簡 Header
-    headers = {'User-Agent': 'Mozilla/5.0'}
-
     # --- 1. 🇺🇸 美股 VIX (^VIX) ---
     try:
+        headers_us = {"User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36"}
         yf_url = "https://query1.finance.yahoo.com/v8/finance/chart/^VIX?interval=1d&range=5d"
-        res_us = requests.get(yf_url, headers=headers, timeout=5)
+        res_us = requests.get(yf_url, headers=headers_us, timeout=5)
         if res_us.status_code == 200:
             closes = [c for c in res_us.json()['chart']['result'][0]['indicators']['quote'][0]['close'] if c is not None]
             if len(closes) >= 2:
@@ -1502,60 +1501,56 @@ def fetch_macro_indicators_v3(): # 💡 注意：名稱改為 _v3 強制系統�
     except: pass
 
 
-    # --- 2. 🇹🇼 台股 VIX (VIXTWN) - 完美移植你的扒表術 ---
-    # 準備期交所需要的日期格式 YYYY/MM/DD (抓過去 15 天確保有資料)
-    today_str = datetime.datetime.now().strftime("%Y/%m/%d")
-    start_str = (datetime.datetime.now() - datetime.timedelta(days=15)).strftime("%Y/%m/%d")
+    # --- 2. 🇹🇼 台股 VIX (VIXTWN) - 三重保險備援 ---
+    # 使用你原本成功的完整 Header 偽裝
+    headers_tw = {
+        'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/126.0.0.0 Safari/537.36'
+    }
 
-    # 🌟 策略 A: 抓取期交所 VIX 日報表 (使用你的 POST + read_html 邏輯)
+    # 🌟 策略 A: 你的 Pandas 扒表術 (期交所 vixInfo 日報表)
     try:
+        today_str = datetime.datetime.now().strftime("%Y/%m/%d")
+        start_str = (datetime.datetime.now() - datetime.timedelta(days=15)).strftime("%Y/%m/%d")
         payload = {"queryStartDate": start_str, "queryEndDate": today_str}
-        res_daily = requests.post("https://www.taifex.com.tw/cht/3/vixInfo", data=payload, headers=headers, timeout=5)
         
-        # 你的絕招：直接用 Pandas 解析 HTML 表格
+        res_daily = requests.post("https://www.taifex.com.tw/cht/3/vixInfo", data=payload, headers=headers_tw, timeout=5)
         dfs = pd.read_html(StringIO(res_daily.text))
         for df in dfs:
-            # 判斷這是不是我們要的 VIX 表格 (通常會有 '收盤' 欄位)
             if any('收盤' in str(c) for c in df.columns):
                 close_col = next((c for c in df.columns if '收盤' in str(c)), None)
                 if close_col:
-                    # 將收盤價轉為數值，並清除空值
                     s_close = pd.to_numeric(df[close_col], errors='coerce').dropna()
                     if len(s_close) >= 2:
-                        latest_vix = float(s_close.iloc[-1])
-                        prev_vix = float(s_close.iloc[-2])
-                        if 10.0 <= latest_vix <= 150.0:
-                            data["vixtwn"]["value"] = latest_vix
-                            data["vixtwn"]["pct"] = (latest_vix - prev_vix) / prev_vix * 100
+                        data["vixtwn"]["value"] = float(s_close.iloc[-1])
+                        data["vixtwn"]["pct"] = (float(s_close.iloc[-1]) - float(s_close.iloc[-2])) / float(s_close.iloc[-2]) * 100
                     elif len(s_close) == 1:
-                        latest_vix = float(s_close.iloc[-1])
-                        if 10.0 <= latest_vix <= 150.0:
-                            data["vixtwn"]["value"] = latest_vix
-                            data["vixtwn"]["pct"] = 0.0
+                        data["vixtwn"]["value"] = float(s_close.iloc[-1])
+                        data["vixtwn"]["pct"] = 0.0
                 break
     except: pass
 
-    # 🌟 策略 B: 若日報表沒抓到，改抓盤中每分鐘 VIX (vixMinNew)
+    # 🌟 策略 B: FinMind 量化 API (如果期交所網頁擋 Streamlit IP，這個絕對能通)
     if data["vixtwn"]["value"] is None:
         try:
-            res_min = requests.post("https://www.taifex.com.tw/cht/7/vixMinNew", data={"queryDate": today_str}, headers=headers, timeout=5)
-            dfs = pd.read_html(StringIO(res_min.text))
-            for df in dfs:
-                if any('指數' in str(c) or 'VIX' in str(c) for c in df.columns):
-                    s_vix = pd.to_numeric(df.iloc[:, -1], errors='coerce').dropna()
-                    if len(s_vix) > 0:
-                        latest_vix = float(s_vix.iloc[-1])
-                        if 10.0 <= latest_vix <= 150.0:
-                            data["vixtwn"]["value"] = latest_vix
-                            data["vixtwn"]["pct"] = 0.0 # 盤中若抓不到昨收，漲跌幅先設0
-                    break
+            start_fm = (datetime.datetime.now() - datetime.timedelta(days=15)).strftime("%Y-%m-%d")
+            fm_url = f"https://api.finmindtrade.com/api/v4/data?dataset=TaiwanOptionVIX&start_date={start_fm}"
+            res_fm = requests.get(fm_url, headers=headers_tw, timeout=5)
+            if res_fm.status_code == 200:
+                fm_data = res_fm.json().get("data", [])
+                if len(fm_data) > 0:
+                    v = float(fm_data[-1].get("VIX"))
+                    data["vixtwn"]["value"] = v
+                    if len(fm_data) >= 2:
+                        pv = float(fm_data[-2].get("VIX"))
+                        data["vixtwn"]["pct"] = (v - pv) / pv * 100
+                    else:
+                        data["vixtwn"]["pct"] = 0.0
         except: pass
 
-    # 🌟 策略 C: 嗨投資 HiStock 備援 (如果期交所主機維修)
+    # 🌟 策略 C: 嗨投資 HiStock 正規表達式暴力拆解
     if data["vixtwn"]["value"] is None:
         try:
-            import re
-            res_hi = requests.get("https://histock.tw/stock/tcharti.aspx?no=VIXTWN", headers=headers, timeout=5)
+            res_hi = requests.get("https://histock.tw/stock/tcharti.aspx?no=VIXTWN", headers=headers_tw, timeout=5)
             match = re.search(r'id="CPHB1_lblPrice"[^>]*>([\d\.]+)<', res_hi.text)
             if match:
                 data["vixtwn"]["value"] = float(match.group(1))
@@ -1563,10 +1558,16 @@ def fetch_macro_indicators_v3(): # 💡 注意：名稱改為 _v3 強制系統�
         except: pass
 
 
-    # --- 3. CNN 恐懼貪婪指數 ---
+    # --- 3. CNN 恐懼貪婪指數 (🚀 補回完整的 Headers 破解防護) ---
     try:
+        headers_cnn = {
+            "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/126.0.0.0 Safari/537.36",
+            "Accept": "application/json",
+            "Referer": "https://edition.cnn.com/"
+        }
         url = "https://production.dataviz.cnn.io/index/fearandgreed/graphdata"
-        res = requests.get(url, headers=headers, timeout=5)
+        res = requests.get(url, headers=headers_cnn, timeout=5)
+        
         if res.status_code == 200:
             score = int(res.json()['fear_and_greed']['score'])
             if score < 15: rating_tw = "🉐 分批加碼"
@@ -1828,7 +1829,7 @@ def render_sidebar_war_room():
             render_options_dashboard()
             
         with tab3:
-            macro_data = fetch_macro_indicators_v3() # 🚀 改為呼叫 V3 完美移植版本
+            macro_data = fetch_macro_indicators_v4() # 🚀 改為呼叫 V4
             
             vix_val = macro_data["vix"]["value"]
             vix_color = "#a1a1aa" 
