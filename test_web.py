@@ -1521,13 +1521,13 @@ def debug_all_vix_apis():
 debug_all_vix_apis()
 
 # ======================================================
-# 分頁3 - 總經導航 (🚀 終極純淨 API 串接版)
+# 分頁3 - 總經導航 (🚀 MIS 即時行情 API + 終極備援版)
 # ======================================================
-@st.cache_data(ttl=900) 
+@st.cache_data(ttl=300) # 💡 快取縮短為 5 分鐘，確保資料夠即時又不至於被鎖 IP
 def fetch_macro_indicators():
     import requests
+    import re
     import datetime
-    import time
     
     data = {
         "vix": {"value": None, "pct": None},
@@ -1540,17 +1540,15 @@ def fetch_macro_indicators():
         "Accept-Language": "zh-TW,zh;q=0.9"
     }
 
-    # --- 1. 🇺🇸 美股 VIX (^VIX) - 捨棄 yfinance，直攻 Yahoo 底層 API ---
+    # --- 1. 🇺🇸 美股 VIX (^VIX) ---
+    # 主力：Yahoo 隱藏底層 API (非 yfinance 套件，不會被鎖)
     try:
-        # 呼叫 Yahoo 隱藏的 Chart API，完全避開 yfinance 套件被鎖 IP 的問題
         yf_url = "https://query1.finance.yahoo.com/v8/finance/chart/^VIX?interval=1d&range=5d"
         res_us = requests.get(yf_url, headers=headers, timeout=5)
         if res_us.status_code == 200:
             us_json = res_us.json()
-            # 解析 JSON 內的收盤價陣列
             closes = us_json['chart']['result'][0]['indicators']['quote'][0]['close']
-            valid_closes = [c for c in closes if c is not None]  # 過濾掉尚未開盤的空值
-            
+            valid_closes = [c for c in closes if c is not None]
             if len(valid_closes) >= 2:
                 latest = float(valid_closes[-1])
                 prev = float(valid_closes[-2])
@@ -1558,35 +1556,58 @@ def fetch_macro_indicators():
                 data["vix"]["pct"] = (latest - prev) / prev * 100
     except: pass
 
+    # 備援：Google 財經網頁解析
+    if data["vix"]["value"] is None:
+        try:
+            res_gg = requests.get("https://www.google.com/finance/quote/VIX:INDEXCBOE", headers=headers, timeout=5)
+            match = re.search(r'class="YMlKec fxKbKc">([\d\.]+)', res_gg.text)
+            if match:
+                data["vix"]["value"] = float(match.group(1))
+                data["vix"]["pct"] = 0.0
+        except: pass
 
-    # --- 2. 🇹🇼 台股 VIX (VIXTWN) - 導入台灣最強開源 API (FinMind) ---
+
+    # --- 2. 🇹🇼 台股 VIX (VIXTWN) ---
+    # 主力：臺灣期交所 MIS 即時行情隱藏 API (每 15 秒更新的真正源頭)
     try:
-        # FinMind 是台灣極其穩定的開源數據庫，專門提供給量化交易使用，不擋爬蟲
-        # 我們抓取過去 10 天的資料，確保跨越週末與連假依然有數據
-        start_date = (datetime.datetime.now() - datetime.timedelta(days=10)).strftime("%Y-%m-%d")
-        fm_url = f"https://api.finmindtrade.com/api/v4/data?dataset=TaiwanOptionVIX&start_date={start_date}"
-        
-        res_tw = requests.get(fm_url, headers=headers, timeout=5)
-        if res_tw.status_code == 200:
-            fm_json = res_tw.json()
-            if fm_json.get("msg") == "success" and "data" in fm_json:
-                fm_data = fm_json["data"]
-                if len(fm_data) > 0:
-                    latest_vix = fm_data[-1].get("VIX")
-                    
+        mis_url = "https://mis.taifex.com.tw/futures/api/getVix"
+        res_mis = requests.get(mis_url, headers=headers, timeout=5)
+        if res_mis.status_code == 200:
+            mis_data = res_mis.json()
+            if "MsgArray" in mis_data and len(mis_data["MsgArray"]) > 0:
+                latest_vix = mis_data["MsgArray"][0].get("ClosePrice")
+                prev_vix = mis_data["MsgArray"][0].get("PreviousClose")
+                
+                if latest_vix and 10.0 <= float(latest_vix) <= 150.0:
+                    data["vixtwn"]["value"] = float(latest_vix)
+                    if prev_vix and float(prev_vix) > 0:
+                        data["vixtwn"]["pct"] = (float(latest_vix) - float(prev_vix)) / float(prev_vix) * 100
+                    else:
+                        data["vixtwn"]["pct"] = 0.0
+    except: pass
+
+    # 備援：台灣最強開源財經庫 FinMind API (若 MIS 維修則切換)
+    if data["vixtwn"]["value"] is None:
+        try:
+            start_date = (datetime.datetime.now() - datetime.timedelta(days=10)).strftime("%Y-%m-%d")
+            fm_url = f"https://api.finmindtrade.com/api/v4/data?dataset=TaiwanOptionVIX&start_date={start_date}"
+            res_fm = requests.get(fm_url, headers=headers, timeout=5)
+            if res_fm.status_code == 200:
+                fm_json = res_fm.json()
+                if fm_json.get("msg") == "success" and "data" in fm_json and len(fm_json["data"]) > 0:
+                    latest_vix = fm_json["data"][-1].get("VIX")
                     if latest_vix and 10.0 <= float(latest_vix) <= 150.0:
                         data["vixtwn"]["value"] = float(latest_vix)
-                        
-                        # 同步計算台股 VIX 漲跌幅
-                        if len(fm_data) >= 2:
-                            prev_vix = fm_data[-2].get("VIX")
+                        if len(fm_json["data"]) >= 2:
+                            prev_vix = fm_json["data"][-2].get("VIX")
                             data["vixtwn"]["pct"] = (float(latest_vix) - float(prev_vix)) / float(prev_vix) * 100
                         else:
                             data["vixtwn"]["pct"] = 0.0
-    except: pass
+        except: pass
 
 
     # --- 3. CNN 恐懼貪婪指數 ---
+    # 主力：CNN 官方底層 JSON API
     try:
         headers_cnn = {
             "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36",
