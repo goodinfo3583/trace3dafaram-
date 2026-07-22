@@ -1473,50 +1473,56 @@ def render_options_dashboard():
 # ======================================================
 import streamlit as st
 import requests
+import re
 
-def debug_taifex_vix():
-    st.markdown("### 🐛 期交所 VIX 後台爬蟲真實視角測試")
-    url = "https://www.taifex.com.tw/cht/7/vixMinNew"
-    headers = {
-        "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/126.0.0.0 Safari/537.36",
-        "Accept-Language": "zh-TW,zh;q=0.9,en-US;q=0.8,en;q=0.7",
-        "Referer": "https://www.taifex.com.tw/cht/7/vixMinNew"
-    }
-    payload = {"down_type": "1"}
+def debug_all_vix_apis():
+    st.markdown("### 🐛 VIX 終極除錯視角 (純淨 API + Session)")
     
+    # --- 測試 1: 鉅亨網 JSON API ---
+    st.markdown("#### 1️⃣ 鉅亨網 (Anue) JSON API 測試")
     try:
-        # 模擬送出 POST 請求下載檔案
-        res = requests.post(url, data=payload, headers=headers, timeout=5)
-        st.write(f"**HTTP 狀態碼:** {res.status_code}")
-        
-        if res.status_code == 200:
-            # 台灣公家機關的 CSV 通常是 Big5 編碼
-            res.encoding = 'big5' 
-            
-            st.write("**📥 回傳 Headers (檢查是不是真的給了 csv 檔案):**")
-            st.json(dict(res.headers))
-            
-            # 檢查我們想要的特徵字有沒有在原始碼裡
-            has_last_min = "Last 1 min AVG" in res.text
-            has_date = "2026" in res.text
-            
-            st.markdown(f"**內容是否包含 'Last 1 min AVG'？** {'✅ 有' if has_last_min else '❌ 沒有'}")
-            
-            # 用文字框把爬蟲真實看到的內容印出來 (限制長度避免當機)
-            st.text_area(
-                "爬蟲抓到的真實回傳內容 (可用 Ctrl+F 搜尋)", 
-                res.text[:5000] if len(res.text) > 5000 else res.text, 
-                height=400
-            )
+        url_api = "https://ws.api.cnyes.com/ws/api/v1/quote/quotes/TWS:TWVIX:INDEX"
+        res_api = requests.get(url_api, timeout=5)
+        st.write(f"**HTTP 狀態碼:** {res_api.status_code}")
+        if res_api.status_code == 200:
+            st.write("✅ 成功抓取 JSON 原始資料：")
+            st.json(res_api.json())
         else:
-            st.error(f"連線失敗，狀態碼: {res.status_code}")
-            
+            st.error(f"連線失敗，狀態碼: {res_api.status_code}")
     except Exception as e:
-        st.error(f"發生錯誤: {e}")
+        st.error(f"鉅亨網 API 錯誤: {e}")
 
-# 直接呼叫此函數進行測試
-debug_taifex_vix()
+    # --- 測試 2: 期交所 Session 破解法 ---
+    st.markdown("#### 2️⃣ 期交所 Session (帶 Cookie) 下載測試")
+    try:
+        session = requests.Session()
+        headers = {
+            "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36",
+            "Referer": "https://www.taifex.com.tw/cht/7/vixMinNew"
+        }
+        
+        # 1. 拿 Cookie
+        res_get = session.get("https://www.taifex.com.tw/cht/7/vixMinNew", headers=headers, timeout=5)
+        st.write(f"**Step 1: GET 狀態碼 (索取 Cookie):** {res_get.status_code}")
+        st.write(f"**成功拿到 Cookies:** `{session.cookies.get_dict()}`")
+        
+        # 2. POST 下載
+        res_post = session.post("https://www.taifex.com.tw/cht/7/vixMinNew", data={"down_type": "1"}, headers=headers, timeout=5)
+        st.write(f"**Step 2: POST 狀態碼 (下載 CSV):** {res_post.status_code}")
+        
+        has_last_min = "Last 1 min AVG" in res_post.text
+        st.markdown(f"**回傳的檔案內是否包含 'Last 1 min AVG'？** {'✅ 有' if has_last_min else '❌ 沒有'}")
+        
+        st.text_area("期交所回傳的真實 CSV 內容 (前 1000 字元)", res_post.text[:1000], height=200)
+    except Exception as e:
+        st.error(f"期交所 Session 錯誤: {e}")
 
+# 在頁面上直接呼叫這個函數來測試
+debug_all_vix_apis()
+
+# ======================================================
+# 分頁3 - 總經導航 (🚀 Session 突破與 API 雙重引擎版)
+# ======================================================
 @st.cache_data(ttl=900) 
 def fetch_macro_indicators():
     import yfinance as yf
@@ -1539,26 +1545,48 @@ def fetch_macro_indicators():
             data["vix"]["pct"] = float((latest - prev) / prev * 100)
     except: pass
 
-    # --- 2. 🇹🇼 台股 VIX (精準解析你提供的期交所檔案格式) ---
+    # --- 2. 🇹🇼 台股 VIX (VIXTWN) ---
+    
+    # 🌟 策略 A: 鉅亨網 (Anue) 隱藏版 JSON API (最快、無防爬蟲)
     try:
-        headers = {"User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64)"}
-        res_csv = requests.post("https://www.taifex.com.tw/cht/7/vixMinNew", data={"down_type": "1"}, headers=headers, timeout=5)
-        
-        if res_csv.status_code == 200:
-            # 策略 A: 若已收盤，抓取檔案最後一行的 "Last 1 min AVG       36.55"
-            match_close = re.search(r'Last 1 min AVG\s+([\d\.]+)', res_csv.text)
-            if match_close:
-                data["vixtwn"]["value"] = float(match_close.group(1))
-                data["vixtwn"]["pct"] = 0.0
-            else:
-                # 策略 B: 若還在盤中，抓取最後一筆時間報價 (例如: 13450000 36.54)
-                matches = re.findall(r'\d{6,8}\s+([1-9]\d{1,2}\.\d{2})', res_csv.text)
-                if matches:
-                    data["vixtwn"]["value"] = float(matches[-1])
+        res_cnyes = requests.get("https://ws.api.cnyes.com/ws/api/v1/quote/quotes/TWS:TWVIX:INDEX", timeout=5)
+        if res_cnyes.status_code == 200:
+            cnyes_data = res_cnyes.json()
+            if "data" in cnyes_data and len(cnyes_data["data"]) > 0:
+                price = cnyes_data["data"][0].get("price")
+                if price and 10.0 <= float(price) <= 150.0:
+                    data["vixtwn"]["value"] = float(price)
                     data["vixtwn"]["pct"] = 0.0
     except: pass
 
-    # --- 3. CNN 恐懼貪婪指數 (🚀 修正 headers 參數錯誤) ---
+    # 🌟 策略 B: 期交所 Session 破解法 (若 API 失效時啟動)
+    if data["vixtwn"]["value"] is None:
+        try:
+            # 使用 Session 才能自動記住伺服器發的通行證 (Cookies)
+            session = requests.Session()
+            headers = {
+                "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36",
+                "Referer": "https://www.taifex.com.tw/cht/7/vixMinNew"
+            }
+            # 第一步：先 GET 敲門，取得 JSESSIONID 通行證
+            session.get("https://www.taifex.com.tw/cht/7/vixMinNew", headers=headers, timeout=5)
+            
+            # 第二步：帶著剛剛拿到的通行證，發送 POST 請求下載 CSV
+            res_csv = session.post("https://www.taifex.com.tw/cht/7/vixMinNew", data={"down_type": "1"}, headers=headers, timeout=5)
+            
+            if res_csv.status_code == 200:
+                match_close = re.search(r'Last 1 min AVG\s+([\d\.]+)', res_csv.text)
+                if match_close:
+                    data["vixtwn"]["value"] = float(match_close.group(1))
+                    data["vixtwn"]["pct"] = 0.0
+                else:
+                    matches = re.findall(r'\d{6,8}\s+([1-9]\d{1,2}\.\d{2})', res_csv.text)
+                    if matches:
+                        data["vixtwn"]["value"] = float(matches[-1])
+                        data["vixtwn"]["pct"] = 0.0
+        except: pass
+
+    # --- 3. CNN 恐懼貪婪指數 ---
     try:
         headers_cnn = {
             "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36",
@@ -1566,7 +1594,6 @@ def fetch_macro_indicators():
             "Referer": "https://edition.cnn.com/"
         }
         url = "https://production.dataviz.cnn.io/index/fearandgreed/graphdata"
-        # 這裡把漏掉的 headers= 加回去了！
         res = requests.get(url, headers=headers_cnn, timeout=5)
         if res.status_code == 200:
             fg_data = res.json()
