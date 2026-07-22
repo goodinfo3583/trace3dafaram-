@@ -1472,6 +1472,59 @@ def render_options_dashboard():
 # ======================================================
 # 分頁3 - 總經導航 (🚀 MIS 即時行情 API 終極通關密語版)
 # ======================================================
+import streamlit as st
+import requests
+
+def debug_mis_taifex():
+    st.markdown("### 🐛 期交所 MIS API 終極透視鏡")
+    
+    mis_url = "https://mis.taifex.com.tw/futures/api/getQuoteList"
+    headers_mis = {
+        "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36",
+        "Accept": "application/json, text/javascript, */*; q=0.01",
+        "Referer": "https://mis.taifex.com.tw/futures/VolatilityQuotes/",
+        "Origin": "https://mis.taifex.com.tw"
+    }
+    payload = {
+        "MarketType": "0",
+        "SymbolType": "V",
+        "KindID": "1",
+        "CID": "VIX",
+        "ExpireMonth": "",
+        "RowSize": "全部",
+        "PageNo": "",
+        "SortColumn": "",
+        "AscDesc": "A"
+    }
+    
+    try:
+        st.write("📡 **發送 POST 請求至:**", mis_url)
+        st.write("📦 **傳送的 Payload (通關密語):**", payload)
+        
+        res_mis = requests.post(mis_url, json=payload, headers=headers_mis, timeout=10)
+        st.write(f"**HTTP 狀態碼:** `{res_mis.status_code}`")
+        
+        if res_mis.status_code == 200:
+            try:
+                # 嘗試解析為 JSON 格式
+                json_data = res_mis.json()
+                st.success("✅ 成功取得資料！下方為期交所回傳的真實 JSON 結構：")
+                
+                # 將 JSON 結構完美渲染在畫面上
+                st.json(json_data)
+                
+            except Exception as e:
+                st.warning(f"⚠️ 無法解析為 JSON，回傳的可能是純文字或 HTML。錯誤原因：{e}")
+                st.text_area("📄 原始回傳內容：", res_mis.text, height=300)
+        else:
+            st.error(f"❌ 連線失敗或遭到阻擋。")
+            st.text_area("📄 錯誤網頁內容：", res_mis.text, height=300)
+            
+    except Exception as e:
+        st.error(f"🚨 發生嚴重錯誤: {e}")
+
+# 直接呼叫此函數進行測試
+debug_mis_taifex()
 @st.cache_data(ttl=300) 
 def fetch_macro_indicators():
     import requests
