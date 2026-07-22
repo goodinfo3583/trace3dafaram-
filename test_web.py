@@ -1521,13 +1521,13 @@ def debug_all_vix_apis():
 debug_all_vix_apis()
 
 # ======================================================
-# 分頁3 - 總經導航 (🚀 不死鳥多重備援版 - 專治各種反爬蟲與封鎖)
+# 分頁3 - 總經導航 (🚀 終極純淨 API 串接版)
 # ======================================================
 @st.cache_data(ttl=900) 
 def fetch_macro_indicators():
-    import yfinance as yf
     import requests
-    import re
+    import datetime
+    import time
     
     data = {
         "vix": {"value": None, "pct": None},
@@ -1540,76 +1540,56 @@ def fetch_macro_indicators():
         "Accept-Language": "zh-TW,zh;q=0.9"
     }
 
-    # --- 1. 🇺🇸 美股 VIX (^VIX) ---
-    # 策略 A: 先用 yfinance (如果沒被 Yahoo 封鎖的話)
+    # --- 1. 🇺🇸 美股 VIX (^VIX) - 捨棄 yfinance，直攻 Yahoo 底層 API ---
     try:
-        hist_vix = yf.Ticker("^VIX").history(period="5d")
-        if not hist_vix.empty and len(hist_vix) >= 2:
-            latest = hist_vix['Close'].iloc[-1]
-            prev = hist_vix['Close'].iloc[-2]
-            data["vix"]["value"] = float(latest)
-            data["vix"]["pct"] = float((latest - prev) / prev * 100)
+        # 呼叫 Yahoo 隱藏的 Chart API，完全避開 yfinance 套件被鎖 IP 的問題
+        yf_url = "https://query1.finance.yahoo.com/v8/finance/chart/^VIX?interval=1d&range=5d"
+        res_us = requests.get(yf_url, headers=headers, timeout=5)
+        if res_us.status_code == 200:
+            us_json = res_us.json()
+            # 解析 JSON 內的收盤價陣列
+            closes = us_json['chart']['result'][0]['indicators']['quote'][0]['close']
+            valid_closes = [c for c in closes if c is not None]  # 過濾掉尚未開盤的空值
+            
+            if len(valid_closes) >= 2:
+                latest = float(valid_closes[-1])
+                prev = float(valid_closes[-2])
+                data["vix"]["value"] = latest
+                data["vix"]["pct"] = (latest - prev) / prev * 100
     except: pass
 
-    # 策略 B: 如果 yfinance 被鎖，直接去 Google Finance 網頁把數字挖出來
-    if data["vix"]["value"] is None:
-        try:
-            res_us = requests.get("https://www.google.com/finance/quote/VIX:INDEXCBOE", headers=headers, timeout=5)
-            # Google 財經的報價通常包在 class="YMlKec fxKbKc" 裡面
-            match = re.search(r'class="YMlKec fxKbKc">([\d\.]+)', res_us.text)
-            if match:
-                data["vix"]["value"] = float(match.group(1))
-                data["vix"]["pct"] = 0.0 # Google 爬蟲較簡化，僅顯示最新數值
-        except: pass
 
-
-    # --- 2. 🇹🇼 台股 VIX (VIXTWN) ---
-    # 策略 A: 嗨投資 (HiStock) - 結構極度穩定
+    # --- 2. 🇹🇼 台股 VIX (VIXTWN) - 導入台灣最強開源 API (FinMind) ---
     try:
-        res_hi = requests.get("https://histock.tw/stock/tcharti.aspx?no=VIXTWN", headers=headers, timeout=5)
-        if res_hi.status_code == 200:
-            match = re.search(r'id="CPHB1_lblPrice"[^>]*>([\d\.]+)<', res_hi.text)
-            if match:
-                val = float(match.group(1))
-                if 10.0 <= val <= 150.0:
-                    data["vixtwn"]["value"] = val
-                    data["vixtwn"]["pct"] = 0.0
+        # FinMind 是台灣極其穩定的開源數據庫，專門提供給量化交易使用，不擋爬蟲
+        # 我們抓取過去 10 天的資料，確保跨越週末與連假依然有數據
+        start_date = (datetime.datetime.now() - datetime.timedelta(days=10)).strftime("%Y-%m-%d")
+        fm_url = f"https://api.finmindtrade.com/api/v4/data?dataset=TaiwanOptionVIX&start_date={start_date}"
+        
+        res_tw = requests.get(fm_url, headers=headers, timeout=5)
+        if res_tw.status_code == 200:
+            fm_json = res_tw.json()
+            if fm_json.get("msg") == "success" and "data" in fm_json:
+                fm_data = fm_json["data"]
+                if len(fm_data) > 0:
+                    latest_vix = fm_data[-1].get("VIX")
+                    
+                    if latest_vix and 10.0 <= float(latest_vix) <= 150.0:
+                        data["vixtwn"]["value"] = float(latest_vix)
+                        
+                        # 同步計算台股 VIX 漲跌幅
+                        if len(fm_data) >= 2:
+                            prev_vix = fm_data[-2].get("VIX")
+                            data["vixtwn"]["pct"] = (float(latest_vix) - float(prev_vix)) / float(prev_vix) * 100
+                        else:
+                            data["vixtwn"]["pct"] = 0.0
     except: pass
-
-    # 策略 B: StockQ 財經網 - 備用站點
-    if data["vixtwn"]["value"] is None:
-        try:
-            res_sq = requests.get("http://www.stockq.org/index/VIXTW.php", headers=headers, timeout=5)
-            if res_sq.status_code == 200:
-                match = re.search(r'台灣VIX.*?<font[^>]*>([\d\.]+)</font>', res_sq.text, re.IGNORECASE | re.DOTALL)
-                if match:
-                    val = float(match.group(1))
-                    if 10.0 <= val <= 150.0:
-                        data["vixtwn"]["value"] = val
-                        data["vixtwn"]["pct"] = 0.0
-        except: pass
-
-    # 策略 C: 期交所 VIX 日報表 (包容民國年 113/07/21 格式)
-    if data["vixtwn"]["value"] is None:
-        try:
-            res_tf = requests.get("https://www.taifex.com.tw/cht/3/vixInfo", headers=headers, timeout=5)
-            if res_tf.status_code == 200:
-                html = res_tf.text.replace('\n', '')
-                # 兼容 2026/07/21 或 115/07/21
-                matches = re.findall(r'<td[^>]*>\s*(\d{3,4}/\d{2}/\d{2})\s*</td>\s*<td[^>]*>\s*([1-9]\d{1,2}\.\d{2})\s*</td>', html)
-                if matches:
-                    matches.sort(key=lambda x: x[0])
-                    val = float(matches[-1][1])
-                    if 10.0 <= val <= 150.0:
-                        data["vixtwn"]["value"] = val
-                        data["vixtwn"]["pct"] = 0.0
-        except: pass
 
 
     # --- 3. CNN 恐懼貪婪指數 ---
     try:
         headers_cnn = {
-            "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64)",
+            "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36",
             "Accept": "application/json",
             "Referer": "https://edition.cnn.com/"
         }
