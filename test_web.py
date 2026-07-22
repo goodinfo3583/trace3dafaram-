@@ -1471,15 +1471,12 @@ def render_options_dashboard():
 # ======================================================
 # 分頁3 - 總經導航 (🚀 終極正則表達式 - 網頁暴力拆解版)
 # ======================================================
-# ======================================================
-# 分頁3 - 總經導航 (🚀 V4：滿血修復 CNN 與台股 VIX)
-# ======================================================
+
+
+
 @st.cache_data(ttl=300) 
-def fetch_macro_indicators_v4(): # 💡 注意：名稱改為 _v4 強制系統重新抓取
+def fetch_macro_indicators():
     import requests
-    import pandas as pd
-    from io import StringIO
-    import datetime
     import re
     
     data = {
@@ -1488,88 +1485,80 @@ def fetch_macro_indicators_v4(): # 💡 注意：名稱改為 _v4 強制系統�
         "fng": {"score": None, "rating": "無法取得"}
     }
     
-    # --- 1. 🇺🇸 美股 VIX (^VIX) ---
-    try:
-        headers_us = {"User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36"}
-        yf_url = "https://query1.finance.yahoo.com/v8/finance/chart/^VIX?interval=1d&range=5d"
-        res_us = requests.get(yf_url, headers=headers_us, timeout=5)
-        if res_us.status_code == 200:
-            closes = [c for c in res_us.json()['chart']['result'][0]['indicators']['quote'][0]['close'] if c is not None]
-            if len(closes) >= 2:
-                data["vix"]["value"] = float(closes[-1])
-                data["vix"]["pct"] = (float(closes[-1]) - float(closes[-2])) / float(closes[-2]) * 100
-    except: pass
-
-
-    # --- 2. 🇹🇼 台股 VIX (VIXTWN) - 三重保險備援 ---
-    # 使用你原本成功的完整 Header 偽裝
-    headers_tw = {
-        'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/126.0.0.0 Safari/537.36'
+    headers = {
+        "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36",
+        "Accept-Language": "zh-TW,zh;q=0.9"
     }
 
-    # 🌟 策略 A: 你的 Pandas 扒表術 (期交所 vixInfo 日報表)
+    # --- 1. 🇺🇸 美股 VIX (^VIX) - Yahoo 原生 API ---
     try:
-        today_str = datetime.datetime.now().strftime("%Y/%m/%d")
-        start_str = (datetime.datetime.now() - datetime.timedelta(days=15)).strftime("%Y/%m/%d")
-        payload = {"queryStartDate": start_str, "queryEndDate": today_str}
-        
-        res_daily = requests.post("https://www.taifex.com.tw/cht/3/vixInfo", data=payload, headers=headers_tw, timeout=5)
-        dfs = pd.read_html(StringIO(res_daily.text))
-        for df in dfs:
-            if any('收盤' in str(c) for c in df.columns):
-                close_col = next((c for c in df.columns if '收盤' in str(c)), None)
-                if close_col:
-                    s_close = pd.to_numeric(df[close_col], errors='coerce').dropna()
-                    if len(s_close) >= 2:
-                        data["vixtwn"]["value"] = float(s_close.iloc[-1])
-                        data["vixtwn"]["pct"] = (float(s_close.iloc[-1]) - float(s_close.iloc[-2])) / float(s_close.iloc[-2]) * 100
-                    elif len(s_close) == 1:
-                        data["vixtwn"]["value"] = float(s_close.iloc[-1])
-                        data["vixtwn"]["pct"] = 0.0
-                break
+        yf_url = "https://query1.finance.yahoo.com/v8/finance/chart/^VIX?interval=1d&range=5d"
+        res_us = requests.get(yf_url, headers=headers, timeout=5)
+        if res_us.status_code == 200:
+            us_json = res_us.json()
+            closes = us_json['chart']['result'][0]['indicators']['quote'][0]['close']
+            valid_closes = [c for c in closes if c is not None]
+            if len(valid_closes) >= 2:
+                latest = float(valid_closes[-1])
+                prev = float(valid_closes[-2])
+                data["vix"]["value"] = latest
+                data["vix"]["pct"] = (latest - prev) / prev * 100
     except: pass
 
-    # 🌟 策略 B: FinMind 量化 API (如果期交所網頁擋 Streamlit IP，這個絕對能通)
+    # --- 2. 🇹🇼 台股 VIX (VIXTWN) - 暴力拆解官方網頁 ---
+    prev_vix = None
+    
+    # 🌟 策略 A: 先拆解「每日 VIX」網頁，目的是為了拿到昨天的收盤價來算漲跌幅
+    try:
+        res_daily = requests.get("https://www.taifex.com.tw/cht/3/vixInfo", headers=headers, timeout=5)
+        if res_daily.status_code == 200:
+            # 正規表達式：尋找「日期 (如 113/07/21)」+「中間任意字元」+「數值 (如 35.54)」
+            matches_d = re.findall(r'(\d{3,4}/\d{2}/\d{2})[\s\S]{1,100}?([1-9]\d{1,2}\.\d{2,4})', res_daily.text)
+            if matches_d:
+                data["vixtwn"]["value"] = float(matches_d[-1][1])
+                if len(matches_d) >= 2:
+                    prev_vix = float(matches_d[-2][1])
+                    data["vixtwn"]["pct"] = (data["vixtwn"]["value"] - prev_vix) / prev_vix * 100
+    except: pass
+
+    # 🌟 策略 B: 再拆解「盤中每分鐘 VIX」網頁，取得當下最新報價直接覆蓋
+    try:
+        res_min = requests.get("https://www.taifex.com.tw/cht/7/vixMinNew", headers=headers, timeout=5)
+        if res_min.status_code == 200:
+            # 正規表達式：尋找「時間 (如 13:45:00)」+「中間任意字元」+「數值 (如 35.54)」
+            matches_m = re.findall(r'(\d{2}:\d{2}:\d{2})[\s\S]{1,100}?([1-9]\d{1,2}\.\d{2,4})', res_min.text)
+            if matches_m:
+                latest_vix = float(matches_m[-1][1])
+                data["vixtwn"]["value"] = latest_vix
+                # 結合策略 A 拿到的昨收，算出精準的即時漲跌幅
+                if prev_vix:
+                    data["vixtwn"]["pct"] = (latest_vix - prev_vix) / prev_vix * 100
+    except: pass
+
+    # 🌟 策略 C: HiStock 備援 (若期交所網頁維修時自動啟動)
     if data["vixtwn"]["value"] is None:
         try:
-            start_fm = (datetime.datetime.now() - datetime.timedelta(days=15)).strftime("%Y-%m-%d")
-            fm_url = f"https://api.finmindtrade.com/api/v4/data?dataset=TaiwanOptionVIX&start_date={start_fm}"
-            res_fm = requests.get(fm_url, headers=headers_tw, timeout=5)
-            if res_fm.status_code == 200:
-                fm_data = res_fm.json().get("data", [])
-                if len(fm_data) > 0:
-                    v = float(fm_data[-1].get("VIX"))
-                    data["vixtwn"]["value"] = v
-                    if len(fm_data) >= 2:
-                        pv = float(fm_data[-2].get("VIX"))
-                        data["vixtwn"]["pct"] = (v - pv) / pv * 100
-                    else:
-                        data["vixtwn"]["pct"] = 0.0
-        except: pass
-
-    # 🌟 策略 C: 嗨投資 HiStock 正規表達式暴力拆解
-    if data["vixtwn"]["value"] is None:
-        try:
-            res_hi = requests.get("https://histock.tw/stock/tcharti.aspx?no=VIXTWN", headers=headers_tw, timeout=5)
-            match = re.search(r'id="CPHB1_lblPrice"[^>]*>([\d\.]+)<', res_hi.text)
-            if match:
-                data["vixtwn"]["value"] = float(match.group(1))
-                data["vixtwn"]["pct"] = 0.0
+            res_hi = requests.get("https://histock.tw/stock/tcharti.aspx?no=VIXTWN", headers=headers, timeout=5)
+            if res_hi.status_code == 200:
+                match = re.search(r'CPHB1_lblPrice[^>]*>\s*([\d\.]+)\s*<', res_hi.text)
+                if match:
+                    data["vixtwn"]["value"] = float(match.group(1))
+                    data["vixtwn"]["pct"] = 0.0
         except: pass
 
 
-    # --- 3. CNN 恐懼貪婪指數 (🚀 補回完整的 Headers 破解防護) ---
+    # --- 3. CNN 恐懼貪婪指數 ---
     try:
         headers_cnn = {
-            "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/126.0.0.0 Safari/537.36",
+            "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64)",
             "Accept": "application/json",
             "Referer": "https://edition.cnn.com/"
         }
         url = "https://production.dataviz.cnn.io/index/fearandgreed/graphdata"
         res = requests.get(url, headers=headers_cnn, timeout=5)
-        
         if res.status_code == 200:
-            score = int(res.json()['fear_and_greed']['score'])
+            fg_data = res.json()
+            score = int(fg_data['fear_and_greed']['score'])
             if score < 15: rating_tw = "🉐 分批加碼"
             elif score < 25: rating_tw = "🈵 積極買點"
             elif score > 90: rating_tw = "🈲 提高現金"
@@ -1829,7 +1818,7 @@ def render_sidebar_war_room():
             render_options_dashboard()
             
         with tab3:
-            macro_data = fetch_macro_indicators_v4() # 🚀 改為呼叫 V4
+            macro_data = fetch_macro_indicators()
             
             vix_val = macro_data["vix"]["value"]
             vix_color = "#a1a1aa" 
