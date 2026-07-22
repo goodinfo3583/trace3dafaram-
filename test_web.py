@@ -1475,8 +1475,8 @@ def render_options_dashboard():
 import streamlit as st
 import requests
 
-def debug_mis_taifex_v2():
-    st.markdown("### 🐛 期交所 MIS API 終極透視鏡 (第二代：自動破解參數)")
+def debug_mis_taifex_v3():
+    st.markdown("### 🐛 期交所 MIS API 終極透視鏡 (第三代：火力全開不中斷)")
     
     headers_mis = {
         "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36",
@@ -1485,25 +1485,20 @@ def debug_mis_taifex_v2():
         "Origin": "https://mis.taifex.com.tw"
     }
     
-    # 測試清單：一次測完所有期交所合法的參數組合
+    # 測試清單：拔除所有煞車，強制全部印出
     test_cases = [
         {
-            "name": "測試 1：getQuoteList (SymbolType 帶入 O 選擇權)",
-            "url": "https://mis.taifex.com.tw/futures/api/getQuoteList",
-            "payload": {"MarketType":"0", "SymbolType":"O", "KindID":"1", "CID":"VIX", "ExpireMonth":"", "RowSize":"全部", "PageNo":"", "SortColumn":"", "AscDesc":"A"}
-        },
-        {
-            "name": "測試 2：getQuoteList (SymbolType 留白)",
+            "name": "測試 1：getQuoteList (SymbolType 留白)",
             "url": "https://mis.taifex.com.tw/futures/api/getQuoteList",
             "payload": {"MarketType":"0", "SymbolType":"", "KindID":"1", "CID":"VIX", "ExpireMonth":"", "RowSize":"全部", "PageNo":"", "SortColumn":"", "AscDesc":"A"}
         },
         {
-            "name": "測試 3：getVix (專屬 API 測試 A - 帶 MarketType)",
+            "name": "測試 2：getVix (專屬 API 測試 A - 帶 MarketType)",
             "url": "https://mis.taifex.com.tw/futures/api/getVix",
             "payload": {"MarketType":"0"}
         },
         {
-            "name": "測試 4：getVix (專屬 API 測試 B - 完全空 Payload)",
+            "name": "測試 3：getVix (專屬 API 測試 B - 完全空 Payload)",
             "url": "https://mis.taifex.com.tw/futures/api/getVix",
             "payload": {}
         }
@@ -1512,28 +1507,27 @@ def debug_mis_taifex_v2():
     for case in test_cases:
         st.markdown(f"#### 🔍 {case['name']}")
         try:
-            # 這次全面採用 POST 請求
             res = requests.post(case['url'], json=case['payload'], headers=headers_mis, timeout=5)
             st.write(f"**HTTP 狀態碼:** `{res.status_code}`")
             
             if res.status_code == 200:
                 json_data = res.json()
                 
-                # 檢查期交所自定義的錯誤碼 RtCode (1 代表失敗, 0 代表成功)
-                if "RtCode" in json_data and json_data["RtCode"] == "1":
-                    st.error(f"❌ 伺服器拒絕：{json_data.get('RtMsg')}")
+                # 直接判斷 RtData 裡面有沒有我們要的資料
+                if "RtData" in json_data and json_data["RtData"]:
+                    st.success("✅ 這裡有資料！")
                 else:
-                    st.success("✅ 成功！抓到正確通關密語了，資料如下：")
-                    st.json(json_data)
-                    # 抓到就停止迴圈，避免畫面太長
-                    break 
+                    st.warning(f"⚠️ 空包彈 (RtCode: {json_data.get('RtCode')})")
+                    
+                # 這次絕對不 break，強制把所有 JSON 結構印出來
+                st.json(json_data)
             else:
                 st.error(f"❌ HTTP 失敗，狀態碼：{res.status_code}")
         except Exception as e:
             st.error(f"🚨 錯誤: {e}")
 
 # 直接呼叫此函數進行測試
-debug_mis_taifex_v2()
+debug_mis_taifex_v3()
 #
 @st.cache_data(ttl=300) 
 def fetch_macro_indicators():
