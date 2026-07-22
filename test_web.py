@@ -1521,7 +1521,7 @@ def debug_all_vix_apis():
 debug_all_vix_apis()
 
 # ======================================================
-# 分頁3 - 總經導航 (🚀 Session 突破與 API 雙重引擎版)
+# 分頁3 - 總經導航 (🚀 終極 HTML 解析版 - 專攻期交所網頁)
 # ======================================================
 @st.cache_data(ttl=900) 
 def fetch_macro_indicators():
@@ -1545,51 +1545,58 @@ def fetch_macro_indicators():
             data["vix"]["pct"] = float((latest - prev) / prev * 100)
     except: pass
 
-    # --- 2. 🇹🇼 台股 VIX (VIXTWN) ---
+    # --- 2. 🇹🇼 台股 VIX (期交所 HTML 表格精準解析) ---
+    headers = {
+        "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36",
+        "Accept-Language": "zh-TW,zh;q=0.9"
+    }
     
-    # 🌟 策略 A: 鉅亨網 (Anue) 隱藏版 JSON API (最快、無防爬蟲)
+    # 🌟 策略 A: 抓取「每日收盤 VIX」表格 (最穩健，能算出漲跌幅)
     try:
-        res_cnyes = requests.get("https://ws.api.cnyes.com/ws/api/v1/quote/quotes/TWS:TWVIX:INDEX", timeout=5)
-        if res_cnyes.status_code == 200:
-            cnyes_data = res_cnyes.json()
-            if "data" in cnyes_data and len(cnyes_data["data"]) > 0:
-                price = cnyes_data["data"][0].get("price")
-                if price and 10.0 <= float(price) <= 150.0:
-                    data["vixtwn"]["value"] = float(price)
-                    data["vixtwn"]["pct"] = 0.0
+        res_daily = requests.get("https://www.taifex.com.tw/cht/3/vixInfo", headers=headers, timeout=5)
+        if res_daily.status_code == 200:
+            # 清除換行符號，讓 HTML 變成一行，方便正則表達式抓取
+            html = res_daily.text.replace('\n', '').replace('\r', '')
+            
+            # 尋找表格結構：<td>2024/07/21</td> <td>36.55</td>
+            matches = re.findall(r'<td[^>]*>\s*(\d{4}/\d{2}/\d{2})\s*</td>\s*<td[^>]*>\s*([1-9]\d{1,2}\.\d{2})\s*</td>', html)
+            
+            if matches:
+                matches.sort(key=lambda x: x[0])  # 確保依日期由舊到新排序
+                latest_vix = float(matches[-1][1])
+                
+                # 確保 VIX 數值在合理區間，排除異常抓取
+                if 10.0 <= latest_vix <= 150.0:
+                    data["vixtwn"]["value"] = latest_vix
+                    # 計算今日與昨日的漲跌幅
+                    if len(matches) >= 2:
+                        prev_vix = float(matches[-2][1])
+                        data["vixtwn"]["pct"] = (latest_vix - prev_vix) / prev_vix * 100
+                    else:
+                        data["vixtwn"]["pct"] = 0.0
     except: pass
 
-    # 🌟 策略 B: 期交所 Session 破解法 (若 API 失效時啟動)
+    # 🌟 策略 B: 若日報表抓不到，改抓「盤中每分鐘 VIX」表格 (備用)
     if data["vixtwn"]["value"] is None:
         try:
-            # 使用 Session 才能自動記住伺服器發的通行證 (Cookies)
-            session = requests.Session()
-            headers = {
-                "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36",
-                "Referer": "https://www.taifex.com.tw/cht/7/vixMinNew"
-            }
-            # 第一步：先 GET 敲門，取得 JSESSIONID 通行證
-            session.get("https://www.taifex.com.tw/cht/7/vixMinNew", headers=headers, timeout=5)
-            
-            # 第二步：帶著剛剛拿到的通行證，發送 POST 請求下載 CSV
-            res_csv = session.post("https://www.taifex.com.tw/cht/7/vixMinNew", data={"down_type": "1"}, headers=headers, timeout=5)
-            
-            if res_csv.status_code == 200:
-                match_close = re.search(r'Last 1 min AVG\s+([\d\.]+)', res_csv.text)
-                if match_close:
-                    data["vixtwn"]["value"] = float(match_close.group(1))
-                    data["vixtwn"]["pct"] = 0.0
-                else:
-                    matches = re.findall(r'\d{6,8}\s+([1-9]\d{1,2}\.\d{2})', res_csv.text)
-                    if matches:
-                        data["vixtwn"]["value"] = float(matches[-1])
+            res_min = requests.get("https://www.taifex.com.tw/cht/7/vixMinNew", headers=headers, timeout=5)
+            if res_min.status_code == 200:
+                html = res_min.text.replace('\n', '').replace('\r', '')
+                
+                # 尋找表格結構：<td>13:45:00</td> <td>36.54</td>
+                matches = re.findall(r'<td[^>]*>\s*(\d{2}:\d{2}:\d{2})\s*</td>\s*<td[^>]*>\s*([1-9]\d{1,2}\.\d{2})\s*</td>', html)
+                
+                if matches:
+                    latest_vix = float(matches[-1][1])  # 陣列最後一個就是最新報價
+                    if 10.0 <= latest_vix <= 150.0:
+                        data["vixtwn"]["value"] = latest_vix
                         data["vixtwn"]["pct"] = 0.0
         except: pass
 
     # --- 3. CNN 恐懼貪婪指數 ---
     try:
         headers_cnn = {
-            "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36",
+            "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64)",
             "Accept": "application/json",
             "Referer": "https://edition.cnn.com/"
         }
