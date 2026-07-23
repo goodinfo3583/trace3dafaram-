@@ -1,9 +1,9 @@
-# style_manager.py
 import streamlit as st
 import base64
 import os
 import random
 
+#隱藏設定
 def load_global_css():
     """載入全站共用的隱藏設定與基本 CSS"""
     hide_streamlit_style = """
