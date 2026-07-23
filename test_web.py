@@ -11,7 +11,7 @@ import pytz
 import math
 import streamlit.components.v1 as components
 import plotly.express as px
-
+from components import style_manager
 # ==========================================
 # 1. 網頁基本設定 & 目錄路徑初始化
 # ==========================================
