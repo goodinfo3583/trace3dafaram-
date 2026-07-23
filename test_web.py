@@ -12,22 +12,26 @@ import math
 import streamlit.components.v1 as components
 import plotly.express as px
 from components import style_manager
+
 # ==========================================
 # 1. 網頁基本設定 & 目錄路徑初始化
 # ==========================================
 st.set_page_config(page_title="股市派對", layout="wide")
 
-#  啟動 Google Sheets 連線引擎 (全域共用)
+# ==========================================
+# 2. 啟動 Google Sheets 連線與目錄初始化
+# ==========================================
 from streamlit_gsheets import GSheetsConnection
 conn = st.connection("gsheets", type=GSheetsConnection)
 SHEET_URL = "https://docs.google.com/spreadsheets/d/1TxHDahg8ul6lmUtDN-7X75cBXbkU0jaZ3M9zg6exBgU"
 
-# 👉 步驟 1：先集中宣告所有的路徑變數
+# 先集中所有的路徑變數
 DATA_DIR = "./data"
 
 SCORE_HISTORY_DIR = os.path.join(DATA_DIR, "ScoreHistory")
 MARKET_HISTORY_DIR = os.path.join(DATA_DIR, "MarketHistory")
 BLOCK_HISTORY_DIR = os.path.join(DATA_DIR, "BlockHistory")
+
 # ==========================================
 # 🌌 網站主視覺背景設定引擎
 # ==========================================
