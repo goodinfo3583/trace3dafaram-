@@ -2,308 +2,51 @@ import streamlit as st
 import pandas as pd
 import numpy as np
 import os
-import base64
 import glob
 import re
 import datetime
 import requests  
 import pytz  
 import math
-import streamlit.components.v1 as components
 import plotly.express as px
+from streamlit_gsheets import GSheetsConnection
 
-# 隱藏 Streamlit
-hide_streamlit_style = """
-            <style>
-            #MainMenu {visibility: hidden;}
-            footer {visibility: hidden;}
-            header {visibility: hidden;}
-            div[data-testid="stToolbar"] {visibility: hidden;}
-            </style>
-            """
-st.markdown(hide_streamlit_style, unsafe_allow_html=True)
-#置頂預留縮排
-st.markdown("""
-    <style>
-    /* 縮小頁面頂部的留白 */
-    .block-container {
-        padding-top: 0 rem; /* 預設通常是 3rem，您可以調整成 0.5rem 或 0rem */
-    }
-    </style>
-""", unsafe_allow_html=True)
-#置頂預留縮排
-#除錯紅色框
-#st.markdown("""
-    #<style>
-    #/* 給所有主要的區塊加上紅色邊框 */
-    #div[data-testid="stVerticalBlock"] {
-        #border: 2px solid red !important;
-    #}
-    #</style>
-#""", unsafe_allow_html=True)
-#除錯紅色框
+# 🔗 引入我們剛建好的 UI 管理模組
+from components import style_manager
 
 # ==========================================
-# 1. 網頁基本設定 & 目錄路徑初始化
+# 1. 網頁基本設定 (此行絕對不能移動)
 # ==========================================
 st.set_page_config(page_title="股市派對", layout="wide")
 
-# 👇 啟動 Google Sheets 連線引擎 (全域共用)
-from streamlit_gsheets import GSheetsConnection
+# ==========================================
+# 2. 啟動 Google Sheets 連線與目錄初始化
+# ==========================================
 conn = st.connection("gsheets", type=GSheetsConnection)
 SHEET_URL = "https://docs.google.com/spreadsheets/d/1TxHDahg8ul6lmUtDN-7X75cBXbkU0jaZ3M9zg6exBgU"
 
-# 👉 步驟 1：先集中宣告所有的路徑變數
-DATA_DIR = "./data"
-
+DATA_DIR = "./Goodinfo_Rankings"
 SCORE_HISTORY_DIR = os.path.join(DATA_DIR, "ScoreHistory")
 MARKET_HISTORY_DIR = os.path.join(DATA_DIR, "MarketHistory")
 BLOCK_HISTORY_DIR = os.path.join(DATA_DIR, "BlockHistory")
-# ==========================================
-# 🌌 網站主視覺背景設定引擎
-# ==========================================
-def set_background(image_path):
-    try:
-        # 使用傳入的完整路徑來開啟圖片
-        with open(image_path, "rb") as file:
-            encoded_string = base64.b64encode(file.read()).decode()
-            
-        # rgba(15, 23, 42, 0.88) 為深色科技藍遮罩，可依清晰度需求調整 0.88 這個數值
-        css = f"""
-        <style>
-        .stApp {{
-            background-image: 
-                linear-gradient(rgba(15, 23, 42, 0.88), rgba(15, 23, 42, 0.88)), 
-                url(data:image/png;base64,{encoded_string});
-            background-size: cover;
-            background-position: center center;
-            background-attachment: fixed;
-        }}
-        
-        /* 讓區塊卡片帶有微微的透明玻璃質感 */
-        div[data-testid="stVerticalBlock"] > div[style*="border"] {{
-            background-color: rgba(15, 23, 42, 0.6) !important;
-            backdrop-filter: blur(4px); 
-        }}
-        </style>
-        """
-        st.markdown(css, unsafe_allow_html=True)
-    except FileNotFoundError:
-        st.warning(f"⚠️ 找不到背景圖片檔：{image_path}，請確認檔名與路徑是否完全正確。")
 
-# ==========================================
-# 🌌 網頁風格設計
-# ==========================================
-st.markdown(
-    """
-    <style>
-    /* 1. 變更全站主背景色 */
-    .stApp { background-color: #0A0D14 !important; }
-    
-    /* 2. 強制標題與內文變成明亮的灰白 */
-    h1, h2, h3, h4, h5, h6, p, label, .stMarkdown, .stText { color: #E2E8F0 !important; }
-    
-    /* 3. 隱藏預設的通知背景 */
-    [data-testid="stAlert"] { background-color: transparent !important; border: 1px solid #2D3748 !important; }
-    
-    /* 4. 側邊欄背景色與邊框 */
-    [data-testid="stSidebar"] { background-color: #111622 !important; border-right: 1px solid #1E293B; }
-    
-    /* 5. 輸入框等元件 */
-    .stTextInput>div>div>input { background-color: #1A202C !important; color: #FFFFFF !important; border: 1px solid #4A5568 !important; }
-    
-    /* 6. 表格深色化修正 */
-    div[data-testid="stDataFrame"] { background-color: #111622 !important; border: 1px solid #1E293B !important; border-radius: 6px; }
-
-    /* 7. 超連結優化 */
-    [data-testid="stSidebar"] a { color: #00D2FF !important; text-decoration: none !important; font-weight: 500 !important; letter-spacing: 0.5px; transition: all 0.3s ease; }
-    [data-testid="stSidebar"] a:hover { color: #FFD700 !important; text-shadow: 0px 0px 8px rgba(255, 215, 0, 0.5); }
-    
-    /* 8. 🔴 全局按鈕與連結按鈕護眼暗黑化 (解決刺眼問題) */
-    .stButton > button, .stLinkButton > a {
-        background-color: #1E293B !important; /* 深石板灰 */
-        color: #94A3B8 !important; /* 低調灰字 */
-        border: 1px solid #334155 !important;
-        transition: all 0.2s ease-in-out;
-    }
-    /* 滑鼠懸停時才亮起科技藍 */
-    .stButton > button:hover, .stLinkButton > a:hover {
-        border-color: #00D2FF !important;
-        color: #00D2FF !important;
-        box-shadow: 0 0 8px rgba(0, 210, 255, 0.2);
-    }
-    </style>
-    """,
-    unsafe_allow_html=True
-)
-# ==========================================
-# 🖼️ 網站圖片資料夾路徑初始化
-# ==========================================
-# 👉 宣告專門存放網頁圖片素材的資料夾
 IMAGE_DIR = "./image"
-
-# 🌟 新增防護罩：如果資料夾不存在，就自動建立一個，避免程式報錯
 if not os.path.exists(IMAGE_DIR):
     os.makedirs(IMAGE_DIR)
 
-# 👉 自動組合新路徑：./image/派對盛宴邀請.png
-bg_path = os.path.join(IMAGE_DIR, "派對盛宴邀請.png")
-set_background(bg_path)
-
-#=====
-#動態視覺特效設計
-#=====
 # ==========================================
-# ✨ 頂級視覺魔法：純代碼動態螢火蟲/粒子引擎
+# 3. 呼叫渲染視覺元件 (一行代碼，乾淨俐落)
 # ==========================================
-def render_fireflies():
-    import random
-    
-    # 🌟 這裡可以自訂螢火蟲的數量
-    num_fireflies = 5 
-    
-    css_rules = []
-    html_divs = []
-    
-    # 利用 Python 迴圈，隨機生成每一隻螢火蟲的飛行軌跡與閃爍頻率
-    for i in range(num_fireflies):
-        size = random.uniform(2, 5)          # 螢火蟲大小 (px)
-        start_x = random.uniform(0, 100)     # 初始 X 座標 (0~100vw)
-        start_y = random.uniform(0, 100)     # 初始 Y 座標 (0~100vh)
-        move_x = random.uniform(-20, 20)     # 橫向飄移範圍
-        move_y = random.uniform(-20, 20)     # 縱向飄移範圍
-        duration = random.uniform(10, 25)    # 飛行一圈花費時間 (10~25秒，製造錯落感)
-        delay = random.uniform(0, 10)        # 延遲出發時間
-        pulse_dur = random.uniform(2, 5)     # 呼吸燈閃爍頻率
-        
-        # 針對單隻螢火蟲寫入專屬 CSS 動畫
-        css_rules.append(f"""
-        .firefly-{i} {{
-            position: absolute;
-            width: {size}px; height: {size}px;
-            left: {start_x}vw; top: {start_y}vh;
-            background: #FFFFDF; /* 🟡 核心顏色：金黃色 */
-            border-radius: 50%;
-            box-shadow: 0 0 {size*3}px {size}px rgba(255, 215, 0, 0.6); /* 發光暈暈效果 */
-            animation: drift-{i} {duration}s infinite ease-in-out {delay}s, flash-{i} {pulse_dur}s infinite ease-in-out {delay}s;
-            opacity: 0;
-        }}
-        /* 飛行軌跡動畫 */
-        @keyframes drift-{i} {{
-            0% {{ transform: translate(0px, 0px); }}
-            25% {{ transform: translate({move_x}vw, {move_y}vh); }}
-            50% {{ transform: translate({move_x/2}vw, {move_y*1.5}vh); }}
-            75% {{ transform: translate({-move_x}vw, {move_y/2}vh); }}
-            100% {{ transform: translate(0px, 0px); }}
-        }}
-        /* 呼吸燈閃爍動畫 */
-        @keyframes flash-{i} {{
-            0%, 100% {{ opacity: 0; }}
-            50% {{ opacity: {random.uniform(0.5, 1.0)}; }}
-        }}
-        """)
-        html_divs.append(f"<div class='firefly-{i}'></div>")
-    
-    # 組合 CSS 與 HTML 容器
-    full_code = f"""
-    <style>
-    .fireflies-container {{
-        position: fixed;
-        top: 0; left: 0; width: 100vw; height: 100vh;
-        pointer-events: none; /* 🛡️ 絕對關鍵：這讓滑鼠可以穿透特效，不會擋住任何按鈕點擊！ */
-        z-index: 1000;        /* 浮在背景之上，但可以在你的下拉選單或置頂選單之下 */
-        overflow: hidden;
-    }}
-    {''.join(css_rules)}
-    </style>
-    <div class="fireflies-container">
-        {''.join(html_divs)}
-    </div>
-    """
-    st.markdown(full_code, unsafe_allow_html=True)
+style_manager.load_global_css()
+style_manager.set_background(os.path.join(IMAGE_DIR, "派對盛宴邀請.png"))
+style_manager.render_fireflies()
+style_manager.render_marquee()
 
-# =========================
-# 👇 呼叫動態視覺特效設計
-# =========================
-render_fireflies()
-
-#跑馬燈
 # ==========================================
-# 跑馬燈區塊 (終極全自動配時 + 尺寸自訂 + 無縫直接切換版)
+# 🛑 隱形急救引擎 (這是你原本檔案 307 行開始的內容...)
 # ==========================================
-# 1. 圖片轉 Base64 的輔助函式
-def get_image_base64(image_path):
-    with open(image_path, "rb") as image_file:
-        data = image_file.read()
-        mime_type = "image/gif" if image_path.lower().endswith('.gif') else "image/png"
-        encoded_string = base64.b64encode(data).decode()
-    return f"data:{mime_type};base64,{encoded_string}"
-
-# 2. 圖片檔名列表與資料夾設定
-image_folder = "static" 
-image_files = ["沙漠之城.png", "法人意向.png", "組合畫家.png", "組合化學晶礦.png", "鐵風堡b.png"]
-
-# 💡 核心升級：自動計算時間，防呆防錯！
-total_images = len(image_files)
-time_per_slide = 5  # 每張圖片顯示 5 秒
-total_time = total_images * time_per_slide
-
-# 自動算出每張圖佔據的百分比 (例如 5 張就是 20.0%)
-visible_percent = (1 / total_images) * 100 
-
-# 3. 組合圖片標籤與自動生成 CSS 延遲時間
-image_tags = ""
-delay_css = ""
-for i, img_name in enumerate(image_files):
-    img_path = os.path.join(image_folder, img_name)
-    if os.path.exists(img_path):
-        b64 = get_image_base64(img_path)
-        image_tags += f'<img class="slide slide-{i}" src="{b64}">'
-        delay_css += f"    .slide-{i} {{ animation-delay: {i * time_per_slide}s; }}\n"
-    else:
-        st.error(f"系統找不到這張圖片：{img_path}，請檢查檔名或大小寫！")
-
-# 4. 輪播圖 HTML/CSS (直接切換版)
-marquee_code = f"""
-<style>
-    .slideshow-container {{
-        position: relative;
-        width: 800px;
-        height: 100px;
-        margin: 0 auto 10px auto; 
-        background-color: #0A0D14;
-        display: flex;
-        justify-content: center;
-        align-items: center;
-        overflow: hidden;
-    }}
-    
-    .slide {{
-        position: absolute;
-        height: 100%;
-        object-fit: contain; 
-        visibility: hidden; 
-        opacity: 0;
-        animation: cut {total_time}s infinite; /* 改用名為 cut 的動畫 */
-    }}
-
-    /* 注入 Python 算好的延遲時間 */
-{delay_css}
-
-    /* 💡 乾淨俐落的「直接切換」，強制在極短瞬間完成交接 */
-    @keyframes cut {{
-        0%, {visible_percent - 0.01:.2f}%   {{ visibility: visible; opacity: 1; }} 
-        {visible_percent:.2f}%, 100%        {{ visibility: hidden; opacity: 0; }}  
-    }}
-</style>
-
-<div class="slideshow-container">
-    {image_tags}
-</div>
-"""
-
-# 渲染到網頁上
-st.markdown(marquee_code, unsafe_allow_html=True)
+# if not os.path.exists(DATA_DIR): os.makedirs(DATA_DIR)
+# ... 下方銜接你原有的資料處理邏輯 ...
 # ==========================================
 # 🛑 隱形急救引擎 (請置於程式最頂端，絕對不要刪除！)
 # ==========================================
