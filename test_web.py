@@ -32,6 +32,7 @@ SCORE_HISTORY_DIR = os.path.join(DATA_DIR, "ScoreHistory")
 MARKET_HISTORY_DIR = os.path.join(DATA_DIR, "MarketHistory")
 BLOCK_HISTORY_DIR = os.path.join(DATA_DIR, "BlockHistory")
 
+# 存放網頁圖片素材的路徑
 IMAGE_DIR = "./image"
 if not os.path.exists(IMAGE_DIR):
     os.makedirs(IMAGE_DIR)
@@ -121,19 +122,6 @@ st.markdown(
     """,
     unsafe_allow_html=True
 )
-# ==========================================
-# 🖼️ 網站圖片資料夾路徑初始化
-# ==========================================
-# 👉 宣告專門存放網頁圖片素材的資料夾
-IMAGE_DIR = "./image"
-
-# 🌟 新增防護罩：如果資料夾不存在，就自動建立一個，避免程式報錯
-if not os.path.exists(IMAGE_DIR):
-    os.makedirs(IMAGE_DIR)
-
-# 👉 自動組合新路徑：./image/派對盛宴邀請.png
-bg_path = os.path.join(IMAGE_DIR, "派對盛宴邀請.png")
-set_background(bg_path)
 
 #=====
 #動態視覺特效設計
