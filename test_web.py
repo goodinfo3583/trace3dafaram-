@@ -426,7 +426,7 @@ def get_stock_dictionary():
     
     # 假設 DATA_DIR 已經在全域宣告，若無請確保替換為實際字串
     search_patterns = [
-        "./Goodinfo_Rankings/*辨識號碼*.txt",
+        "./data/*辨識號碼*.txt",
         "./*辨識號碼*.txt"
     ]
     dict_files = []
@@ -1900,7 +1900,7 @@ top_pool_slot = st.empty()
 from collections import defaultdict
 
 @st.cache_data(ttl=3600)
-def load_foreign_ratio_data(data_dir="./Goodinfo_Rankings"):
+def load_foreign_ratio_data(data_dir="./data"):
     """
     掃描資料夾中所有外資持股比例的 CSV 檔案。
     會自動將同一天(如1-300, 301-600)的檔案先垂直合併，再將不同日期的數據水平合併。
@@ -2006,7 +2006,7 @@ def extract_date_from_filename(filename):
 
 @st.cache_data(ttl=300)
 def build_block1_master_df():
-    DATA_DIR = "./Goodinfo_Rankings"
+    DATA_DIR = "./data"
     date_files = defaultdict(lambda: {'txt': [], 'csv': []})
     all_csv_files = glob.glob(os.path.join(DATA_DIR, "*JSON*.csv"))
     
@@ -2124,7 +2124,7 @@ def build_block1_master_df():
 def preload_all_csv_data():
     import os, glob
     import pandas as pd
-    DATA_DIR = "./Goodinfo_Rankings"
+    DATA_DIR = "./data"
     
     # 智慧檔案尋找器 (加入終極欄位清洗，解決 KeyError)
     def safe_load(key, kw1, kw2=""):
@@ -2229,7 +2229,7 @@ def extract_date_from_filename(filename):
 # 🛠️ 核心巨集：合併所有歷史快照與 GitHub 即時數據，產生全域母表
 @st.cache_data(ttl=300)
 def build_block1_master_df():
-    DATA_DIR = "./Goodinfo_Rankings"
+    DATA_DIR = "./data"
     date_files = defaultdict(lambda: {'txt': [], 'csv': []})
     all_csv_files = glob.glob(os.path.join(DATA_DIR, "*JSON*.csv"))
     
@@ -2369,7 +2369,7 @@ if current_page in ["all", "b1"]:
     # ------------------------------------------
     # 💾 站長專屬：JSON 200名快照存檔區
     # ------------------------------------------
-    DATA_DIR = "./Goodinfo_Rankings"
+    DATA_DIR = "./data"
     all_json_csvs = glob.glob(os.path.join(DATA_DIR, "*JSON_History.csv"))
     local_latest_date = "無紀錄"
     if all_json_csvs:
@@ -2385,7 +2385,7 @@ if current_page in ["all", "b1"]:
     c_btn1, c_btn2 = st.columns(2)
 
     with c_btn1: 
-        st.link_button("📊 台股法人籌碼追蹤(50名)", "https://goodinfo3583.github.io/DDong_tw-institutional-stocker/", use_container_width=True)
+        st.link_button("📊 台股法人籌碼追蹤 (50名)", "https://goodinfo3583.github.io/DDong_tw-institutional-stocker/", use_container_width=True)
 
     with c_btn2:
         try: exp_container = st.popover(f"🛠 站長快照 ({status_text})", use_container_width=True)
