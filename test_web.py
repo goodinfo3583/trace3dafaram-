@@ -12,37 +12,6 @@ import math
 import streamlit.components.v1 as components
 import plotly.express as px
 
-# 隱藏 Streamlit
-hide_streamlit_style = """
-            <style>
-            #MainMenu {visibility: hidden;}
-            footer {visibility: hidden;}
-            header {visibility: hidden;}
-            div[data-testid="stToolbar"] {visibility: hidden;}
-            </style>
-            """
-st.markdown(hide_streamlit_style, unsafe_allow_html=True)
-#置頂預留縮排
-st.markdown("""
-    <style>
-    /* 縮小頁面頂部的留白 */
-    .block-container {
-        padding-top: 0 rem; /* 預設通常是 3rem，您可以調整成 0.5rem 或 0rem */
-    }
-    </style>
-""", unsafe_allow_html=True)
-#置頂預留縮排
-#除錯紅色框
-#st.markdown("""
-    #<style>
-    #/* 給所有主要的區塊加上紅色邊框 */
-    #div[data-testid="stVerticalBlock"] {
-        #border: 2px solid red !important;
-    #}
-    #</style>
-#""", unsafe_allow_html=True)
-#除錯紅色框
-
 # ==========================================
 # 1. 網頁基本設定 & 目錄路徑初始化
 # ==========================================
