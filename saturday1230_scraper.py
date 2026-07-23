@@ -14,7 +14,7 @@ from selenium.webdriver.common.by import By
 # ==========================================
 # 1. 設定區塊
 # ==========================================
-SAVE_DIR = "Goodinfo_Rankings"
+SAVE_DIR = "data"
 if not os.path.exists(SAVE_DIR):
     os.makedirs(SAVE_DIR)
 

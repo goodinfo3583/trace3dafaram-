@@ -54,7 +54,7 @@ conn = st.connection("gsheets", type=GSheetsConnection)
 SHEET_URL = "https://docs.google.com/spreadsheets/d/1TxHDahg8ul6lmUtDN-7X75cBXbkU0jaZ3M9zg6exBgU"
 
 # 👉 步驟 1：先集中宣告所有的路徑變數
-DATA_DIR = "./Goodinfo_Rankings"
+DATA_DIR = "./data"
 
 SCORE_HISTORY_DIR = os.path.join(DATA_DIR, "ScoreHistory")
 MARKET_HISTORY_DIR = os.path.join(DATA_DIR, "MarketHistory")

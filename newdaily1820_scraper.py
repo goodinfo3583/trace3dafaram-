@@ -14,7 +14,7 @@ import re
 # ==========================================
 # 1. 基本設定區塊
 # ==========================================
-SAVE_DIR = "Goodinfo_Rankings"
+SAVE_DIR = "data"
 if not os.path.exists(SAVE_DIR):
     os.makedirs(SAVE_DIR)
 
