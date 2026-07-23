@@ -12,7 +12,7 @@ import plotly.express as px
 from streamlit_gsheets import GSheetsConnection
 
 # 🔗 引入我們剛建好的 UI 管理模組
-from components import style_manager
+from views import style_manager
 
 # ==========================================
 # 1. 網頁基本設定 (此行絕對不能移動)
