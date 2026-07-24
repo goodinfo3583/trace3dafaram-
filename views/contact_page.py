@@ -98,5 +98,4 @@ def show_contact_page(conn, SHEET_URL):
     # 🛑 補上隱藏的傀儡按鈕，避免在聯絡我們頁面時頂部導覽列失效網頁卡死！
     render_proxy_buttons()
     
-    # 🛑 最核心的魔法：渲染完聯絡表單後，直接強制停止後續程式！完全不讀取底下的大數據！
-    st.stop()
+

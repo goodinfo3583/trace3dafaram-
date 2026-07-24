@@ -75,7 +75,20 @@ if current_page == "news":
     show_news_page()
 elif current_page == "contact":
     show_contact_page(conn, SHEET_URL)
-    
+elif current_page == "b1":
+    pass
+elif current_page == "b2":
+    pass
+elif current_page == "b3":
+    pass
+
+elif current_page == "b4":
+    pass
+elif current_page == "b5":
+    pass
+
+elif current_page == "b6":
+    pass    
 # ==========================================
 # 🌟 "觀察名單"專屬工具函數區 (補回遺失的計分工具)
 # ==========================================
@@ -5009,11 +5022,3 @@ if current_page in ["all", "pool"]:
 render_proxy_buttons()
 
 
-# ==========================================
-# 🧪 測試區：Google Sheets 連線測試
-# ==========================================
-#if st.button("🔄 立即強制同步大數據"):
-    # 在這裡做完你的資料更新邏輯...
-    
-    # 強制網頁從頭重跑，清洗並更新畫面
-    #st.rerun()
