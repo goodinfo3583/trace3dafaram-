@@ -38,7 +38,7 @@ if not os.path.exists(IMAGE_DIR):
     os.makedirs(IMAGE_DIR)
 
 # ==========================================
-# 3. 呼叫渲染視覺元件 
+# 3. 呼叫渲染視覺元件 components
 # ==========================================
 style_manager.load_global_css()
 style_manager.set_background(os.path.join(IMAGE_DIR, "派對盛宴邀請.png"))
