@@ -135,3 +135,25 @@ def inject_custom_header():
     """
     # 透過隱藏的 iframe 執行上述的 JavaScript 注入
     components.html(inject_js, height=0, width=0)
+
+
+# 放在 components/nav_manager.py 的最下方
+import streamlit as st
+
+def render_proxy_buttons():
+    """幕後無縫換頁引擎 (隱藏的切換按鈕)"""
+    def change_page(page_name):
+        st.query_params["page"] = page_name 
+
+    with st.container():
+        # 建立隱形按鈕，這裡的字串必須對應你 JS 裡面的 data-target
+        st.button("NavToContact", on_click=change_page, args=("contact",))
+        st.button("NavToNews", on_click=change_page, args=("news",))
+        st.button("NavToPool", on_click=change_page, args=("pool",))
+        st.button("NavToB1", on_click=change_page, args=("b1",))
+        st.button("NavToB2", on_click=change_page, args=("b2",))
+        st.button("NavToB3", on_click=change_page, args=("b3",))
+        st.button("NavToB4", on_click=change_page, args=("b4",))
+        st.button("NavToB5", on_click=change_page, args=("b5",))
+        st.button("NavToB6", on_click=change_page, args=("b6",))
+        st.button("登入專區", on_click=change_page, args=("login",))
