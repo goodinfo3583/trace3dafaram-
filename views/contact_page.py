@@ -96,6 +96,6 @@ def show_contact_page(conn, SHEET_URL):
                         st.error(f"❌ 傳送失敗，後台連線異常：{str(e)}")
                         
     # 🛑 補上隱藏的傀儡按鈕，避免在聯絡我們頁面時頂部導覽列失效網頁卡死！
-    render_proxy_buttons()
+    # render_proxy_buttons()
     
 
