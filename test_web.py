@@ -5019,5 +5019,4 @@ if current_page in ["all", "pool"]:
 # 🎭 幕後無縫換頁引擎 (放在最後)
 # ==========================================
 # 如果程式順利走到這裡(沒有被上面的 st.stop 攔截)，就渲染按鈕
-nav)manager.render_proxy_buttons()
-
+nav_manager.render_proxy_buttons()
