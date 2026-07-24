@@ -4226,28 +4226,6 @@ if current_page in ["all", "b6"]:
 
   
 # ==========================================以上網頁核心區塊↑↑↑↑↑
-# ==========================================
-# 🎭 幕後無縫換頁引擎 (先定義成函數，供全站各區塊的 st.stop() 呼叫)切換頁避免卡死
-# ==========================================
-def render_proxy_buttons():
-    """將隱藏按鈕打包成函數，確保在 st.stop() 切斷程式前能被提早渲染"""
-    def change_page(page_name):
-        st.session_state.current_page = page_name
-        st.query_params["page"] = page_name 
-
-    with st.container():
-        st.button("NavToNews", on_click=change_page, args=("news",))
-        st.button("NavToPool", on_click=change_page, args=("pool",))
-        st.button("NavToB1", on_click=change_page, args=("b1",))
-        st.button("NavToB2", on_click=change_page, args=("b2",))
-        st.button("NavToB3", on_click=change_page, args=("b3",))
-        st.button("NavToB4", on_click=change_page, args=("b4",))
-        st.button("NavToB5", on_click=change_page, args=("b5",))
-        st.button("NavToB6", on_click=change_page, args=("b6",))
-        st.button("NavToContact", on_click=change_page, args=("contact",))
-
-
-
 # ==========================================↓↓↓
 # 🔒 觀察名單專屬包廂鎖 頂級核心數據分析觀察名單 (🚨 必須放在計分部分檔案最下方！)
 # ==========================================
@@ -5012,9 +4990,7 @@ if current_page in ["all", "pool"]:
                 # 👇 呼叫這個局部渲染魔法函數，把剛剛算好的分數傳進去！
                 render_pool_interactive_ui(res_df, hist_combined)
         
-# ==========================================
-# 🧪 測試區：Google Sheets 連線測試
-# ==========================================
+
 # ==========================================
 # 🎭 幕後無縫換頁引擎 (放在最後)
 # ==========================================
