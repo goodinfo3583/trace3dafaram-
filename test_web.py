@@ -23,7 +23,7 @@ from utils.data_utils import (
 st.set_page_config(page_title="股市派對", layout="wide")
 # 呼叫渲染視覺元件 components
 style_manager.load_global_css()
-style_manager.set_background(os.path.join(IMAGE_DIR, "派對盛宴邀請.png")
+style_manager.set_background("./image/派對盛宴邀請.png")
 style_manager.render_fireflies()
 style_manager.render_marquee()
 # 注入客製化頂部導覽列
