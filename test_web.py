@@ -21,6 +21,13 @@ from utils.data_utils import (
 # 1. 網頁基本設定 & 目錄路徑初始化
 # ==========================================
 st.set_page_config(page_title="股市派對", layout="wide")
+# 呼叫渲染視覺元件 components
+style_manager.load_global_css()
+style_manager.set_background(os.path.join(IMAGE_DIR, "派對盛宴邀請.png"))
+style_manager.render_fireflies()
+style_manager.render_marquee()
+# 注入客製化頂部導覽列
+nav_manager.inject_custom_header()
 
 # ==========================================
 # 2. 啟動 Google Sheets 連線與目錄初始化
@@ -35,31 +42,17 @@ DATA_DIR = "./data"
 SCORE_HISTORY_DIR = os.path.join(DATA_DIR, "ScoreHistory")
 MARKET_HISTORY_DIR = os.path.join(DATA_DIR, "MarketHistory")
 BLOCK_HISTORY_DIR = os.path.join(DATA_DIR, "BlockHistory")
-
-# 存放網頁圖片的路徑
-IMAGE_DIR = "./image"
-if not os.path.exists(IMAGE_DIR):
-    os.makedirs(IMAGE_DIR)
-
-# ==========================================
-# 3. 呼叫渲染視覺元件 components
-# ==========================================
-style_manager.load_global_css()
-style_manager.set_background(os.path.join(IMAGE_DIR, "派對盛宴邀請.png"))
-style_manager.render_fireflies()
-style_manager.render_marquee()
-# 🚀 注入客製化頂部導覽列
-nav_manager.inject_custom_header()
-
-# ==========================================
 #  隱形急救引擎 (請置於程式最頂端，絕對不要刪除！)
-# ==========================================
 # 即使不顯示區塊 0 面板，這段程式碼也必須存在，
 # 否則側邊欄導航會因為讀不到歷史檔案而顯示「查無資料」。
 if not os.path.exists(DATA_DIR): os.makedirs(DATA_DIR)
 if not os.path.exists(SCORE_HISTORY_DIR): os.makedirs(SCORE_HISTORY_DIR)
 if not os.path.exists(MARKET_HISTORY_DIR): os.makedirs(MARKET_HISTORY_DIR)
 if not os.path.exists(BLOCK_HISTORY_DIR): os.makedirs(BLOCK_HISTORY_DIR)
+# 存放網頁圖片的路徑
+IMAGE_DIR = "./image"
+if not os.path.exists(IMAGE_DIR):
+    os.makedirs(IMAGE_DIR)
 
 # 定義路徑
 backup_df_path = os.path.join(DATA_DIR, "sidebar_twse_df_backup.csv")
@@ -76,16 +69,11 @@ if not os.path.exists(backup_df_path):
 if not os.path.exists(backup_margin_path):
     pd.DataFrame([{"today_bal": 556359646.0, "prev_bal": 535025764.0}]).to_csv(backup_margin_path, index=False, encoding='utf-8-sig')
 
-
 # ==========================================
 # 🚦 網頁首頁路由控制中心 (極速切換引擎)
 # ==========================================
 # 【首頁預設】
 current_page = st.query_params.get("page", "b1")
-import streamlit as st
-import streamlit.components.v1 as components
-
-
 
 # ========================================================== 
 import time  # 引入時間模組來做快取破壞器開始 - 【市場消息】
