@@ -42,13 +42,12 @@ DATA_DIR = "./data"
 SCORE_HISTORY_DIR = os.path.join(DATA_DIR, "ScoreHistory")
 MARKET_HISTORY_DIR = os.path.join(DATA_DIR, "MarketHistory")
 BLOCK_HISTORY_DIR = os.path.join(DATA_DIR, "BlockHistory")
-#  隱形急救引擎 (請置於程式最頂端，絕對不要刪除！)
+# 隱形急救引擎 (置於程式最頂端，不要刪除)
 # 即使不顯示區塊 0 面板，這段程式碼也必須存在，否則側邊欄導航會因為讀不到歷史檔案而顯示「查無資料」。
 if not os.path.exists(DATA_DIR): os.makedirs(DATA_DIR)
 if not os.path.exists(SCORE_HISTORY_DIR): os.makedirs(SCORE_HISTORY_DIR)
 if not os.path.exists(MARKET_HISTORY_DIR): os.makedirs(MARKET_HISTORY_DIR)
 if not os.path.exists(BLOCK_HISTORY_DIR): os.makedirs(BLOCK_HISTORY_DIR)
-
 
 # 定義路徑
 backup_df_path = os.path.join(DATA_DIR, "sidebar_twse_df_backup.csv")
@@ -57,18 +56,14 @@ backup_margin_path = os.path.join(DATA_DIR, "sidebar_margin_backup.csv")
 # 1. 補法人備援
 if not os.path.exists(backup_df_path):
     pd.DataFrame({
-        '單位名稱': ['合計'],
-        '買賣差額': ['102770738307']
-    }).to_csv(backup_df_path, index=False, encoding='utf-8-sig')
-
+        '單位名稱': ['合計'], '買賣差額': ['102770738307']}).to_csv(backup_df_path, index=False, encoding='utf-8-sig')
 # 2. 補融資備援
 if not os.path.exists(backup_margin_path):
     pd.DataFrame([{"today_bal": 556359646.0, "prev_bal": 535025764.0}]).to_csv(backup_margin_path, index=False, encoding='utf-8-sig')
 
 # ==========================================
-# 🚦 網頁首頁路由控制中心 (極速切換引擎)
+# 3. 網頁首頁路由控制中心 (極速切換引擎)-首頁設定
 # ==========================================
-# 【首頁預設】
 current_page = st.query_params.get("page", "b1")
 
 # ========================================================== 
