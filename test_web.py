@@ -88,7 +88,9 @@ elif current_page == "b5":
     pass
 
 elif current_page == "b6":
-    pass    
+    pass
+elif current_page == "login"
+    pass
 # ==========================================
 # 🌟 "觀察名單"專屬工具函數區 (補回遺失的計分工具)
 # ==========================================
