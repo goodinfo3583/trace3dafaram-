@@ -43,16 +43,12 @@ SCORE_HISTORY_DIR = os.path.join(DATA_DIR, "ScoreHistory")
 MARKET_HISTORY_DIR = os.path.join(DATA_DIR, "MarketHistory")
 BLOCK_HISTORY_DIR = os.path.join(DATA_DIR, "BlockHistory")
 #  隱形急救引擎 (請置於程式最頂端，絕對不要刪除！)
-# 即使不顯示區塊 0 面板，這段程式碼也必須存在，
-# 否則側邊欄導航會因為讀不到歷史檔案而顯示「查無資料」。
+# 即使不顯示區塊 0 面板，這段程式碼也必須存在，否則側邊欄導航會因為讀不到歷史檔案而顯示「查無資料」。
 if not os.path.exists(DATA_DIR): os.makedirs(DATA_DIR)
 if not os.path.exists(SCORE_HISTORY_DIR): os.makedirs(SCORE_HISTORY_DIR)
 if not os.path.exists(MARKET_HISTORY_DIR): os.makedirs(MARKET_HISTORY_DIR)
 if not os.path.exists(BLOCK_HISTORY_DIR): os.makedirs(BLOCK_HISTORY_DIR)
-# 存放網頁圖片的路徑
-IMAGE_DIR = "./image"
-if not os.path.exists(IMAGE_DIR):
-    os.makedirs(IMAGE_DIR)
+
 
 # 定義路徑
 backup_df_path = os.path.join(DATA_DIR, "sidebar_twse_df_backup.csv")
