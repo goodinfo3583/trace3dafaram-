@@ -5,9 +5,19 @@ import re
 import pandas as pd
 import streamlit as st
 
-# 在這裡定義資料夾路徑，全站共用核心工具箱 函式
-DATA_DIR = "./data"
+# ==========================================
+# 📍 絕對路徑定位系統
+# ==========================================
+# 1. 取得目前這個檔案 (data_utils.py) 所在的目錄絕對路徑 (也就是 utils 資料夾)
+CURRENT_DIR = os.path.dirname(os.path.abspath(__file__))
 
+# 2. 往上一層推回專案根目錄 (test_web.py 所在的位子)
+PROJECT_ROOT = os.path.dirname(CURRENT_DIR)
+
+# 3. 精準定位到 舊名Goodinfo_Rankings (data) 資料夾
+DATA_DIR = os.path.join(PROJECT_ROOT, "data")
+
+# 搬過來的函式
 def extract_date_from_name(filename):
     """從檔名中萃取出 8 碼日期，供全站各區塊排序使用"""
     match = re.search(r'\d{8}', os.path.basename(filename))
