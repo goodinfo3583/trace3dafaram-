@@ -26,6 +26,7 @@ from views.b2_page import show_b2_page, sync_b2_data
 from views.b3_page import show_b3_page, sync_b3_data
 from views.b4_page import show_b4_page, sync_b4_data
 from views.b5_page import show_b5_page, sync_b5_data
+from views.b6_page import show_b6_page, sync_b6_data
 # ==========================================
 # 1. 網頁基本設定 & 目錄路徑初始化
 # ==========================================
@@ -84,6 +85,7 @@ if current_page == "all":
         sync_b3_data(DATA_DIR)
         sync_b4_data(DATA_DIR)
         sync_b5_data(DATA_DIR)
+        sync_b6_data(DATA_DIR)
         # 算完後，把使用者自動傳送回觀察名單
         st.session_state.current_page = "pool"
         st.query_params["page"] = "pool"
@@ -106,7 +108,7 @@ elif current_page == "b4":
 elif current_page == "b5":
     show_b5_page(DATA_DIR, STOCK_DICT)
 elif current_page == "b6":
-    pass
+    show_b6_page(DATA_DIR)
 
 # ==========================================
 # 🌟 所有"側邊雙視窗"專屬工具函數區 
@@ -2110,8 +2112,10 @@ if current_page in ["all", "b1"]:
 # 區塊 4 專屬包廂鎖
 # ==========================================
 
-
-            
+# ==========================================
+# 區塊 5 專屬包廂鎖
+# ==========================================
+          
 # ==========================================
 # 💸 區塊 6：盤後鉅額交易總表 (原生 Dataframe 升級版 + 交易別顯示)
 # ==========================================
