@@ -8,13 +8,31 @@
 
 │
 
-├── 📄test\_web.py                   #  主程式 (Router \& 初始化)
+├── 📄test\_web.py                   #  主程式 (main)(Router \& 初始化)
 
 │                                # 負責: 連線資料庫、讀取 Session、根據點擊把冒險者帶到對應的包廂(views)。
 
+├── 📄newdaily1820\_scraper.py #爬蟲每日法人買賣超資料、法人掃貨、法人連買、鉅額交易(證券交易所、櫃買中心、Goodinfo)
+
 │
 
-├── 📁 components/               #  裝潢與基礎設施 (UI 組件)
+├── 📄newdaily2200\_scraper.py #爬蟲每日 融資餘額 法人 資券動向(證券交易所、櫃買中心、Goodinfo)
+
+│
+
+├── 📄saturday1230\_scraper.py #爬蟲每周大股東變化 大腿動向(神秘金字塔、Goodinfo)
+
+│
+
+├── 📄requirements.txt
+
+│
+
+├── 📄README.md
+
+│
+
+├── 📁 components/               # 裝潢與基礎設施 (UI 組件)
 
 │   ├── 📄 nav\_manager.py        # 導航管家 (頂部 JS 導覽列、全站共用隱形按鈕)
 
@@ -44,5 +62,17 @@
 
 └── 📁 static/                   # 🖼️ 倉庫 (靜態資源)
 
-&#x20;   └── 📄 75743.jpg             # 管家圖片等
+│   └── 📄 75743.jpg             # 管家圖片等
+
+│
+
+│
+
+│
+
+│
+
+│
+
+└── 📁 data/         #存放所有基礎資料、爬蟲資料
 
