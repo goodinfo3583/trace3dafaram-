@@ -5,13 +5,14 @@ import os
 import glob
 import re
 
+#從GoodInfo萃取檔案外資投信買佔比及買佔發行張數日期
 def extract_date_from_name(filename):
     """從檔名萃取 8 碼日期 (202XXXXX)"""
     match = re.search(r'(202\d{5})', str(filename))
     return match.group(1) if match else "00000000"
 
 # ==========================================
-# ⚙️ 後台資料引擎 (Data Engine)：專責運算並寫入 Session
+# 後台資料引擎 (Data Engine)：專責運算並寫入 Session
 # ==========================================
 def sync_b2_data(DATA_DIR):
     """只在背景讀取 B2 資料並寫入 session_state，絕對不繪製任何 UI，確保極速運作"""
