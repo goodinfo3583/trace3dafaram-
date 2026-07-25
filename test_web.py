@@ -197,17 +197,17 @@ def generate_stock_commentary(query):
             if not res.empty:
                 # 模糊抓取動向欄位 (因為欄位名可能是'大股東動向'或'狀態動態')
                 for col in res.columns:
-                    if "動向" in col or "狀態" in col or "趨勢" in col:
+                    if "動向" in col or "狀態" in col or "趨勢" in col or "動態" in col:
                         return str(res.iloc[0][col])
         return ""
 
-    b5_trend_400 = check_big_holder('df_blk5')
+    b5_trend_400 = check_big_holder('b5_400')
     if "增" in b5_trend_400: score += 2
     elif "減" in b5_trend_400: 
         score -= 2
         warns.append("400張大戶減碼")
 
-    b5_trend_1000 = check_big_holder('df_blk5_1000')
+    b5_trend_1000 = check_big_holder('b5_1000')
     if "增" in b5_trend_1000: score += 2
     elif "減" in b5_trend_1000: 
         score -= 2
@@ -1055,8 +1055,8 @@ def render_sidebar_war_room():
             st.markdown("<h4 style='color: #FCD34D;'>💰 區塊 5：大腿動向</h4>", unsafe_allow_html=True)
             
             col_400, col_1000 = st.columns(2)
-            with col_400: scan_and_display("💎 400張以上大戶動向", 'df_blk5', search_query)
-            with col_1000: scan_and_display("🐳 1000張以上超級大戶動向", 'df_blk5_1000', search_query)
+            with col_400: scan_and_display("💎 400張以上大戶動向", 'b5_400', search_query)
+            with col_1000: scan_and_display("🐳 1000張以上超級大戶動向", 'b5_1000', search_query)
 
     # 💡 當搜尋列「沒有內容」時，顯示大盤總經 (隱藏下方 Tabs)
     if not search_query:
