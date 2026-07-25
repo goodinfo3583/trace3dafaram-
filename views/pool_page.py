@@ -442,7 +442,7 @@ def show_pool_page(conn, SHEET_URL, DATA_DIR, STOCK_DICT):
                         st.markdown("### 🧩 觀察名單中的資金聚落")
                         st.caption("將上方觀察名單轉換為產業面積大小，觀察法人口袋中持股變化集中的標的，切換顯示 總分 ▼變量  △ 名次 一覽 (我們排除 ETF 與債券)。")
                         
-                        if not f_res_df.empty and 'STOCK_DICT' in globals() and STOCK_DICT:
+                        if not f_res_df.empty and STOCK_DICT:
                             st.write("")
                             c_opt, c_search = st.columns([3, 1.5])
                             with c_opt:
