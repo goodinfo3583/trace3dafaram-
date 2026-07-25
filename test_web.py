@@ -20,6 +20,7 @@ from utils.data_utils import (
 # 頁面模組
 from views.news_page import show_news_page
 from views.contact_page import show_contact_page
+from views.pool_page import show_pool_page
 # ==========================================
 # 1. 網頁基本設定 & 目錄路徑初始化
 # ==========================================
@@ -69,12 +70,14 @@ if not os.path.exists(backup_margin_path):
 # ==========================================
 current_page = st.query_params.get("page", "b1")
 # ==========================================
-# 4. 🚀 頁面渲染分流
+# 4. 頁面渲染分流
 # ==========================================
 if current_page == "news":
     show_news_page()
 elif current_page == "contact":
     show_contact_page(conn, SHEET_URL)
+elif current_page == "pool":
+    show_pool_page(conn, SHEET_URL, DATA_DIR, STOCK_DICT)
 elif current_page == "b1":
     pass
 elif current_page == "b2":
@@ -91,7 +94,7 @@ elif current_page == "b6":
     pass
 
 # ==========================================
-# 🌟 "觀察名單"專屬工具函數區 (補回遺失的計分工具)
+# 🌟 "觀察名單"專屬工具函數區 
 # ==========================================
 
 def get_df_safe(key): 
