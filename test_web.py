@@ -79,7 +79,7 @@ if current_page == "all":
     # 在觀察名單按下「全市場掃描」後觸發的背景引擎
     with st.spinner("🚀 背景全市場數據高速運算中..."):
         # b1_page.sync_b1_data(DATA_DIR) # 未來搬運 B1 後解除註解
-        sync_b2_data(DATA_DIR)           # 在背景偷偷算好 B2
+        sync_b2_data(DATA_DIR)           # 在背景偷偷算好 b2
         sync_b3_data(DATA_DIR)
         # b3_page.sync_b3_data(DATA_DIR) # 未來搬運 B3 後解除註解
         
@@ -87,9 +87,7 @@ if current_page == "all":
         st.session_state.current_page = "pool"
         st.query_params["page"] = "pool"
         st.rerun()
-# ==========================================
-# 4. 頁面渲染分流
-# ==========================================
+# 頁面渲染分流
 if current_page == "news":
     show_news_page()
 elif current_page == "contact":
@@ -107,7 +105,6 @@ elif current_page == "b4":
     pass
 elif current_page == "b5":
     pass
-
 elif current_page == "b6":
     pass
 
@@ -2102,252 +2099,12 @@ if current_page in ["all", "b1"]:
             else:
                 st.warning("⚠️ 找不到主表與外資表的共通日期，請確認資料是否已同步。")
 # ==========================================
-# 🔒 區塊 2 專屬包廂鎖
+# 區塊 2 專屬包廂鎖
 # ==========================================
 
 # ==========================================
-# 🌟 區塊 3 專屬工具函數區 (必須放在 if 鎖外面)
+# 區塊 3 專屬工具函數區 (必須放在 if 鎖外面)
 # ==========================================
-# 🛠️ 輔助函數：從檔名提取 8 碼日期
-def extract_date_from_name(filename):
-    match = re.search(r'(\d{8})', os.path.basename(filename))
-    return match.group(1) if match else "00000000"
-
-# 🛠️ 必備函數：強硬讀取法
-def robust_read_csv_b3(file_path):
-    for encoding in ['cp950', 'utf-8-sig', 'utf-8']:
-        try:
-            df = pd.read_csv(file_path, encoding=encoding)
-            if not df.empty and len(df.columns) > 1 and '撖' in str(df.iloc[0, 1]): 
-                continue
-            return df
-        except:
-            continue
-    return pd.read_csv(file_path, encoding='cp950', errors='ignore')
-
-# 🛠️ 核心函數：讀取法人連續買超報告
-@st.cache_data(ttl=60)
-def read_live_ln_report(file_keyword, strict_type, exact_field_name, prefix_keyword, col_label):
-    if strict_type == "日":
-        search_pattern1 = os.path.join(DATA_DIR, f"*{file_keyword}*(日)*.csv")
-        search_pattern2 = os.path.join(DATA_DIR, f"*{file_keyword}*日*.csv")
-        target_files = glob.glob(search_pattern1) + glob.glob(search_pattern2)
-        target_files = [f for f in target_files if "週" not in os.path.basename(f) and "周" not in os.path.basename(f) and "wk" not in os.path.basename(f).lower()]
-    else:
-        search_pattern1 = os.path.join(DATA_DIR, f"*{file_keyword}*(週)*.csv")
-        search_pattern2 = os.path.join(DATA_DIR, f"*{file_keyword}*週*.csv")
-        target_files = glob.glob(search_pattern1) + glob.glob(search_pattern2)
-        
-    target_files = list(set(target_files))
-    if not target_files: return pd.DataFrame(), None
-        
-    latest_file = sorted(target_files, key=extract_date_from_name, reverse=True)[0]
-    date_str = extract_date_from_name(latest_file) 
-    
-    try:
-        df = robust_read_csv_b3(latest_file)
-        df.columns = df.columns.astype(str).str.replace('\n', '').str.replace(' ', '').str.replace('\ufeff', '').str.strip()
-        
-        col_id = next((c for c in df.columns if '代號' in c), df.columns[0])
-        col_name = next((c for c in df.columns if '名稱' in c), df.columns[1])
-        
-        target_key = exact_field_name.replace(' ', '')
-        if target_key in df.columns:
-            target_data_col = target_key
-        else:
-            matched_cols = [c for c in df.columns if '買賣' in c and strict_type in c]
-            target_data_col = matched_cols[0] if matched_cols else df.columns[2]
-            
-        df[target_data_col] = pd.to_numeric(df[target_data_col], errors='coerce').fillna(0)
-        df_sorted = df[df[target_data_col] > 0].sort_values(by=target_data_col, ascending=False)
-        
-        if df_sorted.empty: return pd.DataFrame(), date_str
-            
-        output_df = pd.DataFrame()
-        output_df["股票代號"] = df_sorted[col_id].astype(str).str.strip()
-        output_df["股票名稱"] = df_sorted[col_name].astype(str).str.strip()
-        
-        def get_status_tag(val):
-            if strict_type == "日":
-                if val >= 10: return "🔥 波段認養"
-                elif val >= 5: return "⚡ 買盤點火"
-                else: return "🆕 試單觀察"
-            else:
-                if val >= 10: return "👑 長線主控"
-                elif val >= 5: return "🚀 趨勢加溫"
-                else: return "🌱 週線發動"
-                
-        output_df["狀態動態"] = df_sorted[target_data_col].apply(get_status_tag)
-        output_df[col_label] = df_sorted[target_data_col].astype(int)
-        
-        real_pct_trade = [c for c in df_sorted.columns if prefix_keyword in c and "佔成交" in c]
-        real_pct_issue = [c for c in df_sorted.columns if prefix_keyword in c and "佔發行量" in c]
-        
-        if real_pct_trade: output_df["佔成交(%)"] = pd.to_numeric(df_sorted[real_pct_trade[0]], errors='coerce').fillna(0.0)
-        else: output_df["佔成交(%)"] = 0.0
-            
-        if real_pct_issue: output_df["佔發行量(%)"] = pd.to_numeric(df_sorted[real_pct_issue[0]], errors='coerce').fillna(0.0)
-        else: output_df["佔發行量(%)"] = 0.0
-            
-        output_df.index = range(1, len(output_df) + 1)
-        return output_df, date_str
-    except Exception as e:
-        return pd.DataFrame(), f"解讀失敗: {str(e)}"
-
-# ==========================================
-# 🔒 區塊 3 專屬包廂鎖 (畫面渲染包進這裡)
-# ==========================================
-# 🚨 修正點：將原本錯寫的 b1 改為 b3
-if current_page in ["all", "b3"]:
-    st.write("---")
-    st.markdown("<div id='section-3'></div>", unsafe_allow_html=True)
-    st.header("法人連續買超")
-
-    # ========================================================
-    # 🚀 執行排程與備份邏輯
-    # ========================================================
-    with st.spinner("⏳ 載入連續買超數據中..."):
-        live_fo_day, date_fo_day = read_live_ln_report("外資連續買超", "日", "外資連續買賣日數", "外資", "最新連買天數")
-        if live_fo_day.empty and date_fo_day is None: 
-            live_fo_day, date_fo_day = read_live_ln_report("外資連買", "日", "外資連續買賣日數", "外資", "最新連買天數")
-
-        live_it_day, date_it_day = read_live_ln_report("投信連續買超", "日", "投信連續買賣日數", "投信", "最新連買天數")
-        if live_it_day.empty and date_it_day is None:
-            live_it_day, date_it_day = read_live_ln_report("投信連買", "日", "投信連續買賣日數", "投信", "最新連買天數")
-        if live_it_day.empty:
-            live_it_day, date_it_day = read_live_ln_report("外資連續買超", "日", "投信連續買賣日數", "投信", "最新連買天數")
-            if live_it_day.empty:
-                live_it_day, date_it_day = read_live_ln_report("外資連買", "日", "投信連續買賣日數", "投信", "最新連買天數")
-
-        live_fo_wk, date_fo_wk = read_live_ln_report("外資連續買超", "週", "外資連續買賣週數", "外資", "最新連買週數")
-        if live_fo_wk.empty and date_fo_wk is None:
-            live_fo_wk, date_fo_wk = read_live_ln_report("外資連買", "週", "外資連續買賣週數", "外資", "最新連買週數")
-
-        live_it_wk, date_it_wk = read_live_ln_report("投信連續買超", "週", "投信連續買賣週數", "投信", "最新連買週數")
-        if live_it_wk.empty and date_it_wk is None:
-            live_it_wk, date_it_wk = read_live_ln_report("投信連買", "週", "投信連續買賣週數", "投信", "最新連買週數")
-        if live_it_wk.empty:
-            live_it_wk, date_it_wk = read_live_ln_report("外資連續買超", "週", "投信連續買賣週數", "投信", "最新連買週數")
-            if live_it_wk.empty:
-                live_it_wk, date_it_wk = read_live_ln_report("外資連買", "週", "投信連續買賣週數", "投信", "最新連買週數")
-
-    # ========================================================
-    # 🔍 新增：全域 ETF 與 債券 篩選器
-    # ========================================================
-    c_f1, c_f2 = st.columns(2)
-    show_etf_b3 = c_f1.checkbox("顯示 ETF", value=True, key="b3_etf_filter")
-    show_bond_b3 = c_f2.checkbox("顯示 債券/債券ETF", value=True, key="b3_bond_filter")
-
-    def apply_b3_filter(df):
-        if df is None or df.empty:
-            return df
-        mask = (df['股票代號'].str.len() == 4)
-        if show_etf_b3: mask |= ((df['股票代號'].str.len() >= 5) & (~df['股票代號'].str.endswith('B')))
-        if show_bond_b3: mask |= df['股票代號'].str.endswith('B')
-        res_df = df[mask].copy()
-        res_df.index = range(1, len(res_df) + 1)
-        return res_df
-
-    # 套用篩選器
-    live_fo_day = apply_b3_filter(live_fo_day)
-    live_it_day = apply_b3_filter(live_it_day)
-    live_fo_wk = apply_b3_filter(live_fo_wk)
-    live_it_wk = apply_b3_filter(live_it_wk)
-
-    # ========================================================
-    # 🖼️ 視覺介面渲染 (最新單日區塊)
-    # ========================================================
-    h_day1, h_day2 = st.columns(2)
-    with h_day1:
-        st.markdown(f"<h3 style='margin-top: 0; margin-bottom: 0;'>外資最新 日連買</h3>", unsafe_allow_html=True)
-    with h_day2:
-        st.markdown(f"<h3 style='margin-top: 0; margin-bottom: 0;'>投信最新 日連買</h3>", unsafe_allow_html=True)
-
-    st.markdown("<div style='color: white; margin-top: 5px; margin-bottom: 18px; font-size: 16px;'>💡 <b>日動態說明：</b> 🔥 波段認養 (連買10天以上)  ⚡ 買盤點火 (連買5~9天)  🆕 試單觀察 (連買1~4天)</div>", unsafe_allow_html=True)
-
-    c_day1, c_day2 = st.columns(2)
-    with c_day1:
-        if not live_fo_day.empty:
-            st.dataframe(live_fo_day, use_container_width=True)
-        else:
-            st.write("無資料")
-        date_val = date_fo_day if date_fo_day else '無資料'
-        st.markdown(f"<div style='color: #00D2FF; font-size: 16px; margin-top: 1px;'>基準日: {date_val}</div>", unsafe_allow_html=True)
-
-    with c_day2:
-        if not live_it_day.empty:
-            st.dataframe(live_it_day, use_container_width=True)
-        else:
-            st.write("無資料")
-        date_val = date_it_day if date_it_day else '無資料'
-        st.markdown(f"<div style='color: #00D2FF; font-size: 16px; margin-top: 1px;'>基準日: {date_val}</div>", unsafe_allow_html=True)
-
-    st.write("---") 
-
-    # ========================================================
-    # 🖼️ 視覺介面渲染 (最新單週區塊)
-    # ========================================================
-    h_wk1, h_wk2 = st.columns(2)
-    with h_wk1:
-        st.markdown(f"<h3 style='margin-top: 0; margin-bottom: 0;'>外資最新 週連買</h3>", unsafe_allow_html=True)
-    with h_wk2:
-        st.markdown(f"<h3 style='margin-top: 0; margin-bottom: 0;'>投信最新 週連買</h3>", unsafe_allow_html=True)
-
-    st.markdown("<div style='color: white; margin-top: 5px; margin-bottom: 18px; font-size: 16px;'>💡 <b>週動態說明：</b> 👑 長線主控 (連買10週以上)  🚀 趨勢加溫 (連買5~9週)  🌱 週線發動 (連買1~4週)</div>", unsafe_allow_html=True)
-
-    c_wk1, c_wk2 = st.columns(2)
-    with c_wk1:
-        if not live_fo_wk.empty:
-            st.dataframe(live_fo_wk, use_container_width=True)
-        else:
-            st.write("無資料")
-        date_val = date_fo_wk if date_fo_wk else '無資料'
-        st.markdown(f"<div style='color: #00D2FF; font-size: 16px; margin-top: 1px;'>基準日: {date_val}</div>", unsafe_allow_html=True)
-
-    with c_wk2:
-        if not live_it_wk.empty:
-            st.dataframe(live_it_wk, use_container_width=True)
-        else:
-            st.write("無資料")
-        date_val = date_it_wk if date_it_wk else '無資料'
-        st.markdown(f"<div style='color: #00D2FF; font-size: 16px; margin-top: 1px;'>基準日: {date_val}</div>", unsafe_allow_html=True)
-
-    # ========================================================
-    # 🖼️ 記憶體整合連動區塊 (供快搜功能使用)
-    # ========================================================
-    b3_combined_list = []
-
-    if 'live_fo_day' in locals() and not live_fo_day.empty:
-        df_tmp = live_fo_day.copy()
-        df_tmp['連買類型'] = '🌐 外資日連買'
-        df_tmp = df_tmp.rename(columns={'最新連買天數': '連買週期數'})
-        b3_combined_list.append(df_tmp)
-
-    if 'live_it_day' in locals() and not live_it_day.empty:
-        df_tmp = live_it_day.copy()
-        df_tmp['連買類型'] = '🏦 投信日連買'
-        df_tmp = df_tmp.rename(columns={'最新連買天數': '連買週期數'})
-        b3_combined_list.append(df_tmp)
-
-    if 'live_fo_wk' in locals() and not live_fo_wk.empty:
-        df_tmp = live_fo_wk.copy()
-        df_tmp['連買類型'] = '🌐 外資週連買'
-        df_tmp = df_tmp.rename(columns={'最新連買週數': '連買週期數'})
-        b3_combined_list.append(df_tmp)
-
-    if 'live_it_wk' in locals() and not live_it_wk.empty:
-        df_tmp = live_it_wk.copy()
-        df_tmp['連買類型'] = '🏦 投信週連買'
-        df_tmp = df_tmp.rename(columns={'最新連買週數': '連買週期數'})
-        b3_combined_list.append(df_tmp)
-
-    if b3_combined_list:
-        df_b3 = pd.concat(b3_combined_list, ignore_index=True)
-        df_b3 = df_b3[['連買類型', '股票代號', '股票名稱', '狀態動態', '連買週期數']]
-        st.session_state['df_blk3_main'] = df_b3
-    else:
-        st.session_state['df_blk3_main'] = pd.DataFrame(columns=['連買類型', '股票代號', '股票名稱', '狀態動態', '連買週期數'])
-
 
 # ==========================================
 # 🌟 區塊 4 專屬工具函數區 (必須放在 if 鎖外面，確保全域可用)
