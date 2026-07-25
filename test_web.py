@@ -23,6 +23,8 @@ from views.contact_page import show_contact_page
 from views.pool_page import show_pool_page
 
 from views.b2_page import show_b2_page, sync_b2_data
+from views.b3_page import show_b3_page, sync_b3_data
+
 # ==========================================
 # 1. 網頁基本設定 & 目錄路徑初始化
 # ==========================================
@@ -78,6 +80,7 @@ if current_page == "all":
     with st.spinner("🚀 背景全市場數據高速運算中..."):
         # b1_page.sync_b1_data(DATA_DIR) # 未來搬運 B1 後解除註解
         sync_b2_data(DATA_DIR)           # 在背景偷偷算好 B2
+        sync_b3_data(DATA_DIR)
         # b3_page.sync_b3_data(DATA_DIR) # 未來搬運 B3 後解除註解
         
         # 算完後，把使用者自動傳送回觀察名單
@@ -98,7 +101,7 @@ elif current_page == "b1":
 elif current_page == "b2":
     show_b2_page(DATA_DIR)
 elif current_page == "b3":
-    pass
+    show_b3_page(DATA_DIR)
 
 elif current_page == "b4":
     pass
