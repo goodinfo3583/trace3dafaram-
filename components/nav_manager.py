@@ -7,7 +7,7 @@ def inject_custom_header(is_logged_in=False):
 
     # 💡 只有登入 B6 鎖起來
     login_btn_text = "VIP中心💎" if is_logged_in else "登入🛠️"
-    b6_text = "鉅額交易" if is_logged_in else "🔒鉅額交易"
+    b6_text = "鉅額交易" if is_logged_in else "鉅額交易"
     
     inject_js = """
     <script>
