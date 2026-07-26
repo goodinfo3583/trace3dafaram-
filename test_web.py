@@ -39,8 +39,9 @@ style_manager.set_background("./image/派對盛宴邀請.png")
 style_manager.render_fireflies()
 style_manager.render_marquee()
 # 注入客製化頂部導覽列
-nav_manager.inject_custom_header()
-
+# nav_manager.inject_custom_header()
+is_logged_in = st.session_state.get("logged_in", False)
+nav_manager.inject_custom_header(is_logged_in)
 # ==========================================
 # 2. 啟動 Google Sheets 連線與目錄初始化
 # ==========================================
@@ -77,16 +78,6 @@ if not os.path.exists(backup_margin_path):
 # 3. 網頁首頁路由控制中心 (極速切換引擎)-首頁設定
 # ==========================================
 current_page = st.query_params.get("page", "b1")
-
-#登入
-# --- 新增：初始化登入狀態 ---
-if "logged_in" not in st.session_state:
-    st.session_state["logged_in"] = False
-if "username" not in st.session_state:
-    st.session_state["username"] = None
-# 呼叫渲染視覺元件 components(登入)
-is_logged_in = st.session_state.get("logged_in", False)
-nav_manager.inject_custom_header(is_logged_in)
 
 # 頁面渲染分流 (路由中心)
 if current_page == "all":

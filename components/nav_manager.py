@@ -1,13 +1,13 @@
 # components/nav_manager.py
 import streamlit.components.v1 as components
 
-def inject_custom_header():
+# 💡 1. 這裡加上 is_logged_in=False 參數
+def inject_custom_header(is_logged_in=False):
     """注入客製化懸浮頂部導航與隱藏側邊欄邏輯"""
 
     # 💡 只有登入 B6 鎖起來
     login_btn_text = "VIP中心💎" if is_logged_in else "登入🛠️"
     b6_text = "鉅額交易" if is_logged_in else "🔒鉅額交易"
-    #
     
     inject_js = """
     <script>
@@ -50,12 +50,14 @@ def inject_custom_header():
 
         const headerDiv = parentDoc.createElement('div');
         headerDiv.id = 'custom-sticky-header';
+        
+        // 💡 2. 這裡原本寫死的文字，換成了 __LOGIN_TEXT__ 與 __B6_TEXT__
         headerDiv.innerHTML = `
             <div class="disclaimer-bar">
                 <div class="disclaimer-item"><span class="disclaimer-title">使用聲明</span><div class="disclaimer-content">本平台僅供教育研究與籌碼觀察...</div></div>
                 <div class="disclaimer-item"><span class="disclaimer-title">隱私政策</span><div class="disclaimer-content"><b>1. 蒐集目的與範圍...</b></div></div>
                 <div class="disclaimer-item"><a href="#" data-target="NavToContact" class="disclaimer-title internal-nav" style="cursor: pointer;">聯絡我們</a></div>
-                <div class="disclaimer-item"><a href="#" data-target="登入專區" class="disclaimer-title internal-nav vip-login-btn" style="cursor: pointer; display: flex; align-items: center;">登入🛠️</a></div>
+                <div class="disclaimer-item"><a href="#" data-target="登入專區" class="disclaimer-title internal-nav vip-login-btn" style="cursor: pointer; display: flex; align-items: center;">__LOGIN_TEXT__</a></div>
                 <div style="flex-grow: 1;"></div>
                 <div class="disclaimer-item" id="mobile-nav-toggle" title="收起選單" style="cursor: pointer; padding-right: 5px;"><span id="nav-toggle-icon" style="font-size: 18px; color: #38BDF8;">📜</span></div>
             </div>
@@ -68,7 +70,7 @@ def inject_custom_header():
                 <a href="#" data-target="NavToB3" class="nav-text-link internal-nav"><img src="app/static/magicbookwater.png" class="nav-icon" alt="icon">法人連買</a><span class="nav-divider">|</span>
                 <a href="#" data-target="NavToB4" class="nav-text-link internal-nav"><img src="app/static/magicbookground.png" class="nav-icon" alt="icon">資券動向</a><span class="nav-divider">|</span>
                 <a href="#" data-target="NavToB5" class="nav-text-link internal-nav"><img src="app/static/wirtleg.png" class="nav-icon" alt="icon">大腿動向</a><span class="nav-divider">|</span>
-                <a href="#" data-target="NavToB6" class="nav-text-link internal-nav"><img src="app/static/magicbookfire.png" class="nav-icon" alt="icon">鉅額交易</a>
+                <a href="#" data-target="NavToB6" class="nav-text-link internal-nav"><img src="app/static/magicbookfire.png" class="nav-icon" alt="icon">__B6_TEXT__</a>
             </div>
         `;
         parentDoc.body.insertBefore(headerDiv, parentDoc.body.firstChild);
@@ -80,14 +82,11 @@ def inject_custom_header():
                     e.preventDefault(); 
                     const targetName = link.getAttribute('data-target');
                     const btns = Array.from(parentDoc.querySelectorAll('button'));
-
-                    // 💡 使用 textContent 取代 innerText，保證隱藏按鈕也能被找到！
                     const targetBtn = btns.find(b => b.textContent.includes(targetName));
                     if (targetBtn) targetBtn.click();
                 };
             });
 
-            // 🚀 收闔邏輯：只改變 title 與 icon 內容
             const menuToggle = parentDoc.getElementById('mobile-nav-toggle');
             const navContainer = parentDoc.getElementById('nav-btn-container');
             const iconSpan = parentDoc.getElementById('nav-toggle-icon');
@@ -108,7 +107,6 @@ def inject_custom_header():
                 };
             }
 
-            // 側邊欄開關邏輯
             const toggleBtn = parentDoc.getElementById('custom-sidebar-toggle');
             if (toggleBtn) {
                 toggleBtn.onclick = (e) => {
@@ -125,11 +123,10 @@ def inject_custom_header():
                 };
             }
 
-            // 🛡️ 隱藏守護員：可以安心使用 display: none 了
             setInterval(() => {
                 const allBtns = Array.from(parentDoc.querySelectorAll('button'));
                 allBtns.forEach(b => {
-                    if(b.textContent.includes('NavTo')) { 
+                    if(b.textContent.includes('NavTo') || b.textContent.includes('登入專區')) { 
                         const wrapper = b.closest('div[data-testid="stElementContainer"]');
                         if (wrapper) wrapper.style.display = 'none';
                     }
@@ -139,8 +136,16 @@ def inject_custom_header():
     }
     </script>
     """
+    
+    # 💡 3. 這裡執行替換，把真正的狀態文字塞進 JS 裡面
+    inject_js = inject_js.replace("__LOGIN_TEXT__", login_btn_text)
+    inject_js = inject_js.replace("__B6_TEXT__", b6_text)
+
     # 透過隱藏的 iframe 執行上述的 JavaScript 注入
     components.html(inject_js, height=0, width=0)
+
+# ==========================================
+# (下方隱形切換按鈕 def render_proxy_buttons(): 維持不變)
 
 
 # 放在 components/nav_manager.py 的最下方
