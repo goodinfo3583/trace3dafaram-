@@ -9,7 +9,6 @@ import re
 # ==========================================
 def process_directors_data(DATA_DIR):
     """讀取並合併多個月份的董監事持股資料"""
-    # 🌟 關鍵修復 A：使用 set() 避免同一個檔案被兩個條件重複抓取
     search_patterns = [
         os.path.join(DATA_DIR, "*神秘金字塔*董監事*.csv"),
         os.path.join(DATA_DIR, "*董監事持股*.csv")
@@ -21,33 +20,29 @@ def process_directors_data(DATA_DIR):
     if not files: return pd.DataFrame()
     
     merged_df = None
-    processed_months = set() # 🌟 關鍵修復 B：紀錄已經處理過的月份，避免重複合併產生 _x, _y 欄位
+    processed_months = set() 
     
-    # 確保依照檔名排序，最新月份優先處理
     for f in sorted(list(files), reverse=True):
-        # 擷取檔名的前綴日期，例如 20260615 -> 擷取前6碼 202606
         m = re.search(r'(202[0-9]{3,5})', os.path.basename(f))
         if not m: continue
         month_str = m.group(1)[:6] 
         
-        # 如果該月份已經合併過了，就跳過，避免重複計算
         if month_str in processed_months:
             continue
             
         df = None
         for enc in ['utf-8-sig', 'big5', 'cp950', 'utf-8']:
             try:
-                # 讀取資料
                 df = pd.read_csv(f, encoding=enc, header=0)
                 break
             except: pass
             
         if df is None or df.empty: continue
         
-        # 🌟 關鍵修復 1：清理欄位名稱中的所有空白 (加入 \xa0 不換行空白處理)
+        # 清理欄位名稱中的所有空白 (包含 \xa0 不換行空白)
         df.columns = [str(c).replace(' ', '').replace('\u3000', '').replace('\ufeff', '').replace('\xa0', '') for c in df.columns]
         
-        # 🌟 關鍵修復 2：精準解析 "個股代號/名稱"
+        # 精準解析 "個股代號/名稱"
         c_id_name = next((c for c in df.columns if '代號' in c and '名稱' in c), None)
         if c_id_name:
             df['股票代號'] = df[c_id_name].astype(str).str.extract(r'(\d+)', expand=False)
@@ -63,23 +58,22 @@ def process_directors_data(DATA_DIR):
                 
         df = df.dropna(subset=['股票代號'])
         
-        # 🌟 關鍵修復 3：精準鎖定神秘金字塔的「持股比例」欄位
+        # 精準鎖定神秘金字塔的「持股比例」欄位
         c_this_month = next((c for c in df.columns if c == '本月' or c == '本月%'), None)
         c_prev_month = next((c for c in df.columns if c == '前一月'), None)
         
         keep_cols = ['股票代號', '股票名稱']
         
         if c_this_month:
-            # 轉化為數字，去除 % 和逗號
             df[f'{month_str}持股%'] = pd.to_numeric(df[c_this_month].astype(str).str.replace('%', '').str.replace(',', ''), errors='coerce')
             processed_months.add(month_str)
             keep_cols.append(f'{month_str}持股%')
             
-        # 擷取檔案內的「前一月」，當作備用的趨勢計算基準
         if c_prev_month:
             df[f'{month_str}_前一月'] = pd.to_numeric(df[c_prev_month].astype(str).str.replace('%', '').str.replace(',', ''), errors='coerce')
             keep_cols.append(f'{month_str}_前一月')
             
+        # 🛡️ 這裡就是防止笛卡爾積記憶體爆炸的護城河
         df_clean = df[keep_cols].drop_duplicates(subset=['股票代號'])
         
         if merged_df is None:
@@ -90,21 +84,17 @@ def process_directors_data(DATA_DIR):
     if merged_df is not None and not merged_df.empty:
         sorted_months = sorted(list(processed_months), reverse=True)
         
-        # 🤖 自己計算真正的趨勢與動態
         if len(sorted_months) >= 2:
-            # 狀況 A：如果資料夾有多個月的檔案 (例如 202606 和 202605)
             m1, m2 = sorted_months[0], sorted_months[1]
             if f'{m1}持股%' in merged_df.columns and f'{m2}持股%' in merged_df.columns:
                 merged_df['近月增減%'] = merged_df[f'{m1}持股%'] - merged_df[f'{m2}持股%']
         
-        # 狀況 B：如果只有一個檔案 (例如只有 202606)，就利用該檔案自帶的「前一月」來當作當月增減趨勢
         if '近月增減%' not in merged_df.columns and len(sorted_months) >= 1:
             m1 = sorted_months[0]
             if f'{m1}持股%' in merged_df.columns and f'{m1}_前一月' in merged_df.columns:
-                merged_df['近期增減%'] = merged_df[f'{m1}持股%'] - merged_df[f'{m1}_前一月']
+                merged_df['近月增減%'] = merged_df[f'{m1}持股%'] - merged_df[f'{m1}_前一月']
                 
-        # 產生對應的中文動態
-        if '近期增減%' in merged_df.columns:
+        if '近月增減%' in merged_df.columns:
             def get_trend(val):
                 if pd.isna(val): return "無"
                 if val >= 1.0: return "🔥 大增"
@@ -114,20 +104,18 @@ def process_directors_data(DATA_DIR):
                 if val > -0.1: return "↘️ 微減"
                 return "🚨 減/大減"
                 
-            merged_df['動態'] = merged_df['近期增減%'].round(2).apply(get_trend)
-            merged_df['近期增減%'] = merged_df['近期增減%'].round(2)
+            merged_df['動態'] = merged_df['近月增減%'].round(2).apply(get_trend)
+            merged_df['近月增減%'] = merged_df['近月增減%'].round(2)
             
-        # 重新整理並排序欄位 (把最新的月份放在最前面)
         cols_order = ['股票代號', '股票名稱']
-        if '動態' in merged_df.columns: cols_order.extend(['動態', '近期增減%'])
+        if '動態' in merged_df.columns: cols_order.extend(['動態', '近月增減%'])
         for m in sorted_months:
             if f'{m}持股%' in merged_df.columns: cols_order.append(f'{m}持股%')
             
         merged_df = merged_df[[c for c in cols_order if c in merged_df.columns]]
         
-        # 依照近期增減排行，大增的排在最前面
-        if '近期增減%' in merged_df.columns:
-            merged_df = merged_df.sort_values('近期增減%', ascending=False)
+        if '近月增減%' in merged_df.columns:
+            merged_df = merged_df.sort_values('近月增減%', ascending=False)
             
         return merged_df
         
@@ -153,7 +141,7 @@ def show_b7_page(DATA_DIR, STOCK_DICT):
                 border-top: 1px solid #10b981; border-bottom: 1px solid #10b981; padding: 15px 20px; 
                 border-radius: 10px; text-align: center; box-shadow: 0px 0px 20px rgba(16, 189, 129, 0.2); margin-bottom: 20px;">
         <h2 style="color: #ecfdf5; margin: 0; letter-spacing: 2px; text-shadow: 0 0 15px rgba(16, 185, 129, 0.8);">
-            董監事動向 (近月比較)
+            董監事動向
         </h2>
     </div>
     """, unsafe_allow_html=True)
