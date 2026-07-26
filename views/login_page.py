@@ -38,7 +38,7 @@ def show_login_page():
         <div style='background-color: rgba(17, 22, 34, 0.8); padding: 20px; border-radius: 10px; border: 1px solid #38BDF8; box-shadow: 2px 2px 10px rgba(0,0,0,0.5); margin-bottom: 20px;'>
             <h3 style='color: #FFD700; margin-top: 0;'>親愛的冒險者：</h3>
             <p style='color: #E2E8F0; font-size: 18px; line-height: 1.6;'>
-                「請出示你的 <b>邀請函序號</b> ！」
+                「請出示你的 <b>邀請函序號</b> ！(目前沒有開放任何功能)」
             </p>
         </div>
         """, unsafe_allow_html=True)
