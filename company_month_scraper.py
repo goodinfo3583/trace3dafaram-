@@ -76,19 +76,28 @@ for index, (name_suffix, url) in enumerate(TARGETS.items()):
     try:
         driver.get(url)
         
+        # 🌟 修改這裡：使用正則表達式自動抓取名次區間
         target_rank = None
-        if "301" in name_suffix and "600" in name_suffix:
-            target_rank = ("301", "600")
-        elif "601" in name_suffix and "900" in name_suffix:
-            target_rank = ("601", "900")
+        match = re.search(r'\((\d+)-(\d+)名', name_suffix)
+        if match:
+            target_rank = (match.group(1), match.group(2))
+        else:
+            match_last = re.search(r'\((\d+)-.*?名', name_suffix)
+            if match_last and int(match_last.group(1)) > 300:
+                target_rank = (match_last.group(1), "")
+                
+        # 如果是 1-300 名 (第一頁)，不需要切換，直接設為 None 略過點擊
+        if target_rank and target_rank[0] == "1":
+            target_rank = None
             
         if target_rank and "goodinfo" in url:
-            print(f" └─ 🔍 偵測到需要切換名次，自動點擊選單 ({target_rank[0]}-{target_rank[1]} 名)...")
+            print(f" └─ 🔍 偵測到需要切換名次，自動點擊選單 (包含 '{target_rank[0]}' 名)...")
             time.sleep(5)
             try:
                 options_elements = driver.find_elements(By.TAG_NAME, "option")
                 for opt in options_elements:
-                    if target_rank[0] in opt.text and target_rank[1] in opt.text:
+                    # 只要選項文字包含我們要的起始名次 (例如 901) 就點擊
+                    if target_rank[0] in opt.text: 
                         opt.click()
                         parent_select = opt.find_element(By.XPATH, "..")
                         driver.execute_script("arguments[0].dispatchEvent(new Event('change'))", parent_select)
