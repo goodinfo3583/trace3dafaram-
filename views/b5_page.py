@@ -119,8 +119,13 @@ def process_major_shareholders(DATA_DIR, target_level):
 
 def process_400_shareholders(DATA_DIR):
     """獨立抽出的 400 張中實戶運算引擎"""
-    files = glob.glob(os.path.join(DATA_DIR, "*神秘金字塔*.csv"))
-    if not files: return pd.DataFrame()
+    files = []
+    for ext in ('*.csv', '*.CSV'):
+        files.extend(glob.glob(os.path.join(DATA_DIR, f"*神秘金字塔{ext}")))
+        
+    # 🚀 關鍵修復：如果使用者沒有準備「神秘金字塔」，直接呼叫通用引擎去撈「大股東」檔案裡面的 400 張資料！
+    if not files: 
+        return process_major_shareholders(DATA_DIR, '400')
     
     files = sorted(files, key=os.path.basename, reverse=True)
     master = None
