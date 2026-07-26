@@ -145,7 +145,7 @@ def show_b7_page(DATA_DIR, STOCK_DICT):
                 border-top: 1px solid #10b981; border-bottom: 1px solid #10b981; padding: 15px 20px; 
                 border-radius: 10px; text-align: center; box-shadow: 0px 0px 20px rgba(16, 189, 129, 0.2); margin-bottom: 20px;">
         <h2 style="color: #ecfdf5; margin: 0; letter-spacing: 2px; text-shadow: 0 0 15px rgba(16, 185, 129, 0.8);">
-            👔 董監事動向 (近月比較)
+            董監事動向 (近月比較)
         </h2>
     </div>
     """, unsafe_allow_html=True)
