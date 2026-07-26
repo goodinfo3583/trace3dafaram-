@@ -18,6 +18,7 @@ from utils.data_utils import (
     STOCK_DICT, extract_date_from_name, robust_read_csv, get_latest_csv, get_prev_csv, get_diff_ui
 )
 # 頁面模組
+from views.login_page import show_login_page
 from views.news_page import show_news_page
 from views.contact_page import show_contact_page
 from views.pool_page import show_pool_page
@@ -123,8 +124,6 @@ elif current_page in ["b6"]:
         # 已登入者正常放行
         if current_page == "b6":
             show_b6_page(DATA_DIR)
-
-
 # --- 新增：初始化登入狀態 ---
 if "logged_in" not in st.session_state:
     st.session_state["logged_in"] = False
