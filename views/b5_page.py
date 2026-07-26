@@ -119,7 +119,7 @@ def process_major_shareholders(DATA_DIR, target_level):
 
 def process_400_shareholders(DATA_DIR):
     """獨立抽出的 400 張中實戶運算引擎"""
-    files = glob.glob(os.path.join(DATA_DIR, "*神秘金字塔*.csv"))
+    files = glob.glob(os.path.join(DATA_DIR, "*神秘金字塔 - 股權類股排行*.csv"))
     if not files: return pd.DataFrame()
     
     files = sorted(files, key=os.path.basename, reverse=True)
