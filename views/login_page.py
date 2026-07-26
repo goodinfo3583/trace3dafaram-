@@ -8,8 +8,8 @@ def show_login_page():
 
     # 狀態 1：已經登入 -> 顯示解鎖畫面
     if st.session_state.get("logged_in", False):
-        st.success(f"歡迎回來，{st.session_state['username']}！您已解鎖最高權限。")
-        if st.button("🚪 登出系統", use_container_width=True):
+        st.success(f"歡迎回來，{st.session_state['username']}！您已解鎖權限。")
+        if st.button(" 登出系統", use_container_width=True):
             st.session_state["logged_in"] = False
             st.session_state["username"] = None
             st.query_params["page"] = "b1"
@@ -30,6 +30,17 @@ def show_login_page():
         else:
             # 如果路徑錯誤或找不到圖片，會顯示這個提示，方便你除錯
             st.warning(f"找不到圖片: {npc_path}")
+        try:
+            img_base64 = get_image_base64(npc_image_path)
+            st.markdown(
+                f"""
+                <div style="display: flex; justify-content: center; align-items: center; height: 100%; padding: 10px;">
+                    <img src="{img_base64}" style="width: 100%; max-width: 220px; border-radius: 50%; border: 1px solid rgba(0, 210, 255, 0.7); box-shadow: 0 0 20px rgba(0, 210, 255, 0.4);">
+                </div>
+                """, 
+                unsafe_allow_html=True
+            )
+        except Exception as e:
             
     with col2:
         # 使用 HTML 畫一個遊戲感的對話框
