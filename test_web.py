@@ -30,7 +30,7 @@ from views.b3_page import show_b3_page, sync_b3_data
 from views.b4_page import show_b4_page, sync_b4_data
 from views.b5_page import show_b5_page, sync_b5_data
 from views.b6_page import show_b6_page, sync_b6_data
-from views.b7_page import show_b6_page, sync_b7_data
+from views.b7_page import show_b7_page, sync_b7_data
 # ==========================================
 # 1. 網頁基本設定 & 目錄路徑初始化
 # ==========================================
