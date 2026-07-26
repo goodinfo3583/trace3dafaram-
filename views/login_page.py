@@ -56,7 +56,9 @@ def show_login_page():
                         st.session_state["logged_in"] = True
                         st.session_state["username"] = username
                         st.success("「驗證成功！大門已開啟，請進...」")
-                        time.sleep(1.5)                        
+                        time.sleep(1.5)
+
+                        st.rerun()
                     else:
                         st.error("守衛：「這張邀請函是假的！請重新確認！」")
                 except KeyError:
