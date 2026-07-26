@@ -118,15 +118,13 @@ def process_major_shareholders(DATA_DIR, target_level):
     return pd.DataFrame()
 
 def process_400_shareholders(DATA_DIR):
-    """
-    獨立抽出的 400 張中實戶運算引擎 (精準對應 神秘金字塔 格式)
-    🚀 修復：直接抓取檔案內的增減比例，避免日期相減造成的數值落差！
-    """
+    """獨立抽出的 400 張中實戶運算引擎"""
     files = glob.glob(os.path.join(DATA_DIR, "*神秘金字塔*.csv"))
-    if not files: 
-        return process_major_shareholders(DATA_DIR, '400')
-        
+    if not files: return pd.DataFrame()
+    
     files = sorted(files, key=os.path.basename, reverse=True)
+    master = None
+    all_dates = set()
     
     for f in files:
         df = None
@@ -139,55 +137,75 @@ def process_400_shareholders(DATA_DIR):
         if df is None or df.empty: continue
         
         df.columns = [re.sub(r'\s+', '', str(c)).replace('\ufeff', '') for c in df.columns]
+        c_code = next((c for c in df.columns if '代號' in c or '代碼' in c), None)
+        c_name = next((c for c in df.columns if '名稱' in c), None)
         
-        # 解析代號
-        if '股票代號/名稱' in df.columns:
-            df['股票代號'] = df['股票代號/名稱'].astype(str).str.extract(r'(\d+)', expand=False)
-            df['股票名稱'] = df['股票代號/名稱'].astype(str).str.replace(r'^\d+', '', regex=True).str.strip()
-        else:
-            c_code = next((c for c in df.columns if '代號' in c or '代碼' in c), None)
-            c_name = next((c for c in df.columns if '名稱' in c), None)
-            if not c_code or not c_name: continue
-            df['股票代號'] = df[c_code].astype(str).str.extract(r'(\d+)', expand=False)
-            df['股票名稱'] = df[c_name].astype(str).str.strip()
+        try:
+            if '股票代號/名稱' in df.columns:
+                df['股票代號'] = df['股票代號/名稱'].astype(str).str.extract(r'(\d+)', expand=False)
+                df['股票名稱'] = df['股票代號/名稱'].astype(str).str.replace(r'^\d+', '', regex=True)
+            elif c_code and c_name:
+                df['股票代號'] = df[c_code].astype(str).str.extract(r'(\d+)', expand=False)
+                df['股票名稱'] = df[c_name].astype(str).str.strip()
+            else: continue
             
-        df = df.dropna(subset=['股票代號']).drop_duplicates(subset=['股票代號'])
-        
-        m = re.search(r'(\d{8})', os.path.basename(f))
-        newest_label = m.group(1)[-4:] if m else "最新"
-        delta_col_name = f"▼{newest_label}"
-        
-        # 🎯 優先尋找神秘金字塔原檔內的「總增減比例(%)」
-        c_delta = next((c for c in df.columns if '增減' in c and ('比例' in c or '%' in c)), None)
-        if not c_delta:
-            c_delta = next((c for c in df.columns if '增減' in c), None)
+            df = df.dropna(subset=['股票代號'])
+            df['股票名稱'] = df['股票名稱'].astype(str).str.replace(r'^\d+', '', regex=True).str.strip()
+            df = df.drop_duplicates(subset=['股票代號', '股票名稱'])
             
-        if c_delta:
-            df[delta_col_name] = pd.to_numeric(df[c_delta].astype(str).str.replace('+', '').str.replace('%', ''), errors='coerce').fillna(0.0)
-        else:
-            # 找不到才退回去用日期相減
-            date_cols = sorted([c for c in df.columns if re.match(r'^(?:202\d{5}|\d{4})$', c)], reverse=True)
-            if len(date_cols) >= 2:
-                df[delta_col_name] = pd.to_numeric(df[date_cols[0]], errors='coerce') - pd.to_numeric(df[date_cols[1]], errors='coerce')
-            else:
-                df[delta_col_name] = 0.0
-
-        def get_trend_400(val):
-            if pd.isna(val): return "無資料"
-            if val >= 1.5: return "🔥 大增"
-            if val >= 0.5: return "📈 增"
-            if val > 0: return "↗️ 微增"
-            if val == 0: return "🔄 持平"
-            if val > -0.5: return "↘️ 微減"
-            return "🚨 減/大減"
+            new_cols = []
+            for c in df.columns:
+                if re.match(r'^202\d{5}$', c): new_cols.append(c[-4:])
+                elif re.match(r'^\d{4}$', c): new_cols.append(c)
+                else: new_cols.append(c)
+            df.columns = new_cols
             
-        df['週動態'] = df[delta_col_name].apply(get_trend_400)
-        df['▼6周增減'] = df[delta_col_name] # 相容 B5 畫面的 UI 顯示
+            df = df.set_index(['股票代號', '股票名稱'])
+            date_cols = [c for c in df.columns if re.match(r'^\d{4}$', c)]
+            all_dates.update(date_cols)
+            
+            master = df.combine_first(master) if master is not None else df
+        except: continue
         
-        cols_order = ['股票代號', '股票名稱', '週動態', '▼6周增減', delta_col_name]
+    if master is not None and not master.empty:
+        master = master.reset_index()
+        sorted_dates = sorted(list(all_dates), reverse=True)
         
-        return df[[c for c in cols_order if c in df.columns]].sort_values(by=delta_col_name, ascending=False)
-        
+        if sorted_dates:
+            newest = sorted_dates[0]
+            prev = sorted_dates[1] if len(sorted_dates) >= 2 else newest
+            master[newest] = pd.to_numeric(master[newest], errors='coerce')
+            master[prev] = pd.to_numeric(master[prev], errors='coerce')
+            
+            def get_trend_400(row):
+                v1, v2 = row.get(newest), row.get(prev)
+                if pd.isna(v1) or pd.isna(v2): return "無資料"
+                diff = v1 - v2
+                if diff >= 1.5: return "🔥 大增"
+                if diff >= 0.5: return "📈 增"
+                if diff > 0: return "↗️ 微增"
+                if diff == 0: return "🔄 持平"
+                if diff > -0.5: return "↘️ 微減"
+                return "🚨 減/大減"
+                
+            master['週動態'] = master.apply(get_trend_400, axis=1) if len(sorted_dates) >= 2 else "持平"
+            
+            rename_dict = {newest: f"▼{newest}"}
+            if '上週持有%' in master.columns: rename_dict['上週持有%'] = f"{newest}持有%"
+            if '總增減' in master.columns: rename_dict['總增減'] = "▼6周增減"
+            master = master.rename(columns=rename_dict)
+            
+            cols_order = ['股票代號', '股票名稱', '週動態']
+            if '▼6周增減' in master.columns: cols_order.append('▼6周增減')
+            if f"{newest}持有%" in master.columns: cols_order.append(f"{newest}持有%")
+            cols_order.append(f"▼{newest}")
+            
+            for d in sorted_dates[1:]:
+                if d in master.columns: cols_order.append(d)
+                
+            final_df = master[[c for c in cols_order if c in master.columns]]
+            return final_df.sort_values(by=f"▼{newest}", ascending=False)
+            
     return pd.DataFrame()
 
 # ==========================================
