@@ -6,6 +6,16 @@ import glob
 import yfinance as yf
 from utils.data_utils import robust_read_csv
 
+# 登入鎖
+def show_b6_page(DATA_DIR):
+    # 👇 這是你要的「鎖頭指令」，請放在函式最上方
+    if not st.session_state.get("logged_in", False):
+        st.warning("🔒 這是 VIP 專屬的「鉅額交易」包廂，請先進行身分驗證！")
+        if st.button("🔑 前往登入專區", use_container_width=True):
+            st.query_params["page"] = "login"
+            st.rerun()
+        st.stop()  # 🚨 關鍵指令：強制停止執行後面的程式碼，資料不會外洩！
+
 # ==========================================
 # 🌟 區塊 6 專屬工具函數區 (純運算，無 UI)
 # ==========================================

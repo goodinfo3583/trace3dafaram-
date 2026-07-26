@@ -3,6 +3,12 @@ import streamlit.components.v1 as components
 
 def inject_custom_header():
     """注入客製化懸浮頂部導航與隱藏側邊欄邏輯"""
+
+    # 💡 只有登入 B6 鎖起來
+    login_btn_text = "VIP中心💎" if is_logged_in else "登入🛠️"
+    b6_text = "鉅額交易" if is_logged_in else "🔒鉅額交易"
+    #
+    
     inject_js = """
     <script>
     const parentDoc = window.parent.document;

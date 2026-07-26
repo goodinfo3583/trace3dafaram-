@@ -78,6 +78,16 @@ if not os.path.exists(backup_margin_path):
 # ==========================================
 current_page = st.query_params.get("page", "b1")
 
+#登入
+# --- 新增：初始化登入狀態 ---
+if "logged_in" not in st.session_state:
+    st.session_state["logged_in"] = False
+if "username" not in st.session_state:
+    st.session_state["username"] = None
+# 呼叫渲染視覺元件 components(登入)
+is_logged_in = st.session_state.get("logged_in", False)
+nav_manager.inject_custom_header(is_logged_in)
+
 # 頁面渲染分流 (路由中心)
 if current_page == "all":
     # 在觀察名單按下「全市場掃描」後觸發的背景引擎
@@ -95,12 +105,12 @@ if current_page == "all":
 # 頁面渲染分流
 if current_page == "news":
     show_news_page()
+elif current_page == "login":
+    show_login_page()
 elif current_page == "contact":
     show_contact_page(conn, SHEET_URL)
 elif current_page == "pool":
     show_pool_page(conn, SHEET_URL, DATA_DIR, STOCK_DICT)
-elif current_page == "login":
-    pass    
 elif current_page == "b1":
     show_b1_page(DATA_DIR, STOCK_DICT)
 elif current_page == "b2":
@@ -111,26 +121,9 @@ elif current_page == "b4":
     show_b4_page(DATA_DIR)
 elif current_page == "b5":
     show_b5_page(DATA_DIR, STOCK_DICT) 
-#elif current_page == "b6":
-    #show_b6_page(DATA_DIR)
-# ▼ 受保護的包廂 (必須登入才能看) ▼
-elif current_page in ["b6"]:
-    if not st.session_state["logged_in"]:
-        # 權限攔截：未登入者直接被踢到登入頁面
-        st.warning("這是 登入專屬包廂，請先進行身分驗證！")
-        st.query_params["page"] = "login"
-        st.rerun()
-    else:
-        # 已登入者正常放行
-        if current_page == "b6":
-            show_b6_page(DATA_DIR)
-# --- 新增：初始化登入狀態 ---
-if "logged_in" not in st.session_state:
-    st.session_state["logged_in"] = False
-if "username" not in st.session_state:
-    st.session_state["username"] = None
-# 呼叫渲染視覺元件 components
-style_manager.load_global_css()
+elif current_page == "b6":
+    show_b6_page(DATA_DIR)
+
 
 # ==========================================
 # 🌟 所有"側邊雙視窗"專屬工具函數區 
