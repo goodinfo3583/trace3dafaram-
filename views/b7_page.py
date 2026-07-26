@@ -95,10 +95,10 @@ def process_directors_data(DATA_DIR):
             # 狀況 A：如果資料夾有多個月的檔案 (例如 202606 和 202605)
             m1, m2 = sorted_months[0], sorted_months[1]
             if f'{m1}持股%' in merged_df.columns and f'{m2}持股%' in merged_df.columns:
-                merged_df['近期增減%'] = merged_df[f'{m1}持股%'] - merged_df[f'{m2}持股%']
+                merged_df['近月增減%'] = merged_df[f'{m1}持股%'] - merged_df[f'{m2}持股%']
         
         # 狀況 B：如果只有一個檔案 (例如只有 202606)，就利用該檔案自帶的「前一月」來當作當月增減趨勢
-        if '近期增減%' not in merged_df.columns and len(sorted_months) >= 1:
+        if '近月增減%' not in merged_df.columns and len(sorted_months) >= 1:
             m1 = sorted_months[0]
             if f'{m1}持股%' in merged_df.columns and f'{m1}_前一月' in merged_df.columns:
                 merged_df['近期增減%'] = merged_df[f'{m1}持股%'] - merged_df[f'{m1}_前一月']
