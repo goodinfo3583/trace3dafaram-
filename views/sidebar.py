@@ -3,18 +3,84 @@ import streamlit as st
 import pandas as pd
 import requests
 import re
+import os
 import plotly.graph_objects as go
 from plotly.subplots import make_subplots
 
-# ⚠️ 注意：這裡預設 get_latest_csv, get_prev_csv 存在於 utils.data_utils 中
-# 如果你的這兩個函數在 main.py，請確保它們有正確被引入或傳遞
 from utils.data_utils import get_latest_csv, get_prev_csv
 
 # ==========================================
-# 🌟 所有"側邊雙視窗"專屬工具函數區 
+# 🌟 "側邊雙視窗" 變數雷達與自動載入引擎 
 # ==========================================
+KEY_MAP = {
+    'b1_final_df': ['b1_final_df', 'my_final_df'],
+    'b2_1': ['b2_1', 'df_blk2_1'],
+    'b2_2': ['b2_2', 'df_blk2_2'],
+    'b2_3': ['b2_3', 'df_blk2_3'],
+    'b2_4': ['b2_4', 'df_blk2_4'],
+    'b3_main': ['b3_main', 'df_blk3_main'],
+    'b4_margin_pct': ['b4_margin_pct', 'df_margin_pct'],
+    'b4_short_pct': ['b4_short_pct', 'df_short_pct'],
+    'b4_margin_plus_pct': ['b4_margin_plus_pct', 'df_margin_plus_pct'],
+    'b4_margin_vol': ['b4_margin_vol', 'df_margin_vol'],
+    'b4_short_vol': ['b4_short_vol', 'df_short_vol'],
+    'b4_margin_plus_vol': ['b4_margin_plus_vol', 'df_margin_plus_vol'],
+    'b5_400': ['b5_400', 'df_blk5'],
+    'b5_1000': ['b5_1000', 'df_blk5_1000'],
+}
 
-# --- 1. 快搜專屬工具 ---
+def get_sidebar_df(primary_key):
+    """🌟 側邊欄專用萬能變數雷達：支援新舊 Session State 鑰匙"""
+    aliases = KEY_MAP.get(primary_key, [primary_key])
+    for k in aliases:
+        df = st.session_state.get(k)
+        if isinstance(df, pd.DataFrame) and not df.empty:
+            return df
+    return pd.DataFrame()
+
+def ensure_b1_to_b5_loaded(DATA_DIR):
+    """🚀 背景自動補載機制：當搜尋時發現數據缺失，自動觸發 B1~B5 後台同步引擎"""
+    if not DATA_DIR or not os.path.exists(DATA_DIR):
+        return
+        
+    # B1 補載
+    if get_sidebar_df('b1_final_df').empty:
+        try:
+            from views.b1_page import sync_b1_data
+            sync_b1_data(DATA_DIR)
+        except: pass
+
+    # B2 補載
+    if get_sidebar_df('b2_1').empty:
+        try:
+            from views.b2_page import sync_b2_data
+            sync_b2_data(DATA_DIR)
+        except: pass
+
+    # B3 補載
+    if get_sidebar_df('b3_main').empty:
+        try:
+            from views.b3_page import sync_b3_data
+            sync_b3_data(DATA_DIR)
+        except: pass
+
+    # B4 補載
+    if get_sidebar_df('b4_margin_pct').empty:
+        try:
+            from views.b4_page import sync_b4_data
+            sync_b4_data(DATA_DIR)
+        except: pass
+
+    # B5 補載
+    if get_sidebar_df('b5_1000').empty:
+        try:
+            from views.b5_page import sync_b5_data
+            sync_b5_data(DATA_DIR)
+        except: pass
+
+# ==========================================
+# 🌟 快搜與顯示工具函數區 
+# ==========================================
 def robust_search_engine(df, query):
     if df is None or df.empty: return pd.DataFrame()
     df = df.loc[:, ~df.columns.duplicated()].copy()
@@ -30,12 +96,9 @@ def robust_search_engine(df, query):
 
 def scan_and_display(title, session_key, query):
     st.markdown(f"<h6 style='color: #E2E8F0; margin-bottom: 5px;'>{title}</h6>", unsafe_allow_html=True)
-    if session_key not in st.session_state:
+    df = get_sidebar_df(session_key)
+    if df.empty:
         st.write("⚪ 尚未載入資料表")
-        return
-    df = st.session_state[session_key]
-    if df is None or df.empty:
-        st.write("⚪ 該榜單無任何資料")
         return
     res = robust_search_engine(df, query)
     if not res.empty:
@@ -59,39 +122,41 @@ def scan_and_display(title, session_key, query):
     else:
         st.write("⚪ 未進榜")
 
-# 🤖 [AI 籌碼訊號]新版判斷 (直接對接 B1~B5 新版變數)
+# 🤖 [AI 籌碼訊號] 診斷
 def generate_stock_commentary(query):
     if not query: return ""
     
     score = 0
     warns = []
-    b5_trend_400 = ""
-    b5_trend_1000 = ""
     
     # 🎯 掃描 1: 法人買超診斷 (區塊2 - 共4個表)
     for key in ['b2_1', 'b2_2', 'b2_3', 'b2_4']:
-        if key in st.session_state:
-            res = robust_search_engine(st.session_state[key], query)
+        df = get_sidebar_df(key)
+        if not df.empty:
+            res = robust_search_engine(df, query)
             if not res.empty:
-                score += 1.5  # 出現在法人買超榜，每次加 1.5 分
+                score += 1.5
 
     # 📅 掃描 2: 法人連買診斷 (區塊3)
-    if 'b3_main' in st.session_state:
-        res = robust_search_engine(st.session_state['b3_main'], query)
+    df_b3 = get_sidebar_df('b3_main')
+    if not df_b3.empty:
+        res = robust_search_engine(df_b3, query)
         if not res.empty:
-            score += len(res) * 1.5  # 達成幾項連買條件就加幾次分
+            score += len(res) * 1.5
 
     # 🔄 掃描 3: 券資有利排名 (區塊4 - 共6個表)
     for key in ['b4_margin_pct', 'b4_short_pct', 'b4_margin_plus_pct', 'b4_margin_vol', 'b4_short_vol', 'b4_margin_plus_vol']:
-        if key in st.session_state:
-            res = robust_search_engine(st.session_state[key], query)
+        df = get_sidebar_df(key)
+        if not df.empty:
+            res = robust_search_engine(df, query)
             if not res.empty:
-                score += 0.5  # 券資籌碼權重較輕，每次加 0.5 分
+                score += 0.5
 
     # 💰 掃描 4: 大戶動向診斷 (區塊5)
     def check_big_holder(key):
-        if key in st.session_state:
-            res = robust_search_engine(st.session_state[key], query)
+        df = get_sidebar_df(key)
+        if not df.empty:
+            res = robust_search_engine(df, query)
             if not res.empty:
                 for col in res.columns:
                     if "動向" in col or "狀態" in col or "趨勢" in col or "動態" in col:
@@ -110,7 +175,6 @@ def generate_stock_commentary(query):
         score -= 2
         warns.append("千張超級大戶減碼")
 
-    # 💡 綜合判定邏輯
     has_warning = len(warns) > 0
     warn_str = "、".join(warns)
     high_score = score >= 4
@@ -132,7 +196,7 @@ def generate_stock_commentary(query):
     else: 
         return "❄️ 【弱勢整理】目前未進入任何核心法人與大戶買超榜單，籌碼處於流失或無主力認養狀態。建議暫不考量。"
 
-# 🤖  [ AI 技術型態訊號]判斷
+# 🤖 [AI 技術型態訊號] 判斷
 def generate_technical_signals(df_sig):
     signals = []
     if df_sig is None or df_sig.empty or len(df_sig) < 20: return signals
@@ -155,21 +219,24 @@ def generate_technical_signals(df_sig):
         if df_sig['High'].iloc[-1] >= highest_60d:
             signals.append("🚀 波段創高：今日股價突破 60 日 (約一季) 以來新高點，上攻動能極強！")
     return signals
-    
+
 def render_b4_panorama(view_title, keys_and_labels, query):
     display_list = []
     display_id, display_name = query, "-"
+    
     for label, key in keys_and_labels:
-        if key in st.session_state:
-            res = robust_search_engine(st.session_state[key], query)
+        df = get_sidebar_df(key)
+        if not df.empty:
+            res = robust_search_engine(df, query)
             if not res.empty:
                 display_id = res.iloc[0].get('股票代號', query)
                 display_name = res.iloc[0].get('股票名稱', '-')
                 break
                 
     for label, key in keys_and_labels:
-        if key in st.session_state:
-            res = robust_search_engine(st.session_state[key], query)
+        df = get_sidebar_df(key)
+        if not df.empty:
+            res = robust_search_engine(df, query)
             if not res.empty:
                 row_data = res.iloc[0].to_dict()
                 new_row = {'榜單類型': label}; new_row.update(row_data); display_list.append(new_row)
@@ -184,7 +251,7 @@ def render_b4_panorama(view_title, keys_and_labels, query):
     
     st.markdown(f"<h5 style='color: #E2E8F0;'>{view_title}</h5>", unsafe_allow_html=True)
     st.dataframe(df_panorama[final_cols], use_container_width=True, hide_index=True)
-    
+
 # ==========================================
 # 📈 側邊雙視窗 K 線圖與技術分析引擎
 # ==========================================
@@ -218,7 +285,6 @@ def render_technical_chart(stock_id, timeframe="日線", selected_mas=[], show_r
 
     daily_df = df.copy()
             
-    # --- 週期處理與指標計算 ---
     if timeframe == "週線":
         daily_df = daily_df.resample('W-FRI').agg({'Open': 'first', 'High': 'max', 'Low': 'min', 'Close': 'last', 'Volume': 'sum'}).dropna()
     elif timeframe == "月線":
@@ -621,7 +687,6 @@ def fetch_macro_indicators():
         "Accept-Language": "zh-TW,zh;q=0.9"
     }
 
-    # --- 1. 🇺🇸 美股 VIX (^VIX) ---
     try:
         yf_url = "https://query1.finance.yahoo.com/v8/finance/chart/^VIX?interval=1d&range=5d"
         res_us = requests.get(yf_url, headers=headers, timeout=5)
@@ -636,7 +701,6 @@ def fetch_macro_indicators():
                 data["vix"]["pct"] = (latest - prev) / prev * 100
     except: pass
 
-    # --- 2. 🇹🇼 台股 VIX (VIXTWN) ---
     prev_vix = None
     try:
         res_daily = requests.get("https://www.taifex.com.tw/cht/3/vixInfo", headers=headers, timeout=5)
@@ -670,7 +734,6 @@ def fetch_macro_indicators():
                     data["vixtwn"]["pct"] = 0.0
         except: pass
 
-    # --- 3. CNN 恐懼貪婪指數 ---
     try:
         headers_cnn = {
             "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64)",
@@ -696,10 +759,9 @@ def fetch_macro_indicators():
 
 # =======================================================
 # 🚀 終極局部渲染魔法：將整個側邊視窗獨立為「不閃爍區塊」
-# ⚠️ 加入 STOCK_DICT 作為參數傳遞，避免全域變數讀取失敗
 # =======================================================
 @st.fragment
-def render_sidebar_war_room(STOCK_DICT):
+def render_sidebar_war_room(STOCK_DICT, DATA_DIR="data"):
     st.markdown("<div id='section-search'></div>", unsafe_allow_html=True)
 
     st.markdown("""
@@ -740,8 +802,11 @@ def render_sidebar_war_room(STOCK_DICT):
         
         if search_query:
             query_clean = search_query.strip()
-            industry_label = "未分類"
             
+            # 🚀 關鍵修復：搜尋當下即時觸發 B1~B5 背景補載機制！
+            ensure_b1_to_b5_loaded(DATA_DIR)
+            
+            industry_label = "未分類"
             if STOCK_DICT:
                 if query_clean in STOCK_DICT:
                     pure_stock_id = STOCK_DICT[query_clean]["id"]
@@ -825,17 +890,15 @@ def render_sidebar_war_room(STOCK_DICT):
                 else:
                     st.warning("⚠️ 技術 K 線圖目前僅支援代號查詢。")
 
-            # ----------------------------------------------------
-            # 🚀 以下所有資料庫查詢，全部切換為新版變數 b1 ~ b5
-            # ----------------------------------------------------
-            
+            # ==========================================
+            # 👑 區塊 1 ~ 5：數據庫展演 (對接萬能變數雷達)
+            # ==========================================
             st.markdown("<hr style='border-color: #334155;'>", unsafe_allow_html=True)
             st.markdown("<h4 style='color: #FCD34D;'>👑 區塊 1：短中長線三大法人持股變化</h4>", unsafe_allow_html=True)
             
-            if 'b1_final_df' in st.session_state:
-                df_b1 = st.session_state['b1_final_df']
+            df_b1 = get_sidebar_df('b1_final_df')
+            if not df_b1.empty:
                 res_b1 = robust_search_engine(df_b1, search_query)
-                
                 if not res_b1.empty:
                     date_cols = [c for c in res_b1.columns if '持股%' in c or c.isdigit()]
                     is_all_unranked = True
@@ -892,8 +955,8 @@ def render_sidebar_war_room(STOCK_DICT):
 
             st.markdown("<hr style='border-color: #334155;'>", unsafe_allow_html=True)
             st.markdown("<h4 style='color: #FCD34D;'>📅 區塊 3：法人連買診斷 (日/週)</h4>", unsafe_allow_html=True)
-            if 'b3_main' in st.session_state:
-                df_b3 = st.session_state['b3_main']
+            df_b3 = get_sidebar_df('b3_main')
+            if not df_b3.empty:
                 res_b3 = robust_search_engine(df_b3, search_query)
                 display_id = res_b3.iloc[0]['股票代號'] if not res_b3.empty else search_query
                 display_name = res_b3.iloc[0]['股票名稱'] if not res_b3.empty else "-"
@@ -921,7 +984,7 @@ def render_sidebar_war_room(STOCK_DICT):
             with col_400: scan_and_display("💎 400張以上大戶動向", 'b5_400', search_query)
             with col_1000: scan_and_display("🐳 1000張以上超級大戶動向", 'b5_1000', search_query)
 
-    # 💡 當搜尋列「沒有內容」時，顯示大盤總經 (隱藏下方 Tabs)
+    # 💡 當搜尋列「沒有內容」時，顯示大盤總經
     if not search_query:
         st.write("---") 
         tab1, tab2, tab3 = st.tabs(["🔹 大盤籌碼", "🔹 選擇權", "🔹 總經導航🛠️"])

@@ -115,11 +115,9 @@ elif current_page == "b5":
     show_b5_page(DATA_DIR, STOCK_DICT) 
 elif current_page == "b6":
     show_b6_page(DATA_DIR)
-
 # 渲染側邊欄
 with st.sidebar:
-    # 把主程式的字典丟進去！
-    render_sidebar_war_room(STOCK_DICT)
+    render_sidebar_war_room(STOCK_DICT, DATA_DIR)
 
 # ==========================================
 # 🏠 核心五大區塊
