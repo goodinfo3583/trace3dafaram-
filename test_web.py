@@ -21,7 +21,7 @@ from utils.data_utils import (
 from views.news_page import show_news_page
 from views.contact_page import show_contact_page
 from views.pool_page import show_pool_page
-
+from views.login_page import show_login_page
 from views.b2_page import show_b2_page, sync_b2_data
 from views.b3_page import show_b3_page, sync_b3_data
 from views.b4_page import show_b4_page, sync_b4_data
@@ -97,6 +97,8 @@ elif current_page == "contact":
     show_contact_page(conn, SHEET_URL)
 elif current_page == "pool":
     show_pool_page(conn, SHEET_URL, DATA_DIR, STOCK_DICT)
+elif current_page == "login":
+    pass    
 elif current_page == "b1":
     pass
 elif current_page == "b2":
