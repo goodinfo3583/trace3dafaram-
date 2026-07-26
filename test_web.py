@@ -22,6 +22,7 @@ from views.news_page import show_news_page
 from views.contact_page import show_contact_page
 from views.pool_page import show_pool_page
 from views.login_page import show_login_page
+from views.b1_page import show_b1_page, sync_b1_data
 from views.b2_page import show_b2_page, sync_b2_data
 from views.b3_page import show_b3_page, sync_b3_data
 from views.b4_page import show_b4_page, sync_b4_data
@@ -80,7 +81,7 @@ current_page = st.query_params.get("page", "b1")
 if current_page == "all":
     # 在觀察名單按下「全市場掃描」後觸發的背景引擎
     with st.spinner("🚀 背景全市場數據高速運算中..."):
-        # b1_page.sync_b1_data(DATA_DIR) # 未來搬運 B1 後解除註解
+        sync_b1_data(DATA_DIR)
         sync_b2_data(DATA_DIR)           # 在背景後台算好 b2
         sync_b3_data(DATA_DIR)
         sync_b4_data(DATA_DIR)
@@ -100,7 +101,7 @@ elif current_page == "pool":
 elif current_page == "login":
     pass    
 elif current_page == "b1":
-    pass
+    show_b1_page(DATA_DIR, STOCK_DICT)
 elif current_page == "b2":
     show_b2_page(DATA_DIR)
 elif current_page == "b3":
