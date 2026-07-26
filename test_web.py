@@ -131,6 +131,7 @@ if "username" not in st.session_state:
     st.session_state["username"] = None
 # 呼叫渲染視覺元件 components
 style_manager.load_global_css()
+
 # ==========================================
 # 🌟 所有"側邊雙視窗"專屬工具函數區 
 # ==========================================
