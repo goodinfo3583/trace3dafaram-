@@ -1,10 +1,12 @@
-name: saturday_scraper 1230
+name: company_month_scraper
 
 on:
   workflow_dispatch:
   schedule:
-    # 設定每週六台灣時間中午 12:30 (UTC 04:30) 自動執行
-    - cron: '30 4 * * 6'
+    # 🌟 修改 1：設定為每個月的 15 號中午 12:30 (台灣時間) 自動執行
+    # 伺服器時間為 UTC (04:30)，加上 8 小時剛好是台灣的 12:30
+    # 語法：'分 時 日 月 星期'
+    - cron: '30 4 15 * *'
 
 permissions:
   contents: write
@@ -32,10 +34,10 @@ jobs:
         python -m pip install --upgrade pip
         pip install selenium pandas lxml html5lib requests beautifulsoup4 undetected-chromedriver
 
-    # 🌟 升級裝備：使用 xvfb-run 啟動 Python，欺騙網站這是一台有實體螢幕的電腦
+    # 🌟 修改 2：將執行的檔案名稱改為 company_month_scraper.py
     - name: 🚀 4. 執行籌碼爬蟲腳本
       run: |
-        xvfb-run --auto-servernum --server-args="-screen 0 1920x1080x24" python "saturday1230_scraper.py"
+        xvfb-run --auto-servernum --server-args="-screen 0 1920x1080x24" python "company_month_scraper.py"
 
     - name: 🔄 5. 更新遠端進度 (避免衝突)
       run: |
@@ -44,5 +46,5 @@ jobs:
     - name: 💾 6. 自動將產生的 CSV 提交並上傳回 GitHub
       uses: stefanzweifel/git-auto-commit-action@v5
       with:
-        commit_message: "🤖 自動排程：更新週六大股東籌碼資料"
+        commit_message: "🤖 自動排程：更新月董監籌碼資料"
         file_pattern: 'data/*'
