@@ -4,7 +4,7 @@ import time
 import os
 
 def show_login_page():
-    st.title("驗證中心")
+    st.title("登入")
 
     # 狀態 1：已經登入 -> 顯示解鎖畫面
     if st.session_state.get("logged_in", False):
@@ -35,9 +35,8 @@ def show_login_page():
         # 使用 HTML 畫一個遊戲感的對話框
         st.markdown("""
         <div style='background-color: rgba(17, 22, 34, 0.8); padding: 20px; border-radius: 10px; border: 1px solid #38BDF8; box-shadow: 2px 2px 10px rgba(0,0,0,0.5);'>
-            <h3 style='color: #FFD700; margin-top: 0;'> 登入：</h3>
-            <p style='color: #E2E8F0; font-size: 18px; line-height: 1.6;'>
-                「<br>想要進去請先出示你的 <b>邀請函序號 </b> ！」
+            <h3 style='color: #FFD700; margin-top: 0;'> 親愛的冒險者：</h3>
+            <p style='color: #E2E8F0; font-size: 18px; line-height: 1.6;'>「請先出示你的 <b>邀請函序號 </b> ！」
             </p>
         </div>
         """, unsafe_allow_html=True)
