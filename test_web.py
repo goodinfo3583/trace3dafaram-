@@ -17,7 +17,7 @@ from components import nav_manager
 from utils.data_utils import (
     STOCK_DICT, extract_date_from_name, robust_read_csv, get_latest_csv, get_prev_csv, get_diff_ui
 )
-# 頁面模組
+# 頁面模組或新增其他頁面模組
 from views.login_page import show_login_page
 from views.news_page import show_news_page
 from views.contact_page import show_contact_page
@@ -30,6 +30,7 @@ from views.b3_page import show_b3_page, sync_b3_data
 from views.b4_page import show_b4_page, sync_b4_data
 from views.b5_page import show_b5_page, sync_b5_data
 from views.b6_page import show_b6_page, sync_b6_data
+from views.b7_page import show_b6_page, sync_b7_data
 # ==========================================
 # 1. 網頁基本設定 & 目錄路徑初始化
 # ==========================================
@@ -90,7 +91,9 @@ if current_page == "all":
         sync_b4_data(DATA_DIR)
         sync_b5_data(DATA_DIR)
         sync_b6_data(DATA_DIR)
+        sync_b7_data(DATA_DIR)
         # 算完後，把使用者自動傳送回觀察名單
+        # 新增其他計分頁面b7,b8...
         st.session_state.current_page = "pool"
         st.query_params["page"] = "pool"
         st.rerun()
@@ -115,6 +118,8 @@ elif current_page == "b5":
     show_b5_page(DATA_DIR, STOCK_DICT) 
 elif current_page == "b6":
     show_b6_page(DATA_DIR)
+elif current_page == "b7":
+    show_b7_page(DATA_DIR)
 # 渲染側邊欄
 with st.sidebar:
     render_sidebar_war_room(STOCK_DICT, DATA_DIR)

@@ -27,6 +27,8 @@ KEY_MAP = {
     'b4_margin_plus_vol': ['b4_margin_plus_vol', 'df_margin_plus_vol'],
     'b5_400': ['b5_400', 'df_blk5'],
     'b5_1000': ['b5_1000', 'df_blk5_1000'],
+    'b7_main': ['b7_main']
+    # 新增其他變數載入頁面，如'b7_main': ['b7_main'],--步驟2
 }
 
 def get_sidebar_df(primary_key):
@@ -42,7 +44,7 @@ def ensure_b1_to_b5_loaded(DATA_DIR):
     """🚀 背景自動補載機制：當搜尋時發現數據缺失，自動觸發 B1~B5 後台同步引擎"""
     if not DATA_DIR or not os.path.exists(DATA_DIR):
         return
-        
+    # 放入所有擷入頁面--步驟3
     # B1 補載
     if get_sidebar_df('b1_final_df').empty:
         try:
@@ -77,7 +79,12 @@ def ensure_b1_to_b5_loaded(DATA_DIR):
             from views.b5_page import sync_b5_data
             sync_b5_data(DATA_DIR)
         except: pass
-
+    # B7 補載 (貼在 B5 補載邏輯的下方)
+    if get_sidebar_df('b7_main').empty:
+        try:
+            from views.b7_page import sync_b7_data
+            sync_b7_data(DATA_DIR)
+        except: pass
 # ==========================================
 # 🌟 快搜與顯示工具函數區 
 # ==========================================
@@ -803,7 +810,7 @@ def render_sidebar_war_room(STOCK_DICT, DATA_DIR="data"):
         if search_query:
             query_clean = search_query.strip()
             
-            # 🚀 關鍵修復：搜尋當下即時觸發 B1~B5 背景補載機制！
+            # 搜尋當下即時觸發 B1~B5 背景補載機制
             ensure_b1_to_b5_loaded(DATA_DIR)
             
             industry_label = "未分類"
@@ -819,7 +826,7 @@ def render_sidebar_war_room(STOCK_DICT, DATA_DIR="data"):
                             display_name = f"{v['id']} {v['name']}"
                             industry_label = v["industry"]
                             break
-            
+                                    
             if pure_stock_id == "":
                 match_num = re.search(r'\d+', query_clean)
                 if match_num: pure_stock_id = match_num.group(0)
@@ -983,7 +990,12 @@ def render_sidebar_war_room(STOCK_DICT, DATA_DIR="data"):
             col_400, col_1000 = st.columns(2)
             with col_400: scan_and_display("💎 400張以上大戶動向", 'b5_400', search_query)
             with col_1000: scan_and_display("🐳 1000張以上超級大戶動向", 'b5_1000', search_query)
-
+            # 👇 
+            #區塊 7 新增--步驟4
+            st.markdown("<hr style='border-color: #334155;'>", unsafe_allow_html=True)
+            st.markdown("<h4 style='color: #FCD34D;'>👔 區塊 7：董監動向</h4>", unsafe_allow_html=True)
+            scan_and_display("董監持股與大股東質押變化", 'b7_main', search_query)
+            
     # 💡 當搜尋列「沒有內容」時，顯示大盤總經
     if not search_query:
         st.write("---") 

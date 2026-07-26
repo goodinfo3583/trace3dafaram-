@@ -71,6 +71,7 @@ def inject_custom_header(is_logged_in=False):
                 <a href="#" data-target="NavToB4" class="nav-text-link internal-nav"><img src="app/static/magicbookground.png" class="nav-icon" alt="icon">資券動向</a><span class="nav-divider">|</span>
                 <a href="#" data-target="NavToB5" class="nav-text-link internal-nav"><img src="app/static/wirtleg.png" class="nav-icon" alt="icon">大腿動向</a><span class="nav-divider">|</span>
                 <a href="#" data-target="NavToB6" class="nav-text-link internal-nav"><img src="app/static/magicbookfire.png" class="nav-icon" alt="icon">__B6_TEXT__</a>
+                <a href="#" data-target="NavToB7" class="nav-text-link internal-nav"><img src="app/static/wirtleg.png" class="nav-icon" alt="icon">董監動向</a><span class="nav-divider">|</span>
             </div>
         `;
         parentDoc.body.insertBefore(headerDiv, parentDoc.body.firstChild);
@@ -167,4 +168,5 @@ def render_proxy_buttons():
         st.button("NavToB4", on_click=change_page, args=("b4",))
         st.button("NavToB5", on_click=change_page, args=("b5",))
         st.button("NavToB6", on_click=change_page, args=("b6",))
-        st.button("登入專區", on_click=change_page, args=("login",))
+        st.button("NavToB7", on_click=change_page, args=("b7",))
+        st.button("登入", on_click=change_page, args=("login",))
