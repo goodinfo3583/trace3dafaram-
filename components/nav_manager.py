@@ -169,4 +169,4 @@ def render_proxy_buttons():
         st.button("NavToB5", on_click=change_page, args=("b5",))
         st.button("NavToB6", on_click=change_page, args=("b6",))
         st.button("NavToB7", on_click=change_page, args=("b7",))
-        st.button("登入", on_click=change_page, args=("login",))
+        st.button("登入專區", on_click=change_page, args=("login",))
