@@ -16,8 +16,13 @@ from utils.data_utils import robust_read_csv
 # ==========================================
 # 🌟 "觀察名單"專屬工具函數區 
 # ==========================================
-def get_df_safe(key): 
-    return st.session_state.get(key, pd.DataFrame())
+def get_df_safe(*keys): 
+    """🌟 升級版：支援多重 Key 備援，完美橋接新舊版記憶體變數"""
+    for k in keys:
+        df = st.session_state.get(k)
+        if isinstance(df, pd.DataFrame) and not df.empty:
+            return df.copy()
+    return pd.DataFrame()
 
 def fmt_d(d_str): 
     return f"{d_str[4:6]}/{d_str[6:]}" if d_str != "00000000" else "--/--"
@@ -76,8 +81,21 @@ def show_pool_page(conn, SHEET_URL, DATA_DIR, STOCK_DICT):
         st.write("---")
         st.markdown("<div id='section-top-pool'></div>", unsafe_allow_html=True)
 
-        df_b5_1000 = get_df_safe('df_blk5_1000')
-        df_b5_400 = get_df_safe('df_blk5')
+        # 🚀 統一對接新版 B1 ~ B6 的變數名稱 (同時向下相容舊版變數名)
+        df_b1 = get_df_safe('b1_final_df', 'my_final_df')
+        df_b5_1000 = get_df_safe('b5_1000', 'df_blk5_1000')
+        df_b5_400 = get_df_safe('b5_400', 'df_blk5')
+        df_b2_1 = get_df_safe('b2_1', 'df_blk2_1')
+        df_b2_2 = get_df_safe('b2_2', 'df_blk2_2')
+        df_b2_3 = get_df_safe('b2_3', 'df_blk2_3')
+        df_b2_4 = get_df_safe('b2_4', 'df_blk2_4')
+        df_b3 = get_df_safe('b3_main', 'df_blk3_main')
+        df_b4_mar_pct = get_df_safe('b4_margin_pct', 'df_margin_pct')
+        df_b4_mar_vol = get_df_safe('b4_margin_vol', 'df_margin_vol')
+        df_b4_sho_pct = get_df_safe('b4_short_pct', 'df_short_pct')
+        df_b4_sho_vol = get_df_safe('b4_short_vol', 'df_short_vol')
+        df_b4_mp_pct = get_df_safe('b4_margin_plus_pct', 'df_margin_plus_pct')
+        df_b4_mp_vol = get_df_safe('b4_margin_plus_vol', 'df_margin_plus_vol')
         
         # 🚀 掃描最新日期邏輯
         all_files = glob.glob(os.path.join(DATA_DIR, "*"))
@@ -100,7 +118,7 @@ def show_pool_page(conn, SHEET_URL, DATA_DIR, STOCK_DICT):
                     elif "大股東" in filename or "神秘金字塔" in filename or "集保" in filename:
                         if file_date > d_b5_share: d_b5_share = file_date
 
-        def fmt_d(date_str):
+        def fmt_d_str(date_str):
             if date_str and len(date_str) >= 8 and date_str != "00000000":
                 return f"{date_str[4:6]}/{date_str[6:8]}"
             return "--/--"
@@ -114,7 +132,7 @@ def show_pool_page(conn, SHEET_URL, DATA_DIR, STOCK_DICT):
                 觀察名單
             </h2>
             <div style='font-size:13px; color:#00D2FF; font-weight:500; margin-top:8px;'>
-                 基準日 : 📍法人持股: {fmt_d(d_b1_inst)} ｜ 📍法人買況: {fmt_d(d_b23_chip)} ｜ 📍資券: {fmt_d(d_b4_margin)} ｜ 📍大腿: {fmt_d(d_b5_share)}
+                 基準日 : 📍法人持股: {fmt_d_str(d_b1_inst)} ｜ 📍法人買況: {fmt_d_str(d_b23_chip)} ｜ 📍資券: {fmt_d_str(d_b4_margin)} ｜ 📍大腿: {fmt_d_str(d_b5_share)}
             </div>
         </div>
         """, unsafe_allow_html=True)
@@ -122,21 +140,18 @@ def show_pool_page(conn, SHEET_URL, DATA_DIR, STOCK_DICT):
         with st.container(border=True):
             st.info("💡 我們試著觀察近5/20/60/120日法人動向持股上升的變化前段班且當天持續買入的標的...")
 
-            # 🚨 關鍵阻斷器
-            if 'df_blk2_1' not in st.session_state or st.session_state['df_blk2_1'].empty or 'df_blk5_1000' not in st.session_state or st.session_state['df_blk5_1000'].empty:
+            # 🚨 關鍵阻斷器 (改為偵測新版主表 B1 與 B5 是否為空)
+            if df_b1.empty or df_b5_1000.empty:
                 st.warning("⚠️ 記憶體中尚無最新數據 (或尚未載入大股東資料)，請點擊下方按鈕啟動全市場掃描引擎。")
                 c_btn1, c_btn2, c_btn3 = st.columns([1, 2, 1])
                 with c_btn2:
                     if st.button("🚀 啟動全市場掃描 (計算總分)", type="primary", use_container_width=True):
-                        # 這裡把跳轉邏輯改成觸發 st.rerun，並改變 session_state，讓外層 main.py 去跑全部資料
                         st.session_state.current_page = "all" 
                         st.query_params["page"] = "all"
                         st.rerun()
-                # 💡 注意：我們在這裡拿掉了 st.stop() 與 render_proxy_buttons()！
-                return # 使用 return 提早結束這個函數的渲染，而不是粗暴地砍斷整個程式
+                return # 使用 return 提早結束渲染
 
-                        # ---------------- 開始正式運算數據分析觀察名單打底及積分 ----------------
-            df_b1 = st.session_state.get('my_final_df', pd.DataFrame()).copy()
+            # ---------------- 開始正式運算數據分析觀察名單打底及積分 ----------------
             dyn_col = next((c for c in df_b1.columns if '動態' in c or '動能' in c), None)
             rank_col = next((c for c in df_b1.columns if '今日上榜' in c or '上榜' in c), None)
             
@@ -154,26 +169,18 @@ def show_pool_page(conn, SHEET_URL, DATA_DIR, STOCK_DICT):
                     fo_sell_files = glob.glob(os.path.join(DATA_DIR, "*外資賣出佔成交比*3日*.csv"))
                     if not fo_sell_files: fo_sell_files = glob.glob(os.path.join(DATA_DIR, "*外資賣出佔成交比*.csv"))
                     if fo_sell_files:
-                        df_fs = robust_read_csv_pool(sorted(fo_sell_files, reverse=True)[0])
+                        df_fs = robust_read_csv(sorted(fo_sell_files, reverse=True)[0])
                         id_c = next((c for c in df_fs.columns if '代號' in c), None)
                         if id_c: fo_sell_ids = set(df_fs[id_c].astype(str).str.replace(r'\D', '', regex=True))
                     
                     it_sell_files = glob.glob(os.path.join(DATA_DIR, "*投信賣出佔成交比*5日*.csv"))
                     if not it_sell_files: it_sell_files = glob.glob(os.path.join(DATA_DIR, "*投信賣出佔成交比*.csv"))
                     if it_sell_files:
-                        df_is = robust_read_csv_pool(sorted(it_sell_files, reverse=True)[0])
+                        df_is = robust_read_csv(sorted(it_sell_files, reverse=True)[0])
                         id_c = next((c for c in df_is.columns if '代號' in c), None)
                         if id_c: it_sell_ids = set(df_is[id_c].astype(str).str.replace(r'\D', '', regex=True))
                 except: pass
 
-                df_b2_1, df_b2_2 = get_df_safe('df_blk2_1'), get_df_safe('df_blk2_2')
-                df_b2_3, df_b2_4 = get_df_safe('df_blk2_3'), get_df_safe('df_blk2_4')
-                df_b3 = get_df_safe('df_blk3_main')
-                
-                df_b4_mar_pct, df_b4_mar_vol = get_df_safe('df_margin_pct'), get_df_safe('df_margin_vol')
-                df_b4_sho_pct, df_b4_sho_vol = get_df_safe('df_short_pct'), get_df_safe('df_short_vol')
-                df_b4_mp_pct, df_b4_mp_vol = get_df_safe('df_margin_plus_pct'), get_df_safe('df_margin_plus_vol')
-                
                 s_b4_mar_pct, s_b4_mar_vol = set(df_b4_mar_pct.get('股票代號', [])), set(df_b4_mar_vol.get('股票代號', []))
                 s_b4_sho_pct, s_b4_sho_vol = set(df_b4_sho_pct.get('股票代號', [])), set(df_b4_sho_vol.get('股票代號', []))
                 s_b4_mp_pct, s_b4_mp_vol = set(df_b4_mp_pct.get('股票代號', [])), set(df_b4_mp_vol.get('股票代號', []))
@@ -188,9 +195,9 @@ def show_pool_page(conn, SHEET_URL, DATA_DIR, STOCK_DICT):
                         if not temp_block.empty:
                             block_sids = set(temp_block['證券代號'].astype(str).str.replace(r'\D', '', regex=True))
                 except: pass
-###########
+
                 # ==========================================
-                # 🚀 修正 2：終極版代號清洗與「動態欄位」智慧轉換引擎
+                # 🚀 代號清洗與「動態欄位」智慧轉換引擎
                 # ==========================================
                 def ultra_clean_id(val):
                     """將任何奇怪型別或夾帶小數點、空白的代號，全部扒光剩下純數字字串"""
@@ -212,20 +219,18 @@ def show_pool_page(conn, SHEET_URL, DATA_DIR, STOCK_DICT):
                 dict_1000, dict_400 = {}, {}
                 
                 # ------------------------------------------
-                # 🎯 處理 1000 張大戶字典 (支援雙模態)
+                # 🎯 處理 1000 張大戶字典
                 # ------------------------------------------
                 if not df_b5_1000.empty and '股票代號' in df_b5_1000.columns:
                     if '週動態' in df_b5_1000.columns:
-                        # 情況 A：讀取到的是區塊 5 處理過的表格
                         dict_1000 = {ultra_clean_id(k): str(v) for k, v in zip(df_b5_1000['股票代號'], df_b5_1000['週動態'])}
                     else:
-                        # 情況 B：讀取到的是原始 CSV！自動尋找增減欄位並當場轉換！
                         delta_col = next((c for c in df_b5_1000.columns if '1千張增減' in c or '1000張增減' in c or '增減' in c), None)
                         if delta_col:
                             dict_1000 = {ultra_clean_id(k): raw_delta_to_trend(v) for k, v in zip(df_b5_1000['股票代號'], df_b5_1000[delta_col])}
 
                 # ------------------------------------------
-                # 🎯 處理 400 張大戶字典 (支援雙模態)
+                # 🎯 處理 400 張大戶字典
                 # ------------------------------------------
                 if not df_b5_400.empty and '股票代號' in df_b5_400.columns:
                     if '週動態' in df_b5_400.columns:
@@ -238,7 +243,6 @@ def show_pool_page(conn, SHEET_URL, DATA_DIR, STOCK_DICT):
 
                 results = []
                 for _, row in pool_df.iterrows():
-                    # 在迴圈內，一樣用最高規格把代號洗乾淨
                     sid = ultra_clean_id(row['股票代號'])
                     sname = str(row.get('股票名稱', '')).strip()
                     b1_dyn = str(row.get(dyn_col, '')) if dyn_col else '-'
@@ -307,7 +311,7 @@ def show_pool_page(conn, SHEET_URL, DATA_DIR, STOCK_DICT):
                         if abs(short_decrease_val) >= 1: score += 1.2; details.append("空頭認輸(借券減>1%): +1.2")
 
                     # ==========================================
-                    # 🚀 修正 3：利用極速字典精準抓取動態
+                    # 🚀 動態捕捉
                     # ==========================================
                     r_b5_1000, r_b5_400 = "-", "-"
                     
@@ -399,7 +403,7 @@ def show_pool_page(conn, SHEET_URL, DATA_DIR, STOCK_DICT):
                 # 🛑 終極防呆鎖死機制：絕對不准存 0 分進去！
                 valid_calc = False
                 if not res_df.empty and '總分' in res_df.columns:
-                    valid_calc = (res_df['總分'] > 0).sum() >= 5 # 至少要有 5 檔股票總分大於 0 才算合法運算
+                    valid_calc = (res_df['總分'] > 0).sum() >= 5 
                     
                 if valid_calc and anchor_date_str != "00000000":
                     save_df = res_df.copy()
@@ -419,12 +423,10 @@ def show_pool_page(conn, SHEET_URL, DATA_DIR, STOCK_DICT):
                     st.warning("⚠️ 本次計算總分多數為 0，已啟動防呆攔截機制：暫不覆寫 Google Sheets 歷史紀錄。請點擊上方按鈕載入最新籌碼大數據。")
 
                 # ==========================================
-                # 🚀 終極 UI 修正：局部渲染魔法 (Fragment) 避免畫面亂跳
-                # 解決點選按鈕或輸入密碼後，畫面瘋狂跳回頂端的問題！
+                # 🚀 局部渲染魔法 (Fragment) 避免畫面亂跳
                 # ==========================================
                 st.markdown("<hr style='border-color: #334155;'>", unsafe_allow_html=True)
                 
-                # 👇 建立局部渲染魔法函數，包裝所有互動區塊，保證網頁絕對不會亂跳！
                 @st.fragment
                 def render_pool_interactive_ui(f_res_df, f_hist_combined):
                     selected_view = st.radio(
@@ -453,10 +455,8 @@ def show_pool_page(conn, SHEET_URL, DATA_DIR, STOCK_DICT):
                             with c_search:
                                 pool_search = st.text_input("🔍 板塊內標的搜尋", placeholder="輸入代號/名稱以聚焦...", key="pool_treemap_search")
 
-                            # 複製一份專門用來處理的 DataFrame
                             treemap_pool_df = f_res_df.copy()
 
-                            # 💡 資料前處理：轉換數值欄位以供排序與格式化
                             treemap_pool_df['數值_總分'] = pd.to_numeric(treemap_pool_df['總分'], errors='coerce').fillna(0.0)
                             treemap_pool_df['數值_△'] = pd.to_numeric(treemap_pool_df['△'].astype(str).str.replace('+', '', regex=False).str.replace('%', '', regex=False), errors='coerce').fillna(0.0)
                             
@@ -517,7 +517,6 @@ def show_pool_page(conn, SHEET_URL, DATA_DIR, STOCK_DICT):
                                     "rgba(6, 78, 59, 0.85)",      "rgba(154, 52, 18, 0.85)",    "rgba(112, 26, 117, 0.85)",   "rgba(51, 65, 85, 0.85)"
                                 ]
 
-                                import plotly.express as px
                                 fig = px.treemap(
                                     treemap_pool_df,
                                     path=[px.Constant("板塊資金聚落"), '產業別', '顯示名稱'], 
@@ -561,7 +560,6 @@ def show_pool_page(conn, SHEET_URL, DATA_DIR, STOCK_DICT):
                                 st.caption("以下標的已進榜觀察名單，但因非一般企業已從上方產業聚落中剔除。💡 **游標懸停於標籤可查看詳細分數與大股東動向。**")
                                 
                                 tags_html = ""
-                                import html
                                 
                                 for _, r in pool_excluded_etfs.iterrows():
                                     name = str(r.get('名稱', ''))
@@ -785,10 +783,8 @@ def show_pool_page(conn, SHEET_URL, DATA_DIR, STOCK_DICT):
                                         
                                     week_df['模型分數變化'] = week_df.apply(score_diff, axis=1)
                                     
-                                    # 1. 在顯示清單的 '鎖定日期' 後面，插入 '▼明細' 欄位
                                     show_cols = ['鎖定日期', '▼明細', '代號', '名稱', '鎖定收盤價', col_price_name, '區間報酬', '總分', '今日分數', '模型分數變化']
 
-                                    # 2. 為了避免長串的權重文字把版面撐壞，套用跟首頁一樣的 TextColumn 設定，讓它變成滑鼠懸停顯示
                                     st.dataframe(
                                         week_df[[c for c in show_cols if c in week_df.columns]], 
                                         use_container_width=True, 
@@ -812,4 +808,3 @@ def show_pool_page(conn, SHEET_URL, DATA_DIR, STOCK_DICT):
 
                 # 👇 呼叫這個局部渲染魔法函數，把剛剛算好的分數傳進去！
                 render_pool_interactive_ui(res_df, hist_combined)
-            
