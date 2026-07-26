@@ -27,8 +27,7 @@ KEY_MAP = {
     'b4_margin_plus_vol': ['b4_margin_plus_vol', 'df_margin_plus_vol'],
     'b5_400': ['b5_400', 'df_blk5'],
     'b5_1000': ['b5_1000', 'df_blk5_1000'],
-    'b7_main': ['b7_main']
-    # 新增其他變數載入頁面，如'b7_main': ['b7_main'],--步驟2
+    'b7_main': ['b7_main'], 
 }
 
 def get_sidebar_df(primary_key):
@@ -44,47 +43,26 @@ def ensure_b1_to_b5_loaded(DATA_DIR):
     """🚀 背景自動補載機制：當搜尋時發現數據缺失，自動觸發 B1~B5 後台同步引擎"""
     if not DATA_DIR or not os.path.exists(DATA_DIR):
         return
-    # 放入所有擷入頁面--步驟3
-    # B1 補載
+        
     if get_sidebar_df('b1_final_df').empty:
-        try:
-            from views.b1_page import sync_b1_data
-            sync_b1_data(DATA_DIR)
+        try: from views.b1_page import sync_b1_data; sync_b1_data(DATA_DIR)
         except: pass
-
-    # B2 補載
     if get_sidebar_df('b2_1').empty:
-        try:
-            from views.b2_page import sync_b2_data
-            sync_b2_data(DATA_DIR)
+        try: from views.b2_page import sync_b2_data; sync_b2_data(DATA_DIR)
         except: pass
-
-    # B3 補載
     if get_sidebar_df('b3_main').empty:
-        try:
-            from views.b3_page import sync_b3_data
-            sync_b3_data(DATA_DIR)
+        try: from views.b3_page import sync_b3_data; sync_b3_data(DATA_DIR)
         except: pass
-
-    # B4 補載
     if get_sidebar_df('b4_margin_pct').empty:
-        try:
-            from views.b4_page import sync_b4_data
-            sync_b4_data(DATA_DIR)
+        try: from views.b4_page import sync_b4_data; sync_b4_data(DATA_DIR)
+        except: pass
+    if get_sidebar_df('b5_1000').empty:
+        try: from views.b5_page import sync_b5_data; sync_b5_data(DATA_DIR)
+        except: pass
+    if get_sidebar_df('b7_main').empty:
+        try: from views.b7_page import sync_b7_data; sync_b7_data(DATA_DIR)
         except: pass
 
-    # B5 補載
-    if get_sidebar_df('b5_1000').empty:
-        try:
-            from views.b5_page import sync_b5_data
-            sync_b5_data(DATA_DIR)
-        except: pass
-    # B7 補載 (貼在 B5 補載邏輯的下方)
-    if get_sidebar_df('b7_main').empty:
-        try:
-            from views.b7_page import sync_b7_data
-            sync_b7_data(DATA_DIR)
-        except: pass
 # ==========================================
 # 🌟 快搜與顯示工具函數區 
 # ==========================================
@@ -92,13 +70,19 @@ def robust_search_engine(df, query):
     if df is None or df.empty: return pd.DataFrame()
     df = df.loc[:, ~df.columns.duplicated()].copy()
     query = str(query).strip()
+    
+    # 🎯 優先判定：完全精準比對 (避免 3324 去撞到 03324T 的權證)
+    if '股票代號' in df.columns:
+        exact_mask = df['股票代號'].astype(str).str.strip() == query
+        if exact_mask.any():
+            return df[exact_mask]
+            
+    # 🎯 次級判定：包含字串比對
     mask = pd.Series(False, index=df.index)
     if '股票代號' in df.columns:
-        df['股票代號'] = df['股票代號'].astype(str).str.strip()
-        mask = mask | (df['股票代號'] == query)
+        mask = mask | df['股票代號'].astype(str).str.contains(query, na=False)
     if '股票名稱' in df.columns:
-        df['股票名稱'] = df['股票名稱'].astype(str).str.strip()
-        mask = mask | df['股票名稱'].str.contains(query, na=False, case=False)
+        mask = mask | df['股票名稱'].astype(str).str.contains(query, na=False, case=False)
     return df[mask]
 
 def scan_and_display(title, session_key, query):
@@ -129,35 +113,57 @@ def scan_and_display(title, session_key, query):
     else:
         st.write("⚪ 未進榜")
 
-# 🤖 [AI 籌碼訊號] 診斷
+# 🤖 [AI 籌碼訊號] 診斷 (嚴格把關版)
 def generate_stock_commentary(query):
     if not query: return ""
     
     score = 0
     warns = []
     
-    # 🎯 掃描 1: 法人買超診斷 (區塊2 - 共4個表)
+    # 🎯 掃描 1: 法人買超診斷 (剔除 持平、沉澱)
     for key in ['b2_1', 'b2_2', 'b2_3', 'b2_4']:
         df = get_sidebar_df(key)
         if not df.empty:
             res = robust_search_engine(df, query)
             if not res.empty:
-                score += 1.5
+                row_str = " ".join([str(x) for x in res.iloc[0].values])
+                if '未進榜' not in row_str and '持平' not in row_str and '沉澱' not in row_str:
+                    score += 1.5
 
-    # 📅 掃描 2: 法人連買診斷 (區塊3)
+    # 📅 掃描 2: 法人連買診斷 (剔除 未進榜、中斷)
     df_b3 = get_sidebar_df('b3_main')
     if not df_b3.empty:
         res = robust_search_engine(df_b3, query)
         if not res.empty:
-            score += len(res) * 1.5
+            for _, row in res.iterrows():
+                row_str = " ".join([str(x) for x in row.values])
+                if '未進榜' not in row_str and '中斷' not in row_str:
+                    score += 1.5
 
-    # 🔄 掃描 3: 券資有利排名 (區塊4 - 共6個表)
-    for key in ['b4_margin_pct', 'b4_short_pct', 'b4_margin_plus_pct', 'b4_margin_vol', 'b4_short_vol', 'b4_margin_plus_vol']:
+    # 🔄 掃描 3: 券資有利排名 (條件觸發)
+    b4_margin_dec = False
+    b4_short_dec = False
+    b4_margin_plus = False
+    
+    for key in ['b4_margin_pct', 'b4_margin_vol']:
         df = get_sidebar_df(key)
-        if not df.empty:
-            res = robust_search_engine(df, query)
-            if not res.empty:
-                score += 0.5
+        if not df.empty and not robust_search_engine(df, query).empty:
+            b4_margin_dec = True
+            
+    for key in ['b4_short_pct', 'b4_short_vol']:
+        df = get_sidebar_df(key)
+        if not df.empty and not robust_search_engine(df, query).empty:
+            b4_short_dec = True
+            
+    for key in ['b4_margin_plus_pct', 'b4_margin_plus_vol']:
+        df = get_sidebar_df(key)
+        if not df.empty and not robust_search_engine(df, query).empty:
+            b4_margin_plus = True
+
+    if b4_margin_dec: score += 0.5
+    if b4_short_dec: score += 0.5
+    if b4_margin_plus and (b4_margin_dec or b4_short_dec):
+        score += 0.5  # 只有當融資減少或借券減少時，融券增加才給分
 
     # 💰 掃描 4: 大戶動向診斷 (區塊5)
     def check_big_holder(key):
@@ -171,23 +177,23 @@ def generate_stock_commentary(query):
         return ""
 
     b5_trend_400 = check_big_holder('b5_400')
-    if "增" in b5_trend_400: score += 2
+    if "增" in b5_trend_400 and "減" not in b5_trend_400: score += 2
     elif "減" in b5_trend_400: 
         score -= 2
         warns.append("400張大戶減碼")
 
     b5_trend_1000 = check_big_holder('b5_1000')
-    if "增" in b5_trend_1000: score += 2
+    if "增" in b5_trend_1000 and "減" not in b5_trend_1000: score += 2
     elif "減" in b5_trend_1000: 
         score -= 2
-        warns.append("千張超級大戶減碼")
+        warns.append("千張大戶減碼")
 
     has_warning = len(warns) > 0
     warn_str = "、".join(warns)
     high_score = score >= 4
     
     if has_warning and high_score:
-        return f"⚔️ 【激烈換手】系統偵測到法人與大戶分歧 ({warn_str})，但籌碼動能依然獲 {score} 分的高評估！代表『倒貨正被強勢吃下』。若能維持強勢，承接方實力極強，需嚴設停損。"
+        return f"⚔️ 【激烈換手】系統偵測到大戶分歧 ({warn_str})，但籌碼動能依然獲 {score} 分的高評估！代表『倒貨正被強勢吃下』。需嚴設停損。"
     if has_warning and not high_score:
         return f"🚨 【風險警示】大戶正在進行倒貨調節 ({warn_str})，且無強大買盤承接，籌碼結構面臨鬆動。建議暫避風頭。"
     if "大減" in b5_trend_400 or "大減" in b5_trend_1000:
@@ -810,31 +816,41 @@ def render_sidebar_war_room(STOCK_DICT, DATA_DIR="data"):
         if search_query:
             query_clean = search_query.strip()
             
-            # 搜尋當下即時觸發 B1~B5 背景補載機制
             ensure_b1_to_b5_loaded(DATA_DIR)
             
             industry_label = "未分類"
             if STOCK_DICT:
-                if query_clean in STOCK_DICT:
-                    pure_stock_id = STOCK_DICT[query_clean]["id"]
-                    display_name = f"{STOCK_DICT[query_clean]['id']} {STOCK_DICT[query_clean]['name']}"
-                    industry_label = STOCK_DICT[query_clean]["industry"]
-                else:
+                # 🎯 精準命中字典 (避免 3324 被 03324T 攔截)
+                exact_found = False
+                for k, v in STOCK_DICT.items():
+                    if query_clean == v["id"] or query_clean == v["name"] or query_clean == k:
+                        pure_stock_id = v["id"]
+                        display_name = f"{v['id']} {v['name']}"
+                        industry_label = v["industry"]
+                        exact_found = True
+                        break
+                
+                # 若無完全比對成功，才啟用包含字元比對
+                if not exact_found:
                     for k, v in STOCK_DICT.items():
                         if query_clean in k:
                             pure_stock_id = v["id"]
                             display_name = f"{v['id']} {v['name']}"
                             industry_label = v["industry"]
                             break
-                                    
+            
+            # 抽出四位數純代碼，避免抓到權證代碼
             if pure_stock_id == "":
-                match_num = re.search(r'\d+', query_clean)
+                match_num = re.search(r'\d{4}', query_clean)
                 if match_num: pure_stock_id = match_num.group(0)
+                else:
+                    match_num2 = re.search(r'\d+', query_clean)
+                    if match_num2: pure_stock_id = match_num2.group(0)
 
             st.markdown(f"### 🎯 綜合診斷標的：<span style='color: #00D2FF;'>{display_name}</span> <span style='font-size:16px; background-color:#1E293B; padding:4px 10px; border-radius:6px; color:#38BDF8; border: 1px solid #38BDF8; margin-left:10px;'>🏷️ {industry_label}</span>", unsafe_allow_html=True)
 
             # ==========================================
-            # 🚀 融合 AI 訊號區
+            # 🚀 融合 AI 訊號區 (統一 15px 粗體)
             # ==========================================
             target_query = pure_stock_id if pure_stock_id else search_query
             old_ai_msg = generate_stock_commentary(target_query)
@@ -856,15 +872,17 @@ def render_sidebar_war_room(STOCK_DICT, DATA_DIR="data"):
                 signal_html = "<div style='background-color: rgba(0, 210, 255, 0.05); border-left: 4px solid #00D2FF; padding: 12px; border-radius: 5px; margin: 10px 0px;'>"
                 signal_html += "<h5 style='color: #00D2FF; margin-top:0px; margin-bottom: 10px;'>📡 AI 綜合籌碼與技術雷達</h5>"
                 
+                # 籌碼文字設定
                 if old_ai_msg:
                     signal_html += f"<p style='color: #FCD34D; margin: 5px 0px; font-size: 15px; font-weight: bold;'>{old_ai_msg}</p>"
                 
                 if old_ai_msg and new_ai_msgs:
                     signal_html += "<hr style='border-color: rgba(0, 210, 255, 0.15); margin: 8px 0px;'>"
                     
+                # 技術文字設定 (統一 15px 粗體)
                 if new_ai_msgs:
                     for sig in new_ai_msgs:
-                        signal_html += f"<p style='color: #E2E8F0; margin: 5px 0px; font-size: 14.5px;'>{sig}</p>"
+                        signal_html += f"<p style='color: #38BDF8; margin: 5px 0px; font-size: 15px; font-weight: bold;'>{sig}</p>"
                     
                 signal_html += "</div>"
                 st.markdown(signal_html, unsafe_allow_html=True)
@@ -898,7 +916,7 @@ def render_sidebar_war_room(STOCK_DICT, DATA_DIR="data"):
                     st.warning("⚠️ 技術 K 線圖目前僅支援代號查詢。")
 
             # ==========================================
-            # 👑 區塊 1 ~ 5：數據庫展演 (對接萬能變數雷達)
+            # 👑 區塊 1 ~ 7：數據庫展演 (對接萬能變數雷達)
             # ==========================================
             st.markdown("<hr style='border-color: #334155;'>", unsafe_allow_html=True)
             st.markdown("<h4 style='color: #FCD34D;'>👑 區塊 1：短中長線三大法人持股變化</h4>", unsafe_allow_html=True)
@@ -990,12 +1008,11 @@ def render_sidebar_war_room(STOCK_DICT, DATA_DIR="data"):
             col_400, col_1000 = st.columns(2)
             with col_400: scan_and_display("💎 400張以上大戶動向", 'b5_400', search_query)
             with col_1000: scan_and_display("🐳 1000張以上超級大戶動向", 'b5_1000', search_query)
-            # 👇 
-            #區塊 7 新增--步驟4
+
             st.markdown("<hr style='border-color: #334155;'>", unsafe_allow_html=True)
             st.markdown("<h4 style='color: #FCD34D;'>👔 區塊 7：董監動向</h4>", unsafe_allow_html=True)
             scan_and_display("董監持股與大股東質押變化", 'b7_main', search_query)
-            
+
     # 💡 當搜尋列「沒有內容」時，顯示大盤總經
     if not search_query:
         st.write("---") 
