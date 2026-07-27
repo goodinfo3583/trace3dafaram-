@@ -212,6 +212,49 @@ def build_block1_master_df(data_dir):
     
     return pd.DataFrame(), [], [], {}, {}
 
+# 抓取持股衰竭
+@st.cache_data(ttl=600)
+def fetch_github_json_down():
+    """獨立抓取法人持股衰退(負向)的 JSON 資料"""
+    days_list = [5, 10, 20, 30, 60, 120]
+    json_dfs = {}
+    
+    # 指向你要抓取的 GitHub 來源
+    account, repo, branch = "voidful", "tw-institutional-stocker", "main"
+
+    for d in days_list:
+        url = f"https://raw.githubusercontent.com/{account}/{repo}/{branch}/docs/data/top_three_inst_change_{d}_down.json"
+        try:
+            res = requests.get(url, timeout=5)
+            if res.status_code == 200:
+                df = pd.DataFrame(res.json())
+                if not df.empty:
+                    # 基礎資料清理：確保代號格式正確
+                    df['股票代號'] = df['code'].astype(str).str.replace(r'\.0$', '', regex=True).str.strip()
+                    df['股票代號'] = df['股票代號'].apply(lambda x: x.zfill(4) if x.isdigit() else x)
+                    df['股票名稱'] = df['name'].astype(str).str.strip()
+                    
+                    # 重新命名欄位，讓畫面更直覺
+                    df = df.rename(columns={
+                        'three_inst_ratio': '法人持股', 
+                        'change': '累積衰退'
+                    })
+                    df['排名'] = (df.index + 1).astype(int) 
+                    
+                    # 將持股與衰退比例加上 % 符號排版
+                    df['法人持股'] = df['法人持股'].apply(lambda x: f"{float(x):.2f}%" if pd.notna(x) else "0.00%")
+                    df['累積衰退'] = df['累積衰退'].apply(lambda x: f"{float(x):.2f}%" if pd.notna(x) else "0.00%")
+                    
+                    # 只保留畫面要呈現的欄位
+                    json_dfs[d] = df[['排名', '股票代號', '股票名稱', '法人持股', '累積衰退']]
+                else:
+                    json_dfs[d] = pd.DataFrame()
+            else:
+                json_dfs[d] = pd.DataFrame()
+        except:
+            json_dfs[d] = pd.DataFrame()
+            
+    return json_dfs
 # ==========================================
 # ⚙️ 後台資料引擎 (Data Engine)
 # ==========================================
@@ -425,7 +468,43 @@ def show_b1_page(DATA_DIR, STOCK_DICT):
 
     st.write("")
     st.info("💡 △是單日的法人持股增減(如果最新基準日未進前200榜，△會直接以歸0計算)；5/20/60/120日ΔChange為5/20/60/120期間的累積變化，我們可以試著短線與長線一起觀察。")
+#
+# ==========================================
+    # 📉 法人提款機：持股衰退 (負向) 追蹤區塊
+    # ==========================================
+    st.write("---")
+    st.markdown("### 📉 法人提款機：持股持續衰退追蹤 (負向)")
+    st.caption("觀察法人資金撤出的標的，這些通常是被法人連日賣超、持股比例下降的清單。")
+    
+    # 呼叫我們剛剛寫的獨立函數
+    down_dfs = fetch_github_json_down()
+    
+    # 建立 6 個天數的 Tab
+    t_down_5, t_down_10, t_down_20, t_down_30, t_down_60, t_down_120 = st.tabs([
+        "🟢 5日衰退", "🟢 10日衰退", "🟢 20日衰退", "🟢 30日衰退", "🟢 60日衰退", "🟢 120日衰退"
+    ])
+    
+    # 建立一個小工具函數來幫忙畫出表格
+    def render_down_table(day_key):
+        if day_key in down_dfs and not down_dfs[day_key].empty:
+            df_display = down_dfs[day_key].copy()
+            # 將表格背景稍微加上一點淡綠色，視覺上暗示是負向(台股跌是綠色)
+            st.dataframe(
+                df_display.style.apply(lambda x: ['background-color: rgba(0, 230, 118, 0.1)'] * len(x), axis=1), 
+                use_container_width=True, 
+                hide_index=True
+            )
+        else:
+            st.info(f"⚪ 尚無 {day_key} 日衰退數據。")
 
+    # 把對應天數的資料塞進 Tab 裡
+    with t_down_5: render_down_table(5)
+    with t_down_10: render_down_table(10)
+    with t_down_20: render_down_table(20)
+    with t_down_30: render_down_table(30)
+    with t_down_60: render_down_table(60)
+    with t_down_120: render_down_table(120)
+#
     # ==========================================
     # 📊 繪製區塊 ：產業聚落與資金輪動板塊 (Treemap)
     # ==========================================
