@@ -130,36 +130,96 @@ def scan_and_display(title, session_key, query):
         st.write("⚪ 未進榜")
 
 # 🤖 [AI 籌碼訊號] 診斷
+# ==========================================
+# 🛠️ [新增] 檢查最新數據是否有效的核心引擎
+# ==========================================
+def is_latest_data_valid(res, block_key=''):
+    """確保 dataframe 中的進榜是「最新日期」或「最新欄位」真的有數值，而不是歷史紀錄疊加"""
+    if res is None or res.empty: 
+        return False
+    row = res.iloc[0]
+    
+    # 1. 針對大戶/董監動向 (B5, B7) 檢查文字特徵
+    if 'b5' in block_key or 'b7' in block_key:
+        for col in res.columns:
+            if any(k in col for k in ["動向", "狀態", "趨勢", "動態", "變化"]):
+                val_str = str(row[col])
+                return "增" in val_str or "加碼" in val_str
+        return False
+        
+    # 2. 一般區塊 (B1, B2, B3, B4)：過濾出可能的日期或數據欄位
+    data_cols = [c for c in res.columns if any(k in str(c) for k in ['%', '佔', '持股', '張', '量']) or str(c).replace('-','').replace('/','').isdigit()]
+    
+    if not data_cols:
+        return True # 若無特定數據欄位，視為有效進榜
+        
+    # 提取欄位名稱內的數字作為權重，藉此抓出「最新日期」
+    def get_col_weight(col):
+        nums = re.findall(r'\d+', str(col))
+        return int("".join(nums)) if nums else 0
+        
+    max_weight = max([get_col_weight(c) for c in data_cols] + [0])
+    # 抓取屬於最新日期的所有候選欄位 (若合併表格將日期放在最後，此舉能精準抓出最新數據)
+    latest_candidates = [c for c in data_cols if get_col_weight(c) == max_weight]
+    
+    # 只要最新的候選欄位中，有任何一個具備實質數據，即代表最新日有買入/動作
+    for col in latest_candidates:
+        val = row[col]
+        if pd.isna(val): continue
+        
+        val_str = str(val).strip().replace('%', '').replace(',', '')
+        if val_str.lower() in ['', '-', 'nan', 'none', 'null', '未進榜']: continue
+        
+        try:
+            # 判斷是否非 0。
+            # 使用 abs() 是為了兼容部分券資/籌碼公式「數值越負越好」的特殊指標，確保負值訊號也能順利被計入。
+            if abs(float(val_str)) > 0.0001:
+                return True
+        except ValueError:
+            # 無法轉數字的字串 (例如：連買、創高等文字訊號)，直接視為有效進榜
+            return True
+            
+    return False
+
+
+# 🤖 [AI 籌碼訊號] 診斷 (修正計分疊加與納入 B1, B7)
 def generate_stock_commentary(query):
     if not query: return ""
     
     score = 0
     warns = []
     
-    # 🎯 掃描 1: 法人買超診斷 (區塊2 - 共4個表)
+    # 🎯 掃描 1: B1 短中長線三大法人持股變化 (新增計分)
+    df_b1 = get_sidebar_df('b1_final_df')
+    if not df_b1.empty:
+        res = robust_search_engine(df_b1, query)
+        if not res.empty and is_latest_data_valid(res, 'b1'):
+            score += 1.0
+
+    # 🎯 掃描 2: 法人買超診斷 (區塊2 - 共4個表)
     for key in ['b2_1', 'b2_2', 'b2_3', 'b2_4']:
         df = get_sidebar_df(key)
         if not df.empty:
             res = robust_search_engine(df, query)
-            if not res.empty:
+            if not res.empty and is_latest_data_valid(res, 'b2'):
                 score += 1.5
 
-    # 📅 掃描 2: 法人連買診斷 (區塊3)
+    # 📅 掃描 3: 法人連買診斷 (區塊3)
     df_b3 = get_sidebar_df('b3_main')
     if not df_b3.empty:
         res = robust_search_engine(df_b3, query)
-        if not res.empty:
+        if not res.empty and is_latest_data_valid(res, 'b3'):
             score += len(res) * 1.5
 
-    # 🔄 掃描 3: 券資有利排名 (區塊4 - 共6個表)
+    # 🔄 掃描 4: 券資有利排名 (區塊4 - 共6個表)
     for key in ['b4_margin_pct', 'b4_short_pct', 'b4_margin_plus_pct', 'b4_margin_vol', 'b4_short_vol', 'b4_margin_plus_vol']:
         df = get_sidebar_df(key)
         if not df.empty:
             res = robust_search_engine(df, query)
-            if not res.empty:
+            if not res.empty and is_latest_data_valid(res, 'b4'):
                 score += 0.5
 
-    # 💰 掃描 4: 大戶動向診斷 (區塊5)
+    # 💰 掃描 5: 大戶動向診斷 (區塊5)
     def check_big_holder(key):
         df = get_sidebar_df(key)
         if not df.empty:
@@ -182,6 +242,14 @@ def generate_stock_commentary(query):
         score -= 2
         warns.append("千張超級大戶減碼")
 
+    # 👔 掃描 6: 董監動向 (區塊7 - 新增計分)
+    df_b7 = get_sidebar_df('b7_main')
+    if not df_b7.empty:
+        res = robust_search_engine(df_b7, query)
+        if not res.empty and is_latest_data_valid(res, 'b7'):
+            score += 2  # 董監加碼或質押狀態有利，給予強烈籌碼加分
+
+    # === 下方判定邏輯維持不變 ===
     has_warning = len(warns) > 0
     warn_str = "、".join(warns)
     high_score = score >= 4
