@@ -368,6 +368,27 @@ def show_b1_page(DATA_DIR, STOCK_DICT):
                     else: st.error("❌ 尚未獲取到 GitHub 數據，封存失敗。")
             elif admin_pw != "": st.error("❌ 密碼錯誤，無法使用此功能。")
 
+            if st.button("💾 同步將【負向衰退】數據封存為歷史 CSV", use_container_width=True):
+                    date_str = snap_date.strftime("%Y%m%d")
+                    save_path_down = os.path.join(DATA_DIR, f"{date_str}_Down_History.csv")
+                    all_snap_down = []
+                    
+                    # 抓取最新的負向資料
+                    current_down_dfs = fetch_github_json_down()
+                    
+                    for d in [5, 10, 20, 30]:
+                        if d in current_down_dfs and not current_down_dfs[d].empty:
+                            temp = current_down_dfs[d].copy()
+                            temp['上榜區塊'] = f"{d}日衰退"
+                            all_snap_down.append(temp)
+                    
+                    if all_snap_down:
+                        snap_df_down = pd.concat(all_snap_down, ignore_index=True)
+                        snap_df_down.to_csv(save_path_down, index=False, encoding='utf-8-sig')
+                        st.success(f"✅ 成功生成 {date_str} 的負向衰退歷史快照！現在可以到歷史 Tab 追蹤了。")
+                    else: 
+                        st.error("❌ 尚未獲取到 GitHub 負向數據，封存失敗。")
+
     # ==========================================
     # 🔧 UI 數據渲染 (四大榜單)
     # ==========================================
@@ -469,41 +490,7 @@ def show_b1_page(DATA_DIR, STOCK_DICT):
     st.write("")
     st.info("💡 △是單日的法人持股增減(如果最新基準日未進前200榜，△會直接以歸0計算)；5/20/60/120日ΔChange為5/20/60/120期間的累積變化，我們可以試著短線與長線一起觀察。")
 #
-# ==========================================
-    # 📉 法人提款機：持股衰退 (負向) 追蹤區塊
-    # ==========================================
-    st.write("---")
-    st.markdown("### 📉 法人提款機：持股持續衰退追蹤 (負向)")
-    st.caption("觀察法人資金撤出的標的，這些通常是被法人連日賣超、持股比例下降的清單。")
-    
-    # 呼叫我們剛剛寫的獨立函數
-    down_dfs = fetch_github_json_down()
-    
-    # 建立 6 個天數的 Tab
-    t_down_5, t_down_10, t_down_20, t_down_30, t_down_60, t_down_120 = st.tabs([
-        "🟢 5日衰退", "🟢 10日衰退", "🟢 20日衰退", "🟢 30日衰退", "🟢 60日衰退", "🟢 120日衰退"
-    ])
-    
-    # 建立一個小工具函數來幫忙畫出表格
-    def render_down_table(day_key):
-        if day_key in down_dfs and not down_dfs[day_key].empty:
-            df_display = down_dfs[day_key].copy()
-            # 將表格背景稍微加上一點淡綠色，視覺上暗示是負向(台股跌是綠色)
-            st.dataframe(
-                df_display.style.apply(lambda x: ['background-color: rgba(0, 230, 118, 0.1)'] * len(x), axis=1), 
-                use_container_width=True, 
-                hide_index=True
-            )
-        else:
-            st.info(f"⚪ 尚無 {day_key} 日衰退數據。")
 
-    # 把對應天數的資料塞進 Tab 裡
-    with t_down_5: render_down_table(5)
-    with t_down_10: render_down_table(10)
-    with t_down_20: render_down_table(20)
-    with t_down_30: render_down_table(30)
-    with t_down_60: render_down_table(60)
-    with t_down_120: render_down_table(120)
 #
     # ==========================================
     # 📊 繪製區塊 ：產業聚落與資金輪動板塊 (Treemap)
@@ -642,6 +629,68 @@ def show_b1_page(DATA_DIR, STOCK_DICT):
             st.markdown(f"<div style='margin-top: 5px; line-height: 2.4;'>{tags_html}</div>", unsafe_allow_html=True)
     else:
         st.info("⚪ 尚無全市場大數據或找不到產業字典，請確認背景掃描引擎已啟動。")
+
+    # ==========================================
+    # 📉 法人提款機：持股衰退 (負向) 追蹤區塊
+    # ==========================================
+    st.write("---")
+    st.markdown("### 📉 法人提款機：持股持續衰退追蹤 (負向)")
+    st.caption("觀察法人資金撤出的標的，這些通常是被法人連日賣超、持股比例下降的清單。")
+    
+    # 呼叫獨立函數獲取今日最新負向資料
+    down_dfs = fetch_github_json_down()
+    
+    # 建立 5 個 Tab (修正了變數與標籤數量不一致的問題，並新增歷史紀錄 Tab)
+    t_down_5, t_down_10, t_down_20, t_down_30, t_down_history = st.tabs([
+        "🟢 5日衰退", "🟢 10日衰退", "🟢 20日衰退", "🟢 30日衰退", "📊 歷史衰退紀錄"
+    ])
+    
+    # 建立一個小工具函數來幫忙畫出今日表格
+    def render_down_table(day_key):
+        if day_key in down_dfs and not down_dfs[day_key].empty:
+            df_display = down_dfs[day_key].copy()
+            # 將表格背景稍微加上一點淡綠色，視覺上暗示是負向
+            st.dataframe(
+                df_display.style.apply(lambda x: ['background-color: rgba(0, 230, 118, 0.1)'] * len(x), axis=1), 
+                use_container_width=True, 
+                hide_index=True
+            )
+        else:
+            st.info(f"⚪ 尚無 {day_key} 日衰退數據。")
+
+    # 渲染今日天數
+    with t_down_5: render_down_table(5)
+    with t_down_10: render_down_table(10)
+    with t_down_20: render_down_table(20)
+    with t_down_30: render_down_table(30)
+    
+    # 渲染歷史紀錄 Tab
+    with t_down_history:
+        st.markdown("##### 📅 歷史衰退快照紀錄")
+        # 尋找資料夾內所有的「負向」歷史紀錄 CSV
+        down_history_files = glob.glob(os.path.join(DATA_DIR, "*_Down_History.csv"))
+        
+        if down_history_files:
+            # 擷取檔名中的日期 (例如 20260727) 並由新到舊排序
+            history_dates = sorted([re.search(r'(202\d{5})', os.path.basename(f)).group(1) for f in down_history_files if re.search(r'(202\d{5})', f)], reverse=True)
+            
+            if history_dates:
+                # 讓使用者選擇要看哪一天的紀錄 (例如 0727, 0724)
+                selected_date = st.selectbox("選擇歷史日期", history_dates, key="down_history_select")
+                target_file = os.path.join(DATA_DIR, f"{selected_date}_Down_History.csv")
+                
+                try:
+                    df_hist = pd.read_csv(target_file, encoding='utf-8-sig')
+                    st.dataframe(
+                        df_hist.style.apply(lambda x: ['background-color: rgba(0, 230, 118, 0.1)'] * len(x), axis=1), 
+                        use_container_width=True, 
+                        hide_index=True
+                    )
+                except Exception as e:
+                    st.error("讀取歷史資料失敗。")
+        else:
+            st.info("⚪ 目前尚未儲存任何歷史衰退紀錄。站長可以透過上方快照功能每天存檔！")
+
 
     # ==========================================
     # 🕵️‍♂️ [深潛實驗室] 雙引擎籌碼歷史軌跡
