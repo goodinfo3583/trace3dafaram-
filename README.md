@@ -24,6 +24,10 @@
 
 │
 
+├── 📄company\_month\_scraper.py #爬蟲每月董監變化 (Goodinfo)
+
+│
+
 ├── 📄requirements.txt
 
 │
@@ -50,21 +54,37 @@
 
 │   ├── 📄 news\_page.py          # 市場消息
 
-│   ├── 📄 contact\_page.py      #  聯絡我們 (寫入 G-Sheets)
+│   ├── 📄 contact\_page.py       # 聯絡我們 (寫入 G-Sheets)
 
-│   ├── 📄 pool\_page.py          #  觀察名單 (大數據計分、樹狀圖、歷史回測)
+│   ├── 📄 login\_page.py         # 登入頁面
+
+│   ├── 📄 sidebar.py            # 側邊視窗欄位
+
+│   ├── 📄 pool\_page.py          # 觀察名單 (大數據計分、樹狀圖、歷史回測)
 
 │   ├── 📄 b1\_page.py            # 區塊 1 法人動向
 
-│   └── 📄 b2\_page.py            # 區塊 2 ...
+│   ├── 📄 b2\_page.py            # 區塊 2 法人掃貨
+
+│   ├── 📄 b3\_page.py            # 區塊 3 法人連買
+
+│   ├── 📄 b4\_page.py            # 區塊 4 資券動向
+
+│   ├── 📄 b5\_page.py            # 區塊 5 大腿動向
+
+│   ├── 📄 b6\_page.py            # 區塊 6 鉅額交易
+
+│   └── 📄 b7\_page.py            # 區塊 7 董監動向
 
 │
 
-└── 📁 static/                   # 🖼️ 倉庫 (靜態資源)
+└── 📁 static/                   # 🖼️ 圖片倉庫 (靜態資源)
 
 │   └── 📄 75743.jpg             # 管家圖片等
 
-│
+└── 📁 image/                   # 🖼️ 圖片 (主視覺背景圖)
+
+│   └── 📄 75743.jpg派對盛宴邀請.png
 
 │
 
