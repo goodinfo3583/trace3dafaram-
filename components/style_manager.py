@@ -172,38 +172,34 @@ def render_marquee():
 #跑馬燈懸浮卡片
 #B2法人掃貨
 def render_b2_top10_glass_card():
-    """渲染 B2 法人掃貨 專屬懸浮玻璃卡片 (包含縮小、關閉、4大榜單輪播)"""
+    """渲染 B2 法人掃貨 專屬懸浮玻璃卡片 (完美解決欄位擠壓問題)"""
     import pandas as pd
     import streamlit as st
 
-    # 檢查是否已有 B2 資料
     if 'df_blk2_1' not in st.session_state:
         return
 
     try:
-        raw_df_21 = st.session_state.get('df_blk2_1', pd.DataFrame()) # 外資佔成交
-        raw_df_22 = st.session_state.get('df_blk2_2', pd.DataFrame()) # 投信佔成交
-        raw_df_23 = st.session_state.get('df_blk2_3', pd.DataFrame()) # 外資佔發行
-        raw_df_24 = st.session_state.get('df_blk2_4', pd.DataFrame()) # 投信佔發行
+        raw_df_21 = st.session_state.get('df_blk2_1', pd.DataFrame()) 
+        raw_df_22 = st.session_state.get('df_blk2_2', pd.DataFrame()) 
+        raw_df_23 = st.session_state.get('df_blk2_3', pd.DataFrame()) 
+        raw_df_24 = st.session_state.get('df_blk2_4', pd.DataFrame()) 
 
-        # 過濾函數：只抓 4 碼純股票，不包含 ETF (排除 00 開頭)
         def get_top10_pure(df, target_col):
             if df is None or df.empty or target_col not in df.columns:
                 return pd.DataFrame()
             df['股票代號'] = df['股票代號'].astype(str).str.strip()
             pure = df[(df['股票代號'].str.len() == 4) & (~df['股票代號'].str.startswith('00'))].copy()
-            # 確保排序正確並取前 10
             pure[target_col] = pd.to_numeric(pure[target_col], errors='coerce').fillna(0)
             pure = pure.sort_values(by=target_col, ascending=False).head(10)
             return pure
 
-        # 自動找出代表「最新數據」的欄位名稱 (例如 '0806成交比%')
         def get_latest_col(df, keyword):
             if df.empty: return None, "未知"
             cols = [c for c in df.columns if keyword in c]
             if not cols: return None, "未知"
             latest = cols[0]
-            date_str = latest.replace(keyword, "") # 抽出 0806
+            date_str = latest.replace(keyword, "")
             return latest, date_str
 
         c21_col, d_21 = get_latest_col(raw_df_21, "成交比%")
@@ -216,26 +212,50 @@ def render_b2_top10_glass_card():
         df_23 = get_top10_pure(raw_df_23, c23_col)
         df_24 = get_top10_pure(raw_df_24, c24_col)
 
-        # 產生 HTML 列表
         def make_list_html(df, val_col):
             if df.empty or val_col is None:
                 return "<p style='font-size:14px; text-align:center; color:#94A3B8; margin-top:40px;'>目前無資料或尚未開盤</p>"
             
-            html = "<ul style='padding-left: 5px; margin: 0; font-size: 14px; line-height: 1.5; list-style-type: none;'>"
+            html = "<ul style='padding-left: 0; margin: 0; list-style-type: none;'>"
             for i, row in enumerate(df.to_dict('records')):
                 val = row.get(val_col, 0)
-                status = row.get('今日短動態', '').split(' ')[0] # 只取 '🔥' 或 '🚨 轉賣反轉'，濾掉括號數字以節省空間
                 
-                # 處理狀態文字過長
-                if "(" in status: status = status.split("(")[0].strip()
-                if "轉賣反轉" in status: status = "🚨 轉賣"
+                # --- 🎯 狀態文字精簡處理 ---
+                raw_status = row.get('今日短動態', '')
+                # 去除括號與後面的數字 (例如: "🔥 強延續 (1.89%)" -> "🔥 強延續")
+                clean_status = raw_status.split('(')[0].strip()
                 
+                # 特殊處理：為了排版美觀，我們將狀態文字縮減為圖示+2個字
+                if "轉賣反轉" in clean_status:
+                    short_status = "🚨 轉賣"
+                elif "今日突擊卡位" in clean_status:
+                    short_status = "🆕 卡位"
+                elif "持續加碼" in clean_status:
+                    short_status = "🔥 加碼"
+                elif "強延續" in clean_status:
+                    short_status = "🔥 強攻"
+                elif "劇烈倒貨" in clean_status:
+                    short_status = "🚨 倒貨"
+                elif "調節洗盤" in clean_status:
+                    short_status = "📉 調節"
+                elif "量縮持平" in clean_status or "持平" in clean_status:
+                    short_status = "🔄 持平"
+                elif "趨緩" in clean_status:
+                    short_status = "⚠️ 趨緩"
+                else:
+                    # 如果都沒配對到，只取前三個字元(包含圖示)
+                    short_status = clean_status[:3] if len(clean_status) > 3 else clean_status
+                # -----------------------------
+
+                # 採用 Flexbox 排版，保證不擠壓不換行
                 html += (
-                    f"<li>"
-                    f"<b style='color:#FFF; display:inline-block; width:22px;'>{i+1}.</b>"
-                    f"<span style='display:inline-block; width:95px; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; vertical-align:bottom;'>{row['股票代號']}{row['股票名稱']}</span>"
-                    f"<span style='color:#FFD700; font-size: 11.5px; margin: 0 4px;'>{status}</span>"
-                    f"<span style='color:#FF4C4C; font-weight:bold; float:right;'>{val:.2f}%</span>"
+                    f"<li style='display: flex; align-items: center; justify-content: space-between; margin-bottom: 4px; font-size: 14px; line-height: 1.4;'>"
+                    f"  <div style='display: flex; align-items: center; width: 55%; overflow: hidden;'>"
+                    f"      <b style='color:#FFF; width:22px; flex-shrink: 0;'>{i+1}.</b>"
+                    f"      <span style='white-space:nowrap; overflow:hidden; text-overflow:ellipsis;'>{row['股票代號']}{row['股票名稱']}</span>"
+                    f"  </div>"
+                    f"  <div style='width: 25%; color:#FFD700; font-size: 12px; text-align: left; white-space:nowrap;'>{short_status}</div>"
+                    f"  <div style='width: 20%; color:#FF4C4C; font-weight:bold; text-align: right;'>{val:.1f}%</div>"
                     f"</li>"
                 )
             html += "</ul>"
@@ -247,8 +267,6 @@ def render_b2_top10_glass_card():
         h_24 = make_list_html(df_24, c24_col)
 
         # HTML, CSS 頂格並單行化
-        # 注意: id 從 min-card 改為 min-b2-card，避免與 B3 卡片衝突
-        # top 屬性設定為 55vh，讓他顯示在 B3 卡片的下方
         card_html = f"""
 <input type="checkbox" id="close-b2-card" style="display:none;">
 <input type="checkbox" id="min-b2-card" style="display:none;">
@@ -258,9 +276,8 @@ def render_b2_top10_glass_card():
 #min-b2-card:checked ~ #b2-top10-card {{ padding-bottom: 8px; width: 220px; }}
 #min-b2-card:checked ~ #b2-top10-card .min-icon-b2::after {{ content: '□'; font-size: 14px; }}
 #min-b2-card:not(:checked) ~ #b2-top10-card .min-icon-b2::after {{ content: '_'; font-size: 14px; position: relative; top: -3px; }}
-
 @keyframes slideInRightB2 {{ from {{ transform: translateX(120%); opacity: 0; }} to {{ transform: translateX(0); opacity: 1; }} }}
-.glass-panel-b2 {{ position: fixed; top: 56vh; right: 20px; width: 330px; background: rgba(30, 20, 20, 0.88); backdrop-filter: blur(12px); -webkit-backdrop-filter: blur(12px); border: 1px solid rgba(255, 76, 76, 0.35); border-radius: 12px; padding: 12px 16px; z-index: 999998; color: #E2E8F0; box-shadow: 0 8px 32px 0 rgba(0, 0, 0, 0.6); animation: slideInRightB2 0.8s cubic-bezier(0.25, 0.8, 0.25, 1); transition: all 0.3s ease; }}
+.glass-panel-b2 {{ position: fixed; top: 56vh; right: 20px; width: 330px; background: rgba(30, 20, 20, 0.88); backdrop-filter: blur(12px); -webkit-backdrop-filter: blur(12px); border: 1px solid rgba(255, 76, 76, 0.35); border-radius: 12px; padding: 12px 16px; z-index: 999998; color: #E2E8F0; box-shadow: 0 8px 32px 0 rgba(0, 0, 0, 0.6); animation: slideInRightB2 0.8s cubic-bezier(0.25, 0.8, 0.25, 1); transition: all 0.3s ease; box-sizing: border-box; }}
 .header-bar-b2 {{ display: flex; justify-content: space-between; align-items: center; border-bottom: 1px solid rgba(255,255,255,0.1); padding-bottom: 6px; margin-bottom: 8px; cursor: default; }}
 .header-title-b2 {{ font-size: 14px; font-weight: bold; color: #FF7676; }}
 .action-btns-b2 {{ display: flex; gap: 10px; align-items: center; }}
@@ -268,7 +285,7 @@ def render_b2_top10_glass_card():
 .action-btn-b2:hover {{ color: #FF4C4C; }}
 .panel-title-b2 {{ margin: 0 0 8px 0; font-size: 14.5px; font-weight: bold; color: #FF4C4C; display: flex; justify-content: space-between; align-items: flex-end; }}
 .date-badge-b2 {{ font-size: 11.5px; color: #94A3B8; font-weight: normal; }}
-.carousel-wrapper-b2 {{ position: relative; max-height: 310px; height: 310px; overflow: hidden; transition: all 0.3s ease; opacity: 1; }}
+.carousel-wrapper-b2 {{ position: relative; max-height: 270px; height: 270px; overflow: hidden; transition: all 0.3s ease; opacity: 1; }}
 .carousel-item-b2 {{ position: absolute; top: 0; left: 0; width: 100%; opacity: 0; animation: fadeSwitchB2 20s infinite; }}
 .carousel-item-b2:nth-child(1) {{ animation-delay: 0s; }}
 .carousel-item-b2:nth-child(2) {{ animation-delay: 5s; }}
