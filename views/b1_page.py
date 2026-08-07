@@ -59,7 +59,7 @@ def load_foreign_ratio_data(data_dir):
 
 @st.cache_data(ttl=600)
 def fetch_github_json_all():
-    """從 GitHub 取得最新的法人籌碼 JSON"""
+    """從 GitHub 取得最新的正向法人籌碼 JSON (維持原版 5/20/60/120)"""
     days_list = [5, 20, 60, 120]
     json_dfs = {}
     account, repo, branch = "goodinfo3583", "DDong_tw-institutional-stocker", "main"
@@ -100,7 +100,7 @@ def extract_date_from_filename(filename):
 
 @st.cache_data(ttl=300)
 def build_block1_master_df(data_dir):
-    """合併所有歷史快照與 GitHub 即時數據，產生全域母表"""
+    """合併所有歷史快照與 GitHub 即時數據，產生正向全域母表"""
     date_files = defaultdict(lambda: {'txt': [], 'csv': []})
     all_csv_files = glob.glob(os.path.join(data_dir, "*JSON*.csv"))
     
@@ -216,10 +216,11 @@ def build_block1_master_df(data_dir):
 @st.cache_data(ttl=600)
 def fetch_github_json_down():
     """獨立抓取法人持股衰退(負向)的 JSON 資料"""
-    days_list = [5, 10, 20, 30, 60, 120]
+    # 🌟 修正點 1：依照 voidful 目前提供的天數，改為 5, 10, 20, 30
+    days_list = [5, 10, 20, 30] 
     json_dfs = {}
     
-    # 指向你要抓取的 GitHub 來源
+    # 🌟 修正點 2：指回原作者 voidful 的來源 (因為他有新的 5/10/20/30 架構)
     account, repo, branch = "voidful", "tw-institutional-stocker", "main"
 
     for d in days_list:
@@ -229,23 +230,17 @@ def fetch_github_json_down():
             if res.status_code == 200:
                 df = pd.DataFrame(res.json())
                 if not df.empty:
-                    # 基礎資料清理：確保代號格式正確
                     df['股票代號'] = df['code'].astype(str).str.replace(r'\.0$', '', regex=True).str.strip()
                     df['股票代號'] = df['股票代號'].apply(lambda x: x.zfill(4) if x.isdigit() else x)
                     df['股票名稱'] = df['name'].astype(str).str.strip()
                     
-                    # 重新命名欄位，讓畫面更直覺
                     df = df.rename(columns={
                         'three_inst_ratio': '法人持股', 
                         'change': '累積衰退'
                     })
                     df['排名'] = (df.index + 1).astype(int) 
                     
-                    # 將持股與衰退比例加上 % 符號排版
-                    df['法人持股'] = df['法人持股'].apply(lambda x: f"{float(x):.2f}%" if pd.notna(x) else "0.00%")
-                    df['累積衰退'] = df['累積衰退'].apply(lambda x: f"{float(x):.2f}%" if pd.notna(x) else "0.00%")
-                    
-                    # 只保留畫面要呈現的欄位
+                    # 拿掉 % 符號的動作，保留純數值，才能順利存入 CSV 計算單日歷史△
                     json_dfs[d] = df[['排名', '股票代號', '股票名稱', '法人持股', '累積衰退']]
                 else:
                     json_dfs[d] = pd.DataFrame()
@@ -255,12 +250,85 @@ def fetch_github_json_down():
             json_dfs[d] = pd.DataFrame()
             
     return json_dfs
+
+@st.cache_data(ttl=300)
+def build_block1_down_master_df(data_dir):
+    """合併所有【負向衰退】歷史快照，產生全域母表"""
+    date_files = defaultdict(list)
+    all_csv_files = glob.glob(os.path.join(data_dir, "*_Down_History.csv"))
+
+    for f in all_csv_files:
+        d_label = extract_date_from_filename(os.path.basename(f))
+        if d_label: date_files[d_label].append(f)
+
+    sorted_dates = sorted(date_files.keys(), reverse=True)
+    f_df = pd.DataFrame()
+
+    if sorted_dates:
+        for i, date_label in enumerate(sorted_dates[:30]):
+            df = pd.read_csv(date_files[date_label][0], encoding='utf-8-sig')
+            if not df.empty and '股票代號' in df.columns:
+                df['股票代號'] = df['股票代號'].astype(str).str.replace(r'\.0$', '', regex=True).str.strip()
+                df['股票代號'] = df['股票代號'].apply(lambda x: x.zfill(4) if x.isdigit() else x)
+                df['股票名稱'] = df['股票名稱'].astype(str).str.strip()
+                
+                # 防呆：確保法人持股為數值
+                if df['法人持股'].dtype == object:
+                    df['法人持股'] = df['法人持股'].astype(str).str.replace('%', '', regex=False)
+                df['法人持股'] = pd.to_numeric(df['法人持股'], errors='coerce').fillna(0.0)
+
+                df = df.rename(columns={'法人持股': f"{date_label}持股%"})
+
+                def agg_sections_func(x):
+                    valid_x = set()
+                    for val in x:
+                        if pd.notna(val) and str(val).strip() != "":
+                            for p in str(val).split(','): valid_x.add(p.strip())
+                    return ",".join(list(valid_x))
+
+                agg_dict = {f"{date_label}持股%": 'max'}
+                if '上榜區塊' in df.columns:
+                    agg_dict['上榜區塊'] = agg_sections_func
+
+                df_day = df.groupby(['股票代號', '股票名稱']).agg(agg_dict).reset_index()
+                if '上榜區塊' in df.columns:
+                    df_day = df_day.rename(columns={'上榜區塊': f"{date_label}_區塊"})
+
+                if f_df is None or f_df.empty: f_df = df_day
+                else: f_df = pd.merge(f_df, df_day, on=['股票代號', '股票名稱'], how='outer')
+
+        if f_df is not None and not f_df.empty:
+            d_cols = sorted([c for c in f_df.columns if '持股%' in c], reverse=True)
+            for c in d_cols: f_df[c] = pd.to_numeric(f_df[c], errors='coerce').fillna(0)
+
+            latest_sect_col = f"{sorted_dates[0]}_區塊"
+            if latest_sect_col not in f_df.columns: f_df[latest_sect_col] = ""
+
+            f_df['今日衰退上榜'] = f_df[latest_sect_col].fillna("")
+
+            # 計算單日衰退 △
+            if len(d_cols) >= 2:
+                f_df['單日△'] = f_df.apply(lambda row: row[d_cols[0]] - row[d_cols[1]] if row[d_cols[1]] > 0.001 else 0.0, axis=1)
+            else: 
+                f_df['單日△'] = 0.0
+
+            for col in d_cols:
+                f_df[col] = f_df[col].apply(lambda x: "未進榜" if pd.isna(x) or abs(x) < 0.0001 else f"{x:.2f}")
+
+            # 負向表單：依據單日△ 排序 (越負排越前面)
+            f_df = f_df.sort_values(by=['單日△'], ascending=True)
+            return f_df, sorted_dates, d_cols
+
+    return pd.DataFrame(), [], []
+
 # ==========================================
 # ⚙️ 後台資料引擎 (Data Engine)
 # ==========================================
 def sync_b1_data(data_dir):
     """B1 專屬背景同步引擎"""
     final_df, sorted_dates, date_cols, color_ref, json_dfs = build_block1_master_df(data_dir)
+    # 載入負向母表
+    down_final_df, down_sorted_dates, down_date_cols = build_block1_down_master_df(data_dir)
     foreign_df = load_foreign_ratio_data(data_dir)
     
     st.session_state['b1_final_df'] = final_df
@@ -269,6 +337,10 @@ def sync_b1_data(data_dir):
     st.session_state['b1_color_ref'] = color_ref
     st.session_state['b1_json_dfs'] = json_dfs
     st.session_state['b1_foreign_df'] = foreign_df
+    
+    st.session_state['b1_down_final_df'] = down_final_df
+    st.session_state['b1_down_sorted_dates'] = down_sorted_dates
+    st.session_state['b1_down_date_cols'] = down_date_cols
 
 # ==========================================
 # 🖼️ 前台畫面渲染 (Views)
@@ -286,6 +358,9 @@ def show_b1_page(DATA_DIR, STOCK_DICT):
     color_ref = st.session_state.get('b1_color_ref', {})
     json_dfs = st.session_state.get('b1_json_dfs', {})
     df_foreign = st.session_state.get('b1_foreign_df', pd.DataFrame())
+    
+    down_final_df = st.session_state.get('b1_down_final_df', pd.DataFrame())
+    down_date_cols = st.session_state.get('b1_down_date_cols', [])
 
     st.write("---")
     st.markdown("<div id='section-1'></div>", unsafe_allow_html=True)
@@ -397,6 +472,8 @@ def show_b1_page(DATA_DIR, STOCK_DICT):
                     
             elif admin_pw != "": 
                 st.error("❌ 密碼錯誤，無法使用此功能。")
+
+
     # ==========================================
     # 🔧 UI 數據渲染 (四大榜單)
     # ==========================================
@@ -446,7 +523,7 @@ def show_b1_page(DATA_DIR, STOCK_DICT):
         if change_col in df.columns: 
             df[change_col] = df[change_col].apply(format_delta)
             
-        df['法人金額'] = "0.00"
+        df['法人金額'] = "0.00" 
         df['最新動態'] = df['最新動態'].fillna("⚪ 尚無比對紀錄")
         return df
 
@@ -489,7 +566,7 @@ def show_b1_page(DATA_DIR, STOCK_DICT):
                 elif cnt == 3: bg = 'background-color: rgba(255, 165, 0, 0.25)'    
                 elif cnt == 2: bg = 'background-color: rgba(80, 200, 120, 0.25)'    
                 elif cnt == 1: bg = 'background-color: rgba(0, 127, 255, 0.25)'    
-                else: bg = 'background-color: #111622; color: #E2E8F0'                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                
+                else: bg = 'background-color: #111622; color: #E2E8F0'                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                     
                 return [bg] * len(row)
                 
             all_display_cols = ['股票代號', '股票名稱', '今日上榜', '最新動態', '△'] + date_cols
@@ -497,9 +574,7 @@ def show_b1_page(DATA_DIR, STOCK_DICT):
 
     st.write("")
     st.info("💡 △是單日的法人持股增減(如果最新基準日未進前200榜，△會直接以歸0計算)；5/20/60/120日ΔChange為5/20/60/120期間的累積變化，我們可以試著短線與長線一起觀察。")
-#
 
-#
     # ==========================================
     # 📊 繪製區塊 ：產業聚落與資金輪動板塊 (Treemap)
     # ==========================================
