@@ -418,7 +418,7 @@ def show_b1_page(DATA_DIR, STOCK_DICT):
                 snap_date = st.date_input("選擇這份資料的基準日(※通常更新前1日※)")
                 st.write("")
                 
-                if st.button("💾 站長專屬：一鍵封存今日【正向】與【負向衰退】歷史數據", use_container_width=True, type="primary"):
+                if st.button("💾 儲存正向與衰退歷史數據", use_container_width=True, type="primary"):
                     date_str = snap_date.strftime("%Y%m%d")
                     
                     # --- 1. 處理正向數據 (5/20/60/120) ---
