@@ -226,7 +226,7 @@ def render_top10_glass_card():
         fo_wk_html = make_list_html(fo_wk_df, "最新連買週數", "週")
         it_wk_html = make_list_html(it_wk_df, "最新連買週數", "週")
 
-        # 注意：以下 HTML 字串頂格寫，絕對不要有左側縮排，防止 Markdown 渲染崩潰
+        # 以下 HTML 字串頂格寫，絕對不要有左側縮排，並注入新的 JS 拖曳引擎
         card_html = f"""
 <input type="checkbox" id="close-card-toggle" style="display:none;">
 <style>
@@ -341,30 +341,40 @@ def render_top10_glass_card():
 </div>
 
 <img src="x" onerror="
-var card = document.getElementById('b3-top10-card');
-var header = document.getElementById('drag-header');
-var isDragging = false;
-var offsetX, offsetY;
-if(header && card) {{
-    header.onmousedown = function(e) {{
-        isDragging = true;
-        var rect = card.getBoundingClientRect();
-        offsetX = e.clientX - rect.left;
-        offsetY = e.clientY - rect.top;
-        card.style.right = 'auto';
-        card.style.bottom = 'auto';
-        card.style.margin = '0';
-    }};
-    document.onmousemove = function(e) {{
+if (!window.b3DragInit) {{
+    window.b3DragInit = true;
+    var isDragging = false;
+    var offsetX = 0, offsetY = 0;
+    
+    document.addEventListener('mousedown', function(e) {{
+        var header = document.getElementById('drag-header');
+        if (header && header.contains(e.target)) {{
+            isDragging = true;
+            var card = document.getElementById('b3-top10-card');
+            var rect = card.getBoundingClientRect();
+            offsetX = e.clientX - rect.left;
+            offsetY = e.clientY - rect.top;
+            
+            card.style.right = 'auto';
+            card.style.bottom = 'auto';
+            card.style.margin = '0';
+        }}
+    }});
+    
+    document.addEventListener('mousemove', function(e) {{
         if (isDragging) {{
             e.preventDefault();
-            card.style.left = (e.clientX - offsetX) + 'px';
-            card.style.top = (e.clientY - offsetY) + 'px';
+            var card = document.getElementById('b3-top10-card');
+            if (card) {{
+                card.style.left = (e.clientX - offsetX) + 'px';
+                card.style.top = (e.clientY - offsetY) + 'px';
+            }}
         }}
-    }};
-    document.onmouseup = function(e) {{
+    }});
+    
+    document.addEventListener('mouseup', function(e) {{
         isDragging = false;
-    }};
+    }});
 }}
 " style="display:none;">
 """
