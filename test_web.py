@@ -51,7 +51,7 @@ if not os.path.exists(BLOCK_HISTORY_DIR): os.makedirs(BLOCK_HISTORY_DIR)
 if 'b3_data' not in st.session_state:
     sync_b3_data(DATA_DIR)
 if 'df_blk2_1' not in st.session_state:
-    sync_b2_data(DATA_DIR
+    sync_b2_data(DATA_DIR)
 
 
 # 呼叫渲染視覺元件 components
