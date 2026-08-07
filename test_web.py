@@ -54,6 +54,8 @@ if 'b3_data' not in st.session_state:
     sync_b3_data(DATA_DIR)
 if 'b4_squeeze_radar' not in st.session_state:
     sync_b4_data(DATA_DIR)
+if 'b5_1000' not in st.session_state:
+    sync_b5_data(DATA_DIR)
 # 呼叫渲染視覺元件 components
 style_manager.load_global_css()
 style_manager.set_background("./image/派對盛宴邀請.png")
@@ -66,6 +68,8 @@ try:
     style_manager.render_b2_top10_glass_card()
     # 呼叫 B4 軋空/套牢雷達卡片 (左上方)
     style_manager.render_b4_top10_glass_card()
+    # 呼叫 B5 大腿雙向共振卡片 (左下方)
+    style_manager.render_b5_top10_glass_card()
 except AttributeError as e:
     # 避免尚未存檔完成時當機
     print(f"UI 渲染警告: {e}")

@@ -552,3 +552,148 @@ def render_b4_top10_glass_card():
     except Exception as e:
         print(f"B4 Glass Card Error: {e}")
         pass
+
+#B5 大腿動向玻璃卡片
+def render_b5_top10_glass_card():
+    """渲染 B5 大腿動向 (長短線雙向共振) 專屬懸浮玻璃卡片"""
+    import pandas as pd
+    import streamlit as st
+
+    # 檢查是否已有 B5 的 1000張與 400張數據
+    if 'b5_1000' not in st.session_state or 'b5_400' not in st.session_state:
+        return
+
+    try:
+        df_1000 = st.session_state['b5_1000']
+        df_400 = st.session_state['b5_400']
+        
+        if df_1000.empty or df_400.empty:
+            return
+
+        # 找到最新日期的欄位名稱
+        latest_col_1000 = next((c for c in df_1000.columns if c.startswith('▼') and '6周' not in c), None)
+        latest_col_400 = next((c for c in df_400.columns if c.startswith('▼') and '6周' not in c), None)
+        
+        if not latest_col_1000 or not latest_col_400: return
+        date_str = latest_col_1000.replace('▼', '') # 擷取日期字串 (e.g., 0806)
+
+        # 嚴格過濾純股票 (排除 00 開頭)
+        def get_pure(df):
+            df['股票代號'] = df['股票代號'].astype(str).str.strip()
+            return df[(df['股票代號'].str.len() == 4) & (~df['股票代號'].str.startswith('00'))].copy()
+
+        df_1k_pure = get_pure(df_1000)
+        df_400_pure = get_pure(df_400)
+
+        # 進行合併 (Merge) 取出共振標的
+        df_1k_sub = df_1k_pure[['股票代號', '股票名稱', '週動態', '▼6周增減', latest_col_1000]].copy()
+        df_1k_sub = df_1k_sub.rename(columns={'▼6周增減': '6周(千)', latest_col_1000: '最新(千)', '週動態': '狀態(千)'})
+        
+        df_400_sub = df_400_pure[['股票代號', '週動態', '▼6周增減', latest_col_400]].copy()
+        df_400_sub = df_400_sub.rename(columns={'▼6周增減': '6周(四)', latest_col_400: '最新(四)', '週動態': '狀態(四)'})
+
+        # 兩者聯集 (取共同都有的)
+        sync_df = pd.merge(df_1k_sub, df_400_sub, on='股票代號', how='inner')
+        
+        # 轉換為數值方便排序
+        for col in ['6周(千)', '最新(千)', '6周(四)', '最新(四)']:
+            sync_df[f"{col}_val"] = pd.to_numeric(sync_df[col].astype(str).str.replace('+', '').str.replace('%', ''), errors='coerce').fillna(0)
+
+        # --- 榜單 1：長線 6 周雙引擎共振 ---
+        # 條件：千張與四百張 6 周皆為正，依千張排序
+        cond_6w = (sync_df['6周(千)_val'] > 0) & (sync_df['6周(四)_val'] > 0)
+        top10_6w = sync_df[cond_6w].sort_values(by='6周(千)_val', ascending=False).head(10)
+
+        # --- 榜單 2：短線最新週雙引擎共振 ---
+        # 條件：千張與四百張最新週皆為正，依千張排序
+        cond_latest = (sync_df['最新(千)_val'] > 0) & (sync_df['最新(四)_val'] > 0)
+        top10_latest = sync_df[cond_latest].sort_values(by='最新(千)_val', ascending=False).head(10)
+
+        # 產生 HTML 列表的函數
+        def make_resonance_html(df, is_6w):
+            if df.empty:
+                return "<p style='font-size:14px; text-align:center; color:#94A3B8; margin-top:40px;'>本週尚無雙引擎共振標的</p>"
+            
+            html = "<ul style='padding-left: 0; margin: 0; list-style-type: none;'>"
+            for i, row in enumerate(df.to_dict('records')):
+                if is_6w:
+                    val_1 = row['6周(千)_val']
+                    val_2 = row['6周(四)_val']
+                    # 6周顯示數字
+                    info_html = f"<div style='width: 45%; color:#F59E0B; font-weight:bold; font-size: 13px; text-align: right;'>{val_1:.2f}% <span style='color:#94A3B8; font-size:11px; font-weight:normal;'>/</span> {val_2:.2f}%</div>"
+                else:
+                    status_1 = row.get('狀態(千)', '')[:3] # 取前3字 (包含圖示)
+                    status_2 = row.get('狀態(四)', '')[:3]
+                    # 最新週顯示動態圖示
+                    info_html = f"<div style='width: 45%; color:#F59E0B; font-size: 12px; text-align: right;'>{status_1} <span style='color:#94A3B8; font-size:11px;'>/</span> {status_2}</div>"
+                
+                html += (
+                    f"<li style='display: flex; align-items: center; justify-content: space-between; margin-bottom: 4px; font-size: 14px; line-height: 1.4;'>"
+                    f"  <div style='display: flex; align-items: center; width: 55%; overflow: hidden;'>"
+                    f"      <b style='color:#FFF; width:22px; flex-shrink: 0;'>{i+1}.</b>"
+                    f"      <span style='white-space:nowrap; overflow:hidden; text-overflow:ellipsis;'>{row['股票代號']}{row['股票名稱']}</span>"
+                    f"  </div>"
+                    f"  {info_html}"
+                    f"</li>"
+                )
+            html += "</ul>"
+            return html
+
+        h_6w = make_resonance_html(top10_6w, is_6w=True)
+        h_latest = make_resonance_html(top10_latest, is_6w=False)
+
+        # HTML, CSS 頂格單行化
+        # 位置：左下方 (top: 56vh; left: 20px;)
+        # 主題色：金色 (#F59E0B)
+        card_html = f"""
+<input type="checkbox" id="close-b5-card" style="display:none;">
+<input type="checkbox" id="min-b5-card" style="display:none;">
+<style>
+#close-b5-card:checked ~ #b5-top10-card {{ display: none !important; }}
+#min-b5-card:checked ~ #b5-top10-card .carousel-wrapper-b5 {{ max-height: 0; opacity: 0; margin-top: 0; }}
+#min-b5-card:checked ~ #b5-top10-card {{ padding-bottom: 8px; width: 220px; }}
+#min-b5-card:checked ~ #b5-top10-card .min-icon-b5::after {{ content: '□'; font-size: 14px; }}
+#min-b5-card:not(:checked) ~ #b5-top10-card .min-icon-b5::after {{ content: '_'; font-size: 14px; position: relative; top: -3px; }}
+@keyframes slideInLeftB5 {{ from {{ transform: translateX(-120%); opacity: 0; }} to {{ transform: translateX(0); opacity: 1; }} }}
+.glass-panel-b5 {{ position: fixed; top: 56vh; left: 20px; width: 330px; background: rgba(30, 25, 10, 0.88); backdrop-filter: blur(12px); -webkit-backdrop-filter: blur(12px); border: 1px solid rgba(245, 158, 11, 0.4); border-radius: 12px; padding: 12px 16px; z-index: 999996; color: #E2E8F0; box-shadow: 0 8px 32px 0 rgba(245, 158, 11, 0.2); animation: slideInLeftB5 0.8s cubic-bezier(0.25, 0.8, 0.25, 1); transition: all 0.3s ease; box-sizing: border-box; }}
+.header-bar-b5 {{ display: flex; justify-content: space-between; align-items: center; border-bottom: 1px solid rgba(255,255,255,0.1); padding-bottom: 6px; margin-bottom: 8px; cursor: default; }}
+.header-title-b5 {{ font-size: 14px; font-weight: bold; color: #FCD34D; }}
+.action-btns-b5 {{ display: flex; gap: 10px; align-items: center; }}
+.action-btn-b5 {{ cursor: pointer; color: #94A3B8; font-weight: bold; transition: color 0.2s; user-select: none; }}
+.action-btn-b5:hover {{ color: #F59E0B; }}
+.panel-title-b5 {{ margin: 0 0 8px 0; font-size: 14px; font-weight: bold; color: #F59E0B; display: flex; justify-content: space-between; align-items: flex-end; }}
+.date-badge-b5 {{ font-size: 11px; color: #94A3B8; font-weight: normal; }}
+.carousel-wrapper-b5 {{ position: relative; max-height: 270px; height: 270px; overflow: hidden; transition: all 0.3s ease; opacity: 1; }}
+.carousel-item-b5 {{ position: absolute; top: 0; left: 0; width: 100%; opacity: 0; animation: fadeSwitchB5 10s infinite; }}
+.carousel-item-b5:nth-child(1) {{ animation-delay: 0s; }}
+.carousel-item-b5:nth-child(2) {{ animation-delay: 5s; }}
+@keyframes fadeSwitchB5 {{ 0%, 45% {{ opacity: 1; z-index: 2; }} 50%, 95% {{ opacity: 0; z-index: 1; }} 100% {{ opacity: 1; z-index: 2; }} }}
+.label-sub {{ font-size: 11px; color: #94A3B8; font-weight: normal; float: right; margin-top: 2px; }}
+</style>
+<div class="glass-panel-b5" id="b5-top10-card">
+<div class="header-bar-b5">
+<span class="header-title-b5">🔥 大腿動向雙向共振</span>
+<div class="action-btns-b5">
+<label for="min-b5-card" class="action-btn-b5 min-icon-b5" title="縮放"></label>
+<label for="close-b5-card" class="action-btn-b5" title="關閉">✕</label>
+</div>
+</div>
+<div class="carousel-wrapper-b5">
+<div class="carousel-item-b5">
+    <div class="panel-title-b5"><span>📊 6周累積共振榜</span><span class="date-badge-b5">📅 {date_str}</span></div>
+    <div style="text-align: right; margin-bottom: 4px;"><span class="label-sub">千張大戶 / 400張中實戶</span></div>
+    {h_6w}
+</div>
+<div class="carousel-item-b5">
+    <div class="panel-title-b5"><span>⚡ 最新週動能共振榜</span><span class="date-badge-b5">📅 {date_str}</span></div>
+    <div style="text-align: right; margin-bottom: 4px;"><span class="label-sub">千張大戶 / 400張中實戶</span></div>
+    {h_latest}
+</div>
+</div>
+</div>
+"""
+        st.markdown(card_html, unsafe_allow_html=True)
+        
+    except Exception as e:
+        print(f"B5 Glass Card Error: {e}")
+        pass
