@@ -48,11 +48,12 @@ if not os.path.exists(MARKET_HISTORY_DIR): os.makedirs(MARKET_HISTORY_DIR)
 if not os.path.exists(BLOCK_HISTORY_DIR): os.makedirs(BLOCK_HISTORY_DIR)
 
 # ✨ 修改 ：在載入畫面之前，確保 B3 數據已經存在記憶體中供卡片/跑馬燈使用
-if 'b3_data' not in st.session_state:
-    sync_b3_data(DATA_DIR)
 if 'df_blk2_1' not in st.session_state:
     sync_b2_data(DATA_DIR)
-
+if 'b3_data' not in st.session_state:
+    sync_b3_data(DATA_DIR)
+if 'b4_squeeze_radar' not in st.session_state:
+    sync_b4_data(DATA_DIR)
 # 呼叫渲染視覺元件 components
 style_manager.load_global_css()
 style_manager.set_background("./image/派對盛宴邀請.png")
@@ -62,7 +63,9 @@ try:
     # 呼叫 B3 法人連買卡片 (藍色光暈，右上方)
     style_manager.render_top10_glass_card() 
     # 呼叫 B2 法人掃貨卡片 (紅色光暈，右下方)
-    style_manager.render_b2_top10_glass_card() 
+    style_manager.render_b2_top10_glass_card()
+    # 呼叫 B4 軋空/套牢雷達卡片 (左上方)
+    style_manager.render_b4_top10_glass_card()
 except AttributeError as e:
     # 避免尚未存檔完成時當機
     print(f"UI 渲染警告: {e}")

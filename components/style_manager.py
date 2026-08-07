@@ -424,3 +424,131 @@ def render_top10_glass_card():
     except Exception as e:
         print(f"Top 10 Glass Card Error: {e}")
         pass
+
+#b4 資券玻璃卡片
+def render_b4_top10_glass_card():
+    """渲染 B4 資券動向 (軋空雷達/套牢名單) 專屬懸浮玻璃卡片"""
+    import pandas as pd
+    import streamlit as st
+
+    # 檢查是否已有 B4 的雷達數據
+    if 'b4_squeeze_radar' not in st.session_state or 'b4_risk_radar' not in st.session_state:
+        return
+
+    try:
+        sq_data = st.session_state['b4_squeeze_radar']
+        rk_data = st.session_state['b4_risk_radar']
+        
+        df_sq = sq_data['df']
+        df_rk = rk_data['df']
+        
+        date_sq = sq_data['date'][-4:] if sq_data['date'] and len(sq_data['date']) >= 4 else "未知"
+        date_rk = rk_data['date'][-4:] if rk_data['date'] and len(rk_data['date']) >= 4 else "未知"
+
+        # 嚴格過濾：4 碼純股票（排除 00 開頭的 ETF）
+        def get_pure_radar_stocks(df):
+            if df is None or df.empty:
+                return pd.DataFrame()
+            df['代號'] = df['代號'].astype(str).str.strip()
+            pure = df[(df['代號'].str.len() == 4) & (~df['代號'].str.startswith('00'))].copy()
+            return pure
+
+        # 取得純股票，並預留前 20 名
+        pure_sq = get_pure_radar_stocks(df_sq).head(20)
+        pure_rk = get_pure_radar_stocks(df_rk).head(20)
+
+        # 產生 HTML 列表的通用函數
+        # theme='sq' 為軋空(紅色系漲幅), theme='rk' 為套牢(綠色系跌幅)
+        def make_radar_html(df, start_idx, theme):
+            # 切片取 1~10 或 11~20
+            sub_df = df.iloc[start_idx : start_idx+10]
+            
+            if sub_df.empty:
+                return "<p style='font-size:14px; text-align:center; color:#94A3B8; margin-top:40px;'>該區間尚無雷達目標</p>"
+            
+            html = "<ul style='padding-left: 0; margin: 0; list-style-type: none;'>"
+            for i, row in enumerate(sub_df.to_dict('records')):
+                # 判斷是軋空還是套牢
+                status = row.get('軋空評估', '') if theme == 'sq' else row.get('套牢評估', '')
+                pct = row.get('漲跌幅', 0.0)
+                
+                # 精簡狀態文字，確保只顯示圖示+2字 (例如: 💥 終極)
+                short_status = status[:4] if len(status) > 4 else status
+                
+                # 顏色邏輯：軋空用紅/金，套牢用綠
+                pct_color = "#FF4C4C" if theme == 'sq' else "#00e676"
+                
+                html += (
+                    f"<li style='display: flex; align-items: center; justify-content: space-between; margin-bottom: 4px; font-size: 14px; line-height: 1.4;'>"
+                    f"  <div style='display: flex; align-items: center; width: 55%; overflow: hidden;'>"
+                    f"      <b style='color:#FFF; width:28px; flex-shrink: 0;'>{start_idx + i + 1}.</b>"
+                    f"      <span style='white-space:nowrap; overflow:hidden; text-overflow:ellipsis;'>{row['代號']}{row['名稱']}</span>"
+                    f"  </div>"
+                    f"  <div style='width: 25%; color:#FFD700; font-size: 12px; text-align: left; white-space:nowrap;'>{short_status}</div>"
+                    f"  <div style='width: 20%; color:{pct_color}; font-weight:bold; text-align: right;'>{pct}%</div>"
+                    f"</li>"
+                )
+            html += "</ul>"
+            return html
+
+        # 分別產生 4 頁的 HTML
+        h_sq_1_10 = make_radar_html(pure_sq, 0, 'sq')
+        h_sq_11_20 = make_radar_html(pure_sq, 10, 'sq')
+        h_rk_1_10 = make_radar_html(pure_rk, 0, 'rk')
+        h_rk_11_20 = make_radar_html(pure_rk, 10, 'rk')
+
+        # HTML, CSS 頂格單行化
+        # 位置：放在左上角 (top: 15vh; left: 20px) 避免跟右邊的 B3, B2 打架
+        # 特殊動畫與變色：前 10 秒是紫色調 (軋空)，後 10 秒變綠色調 (套牢)
+        card_html = f"""
+<input type="checkbox" id="close-b4-card" style="display:none;">
+<input type="checkbox" id="min-b4-card" style="display:none;">
+<style>
+#close-b4-card:checked ~ #b4-top10-card {{ display: none !important; }}
+#min-b4-card:checked ~ #b4-top10-card .carousel-wrapper-b4 {{ max-height: 0; opacity: 0; margin-top: 0; }}
+#min-b4-card:checked ~ #b4-top10-card {{ padding-bottom: 8px; width: 220px; }}
+#min-b4-card:checked ~ #b4-top10-card .min-icon-b4::after {{ content: '□'; font-size: 14px; }}
+#min-b4-card:not(:checked) ~ #b4-top10-card .min-icon-b4::after {{ content: '_'; font-size: 14px; position: relative; top: -3px; }}
+@keyframes slideInLeftB4 {{ from {{ transform: translateX(-120%); opacity: 0; }} to {{ transform: translateX(0); opacity: 1; }} }}
+@keyframes radarBreath {{ 
+    0%, 49.9% {{ border-color: rgba(188, 19, 254, 0.4); box-shadow: 0 8px 32px 0 rgba(188, 19, 254, 0.15); }}
+    50%, 100% {{ border-color: rgba(0, 230, 118, 0.4); box-shadow: 0 8px 32px 0 rgba(0, 230, 118, 0.1); }}
+}}
+.glass-panel-b4 {{ position: fixed; top: 15vh; left: 20px; width: 330px; background: rgba(20, 22, 35, 0.88); backdrop-filter: blur(12px); -webkit-backdrop-filter: blur(12px); border: 1px solid rgba(188, 19, 254, 0.35); border-radius: 12px; padding: 12px 16px; z-index: 999997; color: #E2E8F0; animation: slideInLeftB4 0.8s cubic-bezier(0.25, 0.8, 0.25, 1), radarBreath 20s infinite; transition: all 0.3s ease; box-sizing: border-box; }}
+.header-bar-b4 {{ display: flex; justify-content: space-between; align-items: center; border-bottom: 1px solid rgba(255,255,255,0.1); padding-bottom: 6px; margin-bottom: 8px; cursor: default; }}
+.header-title-b4 {{ font-size: 14px; font-weight: bold; color: #E2E8F0; }}
+.action-btns-b4 {{ display: flex; gap: 10px; align-items: center; }}
+.action-btn-b4 {{ cursor: pointer; color: #94A3B8; font-weight: bold; transition: color 0.2s; user-select: none; }}
+.action-btn-b4:hover {{ color: #00D2FF; }}
+.panel-title-b4 {{ margin: 0 0 8px 0; font-size: 14.5px; font-weight: bold; color: #bc13fe; display: flex; justify-content: space-between; align-items: flex-end; }}
+.panel-title-b4.risk {{ color: #00e676; }}
+.date-badge-b4 {{ font-size: 11.5px; color: #94A3B8; font-weight: normal; }}
+.carousel-wrapper-b4 {{ position: relative; max-height: 270px; height: 270px; overflow: hidden; transition: all 0.3s ease; opacity: 1; }}
+.carousel-item-b4 {{ position: absolute; top: 0; left: 0; width: 100%; opacity: 0; animation: fadeSwitchB4 20s infinite; }}
+.carousel-item-b4:nth-child(1) {{ animation-delay: 0s; }}
+.carousel-item-b4:nth-child(2) {{ animation-delay: 5s; }}
+.carousel-item-b4:nth-child(3) {{ animation-delay: 10s; }}
+.carousel-item-b4:nth-child(4) {{ animation-delay: 15s; }}
+@keyframes fadeSwitchB4 {{ 0%, 22% {{ opacity: 1; z-index: 2; }} 25%, 97% {{ opacity: 0; z-index: 1; }} 100% {{ opacity: 1; z-index: 2; }} }}
+</style>
+<div class="glass-panel-b4" id="b4-top10-card">
+<div class="header-bar-b4">
+<span class="header-title-b4">📡 資券動向雙雷達</span>
+<div class="action-btns-b4">
+<label for="min-b4-card" class="action-btn-b4 min-icon-b4" title="縮放"></label>
+<label for="close-b4-card" class="action-btn-b4" title="關閉">✕</label>
+</div>
+</div>
+<div class="carousel-wrapper-b4">
+<div class="carousel-item-b4"><div class="panel-title-b4"><span>🚀 可能軋空雷達 (1-10)</span><span class="date-badge-b4">📅 {date_sq}</span></div>{h_sq_1_10}</div>
+<div class="carousel-item-b4"><div class="panel-title-b4"><span>🚀 可能軋空雷達 (11-20)</span><span class="date-badge-b4">📅 {date_sq}</span></div>{h_sq_11_20}</div>
+<div class="carousel-item-b4"><div class="panel-title-b4 risk"><span>☠️ 短線套牢名單 (1-10)</span><span class="date-badge-b4">📅 {date_rk}</span></div>{h_rk_1_10}</div>
+<div class="carousel-item-b4"><div class="panel-title-b4 risk"><span>☠️ 短線套牢名單 (11-20)</span><span class="date-badge-b4">📅 {date_rk}</span></div>{h_rk_11_20}</div>
+</div>
+</div>
+"""
+        st.markdown(card_html, unsafe_allow_html=True)
+        
+    except Exception as e:
+        print(f"B4 Glass Card Error: {e}")
+        pass
