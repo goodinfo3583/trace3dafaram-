@@ -400,7 +400,7 @@ def show_b1_page(DATA_DIR, STOCK_DICT):
             
         with exp_container:
             if is_updated_today: st.success(f"✅ **今日已更新！** 資料夾中最新快照為 `{local_latest_date}`。")
-            else: st.warning(f"⚠️ **今日尚未更新！** 資料夾中最新快照停留在 `{local_latest_date}`，請記得下載！")
+            else: st.warning(f" 資料夾中最新快照停留在基準日 `{local_latest_date}`")
                 
             admin_pw = st.text_input("解鎖功能", type="password", key="admin_pw_input")
             
