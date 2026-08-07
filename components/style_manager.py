@@ -168,7 +168,7 @@ def render_marquee():
     <div class="slideshow-container">{image_tags}</div>
     """
     st.markdown(marquee_code, unsafe_allow_html=True)
-    
+#跑馬燈懸浮卡片
 def render_top10_glass_card():
     """渲染右側懸浮玻璃卡片 (支援拖曳、關閉、10檔標的、4大榜單輪播、顯示基準日)"""
     import pandas as pd
@@ -178,18 +178,17 @@ def render_top10_glass_card():
         return
 
     try:
-        # 1. 取得日/週資料與日期
         raw_fo_day_df, date_fo_day = st.session_state['b3_data']['fo_day']
         raw_it_day_df, date_it_day = st.session_state['b3_data']['it_day']
         raw_fo_wk_df, date_fo_wk = st.session_state['b3_data']['fo_wk']
         raw_it_wk_df, date_it_wk = st.session_state['b3_data']['it_wk']
 
-        # 2. 過濾函數 (嚴格 4 碼純股票，並取前 10 名)
+        # 嚴格過濾：4 碼純股票（排除 00 開頭的 ETF）並取前 10 名
         def get_top10_pure_stocks(df):
             if df is None or df.empty:
                 return pd.DataFrame()
             df['股票代號'] = df['股票代號'].astype(str).str.strip()
-            pure_stocks = df[df['股票代號'].str.len() == 4].copy()
+            pure_stocks = df[(df['股票代號'].str.len() == 4) & (~df['股票代號'].str.startswith('00'))].copy()
             return pure_stocks.head(10) 
 
         fo_day_df = get_top10_pure_stocks(raw_fo_day_df)
@@ -197,28 +196,25 @@ def render_top10_glass_card():
         fo_wk_df = get_top10_pure_stocks(raw_fo_wk_df)
         it_wk_df = get_top10_pure_stocks(raw_it_wk_df)
 
-        # 3. 處理基準日顯示 (擷取最後 4 碼，例如 20240806 -> 0806)
         fmt_date = lambda d: d[-4:] if (d and d != "00000000") else "未知"
         d_fo_day = fmt_date(date_fo_day)
         d_it_day = fmt_date(date_it_day)
         d_fo_wk = fmt_date(date_fo_wk)
         d_it_wk = fmt_date(date_it_wk)
 
-        # 4. 生成 10 檔標的的 HTML 列表
         def make_list_html(df, col_days, unit):
             if df is None or df.empty:
-                return "<p style='font-size:14px; text-align:center; color:#94A3B8; margin-top:20px;'>目前無資料或尚未開盤</p>"
+                return "<p style='font-size:14px; text-align:center; color:#94A3B8; margin-top:40px;'>目前無資料或尚未開盤</p>"
             
-            html = "<ul style='padding-left: 5px; margin: 0; font-size: 14.5px; line-height: 1.6; list-style-type: none;'>"
+            html = "<ul style='padding-left: 5px; margin: 0; font-size: 14px; line-height: 1.5; list-style-type: none;'>"
             for i, row in enumerate(df.to_dict('records')):
                 val = row.get(col_days, 0)
                 status = row.get('狀態動態', '')
-                # 加入 white-space:nowrap 防止太長的名字折行導致排版跑掉
                 html += (
                     f"<li>"
-                    f"<b style='color:#FFF; display:inline-block; width:25px;'>{i+1}.</b>"
-                    f"<span style='display:inline-block; width:100px; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; vertical-align:bottom;'>{row['股票代號']}{row['股票名稱']}</span>"
-                    f"<span style='color:#FFD700; font-size: 12.5px; margin: 0 8px;'>{status}</span>"
+                    f"<b style='color:#FFF; display:inline-block; width:22px;'>{i+1}.</b>"
+                    f"<span style='display:inline-block; width:95px; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; vertical-align:bottom;'>{row['股票代號']}{row['股票名稱']}</span>"
+                    f"<span style='color:#FFD700; font-size: 11.5px; margin: 0 4px;'>{status}</span>"
                     f"<span style='color:#00D2FF; float:right;'>{val}{unit}</span>"
                     f"</li>"
                 )
@@ -230,9 +226,8 @@ def render_top10_glass_card():
         fo_wk_html = make_list_html(fo_wk_df, "最新連買週數", "週")
         it_wk_html = make_list_html(it_wk_df, "最新連買週數", "週")
 
-        # 5. HTML 與 CSS 渲染 (注意：標籤全部靠左，無縮排！)
+        # 注意：以下 HTML 字串頂格寫，絕對不要有左側縮排，防止 Markdown 渲染崩潰
         card_html = f"""
-<!-- 絕對有效的純 CSS 關閉機制 -->
 <input type="checkbox" id="close-card-toggle" style="display:none;">
 <style>
 #close-card-toggle:checked ~ #b3-top10-card {{
@@ -246,41 +241,39 @@ def render_top10_glass_card():
     position: fixed;
     top: 15vh;
     right: 20px;
-    width: 320px; /* 稍微加寬以容納 10 檔及日期 */
-    background: rgba(15, 23, 42, 0.85);
+    width: 330px;
+    background: rgba(15, 23, 42, 0.88);
     backdrop-filter: blur(12px);
     -webkit-backdrop-filter: blur(12px);
-    border: 1px solid rgba(0, 210, 255, 0.3);
+    border: 1px solid rgba(0, 210, 255, 0.35);
     border-radius: 12px;
-    padding: 12px 18px;
+    padding: 10px 16px 16px 16px;
     z-index: 999999;
     color: #E2E8F0;
-    box-shadow: 0 8px 32px 0 rgba(0, 0, 0, 0.5);
+    box-shadow: 0 8px 32px 0 rgba(0, 0, 0, 0.6);
     animation: slideInRight 0.8s cubic-bezier(0.25, 0.8, 0.25, 1);
 }}
-/* 拖曳把手的樣式 */
 .drag-header {{
     cursor: grab;
-    padding-bottom: 6px;
-    margin-bottom: 10px;
+    padding: 2px 0 8px 0;
+    margin-bottom: 8px;
     border-bottom: 1px solid rgba(255,255,255,0.1);
     text-align: center;
-    color: #4A5568;
-    font-size: 13px;
+    color: #64748B;
+    font-size: 12px;
     user-select: none;
 }}
 .drag-header:active {{
     cursor: grabbing;
 }}
-/* 關閉按鈕使用 label 來觸發 checkbox */
 .close-btn {{
     position: absolute;
-    top: 10px;
-    right: 15px;
+    top: 8px;
+    right: 12px;
     cursor: pointer;
     color: #94A3B8;
     font-weight: bold;
-    font-size: 18px;
+    font-size: 16px;
     transition: color 0.3s;
     z-index: 10;
 }}
@@ -288,8 +281,8 @@ def render_top10_glass_card():
     color: #FF4C4C;
 }}
 .panel-title {{
-    margin: 0 0 10px 0;
-    font-size: 15px;
+    margin: 0 0 8px 0;
+    font-size: 14.5px;
     font-weight: bold;
     color: #00D2FF;
     display: flex;
@@ -297,28 +290,26 @@ def render_top10_glass_card():
     align-items: flex-end;
 }}
 .date-badge {{
-    font-size: 12px;
+    font-size: 11.5px;
     color: #94A3B8;
     font-weight: normal;
 }}
 .carousel-wrapper {{
     position: relative;
-    height: 290px; /* 足夠塞下 10 檔的高度 */
+    height: 310px;
     overflow: hidden;
 }}
-/* 4個榜單，總動畫時長 20秒 */
 .carousel-item {{
     position: absolute;
     top: 0; left: 0; width: 100%;
     opacity: 0;
-    animation: fadeSwitch 20s infinite; 
+    animation: fadeSwitch 20s infinite;
 }}
 .carousel-item:nth-child(1) {{ animation-delay: 0s; }}
 .carousel-item:nth-child(2) {{ animation-delay: 5s; }}
 .carousel-item:nth-child(3) {{ animation-delay: 10s; }}
 .carousel-item:nth-child(4) {{ animation-delay: 15s; }}
 
-/* 每個榜單停靠 4.5 秒 (22.5%)，切換 0.5 秒 */
 @keyframes fadeSwitch {{
     0%, 22% {{ opacity: 1; z-index: 2; }}
     25%, 97% {{ opacity: 0; z-index: 1; }}
@@ -327,64 +318,54 @@ def render_top10_glass_card():
 </style>
 
 <div class="glass-panel" id="b3-top10-card">
-    <!-- 這個 label 綁定到前面的 checkbox，點擊即觸發隱藏 -->
-    <label for="close-card-toggle" class="close-btn" title="關閉">✕</label>
-    
-    <!-- 拖曳區塊 -->
-    <div class="drag-header" id="drag-header" title="按住可拖曳">
-        ⠿ 點擊此處拖曳 ⠿
-    </div>
-    
-    <div class="carousel-wrapper">
-        <div class="carousel-item">
-            <div class="panel-title"><span>🌐 外資最新日連買</span><span class="date-badge">📅 {d_fo_day}</span></div>
-            {fo_day_html}
-        </div>
-        <div class="carousel-item">
-            <div class="panel-title"><span>🏦 投信最新日連買</span><span class="date-badge">📅 {d_it_day}</span></div>
-            {it_day_html}
-        </div>
-        <div class="carousel-item">
-            <div class="panel-title"><span>👑 外資最新週連買</span><span class="date-badge">📅 {d_fo_wk}</span></div>
-            {fo_wk_html}
-        </div>
-        <div class="carousel-item">
-            <div class="panel-title"><span>🚀 投信最新週連買</span><span class="date-badge">📅 {d_it_wk}</span></div>
-            {it_wk_html}
-        </div>
-    </div>
+<label for="close-card-toggle" class="close-btn" title="關閉">✕</label>
+<div class="drag-header" id="drag-header" title="按住可拖曳">⠿ 點擊此處可拖曳視窗 ⠿</div>
+<div class="carousel-wrapper">
+<div class="carousel-item">
+<div class="panel-title"><span>🌐 外資最新日連買</span><span class="date-badge">📅 {d_fo_day}</span></div>
+{fo_day_html}
+</div>
+<div class="carousel-item">
+<div class="panel-title"><span>🏦 投信最新日連買</span><span class="date-badge">📅 {d_it_day}</span></div>
+{it_day_html}
+</div>
+<div class="carousel-item">
+<div class="panel-title"><span>👑 外資最新週連買</span><span class="date-badge">📅 {d_fo_wk}</span></div>
+{fo_wk_html}
+</div>
+<div class="carousel-item">
+<div class="panel-title"><span>🚀 投信最新週連買</span><span class="date-badge">📅 {d_it_wk}</span></div>
+{it_wk_html}
+</div>
+</div>
 </div>
 
-<!-- 隱藏腳本注入：賦予拖曳能力 -->
 <img src="x" onerror="
-    var card = document.getElementById('b3-top10-card');
-    var header = document.getElementById('drag-header');
-    var isDragging = false;
-    var offsetX, offsetY;
-    if(header && card) {{
-        header.onmousedown = function(e) {{
-            isDragging = true;
-            // 取得游標相對於卡片左上角的相對位置
-            var rect = card.getBoundingClientRect();
-            offsetX = e.clientX - rect.left;
-            offsetY = e.clientY - rect.top;
-            
-            // 釋放右側對齊，讓 left 控制生效
-            card.style.right = 'auto';
-            card.style.bottom = 'auto';
-            card.style.margin = '0';
-        }};
-        document.onmousemove = function(e) {{
-            if (isDragging) {{
-                e.preventDefault();
-                card.style.left = (e.clientX - offsetX) + 'px';
-                card.style.top = (e.clientY - offsetY) + 'px';
-            }}
-        }};
-        document.onmouseup = function(e) {{
-            isDragging = false;
-        }};
-    }}
+var card = document.getElementById('b3-top10-card');
+var header = document.getElementById('drag-header');
+var isDragging = false;
+var offsetX, offsetY;
+if(header && card) {{
+    header.onmousedown = function(e) {{
+        isDragging = true;
+        var rect = card.getBoundingClientRect();
+        offsetX = e.clientX - rect.left;
+        offsetY = e.clientY - rect.top;
+        card.style.right = 'auto';
+        card.style.bottom = 'auto';
+        card.style.margin = '0';
+    }};
+    document.onmousemove = function(e) {{
+        if (isDragging) {{
+            e.preventDefault();
+            card.style.left = (e.clientX - offsetX) + 'px';
+            card.style.top = (e.clientY - offsetY) + 'px';
+        }}
+    }};
+    document.onmouseup = function(e) {{
+        isDragging = false;
+    }};
+}}
 " style="display:none;">
 """
         st.markdown(card_html, unsafe_allow_html=True)
