@@ -407,7 +407,7 @@ def show_b1_page(DATA_DIR, STOCK_DICT):
             if admin_pw == "DDong888": 
                 st.success("🔓 驗證成功！請執行快照封存。")
                 
-                if st.button("🔄 強制抓取 GitHub 最新數據", use_container_width=True):
+                if st.button("🔄 重新整理 GitHub 最新數據", use_container_width=True):
                     fetch_github_json_all.clear()
                     fetch_github_json_down.clear()
                     build_block1_master_df.clear()
