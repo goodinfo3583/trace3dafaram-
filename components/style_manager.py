@@ -171,23 +171,34 @@ def render_marquee():
     
 def render_top5_glass_card():
     """渲染右側懸浮玻璃卡片 (可手動關閉，自動輪播外資/投信前5名)"""
-    
-    # 檢查 session_state 是否已有 b3_data 
-    # (必須確保主程式或背景已跑過 sync_b3_data)
+    import pandas as pd
+    import streamlit as st
+
     if 'b3_data' not in st.session_state:
         return
 
     try:
-        fo_day_df, _ = st.session_state['b3_data']['fo_day']
-        it_day_df, _ = st.session_state['b3_data']['it_day']
+        raw_fo_day_df, _ = st.session_state['b3_data']['fo_day']
+        raw_it_day_df, _ = st.session_state['b3_data']['it_day']
 
-        # 產生 Top 5 列表 HTML 的小幫手函數 (使用 to_dict 避免中文欄位讀取問題)
+        # 🛠️ 修正1：資料過濾引擎 - 只取「代號長度為 4」的純股票
+        def get_top5_pure_stocks(df):
+            if df is None or df.empty:
+                return pd.DataFrame()
+            # 確保股票代號轉為字串並去除空白，然後只取長度為 4 的
+            df['股票代號'] = df['股票代號'].astype(str).str.strip()
+            pure_stocks = df[df['股票代號'].str.len() == 4].copy()
+            return pure_stocks.head(5)
+
+        fo_day_df = get_top5_pure_stocks(raw_fo_day_df)
+        it_day_df = get_top5_pure_stocks(raw_it_day_df)
+
         def make_list_html(df, col_days):
             if df is None or df.empty:
                 return "<p style='font-size:14px; text-align:center; color:#94A3B8;'>目前無資料或尚未開盤</p>"
             
             html = "<ul style='padding-left: 10px; margin: 0; font-size: 15px; line-height: 1.8; list-style-type: none;'>"
-            for i, row in enumerate(df.head(5).to_dict('records')):
+            for i, row in enumerate(df.to_dict('records')):
                 html += (
                     f"<li>"
                     f"<b style='color:#FFF;'>{i+1}.</b> {row['股票代號']}{row['股票名稱']} "
@@ -201,90 +212,90 @@ def render_top5_glass_card():
         fo_html = make_list_html(fo_day_df, "最新連買天數")
         it_html = make_list_html(it_day_df, "最新連買天數")
 
-        # HTML & CSS (加入背景模糊 Glassmorphism 與 JS 點擊隱藏)
+        # 🛠️ 修正2：取消 HTML 的縮排，防止 Streamlit 把它當作程式碼區塊顯示出來
         card_html = f"""
-        <style>
-        @keyframes slideInRight {{
-            from {{ transform: translateX(120%); opacity: 0; }}
-            to {{ transform: translateX(0); opacity: 1; }}
-        }}
-        .glass-panel {{
-            position: fixed;
-            top: 20vh; /* 距離頂部高度，可自行微調 */
-            right: 20px; /* 靠右對齊 */
-            width: 290px;
-            background: rgba(15, 23, 42, 0.75);
-            backdrop-filter: blur(12px);
-            -webkit-backdrop-filter: blur(12px);
-            border: 1px solid rgba(0, 210, 255, 0.3);
-            border-radius: 12px;
-            padding: 18px 20px;
-            z-index: 999999;
-            color: #E2E8F0;
-            box-shadow: 0 8px 32px 0 rgba(0, 0, 0, 0.5);
-            animation: slideInRight 0.8s cubic-bezier(0.25, 0.8, 0.25, 1);
-        }}
-        .close-btn {{
-            position: absolute;
-            top: 8px;
-            right: 12px;
-            cursor: pointer;
-            color: #94A3B8;
-            font-weight: bold;
-            font-size: 16px;
-            transition: color 0.3s;
-        }}
-        .close-btn:hover {{
-            color: #FF4C4C; /* 滑鼠移過去變紅色 */
-        }}
-        .panel-title {{
-            margin-top: 0;
-            font-size: 17px;
-            font-weight: bold;
-            color: #00D2FF;
-            border-bottom: 1px solid rgba(255,255,255,0.1);
-            padding-bottom: 8px;
-            margin-bottom: 12px;
-        }}
-        /* 輪播動畫設定 (10秒一輪，各停5秒，利用透明度切換) */
-        .carousel-wrapper {{
-            position: relative;
-            height: 180px; 
-            overflow: hidden;
-        }}
-        .carousel-item {{
-            position: absolute;
-            top: 0; left: 0; width: 100%;
-            opacity: 0;
-            animation: fadeSwitch 10s infinite;
-        }}
-        .carousel-item:nth-child(2) {{
-            animation-delay: 5s; /* 投信延遲5秒出現 */
-        }}
-        @keyframes fadeSwitch {{
-            0%, 45% {{ opacity: 1; z-index: 2; }}
-            50%, 95% {{ opacity: 0; z-index: 1; }}
-            100% {{ opacity: 1; z-index: 2; }}
-        }}
-        </style>
+<style>
+@keyframes slideInRight {{
+    from {{ transform: translateX(120%); opacity: 0; }}
+    to {{ transform: translateX(0); opacity: 1; }}
+}}
+.glass-panel {{
+    position: fixed;
+    top: 20vh;
+    right: 20px;
+    width: 290px;
+    background: rgba(15, 23, 42, 0.75);
+    backdrop-filter: blur(12px);
+    -webkit-backdrop-filter: blur(12px);
+    border: 1px solid rgba(0, 210, 255, 0.3);
+    border-radius: 12px;
+    padding: 18px 20px;
+    z-index: 999999;
+    color: #E2E8F0;
+    box-shadow: 0 8px 32px 0 rgba(0, 0, 0, 0.5);
+    animation: slideInRight 0.8s cubic-bezier(0.25, 0.8, 0.25, 1);
+}}
+.close-btn {{
+    position: absolute;
+    top: 8px;
+    right: 12px;
+    cursor: pointer;
+    color: #94A3B8;
+    font-weight: bold;
+    font-size: 16px;
+    transition: color 0.3s;
+}}
+.close-btn:hover {{
+    color: #FF4C4C;
+}}
+.panel-title {{
+    margin-top: 0;
+    font-size: 17px;
+    font-weight: bold;
+    color: #00D2FF;
+    border-bottom: 1px solid rgba(255,255,255,0.1);
+    padding-bottom: 8px;
+    margin-bottom: 12px;
+}}
+.carousel-wrapper {{
+    position: relative;
+    height: 180px; 
+    overflow: hidden;
+}}
+.carousel-item {{
+    position: absolute;
+    top: 0; left: 0; width: 100%;
+    opacity: 0;
+    animation: fadeSwitch 10s infinite;
+}}
+.carousel-item:nth-child(2) {{
+    animation-delay: 5s;
+}}
+@keyframes fadeSwitch {{
+    0%, 45% {{ opacity: 1; z-index: 2; }}
+    50%, 95% {{ opacity: 0; z-index: 1; }}
+    100% {{ opacity: 1; z-index: 2; }}
+}}
+</style>
 
-        <div class="glass-panel" id="b3-top5-card">
-            <!-- 點擊 X 就隱藏整個 div -->
-            <span class="close-btn" onclick="document.getElementById('b3-top5-card').style.display='none'">✕</span>
-            
-            <div class="carousel-wrapper">
-                <div class="carousel-item">
-                    <div class="panel-title">🌐 外資最新日連買 TOP 5</div>
-                    {fo_html}
-                </div>
-                <div class="carousel-item">
-                    <div class="panel-title">🏦 投信最新日連買 TOP 5</div>
-                    {it_html}
-                </div>
-            </div>
+<div class="glass-panel" id="b3-top5-card">
+    <span class="close-btn" onclick="document.getElementById('b3-top5-card').style.display='none'">✕</span>
+    <div class="carousel-wrapper">
+        <div class="carousel-item">
+            <div class="panel-title">🌐 外資最新日連買 TOP 5</div>
+            {fo_html}
         </div>
-        """
+        <div class="carousel-item">
+            <div class="panel-title">🏦 投信最新日連買 TOP 5</div>
+            {it_html}
+        </div>
+    </div>
+</div>
+"""
+        # 輸出到前端
         st.markdown(card_html, unsafe_allow_html=True)
+        
     except Exception as e:
-        # 若發生 KeyError 或欄位變動，靜默錯誤不影響主畫面
+        # 如果發生錯誤，顯示在終端機方便除錯，不影響使用者介面
+        print(f"Glass Card Render Error: {e}")
         pass
