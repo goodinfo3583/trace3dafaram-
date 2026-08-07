@@ -386,7 +386,7 @@ def show_b1_page(DATA_DIR, STOCK_DICT):
     today_str = datetime.datetime.now().strftime("%Y%m%d")
     is_updated_today = (local_latest_date == today_str)
     status_icon = "✅" if is_updated_today else "⚠️"
-    status_text = f"{status_icon} 本地最新: {local_latest_date}"
+    status_text = f"{status_icon} 目前基準日: {local_latest_date}"
 
     st.write("") 
     c_btn1, c_btn2 = st.columns(2)
@@ -402,7 +402,7 @@ def show_b1_page(DATA_DIR, STOCK_DICT):
             if is_updated_today: st.success(f"✅ **今日已更新！** 資料夾中最新快照為 `{local_latest_date}`。")
             else: st.warning(f"⚠️ **今日尚未更新！** 資料夾中最新快照停留在 `{local_latest_date}`，請記得下載！")
                 
-            admin_pw = st.text_input("請輸入站長密碼以解鎖功能", type="password", key="admin_pw_input")
+            admin_pw = st.text_input("解鎖功能", type="password", key="admin_pw_input")
             
             if admin_pw == "DDong888": 
                 st.success("🔓 驗證成功！請執行快照封存。")
@@ -415,7 +415,7 @@ def show_b1_page(DATA_DIR, STOCK_DICT):
                     sync_b1_data(DATA_DIR) 
                     st.rerun()                     
                 
-                snap_date = st.date_input("選擇這份資料的實際基準日")
+                snap_date = st.date_input("選擇這份資料的基準日(※通常更新前1日※)")
                 st.write("")
                 
                 if st.button("💾 站長專屬：一鍵封存今日【正向】與【負向衰退】歷史數據", use_container_width=True, type="primary"):
@@ -485,14 +485,14 @@ def show_b1_page(DATA_DIR, STOCK_DICT):
                     c_dl1, c_dl2 = st.columns(2)
                     with c_dl1:
                         st.download_button(
-                            label="📥 下載實體【正向】CSV", 
+                            label="📥 下載正向CSV", 
                             data=st.session_state['dl_csv_up'], 
                             file_name=st.session_state['dl_name_up'],
                             mime="text/csv", type="primary", use_container_width=True
                         )
                     with c_dl2:
                         st.download_button(
-                            label="📥 下載實體【負向】CSV", 
+                            label="📥 下載衰退CSV", 
                             data=st.session_state['dl_csv_down'], 
                             file_name=st.session_state['dl_name_down'],
                             mime="text/csv", type="primary", use_container_width=True
