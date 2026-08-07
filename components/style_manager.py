@@ -171,7 +171,7 @@ def render_marquee():
 
 #跑馬燈懸浮卡片
 def render_top10_glass_card():
-    """渲染右側懸浮玻璃卡片 (支援拖曳、關閉、10檔標的、4大榜單輪播、顯示基準日)"""
+    """渲染右側懸浮玻璃卡片 (支援縮小、展開、關閉、10檔標的、4大榜單輪播、顯示基準日)"""
     import pandas as pd
     import streamlit as st
 
@@ -227,20 +227,29 @@ def render_top10_glass_card():
         fo_wk_html = make_list_html(fo_wk_df, "最新連買週數", "週")
         it_wk_html = make_list_html(it_wk_df, "最新連買週數", "週")
 
-        # HTML, CSS, JS 頂格且 JS 單行化，防止 Markdown 渲染錯誤
+        # HTML, CSS 頂格並單行化，防止 Markdown 渲染錯誤
+        # 使用兩個隱藏的 checkbox 控制：一個負責關閉，一個負責縮小
         card_html = f"""
-<input type="checkbox" id="close-card-toggle" style="display:none;">
+<input type="checkbox" id="close-card" style="display:none;">
+<input type="checkbox" id="min-card" style="display:none;">
 <style>
-#close-card-toggle:checked ~ #b3-top10-card {{ display: none !important; }}
+#close-card:checked ~ #b3-top10-card {{ display: none !important; }}
+#min-card:checked ~ #b3-top10-card .carousel-wrapper {{ max-height: 0; opacity: 0; margin-top: 0; }}
+#min-card:checked ~ #b3-top10-card {{ padding-bottom: 8px; width: 220px; }}
+#min-card:checked ~ #b3-top10-card .min-icon::after {{ content: '□'; font-size: 14px; }}
+#min-card:not(:checked) ~ #b3-top10-card .min-icon::after {{ content: '_'; font-size: 14px; position: relative; top: -3px; }}
+
 @keyframes slideInRight {{ from {{ transform: translateX(120%); opacity: 0; }} to {{ transform: translateX(0); opacity: 1; }} }}
-.glass-panel {{ position: fixed; top: 15vh; right: 20px; width: 330px; background: rgba(15, 23, 42, 0.88); backdrop-filter: blur(12px); -webkit-backdrop-filter: blur(12px); border: 1px solid rgba(0, 210, 255, 0.35); border-radius: 12px; padding: 10px 16px 16px 16px; z-index: 999999; color: #E2E8F0; box-shadow: 0 8px 32px 0 rgba(0, 0, 0, 0.6); animation: slideInRight 0.8s cubic-bezier(0.25, 0.8, 0.25, 1); }}
-.drag-header {{ cursor: grab; padding: 2px 0 8px 0; margin-bottom: 8px; border-bottom: 1px solid rgba(255,255,255,0.1); text-align: center; color: #64748B; font-size: 12px; user-select: none; }}
-.drag-header:active {{ cursor: grabbing; }}
-.close-btn {{ position: absolute; top: 8px; right: 12px; cursor: pointer; color: #94A3B8; font-weight: bold; font-size: 16px; transition: color 0.3s; z-index: 10; }}
+.glass-panel {{ position: fixed; top: 15vh; right: 20px; width: 330px; background: rgba(15, 23, 42, 0.88); backdrop-filter: blur(12px); -webkit-backdrop-filter: blur(12px); border: 1px solid rgba(0, 210, 255, 0.35); border-radius: 12px; padding: 12px 16px; z-index: 999999; color: #E2E8F0; box-shadow: 0 8px 32px 0 rgba(0, 0, 0, 0.6); animation: slideInRight 0.8s cubic-bezier(0.25, 0.8, 0.25, 1); transition: all 0.3s ease; }}
+.header-bar {{ display: flex; justify-content: space-between; align-items: center; border-bottom: 1px solid rgba(255,255,255,0.1); padding-bottom: 6px; margin-bottom: 8px; cursor: default; }}
+.header-title {{ font-size: 14px; font-weight: bold; color: #64748B; }}
+.action-btns {{ display: flex; gap: 10px; align-items: center; }}
+.action-btn {{ cursor: pointer; color: #94A3B8; font-weight: bold; transition: color 0.2s; user-select: none; }}
+.action-btn:hover {{ color: #00D2FF; }}
 .close-btn:hover {{ color: #FF4C4C; }}
 .panel-title {{ margin: 0 0 8px 0; font-size: 14.5px; font-weight: bold; color: #00D2FF; display: flex; justify-content: space-between; align-items: flex-end; }}
 .date-badge {{ font-size: 11.5px; color: #94A3B8; font-weight: normal; }}
-.carousel-wrapper {{ position: relative; height: 310px; overflow: hidden; }}
+.carousel-wrapper {{ position: relative; max-height: 310px; height: 310px; overflow: hidden; transition: all 0.3s ease; opacity: 1; }}
 .carousel-item {{ position: absolute; top: 0; left: 0; width: 100%; opacity: 0; animation: fadeSwitch 20s infinite; }}
 .carousel-item:nth-child(1) {{ animation-delay: 0s; }}
 .carousel-item:nth-child(2) {{ animation-delay: 5s; }}
@@ -249,8 +258,13 @@ def render_top10_glass_card():
 @keyframes fadeSwitch {{ 0%, 22% {{ opacity: 1; z-index: 2; }} 25%, 97% {{ opacity: 0; z-index: 1; }} 100% {{ opacity: 1; z-index: 2; }} }}
 </style>
 <div class="glass-panel" id="b3-top10-card">
-<label for="close-card-toggle" class="close-btn" title="關閉">✕</label>
-<div class="drag-header" id="drag-header" title="按住可拖曳">⠿ 點擊此處可拖曳視窗 ⠿</div>
+<div class="header-bar">
+<span class="header-title">📊 籌碼強勢排行榜</span>
+<div class="action-btns">
+<label for="min-card" class="action-btn min-icon" title="縮放"></label>
+<label for="close-card" class="action-btn close-btn" title="關閉">✕</label>
+</div>
+</div>
 <div class="carousel-wrapper">
 <div class="carousel-item"><div class="panel-title"><span>🌐 外資最新日連買</span><span class="date-badge">📅 {d_fo_day}</span></div>{fo_day_html}</div>
 <div class="carousel-item"><div class="panel-title"><span>🏦 投信最新日連買</span><span class="date-badge">📅 {d_it_day}</span></div>{it_day_html}</div>
@@ -258,7 +272,6 @@ def render_top10_glass_card():
 <div class="carousel-item"><div class="panel-title"><span>🚀 投信最新週連買</span><span class="date-badge">📅 {d_it_wk}</span></div>{it_wk_html}</div>
 </div>
 </div>
-<img src="x" onerror="if(!window.b3DragInit){{window.b3DragInit=true;var isDragging=false;var offsetX=0,offsetY=0;document.addEventListener('mousedown',function(e){{var header=document.getElementById('drag-header');if(header&&header.contains(e.target)){{isDragging=true;var card=document.getElementById('b3-top10-card');var rect=card.getBoundingClientRect();offsetX=e.clientX-rect.left;offsetY=e.clientY-rect.top;card.style.right='auto';card.style.bottom='auto';card.style.margin='0';}}}});document.addEventListener('mousemove',function(e){{if(isDragging){{e.preventDefault();var card=document.getElementById('b3-top10-card');if(card){{card.style.left=(e.clientX-offsetX)+'px';card.style.top=(e.clientY-offsetY)+'px';}}}}}});document.addEventListener('mouseup',function(e){{isDragging=false;}});}}" style="display:none;">
 """
         st.markdown(card_html, unsafe_allow_html=True)
         
