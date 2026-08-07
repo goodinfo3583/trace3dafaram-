@@ -216,11 +216,9 @@ def build_block1_master_df(data_dir):
 @st.cache_data(ttl=600)
 def fetch_github_json_down():
     """獨立抓取法人持股衰退(負向)的 JSON 資料"""
-    # 🌟 修正點 1：依照 voidful 目前提供的天數，改為 5, 10, 20, 30
     days_list = [5, 10, 20, 30] 
     json_dfs = {}
     
-    # 🌟 修正點 2：指回原作者 voidful 的來源 (因為他有新的 5/10/20/30 架構)
     account, repo, branch = "voidful", "tw-institutional-stocker", "main"
 
     for d in days_list:
@@ -420,7 +418,6 @@ def show_b1_page(DATA_DIR, STOCK_DICT):
                 snap_date = st.date_input("選擇這份資料的實際基準日")
                 st.write("")
                 
-                # 🌟 一鍵雙向封存：解決 Streamlit 按鈕會重新整理遺失狀態的問題
                 if st.button("💾 站長專屬：一鍵封存今日【正向】與【負向衰退】歷史數據", use_container_width=True, type="primary"):
                     date_str = snap_date.strftime("%Y%m%d")
                     
@@ -438,7 +435,13 @@ def show_b1_page(DATA_DIR, STOCK_DICT):
                         snap_grouped_up = snap_df_up.groupby(['股票代號', '股票名稱']).agg({
                             '法人持股': 'max', '上榜區塊': lambda x: ",".join(set(x))
                         }).reset_index()
+                        
+                        # 儲存於伺服器供系統讀取
                         snap_grouped_up.to_csv(save_path_up, index=False, encoding='utf-8-sig')
+                        
+                        # 🌟 寫入 session_state，為了稍後給真正的下載按鈕使用
+                        st.session_state['dl_csv_up'] = snap_grouped_up.to_csv(index=False).encode('utf-8-sig')
+                        st.session_state['dl_name_up'] = f"{date_str}_JSON_History.csv"
                         st.success(f"✅ 成功生成【正向】歷史快照 ({len(snap_grouped_up)} 檔)！")
                     else: 
                         st.error("❌ 尚未獲取到 GitHub 正向數據，封存失敗。")
@@ -461,7 +464,13 @@ def show_b1_page(DATA_DIR, STOCK_DICT):
                             '上榜區塊': lambda x: ",".join(set(x)),
                             '累積衰退': 'first'
                         }).reset_index()
+                        
+                        # 儲存於伺服器供系統讀取
                         snap_grouped_down.to_csv(save_path_down, index=False, encoding='utf-8-sig')
+                        
+                        # 🌟 寫入 session_state
+                        st.session_state['dl_csv_down'] = snap_grouped_down.to_csv(index=False).encode('utf-8-sig')
+                        st.session_state['dl_name_down'] = f"{date_str}_Down_History.csv"
                         st.success(f"✅ 成功生成【負向衰退】歷史快照 ({len(snap_grouped_down)} 檔)！")
                     else: 
                         st.error("❌ 尚未獲取到 GitHub 負向數據，封存失敗。")
@@ -470,6 +479,25 @@ def show_b1_page(DATA_DIR, STOCK_DICT):
                     build_block1_master_df.clear() 
                     build_block1_down_master_df.clear()
                     
+                # 🌟 實體的下載按鈕區塊：必須放在 st.button() 外，這樣點擊下載時按鈕才不會因為重整而消失！
+                if 'dl_csv_up' in st.session_state and 'dl_csv_down' in st.session_state:
+                    st.info("💡 系統已成功將歷史紀錄儲存於背景！若需保存實體檔案至電腦，請點擊下方按鈕下載：")
+                    c_dl1, c_dl2 = st.columns(2)
+                    with c_dl1:
+                        st.download_button(
+                            label="📥 下載實體【正向】CSV", 
+                            data=st.session_state['dl_csv_up'], 
+                            file_name=st.session_state['dl_name_up'],
+                            mime="text/csv", type="primary", use_container_width=True
+                        )
+                    with c_dl2:
+                        st.download_button(
+                            label="📥 下載實體【負向】CSV", 
+                            data=st.session_state['dl_csv_down'], 
+                            file_name=st.session_state['dl_name_down'],
+                            mime="text/csv", type="primary", use_container_width=True
+                        )
+                        
             elif admin_pw != "": 
                 st.error("❌ 密碼錯誤，無法使用此功能。")
 
@@ -722,7 +750,6 @@ def show_b1_page(DATA_DIR, STOCK_DICT):
     
     down_dfs = fetch_github_json_down()
     
-    # 這裡配合 voidful 的天數改為 5, 10, 20, 30
     t_down_5, t_down_10, t_down_20, t_down_30, t_down_history, t_down_all = st.tabs([
         "🟢 5日衰退", "🟢 10日衰退", "🟢 20日衰退", "🟢 30日衰退", "📅 單日歷史快照", "📊 歷史衰退全能池"
     ])
@@ -730,7 +757,6 @@ def show_b1_page(DATA_DIR, STOCK_DICT):
     def render_down_table(day_key):
         if day_key in down_dfs and not down_dfs[day_key].empty:
             df_display = down_dfs[day_key].copy()
-            # 由於我們在 API 抓取時移除了 % 符號以利計算，這裡渲染時要加回去
             df_display['法人持股'] = df_display['法人持股'].apply(lambda x: f"{float(x):.2f}%" if pd.notna(x) else "0.00%")
             df_display['累積衰退'] = df_display['累積衰退'].apply(lambda x: f"{float(x):.2f}%" if pd.notna(x) else "0.00%")
             
@@ -759,7 +785,6 @@ def show_b1_page(DATA_DIR, STOCK_DICT):
                 
                 try:
                     df_hist = pd.read_csv(target_file, encoding='utf-8-sig')
-                    # 同樣為單日歷史快照補上 % 符號
                     if '法人持股' in df_hist.columns and df_hist['法人持股'].dtype != object:
                          df_hist['法人持股'] = df_hist['法人持股'].apply(lambda x: f"{x:.2f}%")
                     if '累積衰退' in df_hist.columns and df_hist['累積衰退'].dtype != object:
@@ -780,9 +805,7 @@ def show_b1_page(DATA_DIR, STOCK_DICT):
         if not down_final_df.empty:
              display_cols = ['股票代號', '股票名稱', '今日衰退上榜', '單日△'] + down_date_cols
              
-             # 複製一份來修改顯示
              down_pool_df = down_final_df.copy()
-             # 負向衰退格式化 △ (如果是負的數值，直接顯示負號即可)
              down_pool_df['單日△'] = down_pool_df['單日△'].apply(lambda x: f"{x:.2f}" if x <= 0 else f"+{x:.2f}")
 
              def highlight_down_row(row):
