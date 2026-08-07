@@ -330,50 +330,47 @@ def show_b1_page(DATA_DIR, STOCK_DICT):
             else: st.warning(f"⚠️ **今日尚未更新！** 資料夾中最新快照停留在 `{local_latest_date}`，請記得下載！")
                 
             admin_pw = st.text_input("請輸入站長密碼以解鎖功能", type="password", key="admin_pw_input")
+            
             if admin_pw == "DDong888": 
                 st.success("🔓 驗證成功！請執行快照封存。")
                 
-                if st.button("🔄 站長專屬：強制抓取 GitHub 最新數據", use_container_width=True):
+                if st.button("🔄 強制抓取 GitHub 最新數據", use_container_width=True):
                     fetch_github_json_all.clear()
+                    fetch_github_json_down.clear()
                     build_block1_master_df.clear()
+                    build_block1_down_master_df.clear()
                     sync_b1_data(DATA_DIR) 
                     st.rerun()                     
                 
                 snap_date = st.date_input("選擇這份資料的實際基準日")
                 st.write("")
-                if st.button("💾 將 GitHub 200名數據封存為 CSV", use_container_width=True):
+                
+                # 🌟 一鍵雙向封存：解決 Streamlit 按鈕會重新整理遺失狀態的問題
+                if st.button("💾 站長專屬：一鍵封存今日【正向】與【負向衰退】歷史數據", use_container_width=True, type="primary"):
                     date_str = snap_date.strftime("%Y%m%d")
-                    save_path = os.path.join(DATA_DIR, f"{date_str}_JSON_History.csv")
-                    all_snap_data = []
+                    
+                    # --- 1. 處理正向數據 (5/20/60/120) ---
+                    save_path_up = os.path.join(DATA_DIR, f"{date_str}_JSON_History.csv")
+                    all_snap_up = []
                     for d in [5, 20, 60, 120]:
                         if d in json_dfs and not json_dfs[d].empty:
                             temp = json_dfs[d][['股票代號', '股票名稱', '法人持股']].copy()
                             temp['上榜區塊'] = f"{d}日"
-                            all_snap_data.append(temp)
+                            all_snap_up.append(temp)
                     
-                    if all_snap_data:
-                        snap_df = pd.concat(all_snap_data, ignore_index=True)
-                        snap_grouped = snap_df.groupby(['股票代號', '股票名稱']).agg({
+                    if all_snap_up:
+                        snap_df_up = pd.concat(all_snap_up, ignore_index=True)
+                        snap_grouped_up = snap_df_up.groupby(['股票代號', '股票名稱']).agg({
                             '法人持股': 'max', '上榜區塊': lambda x: ",".join(set(x))
                         }).reset_index()
-                        csv_data = snap_grouped.to_csv(index=False).encode('utf-8-sig')
-                        snap_grouped.to_csv(save_path, index=False, encoding='utf-8-sig')
-                        
-                        build_block1_master_df.clear() # 🌟 清空母表快取
-                        st.success(f"✅ 成功生成 {len(snap_grouped)} 檔股票的歷史快照！")
-                        st.download_button(
-                            label="📥 點我下載快照 CSV 檔案", data=csv_data, file_name=f"{date_str}_JSON_History.csv",
-                            mime="text/csv", type="primary", use_container_width=True
-                        )
-                    else: st.error("❌ 尚未獲取到 GitHub 數據，封存失敗。")
-            elif admin_pw != "": st.error("❌ 密碼錯誤，無法使用此功能。")
+                        snap_grouped_up.to_csv(save_path_up, index=False, encoding='utf-8-sig')
+                        st.success(f"✅ 成功生成【正向】歷史快照 ({len(snap_grouped_up)} 檔)！")
+                    else: 
+                        st.error("❌ 尚未獲取到 GitHub 正向數據，封存失敗。")
 
-            if st.button("💾 同步將【負向衰退】數據封存為歷史 CSV", use_container_width=True):
-                    date_str = snap_date.strftime("%Y%m%d")
+                    # --- 2. 處理負向數據 (5/10/20/30) ---
                     save_path_down = os.path.join(DATA_DIR, f"{date_str}_Down_History.csv")
                     all_snap_down = []
-                    
-                    # 抓取最新的負向資料
                     current_down_dfs = fetch_github_json_down()
                     
                     for d in [5, 10, 20, 30]:
@@ -384,11 +381,22 @@ def show_b1_page(DATA_DIR, STOCK_DICT):
                     
                     if all_snap_down:
                         snap_df_down = pd.concat(all_snap_down, ignore_index=True)
-                        snap_df_down.to_csv(save_path_down, index=False, encoding='utf-8-sig')
-                        st.success(f"✅ 成功生成 {date_str} 的負向衰退歷史快照！現在可以到歷史 Tab 追蹤了。")
+                        snap_grouped_down = snap_df_down.groupby(['股票代號', '股票名稱']).agg({
+                            '法人持股': 'max',
+                            '上榜區塊': lambda x: ",".join(set(x)),
+                            '累積衰退': 'first'
+                        }).reset_index()
+                        snap_grouped_down.to_csv(save_path_down, index=False, encoding='utf-8-sig')
+                        st.success(f"✅ 成功生成【負向衰退】歷史快照 ({len(snap_grouped_down)} 檔)！")
                     else: 
                         st.error("❌ 尚未獲取到 GitHub 負向數據，封存失敗。")
-
+                        
+                    # 清空快取重新載入母表
+                    build_block1_master_df.clear() 
+                    build_block1_down_master_df.clear()
+                    
+            elif admin_pw != "": 
+                st.error("❌ 密碼錯誤，無法使用此功能。")
     # ==========================================
     # 🔧 UI 數據渲染 (四大榜單)
     # ==========================================
@@ -637,19 +645,20 @@ def show_b1_page(DATA_DIR, STOCK_DICT):
     st.markdown("### 📉 法人提款機：持股持續衰退追蹤 (負向)")
     st.caption("觀察法人資金撤出的標的，這些通常是被法人連日賣超、持股比例下降的清單。")
     
-    # 呼叫獨立函數獲取今日最新負向資料
     down_dfs = fetch_github_json_down()
     
-    # 建立 5 個 Tab (修正了變數與標籤數量不一致的問題，並新增歷史紀錄 Tab)
-    t_down_5, t_down_10, t_down_20, t_down_30, t_down_history = st.tabs([
-        "🟢 5日衰退", "🟢 10日衰退", "🟢 20日衰退", "🟢 30日衰退", "📊 歷史衰退紀錄"
+    # 這裡配合 voidful 的天數改為 5, 10, 20, 30
+    t_down_5, t_down_10, t_down_20, t_down_30, t_down_history, t_down_all = st.tabs([
+        "🟢 5日衰退", "🟢 10日衰退", "🟢 20日衰退", "🟢 30日衰退", "📅 單日歷史快照", "📊 歷史衰退全能池"
     ])
     
-    # 建立一個小工具函數來幫忙畫出今日表格
     def render_down_table(day_key):
         if day_key in down_dfs and not down_dfs[day_key].empty:
             df_display = down_dfs[day_key].copy()
-            # 將表格背景稍微加上一點淡綠色，視覺上暗示是負向
+            # 由於我們在 API 抓取時移除了 % 符號以利計算，這裡渲染時要加回去
+            df_display['法人持股'] = df_display['法人持股'].apply(lambda x: f"{float(x):.2f}%" if pd.notna(x) else "0.00%")
+            df_display['累積衰退'] = df_display['累積衰退'].apply(lambda x: f"{float(x):.2f}%" if pd.notna(x) else "0.00%")
+            
             st.dataframe(
                 df_display.style.apply(lambda x: ['background-color: rgba(0, 230, 118, 0.1)'] * len(x), axis=1), 
                 use_container_width=True, 
@@ -658,29 +667,29 @@ def show_b1_page(DATA_DIR, STOCK_DICT):
         else:
             st.info(f"⚪ 尚無 {day_key} 日衰退數據。")
 
-    # 渲染今日天數
     with t_down_5: render_down_table(5)
     with t_down_10: render_down_table(10)
     with t_down_20: render_down_table(20)
     with t_down_30: render_down_table(30)
     
-    # 渲染歷史紀錄 Tab
     with t_down_history:
-        st.markdown("##### 📅 歷史衰退快照紀錄")
-        # 尋找資料夾內所有的「負向」歷史紀錄 CSV
+        st.markdown("##### 📅 歷史衰退單日快照")
         down_history_files = glob.glob(os.path.join(DATA_DIR, "*_Down_History.csv"))
         
         if down_history_files:
-            # 擷取檔名中的日期 (例如 20260727) 並由新到舊排序
             history_dates = sorted([re.search(r'(202\d{5})', os.path.basename(f)).group(1) for f in down_history_files if re.search(r'(202\d{5})', f)], reverse=True)
-            
             if history_dates:
-                # 讓使用者選擇要看哪一天的紀錄 (例如 0727, 0724)
                 selected_date = st.selectbox("選擇歷史日期", history_dates, key="down_history_select")
                 target_file = os.path.join(DATA_DIR, f"{selected_date}_Down_History.csv")
                 
                 try:
                     df_hist = pd.read_csv(target_file, encoding='utf-8-sig')
+                    # 同樣為單日歷史快照補上 % 符號
+                    if '法人持股' in df_hist.columns and df_hist['法人持股'].dtype != object:
+                         df_hist['法人持股'] = df_hist['法人持股'].apply(lambda x: f"{x:.2f}%")
+                    if '累積衰退' in df_hist.columns and df_hist['累積衰退'].dtype != object:
+                         df_hist['累積衰退'] = df_hist['累積衰退'].apply(lambda x: f"{x:.2f}%")
+                         
                     st.dataframe(
                         df_hist.style.apply(lambda x: ['background-color: rgba(0, 230, 118, 0.1)'] * len(x), axis=1), 
                         use_container_width=True, 
@@ -690,6 +699,27 @@ def show_b1_page(DATA_DIR, STOCK_DICT):
                     st.error("讀取歷史資料失敗。")
         else:
             st.info("⚪ 目前尚未儲存任何歷史衰退紀錄。站長可以透過上方快照功能每天存檔！")
+
+    # 全能池歷史軌跡 (負向專用)
+    with t_down_all:
+        if not down_final_df.empty:
+             display_cols = ['股票代號', '股票名稱', '今日衰退上榜', '單日△'] + down_date_cols
+             
+             # 複製一份來修改顯示
+             down_pool_df = down_final_df.copy()
+             # 負向衰退格式化 △ (如果是負的數值，直接顯示負號即可)
+             down_pool_df['單日△'] = down_pool_df['單日△'].apply(lambda x: f"{x:.2f}" if x <= 0 else f"+{x:.2f}")
+
+             def highlight_down_row(row):
+                 return ['background-color: rgba(0, 230, 118, 0.1)'] * len(row)
+
+             st.dataframe(
+                 down_pool_df[display_cols].style.apply(highlight_down_row, axis=1), 
+                 use_container_width=True, 
+                 hide_index=True
+             )
+        else:
+             st.info("⚪ 目前尚未累積足夠的歷史衰退快照。請確認站長快照有成功封存負向資料，累積多日後即可觀察軌跡。")
 
 
     # ==========================================
