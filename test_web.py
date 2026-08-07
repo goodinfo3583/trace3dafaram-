@@ -36,10 +36,10 @@ from views.b7_page import show_b7_page, sync_b7_data
 st.set_page_config(page_title="股市派對", layout="wide")
 # 集中所有路徑變數
 DATA_DIR = "./data"
-
 SCORE_HISTORY_DIR = os.path.join(DATA_DIR, "ScoreHistory")
 MARKET_HISTORY_DIR = os.path.join(DATA_DIR, "MarketHistory")
 BLOCK_HISTORY_DIR = os.path.join(DATA_DIR, "BlockHistory")
+
 # 隱形急救引擎 (置於程式最頂端，不要刪除)
 # 即使不顯示區塊 0 面板，這段程式碼也必須存在，否則側邊欄導航會因為讀不到歷史檔案而顯示「查無資料」。
 if not os.path.exists(DATA_DIR): os.makedirs(DATA_DIR)
@@ -53,21 +53,20 @@ if 'b3_data' not in st.session_state:
 if 'df_blk2_1' not in st.session_state:
     sync_b2_data(DATA_DIR)
 
-
 # 呼叫渲染視覺元件 components
 style_manager.load_global_css()
 style_manager.set_background("./image/派對盛宴邀請.png")
 style_manager.render_fireflies()
-style_manager.render_marquee()
-# 2. 渲染全域 UI
-render_marquee()
-render_top10_glass_card()     # B3 法人連買卡片 (右側上方)
-render_b2_top10_glass_card()  # ✨ B2 法人掃貨卡片 (右側下方，帶微紅色光暈)
-# ✨ 修改 ：呼叫「右側懸浮玻璃卡片」(如是跑馬燈，改成 style_manager.render_text_ticker())
+style_manager.render_marquee() # 呼叫頂層圖片跑馬燈與懸浮玻璃卡片
 try:
+    # 呼叫 B3 法人連買卡片 (藍色光暈，右上方)
     style_manager.render_top10_glass_card() 
-except AttributeError:
-    pass # 避免你還沒存檔 style_manager.py 時網頁當機
+    # 呼叫 B2 法人掃貨卡片 (紅色光暈，右下方)
+    style_manager.render_b2_top10_glass_card() 
+except AttributeError as e:
+    # 避免尚未存檔完成時當機
+    print(f"UI 渲染警告: {e}")
+    pass
 
 # 注入客製化頂部導覽列
 # nav_manager.inject_custom_header()
