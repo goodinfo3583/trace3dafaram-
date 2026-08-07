@@ -681,7 +681,7 @@ def render_b5_top10_glass_card():
 <div class="carousel-wrapper-b5">
 <div class="carousel-item-b5">
     <div class="panel-title-b5"><span>📊 6周累積共振榜</span><span class="date-badge-b5">📅 {date_str}</span></div>
-    <div style="text-align: right; margin-bottom: 4px;"><span class="label-sub">千張大戶 / 400張中實戶</span></div>
+    <div style="text-align: right; margin-bottom: 4px;"><span class="label-sub">千張 / 四百</span></div>
     {h_6w}
 </div>
 <div class="carousel-item-b5">
