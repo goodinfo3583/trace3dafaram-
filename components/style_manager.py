@@ -170,6 +170,135 @@ def render_marquee():
     st.markdown(marquee_code, unsafe_allow_html=True)
 
 #跑馬燈懸浮卡片
+#B2法人掃貨
+def render_b2_top10_glass_card():
+    """渲染 B2 法人掃貨 專屬懸浮玻璃卡片 (包含縮小、關閉、4大榜單輪播)"""
+    import pandas as pd
+    import streamlit as st
+
+    # 檢查是否已有 B2 資料
+    if 'df_blk2_1' not in st.session_state:
+        return
+
+    try:
+        raw_df_21 = st.session_state.get('df_blk2_1', pd.DataFrame()) # 外資佔成交
+        raw_df_22 = st.session_state.get('df_blk2_2', pd.DataFrame()) # 投信佔成交
+        raw_df_23 = st.session_state.get('df_blk2_3', pd.DataFrame()) # 外資佔發行
+        raw_df_24 = st.session_state.get('df_blk2_4', pd.DataFrame()) # 投信佔發行
+
+        # 過濾函數：只抓 4 碼純股票，不包含 ETF (排除 00 開頭)
+        def get_top10_pure(df, target_col):
+            if df is None or df.empty or target_col not in df.columns:
+                return pd.DataFrame()
+            df['股票代號'] = df['股票代號'].astype(str).str.strip()
+            pure = df[(df['股票代號'].str.len() == 4) & (~df['股票代號'].str.startswith('00'))].copy()
+            # 確保排序正確並取前 10
+            pure[target_col] = pd.to_numeric(pure[target_col], errors='coerce').fillna(0)
+            pure = pure.sort_values(by=target_col, ascending=False).head(10)
+            return pure
+
+        # 自動找出代表「最新數據」的欄位名稱 (例如 '0806成交比%')
+        def get_latest_col(df, keyword):
+            if df.empty: return None, "未知"
+            cols = [c for c in df.columns if keyword in c]
+            if not cols: return None, "未知"
+            latest = cols[0]
+            date_str = latest.replace(keyword, "") # 抽出 0806
+            return latest, date_str
+
+        c21_col, d_21 = get_latest_col(raw_df_21, "成交比%")
+        c22_col, d_22 = get_latest_col(raw_df_22, "成交比%")
+        c23_col, d_23 = get_latest_col(raw_df_23, "發行數%")
+        c24_col, d_24 = get_latest_col(raw_df_24, "發行數%")
+
+        df_21 = get_top10_pure(raw_df_21, c21_col)
+        df_22 = get_top10_pure(raw_df_22, c22_col)
+        df_23 = get_top10_pure(raw_df_23, c23_col)
+        df_24 = get_top10_pure(raw_df_24, c24_col)
+
+        # 產生 HTML 列表
+        def make_list_html(df, val_col):
+            if df.empty or val_col is None:
+                return "<p style='font-size:14px; text-align:center; color:#94A3B8; margin-top:40px;'>目前無資料或尚未開盤</p>"
+            
+            html = "<ul style='padding-left: 5px; margin: 0; font-size: 14px; line-height: 1.5; list-style-type: none;'>"
+            for i, row in enumerate(df.to_dict('records')):
+                val = row.get(val_col, 0)
+                status = row.get('今日短動態', '').split(' ')[0] # 只取 '🔥' 或 '🚨 轉賣反轉'，濾掉括號數字以節省空間
+                
+                # 處理狀態文字過長
+                if "(" in status: status = status.split("(")[0].strip()
+                if "轉賣反轉" in status: status = "🚨 轉賣"
+                
+                html += (
+                    f"<li>"
+                    f"<b style='color:#FFF; display:inline-block; width:22px;'>{i+1}.</b>"
+                    f"<span style='display:inline-block; width:95px; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; vertical-align:bottom;'>{row['股票代號']}{row['股票名稱']}</span>"
+                    f"<span style='color:#FFD700; font-size: 11.5px; margin: 0 4px;'>{status}</span>"
+                    f"<span style='color:#FF4C4C; font-weight:bold; float:right;'>{val:.2f}%</span>"
+                    f"</li>"
+                )
+            html += "</ul>"
+            return html
+
+        h_21 = make_list_html(df_21, c21_col)
+        h_22 = make_list_html(df_22, c22_col)
+        h_23 = make_list_html(df_23, c23_col)
+        h_24 = make_list_html(df_24, c24_col)
+
+        # HTML, CSS 頂格並單行化
+        # 注意: id 從 min-card 改為 min-b2-card，避免與 B3 卡片衝突
+        # top 屬性設定為 55vh，讓他顯示在 B3 卡片的下方
+        card_html = f"""
+<input type="checkbox" id="close-b2-card" style="display:none;">
+<input type="checkbox" id="min-b2-card" style="display:none;">
+<style>
+#close-b2-card:checked ~ #b2-top10-card {{ display: none !important; }}
+#min-b2-card:checked ~ #b2-top10-card .carousel-wrapper-b2 {{ max-height: 0; opacity: 0; margin-top: 0; }}
+#min-b2-card:checked ~ #b2-top10-card {{ padding-bottom: 8px; width: 220px; }}
+#min-b2-card:checked ~ #b2-top10-card .min-icon-b2::after {{ content: '□'; font-size: 14px; }}
+#min-b2-card:not(:checked) ~ #b2-top10-card .min-icon-b2::after {{ content: '_'; font-size: 14px; position: relative; top: -3px; }}
+
+@keyframes slideInRightB2 {{ from {{ transform: translateX(120%); opacity: 0; }} to {{ transform: translateX(0); opacity: 1; }} }}
+.glass-panel-b2 {{ position: fixed; top: 56vh; right: 20px; width: 330px; background: rgba(30, 20, 20, 0.88); backdrop-filter: blur(12px); -webkit-backdrop-filter: blur(12px); border: 1px solid rgba(255, 76, 76, 0.35); border-radius: 12px; padding: 12px 16px; z-index: 999998; color: #E2E8F0; box-shadow: 0 8px 32px 0 rgba(0, 0, 0, 0.6); animation: slideInRightB2 0.8s cubic-bezier(0.25, 0.8, 0.25, 1); transition: all 0.3s ease; }}
+.header-bar-b2 {{ display: flex; justify-content: space-between; align-items: center; border-bottom: 1px solid rgba(255,255,255,0.1); padding-bottom: 6px; margin-bottom: 8px; cursor: default; }}
+.header-title-b2 {{ font-size: 14px; font-weight: bold; color: #FF7676; }}
+.action-btns-b2 {{ display: flex; gap: 10px; align-items: center; }}
+.action-btn-b2 {{ cursor: pointer; color: #94A3B8; font-weight: bold; transition: color 0.2s; user-select: none; }}
+.action-btn-b2:hover {{ color: #FF4C4C; }}
+.panel-title-b2 {{ margin: 0 0 8px 0; font-size: 14.5px; font-weight: bold; color: #FF4C4C; display: flex; justify-content: space-between; align-items: flex-end; }}
+.date-badge-b2 {{ font-size: 11.5px; color: #94A3B8; font-weight: normal; }}
+.carousel-wrapper-b2 {{ position: relative; max-height: 310px; height: 310px; overflow: hidden; transition: all 0.3s ease; opacity: 1; }}
+.carousel-item-b2 {{ position: absolute; top: 0; left: 0; width: 100%; opacity: 0; animation: fadeSwitchB2 20s infinite; }}
+.carousel-item-b2:nth-child(1) {{ animation-delay: 0s; }}
+.carousel-item-b2:nth-child(2) {{ animation-delay: 5s; }}
+.carousel-item-b2:nth-child(3) {{ animation-delay: 10s; }}
+.carousel-item-b2:nth-child(4) {{ animation-delay: 15s; }}
+@keyframes fadeSwitchB2 {{ 0%, 22% {{ opacity: 1; z-index: 2; }} 25%, 97% {{ opacity: 0; z-index: 1; }} 100% {{ opacity: 1; z-index: 2; }} }}
+</style>
+<div class="glass-panel-b2" id="b2-top10-card">
+<div class="header-bar-b2">
+<span class="header-title-b2">🚀 法人暴力掃貨榜</span>
+<div class="action-btns-b2">
+<label for="min-b2-card" class="action-btn-b2 min-icon-b2" title="縮放"></label>
+<label for="close-b2-card" class="action-btn-b2" title="關閉">✕</label>
+</div>
+</div>
+<div class="carousel-wrapper-b2">
+<div class="carousel-item-b2"><div class="panel-title-b2"><span>外資買超佔成交%</span><span class="date-badge-b2">📅 {d_21}</span></div>{h_21}</div>
+<div class="carousel-item-b2"><div class="panel-title-b2"><span>投信買超佔成交%</span><span class="date-badge-b2">📅 {d_22}</span></div>{h_22}</div>
+<div class="carousel-item-b2"><div class="panel-title-b2"><span>外資買超佔發行%</span><span class="date-badge-b2">📅 {d_23}</span></div>{h_23}</div>
+<div class="carousel-item-b2"><div class="panel-title-b2"><span>投信買超佔發行%</span><span class="date-badge-b2">📅 {d_24}</span></div>{h_24}</div>
+</div>
+</div>
+"""
+        st.markdown(card_html, unsafe_allow_html=True)
+        
+    except Exception as e:
+        print(f"B2 Glass Card Error: {e}")
+        pass
+
+#B3法人連買
 def render_top10_glass_card():
     """渲染右側懸浮玻璃卡片 (支援縮小、展開、關閉、10檔標的、4大榜單輪播、顯示基準日)"""
     import pandas as pd

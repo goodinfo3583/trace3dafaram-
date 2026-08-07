@@ -49,10 +49,9 @@ if not os.path.exists(BLOCK_HISTORY_DIR): os.makedirs(BLOCK_HISTORY_DIR)
 
 # ✨ 修改 ：在載入畫面之前，確保 B3 數據已經存在記憶體中供卡片/跑馬燈使用
 if 'b3_data' not in st.session_state:
-    try:
-        sync_b3_data(DATA_DIR)
-    except Exception:
-        pass # 若尚未爬取資料則靜默跳過，不影響首頁載入
+    sync_b3_data(DATA_DIR)
+if 'df_blk2_1' not in st.session_state:
+    sync_b2_data(DATA_DIR
 
 
 # 呼叫渲染視覺元件 components
@@ -60,7 +59,10 @@ style_manager.load_global_css()
 style_manager.set_background("./image/派對盛宴邀請.png")
 style_manager.render_fireflies()
 style_manager.render_marquee()
-
+# 2. 渲染全域 UI
+render_marquee()
+render_top10_glass_card()     # B3 法人連買卡片 (右側上方)
+render_b2_top10_glass_card()  # ✨ B2 法人掃貨卡片 (右側下方，帶微紅色光暈)
 # ✨ 修改 ：呼叫「右側懸浮玻璃卡片」(如是跑馬燈，改成 style_manager.render_text_ticker())
 try:
     style_manager.render_top10_glass_card() 
