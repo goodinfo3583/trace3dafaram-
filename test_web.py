@@ -22,7 +22,6 @@ from views.login_page import show_login_page
 from views.news_page import show_news_page
 from views.contact_page import show_contact_page
 from views.pool_page import show_pool_page
-from views.login_page import show_login_page
 from views.sidebar import render_sidebar_war_room
 from views.b1_page import show_b1_page, sync_b1_data
 from views.b2_page import show_b2_page, sync_b2_data
@@ -35,22 +34,6 @@ from views.b7_page import show_b7_page, sync_b7_data
 # 1. 網頁基本設定 & 目錄路徑初始化
 # ==========================================
 st.set_page_config(page_title="股市派對", layout="wide")
-# 呼叫渲染視覺元件 components
-style_manager.load_global_css()
-style_manager.set_background("./image/派對盛宴邀請.png")
-style_manager.render_fireflies()
-style_manager.render_marquee()
-# 注入客製化頂部導覽列
-# nav_manager.inject_custom_header()
-is_logged_in = st.session_state.get("logged_in", False)
-nav_manager.inject_custom_header(is_logged_in)
-# ==========================================
-# 2. 啟動 Google Sheets 連線與目錄初始化
-# ==========================================
-from streamlit_gsheets import GSheetsConnection
-conn = st.connection("gsheets", type=GSheetsConnection)
-SHEET_URL = "https://docs.google.com/spreadsheets/d/1TxHDahg8ul6lmUtDN-7X75cBXbkU0jaZ3M9zg6exBgU"
-
 # 集中所有路徑變數
 DATA_DIR = "./data"
 
@@ -63,6 +46,39 @@ if not os.path.exists(DATA_DIR): os.makedirs(DATA_DIR)
 if not os.path.exists(SCORE_HISTORY_DIR): os.makedirs(SCORE_HISTORY_DIR)
 if not os.path.exists(MARKET_HISTORY_DIR): os.makedirs(MARKET_HISTORY_DIR)
 if not os.path.exists(BLOCK_HISTORY_DIR): os.makedirs(BLOCK_HISTORY_DIR)
+
+# ✨ 修改 ：在載入畫面之前，確保 B3 數據已經存在記憶體中供卡片/跑馬燈使用
+if 'b3_data' not in st.session_state:
+    try:
+        sync_b3_data(DATA_DIR)
+    except Exception:
+        pass # 若尚未爬取資料則靜默跳過，不影響首頁載入
+
+
+# 呼叫渲染視覺元件 components
+style_manager.load_global_css()
+style_manager.set_background("./image/派對盛宴邀請.png")
+style_manager.render_fireflies()
+style_manager.render_marquee()
+
+# ✨ 修改 3：呼叫我們剛剛新增的「右側懸浮玻璃卡片」(如果你選的是跑馬燈，請改成 style_manager.render_text_ticker())
+try:
+    style_manager.render_top5_glass_card() 
+except AttributeError:
+    pass # 避免你還沒存檔 style_manager.py 時網頁當機
+
+# 注入客製化頂部導覽列
+# nav_manager.inject_custom_header()
+is_logged_in = st.session_state.get("logged_in", False)
+nav_manager.inject_custom_header(is_logged_in)
+# ==========================================
+# 2. 啟動 Google Sheets 連線與目錄初始化
+# ==========================================
+from streamlit_gsheets import GSheetsConnection
+conn = st.connection("gsheets", type=GSheetsConnection)
+SHEET_URL = "https://docs.google.com/spreadsheets/d/1TxHDahg8ul6lmUtDN-7X75cBXbkU0jaZ3M9zg6exBgU"
+
+
 
 # 定義路徑
 backup_df_path = os.path.join(DATA_DIR, "sidebar_twse_df_backup.csv")
