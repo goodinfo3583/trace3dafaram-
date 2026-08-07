@@ -61,9 +61,9 @@ style_manager.set_background("./image/派對盛宴邀請.png")
 style_manager.render_fireflies()
 style_manager.render_marquee()
 
-# ✨ 修改 3：呼叫我們剛剛新增的「右側懸浮玻璃卡片」(如果你選的是跑馬燈，請改成 style_manager.render_text_ticker())
+# ✨ 修改 ：呼叫「右側懸浮玻璃卡片」(如是跑馬燈，改成 style_manager.render_text_ticker())
 try:
-    style_manager.render_top5_glass_card() 
+    style_manager.render_top10_glass_card() 
 except AttributeError:
     pass # 避免你還沒存檔 style_manager.py 時網頁當機
 

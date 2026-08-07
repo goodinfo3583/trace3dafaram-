@@ -169,8 +169,8 @@ def render_marquee():
     """
     st.markdown(marquee_code, unsafe_allow_html=True)
     
-def render_top5_glass_card():
-    """渲染右側懸浮玻璃卡片 (可手動關閉，自動輪播外資/投信前5名)"""
+def render_top10_glass_card():
+    """渲染右側懸浮玻璃卡片 (支援拖曳、關閉、10檔標的、4大榜單輪播、顯示基準日)"""
     import pandas as pd
     import streamlit as st
 
@@ -178,124 +178,217 @@ def render_top5_glass_card():
         return
 
     try:
-        raw_fo_day_df, _ = st.session_state['b3_data']['fo_day']
-        raw_it_day_df, _ = st.session_state['b3_data']['it_day']
+        # 1. 取得日/週資料與日期
+        raw_fo_day_df, date_fo_day = st.session_state['b3_data']['fo_day']
+        raw_it_day_df, date_it_day = st.session_state['b3_data']['it_day']
+        raw_fo_wk_df, date_fo_wk = st.session_state['b3_data']['fo_wk']
+        raw_it_wk_df, date_it_wk = st.session_state['b3_data']['it_wk']
 
-        # 🛠️ 修正1：資料過濾引擎 - 只取「代號長度為 4」的純股票
-        def get_top5_pure_stocks(df):
+        # 2. 過濾函數 (嚴格 4 碼純股票，並取前 10 名)
+        def get_top10_pure_stocks(df):
             if df is None or df.empty:
                 return pd.DataFrame()
-            # 確保股票代號轉為字串並去除空白，然後只取長度為 4 的
             df['股票代號'] = df['股票代號'].astype(str).str.strip()
             pure_stocks = df[df['股票代號'].str.len() == 4].copy()
-            return pure_stocks.head(5)
+            return pure_stocks.head(10) 
 
-        fo_day_df = get_top5_pure_stocks(raw_fo_day_df)
-        it_day_df = get_top5_pure_stocks(raw_it_day_df)
+        fo_day_df = get_top10_pure_stocks(raw_fo_day_df)
+        it_day_df = get_top10_pure_stocks(raw_it_day_df)
+        fo_wk_df = get_top10_pure_stocks(raw_fo_wk_df)
+        it_wk_df = get_top10_pure_stocks(raw_it_wk_df)
 
-        def make_list_html(df, col_days):
+        # 3. 處理基準日顯示 (擷取最後 4 碼，例如 20240806 -> 0806)
+        fmt_date = lambda d: d[-4:] if (d and d != "00000000") else "未知"
+        d_fo_day = fmt_date(date_fo_day)
+        d_it_day = fmt_date(date_it_day)
+        d_fo_wk = fmt_date(date_fo_wk)
+        d_it_wk = fmt_date(date_it_wk)
+
+        # 4. 生成 10 檔標的的 HTML 列表
+        def make_list_html(df, col_days, unit):
             if df is None or df.empty:
-                return "<p style='font-size:14px; text-align:center; color:#94A3B8;'>目前無資料或尚未開盤</p>"
+                return "<p style='font-size:14px; text-align:center; color:#94A3B8; margin-top:20px;'>目前無資料或尚未開盤</p>"
             
-            html = "<ul style='padding-left: 10px; margin: 0; font-size: 15px; line-height: 1.8; list-style-type: none;'>"
+            html = "<ul style='padding-left: 5px; margin: 0; font-size: 14.5px; line-height: 1.6; list-style-type: none;'>"
             for i, row in enumerate(df.to_dict('records')):
+                val = row.get(col_days, 0)
+                status = row.get('狀態動態', '')
+                # 加入 white-space:nowrap 防止太長的名字折行導致排版跑掉
                 html += (
                     f"<li>"
-                    f"<b style='color:#FFF;'>{i+1}.</b> {row['股票代號']}{row['股票名稱']} "
-                    f"<span style='color:#FFD700;'>{row['狀態動態']}</span> "
-                    f"<span style='color:#00D2FF;'>{row[col_days]}天</span>"
+                    f"<b style='color:#FFF; display:inline-block; width:25px;'>{i+1}.</b>"
+                    f"<span style='display:inline-block; width:100px; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; vertical-align:bottom;'>{row['股票代號']}{row['股票名稱']}</span>"
+                    f"<span style='color:#FFD700; font-size: 12.5px; margin: 0 8px;'>{status}</span>"
+                    f"<span style='color:#00D2FF; float:right;'>{val}{unit}</span>"
                     f"</li>"
                 )
             html += "</ul>"
             return html
 
-        fo_html = make_list_html(fo_day_df, "最新連買天數")
-        it_html = make_list_html(it_day_df, "最新連買天數")
+        fo_day_html = make_list_html(fo_day_df, "最新連買天數", "天")
+        it_day_html = make_list_html(it_day_df, "最新連買天數", "天")
+        fo_wk_html = make_list_html(fo_wk_df, "最新連買週數", "週")
+        it_wk_html = make_list_html(it_wk_df, "最新連買週數", "週")
 
-        # 🛠️ 修正2：取消 HTML 的縮排，防止 Streamlit 把它當作程式碼區塊顯示出來
+        # 5. HTML 與 CSS 渲染 (注意：標籤全部靠左，無縮排！)
         card_html = f"""
+<!-- 絕對有效的純 CSS 關閉機制 -->
+<input type="checkbox" id="close-card-toggle" style="display:none;">
 <style>
+#close-card-toggle:checked ~ #b3-top10-card {{
+    display: none !important;
+}}
 @keyframes slideInRight {{
     from {{ transform: translateX(120%); opacity: 0; }}
     to {{ transform: translateX(0); opacity: 1; }}
 }}
 .glass-panel {{
     position: fixed;
-    top: 20vh;
+    top: 15vh;
     right: 20px;
-    width: 290px;
-    background: rgba(15, 23, 42, 0.75);
+    width: 320px; /* 稍微加寬以容納 10 檔及日期 */
+    background: rgba(15, 23, 42, 0.85);
     backdrop-filter: blur(12px);
     -webkit-backdrop-filter: blur(12px);
     border: 1px solid rgba(0, 210, 255, 0.3);
     border-radius: 12px;
-    padding: 18px 20px;
+    padding: 12px 18px;
     z-index: 999999;
     color: #E2E8F0;
     box-shadow: 0 8px 32px 0 rgba(0, 0, 0, 0.5);
     animation: slideInRight 0.8s cubic-bezier(0.25, 0.8, 0.25, 1);
 }}
+/* 拖曳把手的樣式 */
+.drag-header {{
+    cursor: grab;
+    padding-bottom: 6px;
+    margin-bottom: 10px;
+    border-bottom: 1px solid rgba(255,255,255,0.1);
+    text-align: center;
+    color: #4A5568;
+    font-size: 13px;
+    user-select: none;
+}}
+.drag-header:active {{
+    cursor: grabbing;
+}}
+/* 關閉按鈕使用 label 來觸發 checkbox */
 .close-btn {{
     position: absolute;
-    top: 8px;
-    right: 12px;
+    top: 10px;
+    right: 15px;
     cursor: pointer;
     color: #94A3B8;
     font-weight: bold;
-    font-size: 16px;
+    font-size: 18px;
     transition: color 0.3s;
+    z-index: 10;
 }}
 .close-btn:hover {{
     color: #FF4C4C;
 }}
 .panel-title {{
-    margin-top: 0;
-    font-size: 17px;
+    margin: 0 0 10px 0;
+    font-size: 15px;
     font-weight: bold;
     color: #00D2FF;
-    border-bottom: 1px solid rgba(255,255,255,0.1);
-    padding-bottom: 8px;
-    margin-bottom: 12px;
+    display: flex;
+    justify-content: space-between;
+    align-items: flex-end;
+}}
+.date-badge {{
+    font-size: 12px;
+    color: #94A3B8;
+    font-weight: normal;
 }}
 .carousel-wrapper {{
     position: relative;
-    height: 180px; 
+    height: 290px; /* 足夠塞下 10 檔的高度 */
     overflow: hidden;
 }}
+/* 4個榜單，總動畫時長 20秒 */
 .carousel-item {{
     position: absolute;
     top: 0; left: 0; width: 100%;
     opacity: 0;
-    animation: fadeSwitch 10s infinite;
+    animation: fadeSwitch 20s infinite; 
 }}
-.carousel-item:nth-child(2) {{
-    animation-delay: 5s;
-}}
+.carousel-item:nth-child(1) {{ animation-delay: 0s; }}
+.carousel-item:nth-child(2) {{ animation-delay: 5s; }}
+.carousel-item:nth-child(3) {{ animation-delay: 10s; }}
+.carousel-item:nth-child(4) {{ animation-delay: 15s; }}
+
+/* 每個榜單停靠 4.5 秒 (22.5%)，切換 0.5 秒 */
 @keyframes fadeSwitch {{
-    0%, 45% {{ opacity: 1; z-index: 2; }}
-    50%, 95% {{ opacity: 0; z-index: 1; }}
+    0%, 22% {{ opacity: 1; z-index: 2; }}
+    25%, 97% {{ opacity: 0; z-index: 1; }}
     100% {{ opacity: 1; z-index: 2; }}
 }}
 </style>
 
-<div class="glass-panel" id="b3-top5-card">
-    <span class="close-btn" onclick="document.getElementById('b3-top5-card').style.display='none'">✕</span>
+<div class="glass-panel" id="b3-top10-card">
+    <!-- 這個 label 綁定到前面的 checkbox，點擊即觸發隱藏 -->
+    <label for="close-card-toggle" class="close-btn" title="關閉">✕</label>
+    
+    <!-- 拖曳區塊 -->
+    <div class="drag-header" id="drag-header" title="按住可拖曳">
+        ⠿ 點擊此處拖曳 ⠿
+    </div>
+    
     <div class="carousel-wrapper">
         <div class="carousel-item">
-            <div class="panel-title">🌐 外資最新日連買 TOP 5</div>
-            {fo_html}
+            <div class="panel-title"><span>🌐 外資最新日連買</span><span class="date-badge">📅 {d_fo_day}</span></div>
+            {fo_day_html}
         </div>
         <div class="carousel-item">
-            <div class="panel-title">🏦 投信最新日連買 TOP 5</div>
-            {it_html}
+            <div class="panel-title"><span>🏦 投信最新日連買</span><span class="date-badge">📅 {d_it_day}</span></div>
+            {it_day_html}
+        </div>
+        <div class="carousel-item">
+            <div class="panel-title"><span>👑 外資最新週連買</span><span class="date-badge">📅 {d_fo_wk}</span></div>
+            {fo_wk_html}
+        </div>
+        <div class="carousel-item">
+            <div class="panel-title"><span>🚀 投信最新週連買</span><span class="date-badge">📅 {d_it_wk}</span></div>
+            {it_wk_html}
         </div>
     </div>
 </div>
+
+<!-- 隱藏腳本注入：賦予拖曳能力 -->
+<img src="x" onerror="
+    var card = document.getElementById('b3-top10-card');
+    var header = document.getElementById('drag-header');
+    var isDragging = false;
+    var offsetX, offsetY;
+    if(header && card) {{
+        header.onmousedown = function(e) {{
+            isDragging = true;
+            // 取得游標相對於卡片左上角的相對位置
+            var rect = card.getBoundingClientRect();
+            offsetX = e.clientX - rect.left;
+            offsetY = e.clientY - rect.top;
+            
+            // 釋放右側對齊，讓 left 控制生效
+            card.style.right = 'auto';
+            card.style.bottom = 'auto';
+            card.style.margin = '0';
+        }};
+        document.onmousemove = function(e) {{
+            if (isDragging) {{
+                e.preventDefault();
+                card.style.left = (e.clientX - offsetX) + 'px';
+                card.style.top = (e.clientY - offsetY) + 'px';
+            }}
+        }};
+        document.onmouseup = function(e) {{
+            isDragging = false;
+        }};
+    }}
+" style="display:none;">
 """
-        # 輸出到前端
         st.markdown(card_html, unsafe_allow_html=True)
         
     except Exception as e:
-        # 如果發生錯誤，顯示在終端機方便除錯，不影響使用者介面
-        print(f"Glass Card Render Error: {e}")
+        print(f"Top 10 Glass Card Error: {e}")
         pass
