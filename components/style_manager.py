@@ -601,16 +601,26 @@ def render_b5_top10_glass_card():
         cond_latest = (sync_df['最新(千)_val'] > 0) & (sync_df['最新(四)_val'] > 0)
         top10_latest = sync_df[cond_latest].sort_values(by='最新(千)_val', ascending=False).head(10)
 
-        # --- 🎯 狀態文字對齊引擎 ---
+        # --- 🎯 狀態文字對齊引擎 (支援 9 階層對稱雷達) ---
         def unify_status_text(raw_status):
             """強迫將所有的狀態轉換為 (1圖示 + 2漢字) 的完美對齊格式"""
             s = str(raw_status)
+            
+            # 多方 (增)
+            if "🚀" in s: return "🚀劇增"
             if "🔥" in s: return "🔥大增"
-            if "📈" in s: return "📈買進"  # 把"增"改成"買進"以湊齊雙字對齊
+            if "📈" in s: return "📈小增"
             if "↗️" in s: return "↗️微增"
+            
+            # 持平
             if "🔄" in s: return "🔄持平"
+            
+            # 空方 (減)
             if "↘️" in s: return "↘️微減"
-            if "🚨" in s: return "🚨大減"
+            if "📉" in s: return "📉小減"
+            if "⚠️" in s: return "⚠️大減"
+            if "🚨" in s: return "🚨劇減"
+            
             return "⚪無字"
 
         def make_resonance_html(df, is_6w):
