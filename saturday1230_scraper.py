@@ -77,19 +77,23 @@ for index, (name_suffix, url) in enumerate(TARGETS.items()):
     try:
         driver.get(url)
         
-        target_rank = None
-        if "301" in name_suffix and "600" in name_suffix:
-            target_rank = ("301", "600")
-        elif "601" in name_suffix and "900" in name_suffix:
-            target_rank = ("601", "900")
-            
-        if target_rank and "goodinfo" in url:
-            print(f" └─ 🔍 偵測到需要切換名次，自動點擊選單 ({target_rank[0]}-{target_rank[1]} 名)...")
+# 💡 修正版：只抓取起始名次 (301, 601, 901)
+        target_start = None
+        if "301-" in name_suffix:
+            target_start = "301"
+        elif "601-" in name_suffix:
+            target_start = "601"
+        elif "901-" in name_suffix:
+            target_start = "901"
+                
+        if target_start and "goodinfo" in url:
+            print(f" └─ 🔍 偵測到需要切換名次，自動點擊選單 ({target_start} 名起)...")
             time.sleep(5)
             try:
                 options_elements = driver.find_elements(By.TAG_NAME, "option")
                 for opt in options_elements:
-                    if target_rank[0] in opt.text and target_rank[1] in opt.text:
+                    # 只要 Goodinfo 的下拉選單文字包含我們的「起始數字」，就點擊它！
+                    if target_start in opt.text:
                         opt.click()
                         parent_select = opt.find_element(By.XPATH, "..")
                         driver.execute_script("arguments[0].dispatchEvent(new Event('change'))", parent_select)
@@ -98,7 +102,7 @@ for index, (name_suffix, url) in enumerate(TARGETS.items()):
                         break
             except Exception as e:
                 print(f" └─ ⚠️ 無法自動切換選單: {e}")
-        
+            
         print(" └─ 正在等待網頁驗證、略過廣告與表格載入 (最長等待 60 秒)...")
         target_df = None
         
