@@ -178,9 +178,12 @@ def process_400_shareholders(DATA_DIR):
             master[prev] = pd.to_numeric(master[prev], errors='coerce')
             
             def get_trend_400(row):
-                v1, v2 = row.get(newest), row.get(prev)
-                if pd.isna(v1) or pd.isna(v2): return "無資料"
-                diff = v1 - v2
+                # 【修正處】CSV 的日期欄位 (例如: 0731) 本身就是變化量，不需要再減去上週。
+                v1 = row.get(newest)
+                if pd.isna(v1): return "無資料"
+                
+                diff = v1  # 直接讀取當週變化量，不再做 v1 - v2
+                
                 if diff >= 1.5: return "🔥 大增"
                 if diff >= 0.5: return "📈 增"
                 if diff > 0: return "↗️ 微增"
@@ -188,7 +191,8 @@ def process_400_shareholders(DATA_DIR):
                 if diff > -0.5: return "↘️ 微減"
                 return "🚨 減/大減"
                 
-            master['週動態'] = master.apply(get_trend_400, axis=1) if len(sorted_dates) >= 2 else "持平"
+            # 套用週動態 (只要有最新一週資料即可判斷)
+            master['週動態'] = master.apply(get_trend_400, axis=1) if len(sorted_dates) >= 1 else "持平"
             
             rename_dict = {newest: f"▼{newest}"}
             if '上週持有%' in master.columns: rename_dict['上週持有%'] = f"{newest}持有%"
