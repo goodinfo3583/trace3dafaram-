@@ -23,7 +23,7 @@ def get_b5_latest_date(DATA_DIR):
     return global_latest
 
 def process_major_shareholders(DATA_DIR, target_level):
-    """通用大戶資料產生器 (純後台版) - 處理 1000/800/600 張"""
+    """通用大戶資料產生器 (純後台版)"""
     files = []
     for ext in ('*.csv', '*.CSV'):
         files.extend(glob.glob(os.path.join(DATA_DIR, f"*大股東{ext}")))
@@ -88,21 +88,15 @@ def process_major_shareholders(DATA_DIR, target_level):
         latest_date_4 = sorted_dates_4[0]
         
         def get_trend(val):
-            if pd.isna(val): return "無資料"
-            # 🎯 9 階層完美對稱雷達
-            if val >= 1.5: return "🚀 劇增"
-            if val >= 1.0: return "🔥 大增"
-            if val >= 0.5: return "📈 小增"
-            if val > 0:    return "↗️ 微增"
-            if val == 0:   return "🔄 持平"
+            if pd.isna(val): return "無"
+            if val >= 1.5: return "🔥 大增"
+            if val >= 0.5: return "📈 增"
+            if val > 0: return "↗️ 微增"
+            if val == 0: return "🔄 持平"
             if val > -0.5: return "↘️ 微減"
-            if val > -1.0: return "📉 小減"
-            if val > -1.5: return "⚠️ 大減"
-            return "🚨 劇減"
+            return "🚨 減/大減"
             
         master['週動態'] = master[f"DELTA_{latest_date_4}"].apply(get_trend)
-        
-        # 由於 1000/800/600 都是多檔合併，因此這裡使用安全且零笛卡爾積的 Pandas 向量相加
         delta_cols = [f"DELTA_{d}" for d in sorted_dates_4 if f"DELTA_{d}" in master.columns]
         master['▼6周增減'] = master[delta_cols[:6]].sum(axis=1, min_count=1)
         
@@ -123,9 +117,8 @@ def process_major_shareholders(DATA_DIR, target_level):
         
     return pd.DataFrame()
 
-
 def process_400_shareholders(DATA_DIR):
-    """獨立抽出的 400 張中實戶運算引擎 - 包含修正版總增減邏輯"""
+    """獨立抽出的 400 張中實戶運算引擎"""
     files = glob.glob(os.path.join(DATA_DIR, "*神秘金字塔 - 股權類股排行*.csv"))
     if not files: return pd.DataFrame()
     
@@ -180,50 +173,34 @@ def process_400_shareholders(DATA_DIR):
         
         if sorted_dates:
             newest = sorted_dates[0]
+            prev = sorted_dates[1] if len(sorted_dates) >= 2 else newest
             master[newest] = pd.to_numeric(master[newest], errors='coerce')
+            master[prev] = pd.to_numeric(master[prev], errors='coerce')
             
             def get_trend_400(row):
+                # 【修正處】CSV 的日期欄位 (例如: 0731) 本身就是變化量，不需要再減去上週。
                 v1 = row.get(newest)
                 if pd.isna(v1): return "無資料"
                 
-                # 🎯 9 階層完美對稱雷達
-                if v1 >= 1.5: return "🚀 劇增"
-                if v1 >= 1.0: return "🔥 大增"
-                if v1 >= 0.5: return "📈 小增"
-                if v1 > 0:    return "↗️ 微增"
-                if v1 == 0:   return "🔄 持平"
-                if v1 > -0.5: return "↘️ 微減"
-                if v1 > -1.0: return "📉 小減"
-                if v1 > -1.5: return "⚠️ 大減"
-                return "🚨 劇減"
+                diff = v1  # 直接讀取當週變化量，不再做 v1 - v2
                 
+                if diff >= 1.5: return "🔥 大增"
+                if diff >= 0.5: return "📈 增"
+                if diff > 0: return "↗️ 微增"
+                if diff == 0: return "🔄 持平"
+                if diff > -0.5: return "↘️ 微減"
+                return "🚨 減/大減"
+                
+            # 套用週動態 (只要有最新一週資料即可判斷)
             master['週動態'] = master.apply(get_trend_400, axis=1) if len(sorted_dates) >= 1 else "持平"
             
             rename_dict = {newest: f"▼{newest}"}
-            
-            # ========================================================
-            # 💡 【修正重點】精準且安全的抓取「總增減 (6週)」數值
-            # ========================================================
-            if '總增減' in master.columns:
-                # 若官方 CSV 含有總增減，直接讀取轉換為數字，絕對精準
-                master['總增減'] = pd.to_numeric(master['總增減'], errors='coerce')
-                rename_dict['總增減'] = "▼6周增減"
-            else:
-                # 防呆機制：若檔案格式改變導致沒有總增減欄位，才動用 Pandas 自動加總前 6 週
-                calc_cols = sorted_dates[:6]
-                for d in calc_cols:
-                    if d in master.columns:
-                        master[d] = pd.to_numeric(master[d], errors='coerce')
-                master['▼6周增減'] = master[[d for d in calc_cols if d in master.columns]].sum(axis=1, min_count=1)
-
-            # 智慧尋找持股比例欄位，避免錯失
-            hold_col = next((c for c in master.columns if '持有%' in c or '持股比例' in c), None)
-            if hold_col: rename_dict[hold_col] = f"{newest}持有%"
-            elif '上週持有%' in master.columns: rename_dict['上週持有%'] = f"{newest}持有%"
-                
+            if '上週持有%' in master.columns: rename_dict['上週持有%'] = f"{newest}持有%"
+            if '總增減' in master.columns: rename_dict['總增減'] = "▼6周增減"
             master = master.rename(columns=rename_dict)
             
-            cols_order = ['股票代號', '股票名稱', '週動態', '▼6周增減']
+            cols_order = ['股票代號', '股票名稱', '週動態']
+            if '▼6周增減' in master.columns: cols_order.append('▼6周增減')
             if f"{newest}持有%" in master.columns: cols_order.append(f"{newest}持有%")
             cols_order.append(f"▼{newest}")
             
