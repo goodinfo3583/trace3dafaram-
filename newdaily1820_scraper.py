@@ -284,19 +284,26 @@ for index, (name_suffix, url) in enumerate(GOODINFO_TARGETS.items()):
     try:
         driver.get(url)
         
-        target_rank = None
-        if "301" in name_suffix and "600" in name_suffix:
-            target_rank = ("301", "600")
-        elif "601" in name_suffix and "900" in name_suffix:
-            target_rank = ("601", "900")
+        # ==========================================
+        # 💡 終極修正版：使用正則表達式自動抓取起始名次
+        # ==========================================
+        target_start = None
+        
+        # 尋找檔名中是否有 "數字-數字名" 的結構，例如 "301-600名"
+        match = re.search(r'(\d+)-\d+名', name_suffix)
+        
+        # 但要排除 "1-300名"，因為這是預設的第一頁，不需要切換
+        if match and match.group(1) != "1": 
+            target_start = match.group(1)
             
-        if target_rank:
-            print(f" └─ 🔍 偵測到需要切換名次，幫你自動點擊下拉選單 ({target_rank[0]}-{target_rank[1]} 名)...")
+        if target_start:
+            print(f" └─ 🔍 偵測到需要切換名次，幫你自動點擊下拉選單 ({target_start} 名起)...")
             time.sleep(5) 
             try:
                 options_elements = driver.find_elements(By.TAG_NAME, "option")
                 for opt in options_elements:
-                    if target_rank[0] in opt.text and target_rank[1] in opt.text:
+                    # 只要下拉選單的文字包含我們的「起始數字」，就點下去
+                    if target_start in opt.text:
                         opt.click()
                         parent_select = opt.find_element(By.XPATH, "..")
                         driver.execute_script("arguments[0].dispatchEvent(new Event('change'))", parent_select)
