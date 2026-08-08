@@ -73,31 +73,30 @@ for index, (name_suffix, url) in enumerate(TARGETS.items()):
     
     print(f"[{index+1}/{len(TARGETS)}] 正在擷取: {name_suffix}")
     
+# (前略...保持不變)
     try:
         driver.get(url)
-        
-        # 🌟 修改這裡：使用正則表達式自動抓取名次區間
-        target_rank = None
-        match = re.search(r'\((\d+)-(\d+)名', name_suffix)
-        if match:
-            target_rank = (match.group(1), match.group(2))
-        else:
-            match_last = re.search(r'\((\d+)-.*?名', name_suffix)
-            if match_last and int(match_last.group(1)) > 300:
-                target_rank = (match_last.group(1), "")
-                
-        # 如果是 1-300 名 (第一頁)，不需要切換，直接設為 None 略過點擊
-        if target_rank and target_rank[0] == "1":
-            target_rank = None
             
-        if target_rank and "goodinfo" in url:
-            print(f" └─ 🔍 偵測到需要切換名次，自動點擊選單 (包含 '{target_rank[0]}' 名)...")
+        # ==============================================================
+        # 🌟 統一終極修正版：使用正則表達式自動萃取起始名次
+        # ==============================================================
+        target_start = None
+            
+        # 尋找檔名中是否有 "數字-數字名" 的結構 (會自動無視後面的 "(高→低)")
+        match = re.search(r'(\d+)-\d+名', name_suffix)
+            
+        # 只要有抓到數字，而且不是預設的第 1 頁 (1-300名)，就將起始名次設定給 target_start
+        if match and match.group(1) != "1":
+            target_start = match.group(1)
+                
+        if target_start and "goodinfo" in url:
+            print(f" └─ 🔍 偵測到需要切換名次，幫你自動點擊下拉選單 ({target_start} 名起)...")
             time.sleep(5)
             try:
                 options_elements = driver.find_elements(By.TAG_NAME, "option")
                 for opt in options_elements:
-                    # 只要選項文字包含我們要的起始名次 (例如 901) 就點擊
-                    if target_rank[0] in opt.text: 
+                    # 只要 Goodinfo 下拉選單的文字包含我們的「起始數字 (例如 901)」，就點擊它！
+                    if target_start in opt.text:
                         opt.click()
                         parent_select = opt.find_element(By.XPATH, "..")
                         driver.execute_script("arguments[0].dispatchEvent(new Event('change'))", parent_select)
@@ -106,9 +105,12 @@ for index, (name_suffix, url) in enumerate(TARGETS.items()):
                         break
             except Exception as e:
                 print(f" └─ ⚠️ 無法自動切換選單: {e}")
-        
+            # ==============================================================
+            
         print(" └─ 正在等待網頁驗證、略過廣告與表格載入 (最長等待 60 秒)...")
         target_df = None
+            
+        # (後略...保持不變)
         
         for i in range(60): 
             try:

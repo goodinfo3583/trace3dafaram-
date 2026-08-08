@@ -23,12 +23,13 @@ def get_b5_latest_date(DATA_DIR):
     return global_latest
 
 def process_major_shareholders(DATA_DIR, target_level):
-    """通用大戶資料產生器 (純後台版)"""
+    """通用大戶資料產生器 (純後台版) - 處理 1000/800/600 張 (支援增減檔案無縫合併)"""
     files = []
     for ext in ('*.csv', '*.CSV'):
         files.extend(glob.glob(os.path.join(DATA_DIR, f"*大股東{ext}")))
     if not files: return pd.DataFrame()
     
+    # 依照日期分組檔案 (把同一週的"增加檔"跟"減少檔"歸類在同一個 key)
     groups = {}
     for f in files:
         m = re.search(r'(\d{8})', os.path.basename(f))
@@ -42,6 +43,7 @@ def process_major_shareholders(DATA_DIR, target_level):
         chunks = []
         detected_date = None
         
+        # 讀取該週的所有檔案 (包含所有名次的增加與減少)
         for f in fs:
             df = None
             for enc in ['utf-8-sig', 'big5', 'cp950', 'utf-8']:
@@ -74,8 +76,11 @@ def process_major_shareholders(DATA_DIR, target_level):
                 chunks.append(df[['股票代號', '股票名稱', '持股%', '增減%']].dropna(subset=['股票代號']))
             except: continue
         
+        # 💡 【優化重點】合併並去重：將該週的「增加檔」與「減少檔」合併，若有重複股票則保留第一筆
         if chunks:
-            comb = pd.concat(chunks, ignore_index=True).groupby(['股票代號', '股票名稱']).max().reset_index()
+            comb = pd.concat(chunks, ignore_index=True)
+            comb = comb.drop_duplicates(subset=['股票代號', '股票名稱'], keep='first').reset_index(drop=True)
+            
             date_4 = detected_date if detected_date else prefix[-4:]
             if date_4 not in all_dates_4: all_dates_4.append(date_4)
             comb = comb.rename(columns={'持股%': f"{date_4}持有%", '增減%': f"DELTA_{date_4}"})
@@ -83,20 +88,27 @@ def process_major_shareholders(DATA_DIR, target_level):
             
     if merged:
         master = merged[0]
+        # 外連結合併歷史週次，確保曾經上榜的股票歷史資料不會遺失
         for m in merged[1:]: master = pd.merge(master, m, on=['股票代號', '股票名稱'], how='outer')
         sorted_dates_4 = sorted(all_dates_4, reverse=True)
         latest_date_4 = sorted_dates_4[0]
         
         def get_trend(val):
-            if pd.isna(val): return "無"
-            if val >= 1.5: return "🔥 大增"
-            if val >= 0.5: return "📈 增"
-            if val > 0: return "↗️ 微增"
-            if val == 0: return "🔄 持平"
+            if pd.isna(val): return "無資料"
+            # 🎯 9 階層完美對稱雷達
+            if val >= 1.5: return "🚀 劇增"
+            if val >= 1.0: return "🔥 大增"
+            if val >= 0.5: return "📈 小增"
+            if val > 0:    return "↗️ 微增"
+            if val == 0:   return "🔄 持平"
             if val > -0.5: return "↘️ 微減"
-            return "🚨 減/大減"
+            if val > -1.0: return "📉 小減"
+            if val > -1.5: return "⚠️ 大減"
+            return "🚨 劇減"
             
         master['週動態'] = master[f"DELTA_{latest_date_4}"].apply(get_trend)
+        
+        # 安全加總近 6 週數值
         delta_cols = [f"DELTA_{d}" for d in sorted_dates_4 if f"DELTA_{d}" in master.columns]
         master['▼6周增減'] = master[delta_cols[:6]].sum(axis=1, min_count=1)
         
@@ -117,8 +129,9 @@ def process_major_shareholders(DATA_DIR, target_level):
         
     return pd.DataFrame()
 
+
 def process_400_shareholders(DATA_DIR):
-    """獨立抽出的 400 張中實戶運算引擎"""
+    """獨立抽出的 400 張中實戶運算引擎 - 包含總增減防呆邏輯"""
     files = glob.glob(os.path.join(DATA_DIR, "*神秘金字塔 - 股權類股排行*.csv"))
     if not files: return pd.DataFrame()
     
@@ -173,34 +186,45 @@ def process_400_shareholders(DATA_DIR):
         
         if sorted_dates:
             newest = sorted_dates[0]
-            prev = sorted_dates[1] if len(sorted_dates) >= 2 else newest
             master[newest] = pd.to_numeric(master[newest], errors='coerce')
-            master[prev] = pd.to_numeric(master[prev], errors='coerce')
             
             def get_trend_400(row):
-                # 【修正處】CSV 的日期欄位 (例如: 0731) 本身就是變化量，不需要再減去上週。
                 v1 = row.get(newest)
                 if pd.isna(v1): return "無資料"
                 
-                diff = v1  # 直接讀取當週變化量，不再做 v1 - v2
+                # 🎯 9 階層完美對稱雷達
+                if v1 >= 1.5: return "🚀 劇增"
+                if v1 >= 1.0: return "🔥 大增"
+                if v1 >= 0.5: return "📈 小增"
+                if v1 > 0:    return "↗️ 微增"
+                if v1 == 0:   return "🔄 持平"
+                if v1 > -0.5: return "↘️ 微減"
+                if v1 > -1.0: return "📉 小減"
+                if v1 > -1.5: return "⚠️ 大減"
+                return "🚨 劇減"
                 
-                if diff >= 1.5: return "🔥 大增"
-                if diff >= 0.5: return "📈 增"
-                if diff > 0: return "↗️ 微增"
-                if diff == 0: return "🔄 持平"
-                if diff > -0.5: return "↘️ 微減"
-                return "🚨 減/大減"
-                
-            # 套用週動態 (只要有最新一週資料即可判斷)
             master['週動態'] = master.apply(get_trend_400, axis=1) if len(sorted_dates) >= 1 else "持平"
             
             rename_dict = {newest: f"▼{newest}"}
-            if '上週持有%' in master.columns: rename_dict['上週持有%'] = f"{newest}持有%"
-            if '總增減' in master.columns: rename_dict['總增減'] = "▼6周增減"
+            
+            # 精準抓取總增減
+            if '總增減' in master.columns:
+                master['總增減'] = pd.to_numeric(master['總增減'], errors='coerce')
+                rename_dict['總增減'] = "▼6周增減"
+            else:
+                calc_cols = sorted_dates[:6]
+                for d in calc_cols:
+                    if d in master.columns:
+                        master[d] = pd.to_numeric(master[d], errors='coerce')
+                master['▼6周增減'] = master[[d for d in calc_cols if d in master.columns]].sum(axis=1, min_count=1)
+
+            hold_col = next((c for c in master.columns if '持有%' in c or '持股比例' in c), None)
+            if hold_col: rename_dict[hold_col] = f"{newest}持有%"
+            elif '上週持有%' in master.columns: rename_dict['上週持有%'] = f"{newest}持有%"
+                
             master = master.rename(columns=rename_dict)
             
-            cols_order = ['股票代號', '股票名稱', '週動態']
-            if '▼6周增減' in master.columns: cols_order.append('▼6周增減')
+            cols_order = ['股票代號', '股票名稱', '週動態', '▼6周增減']
             if f"{newest}持有%" in master.columns: cols_order.append(f"{newest}持有%")
             cols_order.append(f"▼{newest}")
             
