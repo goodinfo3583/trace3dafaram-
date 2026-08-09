@@ -22,13 +22,6 @@ today = datetime.now().strftime("%Y%m%d")
 
 TARGETS = {
     "神秘金字塔 - 股權類股排行(5日之400張以上股東排行)": "https://norway.twsthr.info/StockHoldersTopWeek.aspx",
-    "大股東1000張數週增加(1-300名(高→低))": "https://goodinfo.tw/tw/StockList.asp?RPT_TIME=&MARKET_CAT=%E7%86%B1%E9%96%80%E6%8E%92%E8%A1%8C&INDUSTRY_CAT=%E6%8C%81%E8%82%A1%E8%B6%85%E9%81%8E1%E5%8D%83%E5%BC%B5%E6%8C%81%E6%9C%89%E6%AF%94%E4%BE%8B%E9%80%B1%E5%A2%9E%E5%8A%A0%E6%95%B8%40%40%E6%8C%81%E8%82%A1%E8%B6%85%E9%81%8E1%E5%8D%83%E5%BC%B5%40%40%E6%8C%81%E6%9C%89%E6%AF%94%E4%BE%8B%E9%80%B1%E5%A2%9E%E5%8A%A0%E6%95%B8",
-    "大股東1000張數週增加(301-600名(高→低))": "https://goodinfo.tw/tw/StockList.asp?RPT_TIME=&MARKET_CAT=%E7%86%B1%E9%96%80%E6%8E%92%E8%A1%8C&INDUSTRY_CAT=%E6%8C%81%E8%82%A1%E8%B6%85%E9%81%8E1%E5%8D%83%E5%BC%B5%E6%8C%81%E6%9C%89%E6%AF%94%E4%BE%8B%E9%80%B1%E5%A2%9E%E5%8A%A0%E6%95%B8%40%40%E6%8C%81%E8%82%A1%E8%B6%85%E9%81%8E1%E5%8D%83%E5%BC%B5%40%40%E6%8C%81%E6%9C%89%E6%AF%94%E4%BE%8B%E9%80%B1%E5%A2%9E%E5%8A%A0%E6%95%B8",
-    "大股東1000張數週增加(601-900名(高→低))": "https://goodinfo.tw/tw/StockList.asp?RPT_TIME=&MARKET_CAT=%E7%86%B1%E9%96%80%E6%8E%92%E8%A1%8C&INDUSTRY_CAT=%E6%8C%81%E8%82%A1%E8%B6%85%E9%81%8E1%E5%8D%83%E5%BC%B5%E6%8C%81%E6%9C%89%E6%AF%94%E4%BE%8B%E9%80%B1%E5%A2%9E%E5%8A%A0%E6%95%B8%40%40%E6%8C%81%E8%82%A1%E8%B6%85%E9%81%8E1%E5%8D%83%E5%BC%B5%40%40%E6%8C%81%E6%9C%89%E6%AF%94%E4%BE%8B%E9%80%B1%E5%A2%9E%E5%8A%A0%E6%95%B8",
-    "大股東1000張數週增加(901-913名(高→低))": "https://goodinfo.tw/tw/StockList.asp?RPT_TIME=&MARKET_CAT=%E7%86%B1%E9%96%80%E6%8E%92%E8%A1%8C&INDUSTRY_CAT=%E6%8C%81%E8%82%A1%E8%B6%85%E9%81%8E1%E5%8D%83%E5%BC%B5%E6%8C%81%E6%9C%89%E6%AF%94%E4%BE%8B%E9%80%B1%E5%A2%9E%E5%8A%A0%E6%95%B8%40%40%E6%8C%81%E8%82%A1%E8%B6%85%E9%81%8E1%E5%8D%83%E5%BC%B5%40%40%E6%8C%81%E6%9C%89%E6%AF%94%E4%BE%8B%E9%80%B1%E5%A2%9E%E5%8A%A0%E6%95%B8",
-    "大股東1000張數週減少(1-300名)": "https://goodinfo.tw/tw/StockList.asp?RPT_TIME=&MARKET_CAT=%E7%86%B1%E9%96%80%E6%8E%92%E8%A1%8C&INDUSTRY_CAT=%E6%8C%81%E8%82%A1%E8%B6%85%E9%81%8E1%E5%8D%83%E5%BC%B5%E6%8C%81%E6%9C%89%E6%AF%94%E4%BE%8B%E9%80%B1%E6%B8%9B%E5%B0%91%E6%95%B8%40%40%E6%8C%81%E8%82%A1%E8%B6%85%E9%81%8E1%E5%8D%83%E5%BC%B5%40%40%E6%8C%81%E6%9C%89%E6%AF%94%E4%BE%8B%E9%80%B1%E6%B8%9B%E5%B0%91%E6%95%B8",
-    "大股東1000張數週減少(301-600名)": "https://goodinfo.tw/tw/StockList.asp?RPT_TIME=&MARKET_CAT=%E7%86%B1%E9%96%80%E6%8E%92%E8%A1%8C&INDUSTRY_CAT=%E6%8C%81%E8%82%A1%E8%B6%85%E9%81%8E1%E5%8D%83%E5%BC%B5%E6%8C%81%E6%9C%89%E6%AF%94%E4%BE%8B%E9%80%B1%E6%B8%9B%E5%B0%91%E6%95%B8%40%40%E6%8C%81%E8%82%A1%E8%B6%85%E9%81%8E1%E5%8D%83%E5%BC%B5%40%40%E6%8C%81%E6%9C%89%E6%AF%94%E4%BE%8B%E9%80%B1%E6%B8%9B%E5%B0%91%E6%95%B8",
-    "大股東1000張數週減少(601-658名)": "https://goodinfo.tw/tw/StockList.asp?RPT_TIME=&MARKET_CAT=%E7%86%B1%E9%96%80%E6%8E%92%E8%A1%8C&INDUSTRY_CAT=%E6%8C%81%E8%82%A1%E8%B6%85%E9%81%8E1%E5%8D%83%E5%BC%B5%E6%8C%81%E6%9C%89%E6%AF%94%E4%BE%8B%E9%80%B1%E6%B8%9B%E5%B0%91%E6%95%B8%40%40%E6%8C%81%E8%82%A1%E8%B6%85%E9%81%8E1%E5%8D%83%E5%BC%B5%40%40%E6%8C%81%E6%9C%89%E6%AF%94%E4%BE%8B%E9%80%B1%E6%B8%9B%E5%B0%91%E6%95%B8",
     "大股東1000張數週增減(1-300名)": "https://goodinfo.tw/tw/StockList.asp?RPT_TIME=&MARKET_CAT=%E7%86%B1%E9%96%80%E6%8E%92%E8%A1%8C&INDUSTRY_CAT=%E6%8C%81%E8%82%A11%E5%8D%83%E5%BC%B5%E4%BB%A5%E4%B8%8B%E6%8C%81%E6%9C%89%E6%AF%94%E4%BE%8B%28%25%29%40%40%E6%8C%81%E8%82%A11%E5%8D%83%E5%BC%B5%E4%BB%A5%E4%B8%8B%40%40%E6%8C%81%E6%9C%89%E6%AF%94%E4%BE%8B%28%25%29",
     "大股東1000張數週增減(301-600名)": "https://goodinfo.tw/tw/StockList.asp?RPT_TIME=&MARKET_CAT=%E7%86%B1%E9%96%80%E6%8E%92%E8%A1%8C&INDUSTRY_CAT=%E6%8C%81%E8%82%A11%E5%8D%83%E5%BC%B5%E4%BB%A5%E4%B8%8B%E6%8C%81%E6%9C%89%E6%AF%94%E4%BE%8B%28%25%29%40%40%E6%8C%81%E8%82%A11%E5%8D%83%E5%BC%B5%E4%BB%A5%E4%B8%8B%40%40%E6%8C%81%E6%9C%89%E6%AF%94%E4%BE%8B%28%25%29",
     "大股東1000張數週增減(601-900名)": "https://goodinfo.tw/tw/StockList.asp?RPT_TIME=&MARKET_CAT=%E7%86%B1%E9%96%80%E6%8E%92%E8%A1%8C&INDUSTRY_CAT=%E6%8C%81%E8%82%A11%E5%8D%83%E5%BC%B5%E4%BB%A5%E4%B8%8B%E6%8C%81%E6%9C%89%E6%AF%94%E4%BE%8B%28%25%29%40%40%E6%8C%81%E8%82%A11%E5%8D%83%E5%BC%B5%E4%BB%A5%E4%B8%8B%40%40%E6%8C%81%E6%9C%89%E6%AF%94%E4%BE%8B%28%25%29",
@@ -37,7 +30,7 @@ TARGETS = {
     "大股東1000張數週增減(1501-1800名)": "https://goodinfo.tw/tw/StockList.asp?RPT_TIME=&MARKET_CAT=%E7%86%B1%E9%96%80%E6%8E%92%E8%A1%8C&INDUSTRY_CAT=%E6%8C%81%E8%82%A11%E5%8D%83%E5%BC%B5%E4%BB%A5%E4%B8%8B%E6%8C%81%E6%9C%89%E6%AF%94%E4%BE%8B%28%25%29%40%40%E6%8C%81%E8%82%A11%E5%8D%83%E5%BC%B5%E4%BB%A5%E4%B8%8B%40%40%E6%8C%81%E6%9C%89%E6%AF%94%E4%BE%8B%28%25%29",
     "大股東1000張數週增減(1801-2100名)": "https://goodinfo.tw/tw/StockList.asp?RPT_TIME=&MARKET_CAT=%E7%86%B1%E9%96%80%E6%8E%92%E8%A1%8C&INDUSTRY_CAT=%E6%8C%81%E8%82%A11%E5%8D%83%E5%BC%B5%E4%BB%A5%E4%B8%8B%E6%8C%81%E6%9C%89%E6%AF%94%E4%BE%8B%28%25%29%40%40%E6%8C%81%E8%82%A11%E5%8D%83%E5%BC%B5%E4%BB%A5%E4%B8%8B%40%40%E6%8C%81%E6%9C%89%E6%AF%94%E4%BE%8B%28%25%29",
     "大股東1000張數週增減(2101-2368名)": "https://goodinfo.tw/tw/StockList.asp?RPT_TIME=&MARKET_CAT=%E7%86%B1%E9%96%80%E6%8E%92%E8%A1%8C&INDUSTRY_CAT=%E6%8C%81%E8%82%A11%E5%8D%83%E5%BC%B5%E4%BB%A5%E4%B8%8B%E6%8C%81%E6%9C%89%E6%AF%94%E4%BE%8B%28%25%29%40%40%E6%8C%81%E8%82%A11%E5%8D%83%E5%BC%B5%E4%BB%A5%E4%B8%8B%40%40%E6%8C%81%E6%9C%89%E6%AF%94%E4%BE%8B%28%25%29",
-    }
+}
 
 # ==========================================
 # 2. 啟動瀏覽器 (undetected_chromedriver 破甲版)
@@ -45,7 +38,6 @@ TARGETS = {
 print("正在啟動 Google Chrome 瀏覽器...")
 options = uc.ChromeOptions()
 
-# 我們現在有 Xvfb 虛擬螢幕，所以不需要 --headless，這能讓 Goodinfo 以為我們是真人
 options.add_argument('--no-sandbox')               
 options.add_argument('--disable-dev-shm-usage')    
 options.add_argument('--disable-gpu')              
@@ -84,7 +76,7 @@ for index, (name_suffix, url) in enumerate(TARGETS.items()):
         time.sleep(5)
         
         # ==============================================================
-        # 🌟 統一正則表達式：無腦萃取起始名次 (無視括號與贅字)
+        # 🌟 無腦萃取起始名次 (無視括號與贅字)
         # ==============================================================
         target_start = None
         match = re.search(r'(\d+)-\d+名', name_suffix)
@@ -97,22 +89,26 @@ for index, (name_suffix, url) in enumerate(TARGETS.items()):
         if "goodinfo" in url:
             weeks_to_scrape = []
             
-            # 1. 掃描下拉選單，動態抓取最近 7 週的選項
+            # 1. 掃描下拉選單，動態抓取最近 7 週的選項 (已修復：支援抓取「最新資料」)
             try:
                 options = driver.find_elements(By.TAG_NAME, "option")
                 for opt in options:
-                    txt = opt.text
-                    # 尋找帶有 2026W32 這種格式的文字
-                    w_match = re.search(r'(202\d{1}W\d{2})', txt)
-                    if w_match:
-                        w_str = w_match.group(1)
-                        # 儲存 (網頁顯示的完整文字, 乾淨的週別字串)
-                        if w_str not in [w[1] for w in weeks_to_scrape]:
-                            weeks_to_scrape.append((txt, w_str))
+                    txt = opt.text.strip()
+                    # 判斷一：抓取「最新資料」
+                    if "最新資料" in txt or txt.startswith("最新"):
+                        if "最新資料" not in [w[1] for w in weeks_to_scrape]:
+                            weeks_to_scrape.append((txt, "最新資料"))
+                    # 判斷二：抓取帶有 W 格式的週別
+                    else:
+                        w_match = re.search(r'(202\d{1}W\d{2})', txt)
+                        if w_match:
+                            w_str = w_match.group(1)
+                            if w_str not in [w[1] for w in weeks_to_scrape]:
+                                weeks_to_scrape.append((txt, w_str))
             except Exception as e:
                 print(f" └─ ⚠️ 無法抓取週別選項: {e}")
 
-            # 限制只抓前 7 週，如果抓不到就用最新資料兜底
+            # 限制只抓前 7 週，如果真的都沒抓到，就用最新資料兜底
             weeks_to_scrape = weeks_to_scrape[:7]
             if not weeks_to_scrape:
                 weeks_to_scrape = [("最新資料", "最新資料")]
@@ -121,7 +117,6 @@ for index, (name_suffix, url) in enumerate(TARGETS.items()):
 
             # 2. 開始針對這 7 週進行輪迴抓取
             for w_idx, (week_text, week_str) in enumerate(weeks_to_scrape):
-                # 檔名自動加入週別標籤，避免資料互相覆蓋
                 file_name = f"{today}_{week_str}_{name_suffix}.csv"
                 file_path = os.path.join(SAVE_DIR, file_name)
                 
@@ -132,30 +127,30 @@ for index, (name_suffix, url) in enumerate(TARGETS.items()):
                     opts = driver.find_elements(By.TAG_NAME, "option")
                     for opt in opts:
                         if opt.text == week_text:
-                            # 檢查是否已經是被選取的狀態，不是才點擊
                             if not opt.is_selected():
                                 opt.click()
                                 parent_select = opt.find_element(By.XPATH, "..")
                                 driver.execute_script("arguments[0].dispatchEvent(new Event('change'))", parent_select)
                                 print(f"     └─ 🖱️ 切換週別為 {week_str}，等待網頁重新載入...")
-                                time.sleep(6) # 等待重新讀取
+                                time.sleep(6)
                             break
                 except Exception as e:
                     print(f"     └─ ⚠️ 週別切換失敗: {e}")
 
-                # 【步驟 B】: 切換名次 (Goodinfo 只要換週別，名次就會重置為 1-300，所以必須重新切換)
+                # 【步驟 B】: 切換名次 (已修復：拔除「名」字判斷，放寬點擊條件)
                 if target_start:
                     try:
+                        # 重新抓取選項，因為切換週別後網頁重新整理，舊的選項會失效
                         opts = driver.find_elements(By.TAG_NAME, "option")
                         for opt in opts:
-                            # 確保選項文字包含起始名次，且帶有 "名" 字，避免誤點其他同數字的選項
-                            if target_start in opt.text and "名" in opt.text:
+                            # 只要選項包含起始名次 (例如 301)，且排除掉含有 W 或是 最新 的選項 (避免誤點時間選單)
+                            if target_start in opt.text and "W" not in opt.text and "最新" not in opt.text:
                                 if not opt.is_selected():
                                     opt.click()
                                     parent_select = opt.find_element(By.XPATH, "..")
                                     driver.execute_script("arguments[0].dispatchEvent(new Event('change'))", parent_select)
-                                    print(f"     └─ 🖱️ 再次切換名次為 {target_start} 名起，等待網頁重新載入...")
-                                    time.sleep(6) # 等待重新讀取
+                                    print(f"     └─ 🖱️ 再次切換名次為 {target_start} 起，等待網頁重新載入...")
+                                    time.sleep(6)
                                 break
                     except Exception as e:
                         print(f"     └─ ⚠️ 名次切換失敗: {e}")
@@ -194,7 +189,7 @@ for index, (name_suffix, url) in enumerate(TARGETS.items()):
                 if target_df is not None:
                     for col in target_df.columns:
                         if '代號' in col:
-                            target_df = target_df[target_df[col] != col] # 過濾不小心抓到的標題列
+                            target_df = target_df[target_df[col] != col] # 過濾表頭
                             break
                     target_df.to_csv(file_path, index=False, encoding='utf-8-sig')
                     print(f"     └─ ✅ 歷史資料儲存至: {file_path}")
@@ -202,13 +197,13 @@ for index, (name_suffix, url) in enumerate(TARGETS.items()):
                     print(f"     └─ ❌ 失敗！抓不到表格。")
                     driver.save_screenshot(f"error_shot_{index+1}_{week_str}.png")
 
-                # 若不是該名次的最後一週，稍微休息避免被封鎖
+                # 若不是該名次的最後一週，稍微休息
                 if w_idx < len(weeks_to_scrape) - 1:
                     time.sleep(random.uniform(5, 8))
 
         else:
             # ==============================================================
-            # 🌟 如果不是 Goodinfo (例如 神秘金字塔)，就照常抓取一次即可
+            # 🌟 非 Goodinfo (如 神秘金字塔) 單次抓取邏輯
             # ==============================================================
             file_name = f"{today}_{name_suffix}.csv"
             file_path = os.path.join(SAVE_DIR, file_name)
@@ -248,7 +243,7 @@ for index, (name_suffix, url) in enumerate(TARGETS.items()):
             else:
                 print(f" └─ ❌ 失敗！抓不到表格。")
 
-        # 每個大項目 (1-300, 301-600...) 抓完後的大休息，避免被 Goodinfo 鎖 IP
+        # 每個大項目換網址前的大休息
         if index < len(TARGETS) - 1:
             sleep_time = random.uniform(20, 35)
             print(f"\n └─ [防封鎖機制] 隨機大休息 {sleep_time:.2f} 秒，準備切換下一個目標...")
