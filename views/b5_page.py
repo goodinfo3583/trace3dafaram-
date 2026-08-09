@@ -82,9 +82,16 @@ def process_major_shareholders(DATA_DIR, target_level):
             comb = comb.drop_duplicates(subset=['股票代號', '股票名稱'], keep='first').reset_index(drop=True)
             
             date_4 = detected_date if detected_date else prefix[-4:]
-            if date_4 not in all_dates_4: all_dates_4.append(date_4)
             comb = comb.rename(columns={'持股%': f"{date_4}持有%", '增減%': f"DELTA_{date_4}"})
-            merged.append(comb)
+            
+            # 🛠️ 修復點 1：將同一個 date_4 的資料合併在同一個 DataFrame 中，避免 pd.merge 時產生 _x, _y 結尾
+            if date_4 not in all_dates_4: 
+                all_dates_4.append(date_4)
+                merged.append(comb)
+            else:
+                # 已經有相同日期的資料包，找出來並合併去重
+                idx = all_dates_4.index(date_4)
+                merged[idx] = pd.concat([merged[idx], comb]).drop_duplicates(subset=['股票代號', '股票名稱'], keep='first').reset_index(drop=True)
             
     if merged:
         master = merged[0]
@@ -106,8 +113,13 @@ def process_major_shareholders(DATA_DIR, target_level):
             if val > -1.5: return "⚠️ 大減"
             return "🚨 劇減"
             
-        master['週動態'] = master[f"DELTA_{latest_date_4}"].apply(get_trend)
-        
+        # 🛠️ 修復點 2：加入安全檢查(防呆防崩潰)，若欄位真的遺失則填入無資料
+        target_col = f"DELTA_{latest_date_4}"
+        if target_col in master.columns:
+            master['週動態'] = master[target_col].apply(get_trend)
+        else:
+            master['週動態'] = "無資料"
+            
         # 安全加總近 6 週數值
         delta_cols = [f"DELTA_{d}" for d in sorted_dates_4 if f"DELTA_{d}" in master.columns]
         master['▼6周增減'] = master[delta_cols[:6]].sum(axis=1, min_count=1)
@@ -115,7 +127,7 @@ def process_major_shareholders(DATA_DIR, target_level):
         rename_dict = {}
         cols_order = ['股票代號', '股票名稱', '週動態', '▼6周增減']
         if f"{latest_date_4}持有%" in master.columns: cols_order.append(f"{latest_date_4}持有%")
-            
+#            
         for i, d in enumerate(sorted_dates_4):
             original_delta_col = f"DELTA_{d}"
             if original_delta_col in master.columns:
