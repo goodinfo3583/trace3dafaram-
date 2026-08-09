@@ -10,6 +10,7 @@ import re
 # 🌟 匯入終極突破武器 🌟
 import undetected_chromedriver as uc 
 from selenium.webdriver.common.by import By
+from selenium.webdriver.support.ui import Select  # 🌟 新增：專門控制下拉選單的神器！
 
 # ==========================================
 # 1. 設定區塊
@@ -76,7 +77,7 @@ for index, (name_suffix, url) in enumerate(TARGETS.items()):
         time.sleep(5)
         
         # ==============================================================
-        # 🌟 無腦萃取起始名次 (無視括號與贅字)
+        # 🌟 無腦萃取起始名次
         # ==============================================================
         target_start = None
         match = re.search(r'(\d+)-\d+名', name_suffix)
@@ -87,24 +88,38 @@ for index, (name_suffix, url) in enumerate(TARGETS.items()):
         # 🌟 專屬 Goodinfo 的 7 週時光機抓取邏輯
         # ==============================================================
         if "goodinfo" in url:
+            
+            # 🌟 關鍵防護 1：主動等待時間下拉選單出現 (避免網頁卡住只抓到最新資料)
+            for _ in range(15):
+                try:
+                    sels = driver.find_elements(By.TAG_NAME, "select")
+                    if any("W" in s.text for s in sels):
+                        break
+                except:
+                    pass
+                time.sleep(1)
+
             weeks_to_scrape = []
             
-            # 1. 掃描下拉選單，動態抓取最近 7 週的選項 (已修復：支援抓取「最新資料」)
+            # 1. 掃描下拉選單，動態抓取最近 7 週的選項
             try:
-                options = driver.find_elements(By.TAG_NAME, "option")
-                for opt in options:
-                    txt = opt.text.strip()
-                    # 判斷一：抓取「最新資料」
-                    if "最新資料" in txt or txt.startswith("最新"):
-                        if "最新資料" not in [w[1] for w in weeks_to_scrape]:
-                            weeks_to_scrape.append((txt, "最新資料"))
-                    # 判斷二：抓取帶有 W 格式的週別
-                    else:
-                        w_match = re.search(r'(202\d{1}W\d{2})', txt)
-                        if w_match:
-                            w_str = w_match.group(1)
-                            if w_str not in [w[1] for w in weeks_to_scrape]:
-                                weeks_to_scrape.append((txt, w_str))
+                selects = driver.find_elements(By.TAG_NAME, "select")
+                for sel in selects:
+                    if "最新資料" in sel.text or "W" in sel.text:
+                        options = sel.find_elements(By.TAG_NAME, "option")
+                        for opt in options:
+                            txt = opt.text.strip()
+                            if "最新資料" in txt or txt.startswith("最新"):
+                                if "最新資料" not in [w[1] for w in weeks_to_scrape]:
+                                    weeks_to_scrape.append((txt, "最新資料"))
+                            else:
+                                w_match = re.search(r'(202\d{1}W\d{2})', txt)
+                                if w_match:
+                                    w_str = w_match.group(1)
+                                    if w_str not in [w[1] for w in weeks_to_scrape]:
+                                        weeks_to_scrape.append((txt, w_str))
+                        if weeks_to_scrape:
+                            break # 找到對的下拉選單就跳出
             except Exception as e:
                 print(f" └─ ⚠️ 無法抓取週別選項: {e}")
 
@@ -122,38 +137,51 @@ for index, (name_suffix, url) in enumerate(TARGETS.items()):
                 
                 print(f"   └─ ⏳ [{w_idx+1}/{len(weeks_to_scrape)}] 正在處理週別: {week_str}")
 
-                # 【步驟 A】: 切換週別
-                try:
-                    opts = driver.find_elements(By.TAG_NAME, "option")
-                    for opt in opts:
-                        if opt.text == week_text:
-                            if not opt.is_selected():
-                                opt.click()
-                                parent_select = opt.find_element(By.XPATH, "..")
-                                driver.execute_script("arguments[0].dispatchEvent(new Event('change'))", parent_select)
-                                print(f"     └─ 🖱️ 切換週別為 {week_str}，等待網頁重新載入...")
-                                time.sleep(6)
-                            break
-                except Exception as e:
-                    print(f"     └─ ⚠️ 週別切換失敗: {e}")
-
-                # 【步驟 B】: 切換名次 (已修復：拔除「名」字判斷，放寬點擊條件)
-                if target_start:
+                # 【步驟 A】: 切換週別 (🌟 導入 Select 並且加入防護重試機制)
+                for attempt in range(3):
                     try:
-                        # 重新抓取選項，因為切換週別後網頁重新整理，舊的選項會失效
-                        opts = driver.find_elements(By.TAG_NAME, "option")
-                        for opt in opts:
-                            # 只要選項包含起始名次 (例如 301)，且排除掉含有 W 或是 最新 的選項 (避免誤點時間選單)
-                            if target_start in opt.text and "W" not in opt.text and "最新" not in opt.text:
-                                if not opt.is_selected():
-                                    opt.click()
-                                    parent_select = opt.find_element(By.XPATH, "..")
-                                    driver.execute_script("arguments[0].dispatchEvent(new Event('change'))", parent_select)
-                                    print(f"     └─ 🖱️ 再次切換名次為 {target_start} 起，等待網頁重新載入...")
-                                    time.sleep(6)
+                        changed = False
+                        selects = driver.find_elements(By.TAG_NAME, "select")
+                        for sel in selects:
+                            if week_text in sel.text or "最新資料" in sel.text or "W" in sel.text:
+                                s = Select(sel)
+                                # 如果當前選的不是我們要的週別，才進行切換
+                                if s.first_selected_option.text.strip() != week_text.strip():
+                                    s.select_by_visible_text(week_text)
+                                    changed = True
                                 break
+                        if changed:
+                            print(f"     └─ 🖱️ 切換週別為 {week_str}，等待網頁重新載入...")
+                            time.sleep(8) # 延長等待，確保 DOM 刷新完畢
+                        break # 成功切換就跳出重試迴圈
                     except Exception as e:
-                        print(f"     └─ ⚠️ 名次切換失敗: {e}")
+                        time.sleep(2) # 若報錯 (如 stale element) 則休息2秒重試
+
+                # 【步驟 B】: 切換名次
+                if target_start:
+                    target_rank_text = f"{target_start}~" # 🌟 神奇小撇步：尋找 "301~" 這種格式
+                    for attempt in range(3):
+                        try:
+                            changed = False
+                            # 重新尋找 select，因為切換週別後舊的已經灰飛煙滅了
+                            selects = driver.find_elements(By.TAG_NAME, "select")
+                            for sel in selects:
+                                # 確認這個 select 是負責選名次的
+                                if "~300" in sel.text and "~600" in sel.text:
+                                    s = Select(sel)
+                                    for opt in s.options:
+                                        if target_rank_text in opt.text: # 只要選項裡有 "301~" 這種字眼就對了！
+                                            if not opt.is_selected():
+                                                s.select_by_visible_text(opt.text)
+                                                changed = True
+                                            break
+                                    break
+                            if changed:
+                                print(f"     └─ 🖱️ 再次切換名次為 {target_start} 起，等待網頁重新載入...")
+                                time.sleep(8)
+                            break # 成功切換就跳出重試迴圈
+                        except Exception as e:
+                            time.sleep(2)
 
                 # 【步驟 C】: 解析表格
                 print("     └─ 正在等待網頁驗證與表格載入...")
