@@ -26,7 +26,7 @@ def process_major_shareholders(DATA_DIR, target_level):
     """通用大戶資料產生器 (純後台版) - 處理 1000/800/600 張 (支援增減檔案無縫合併)"""
     files = []
     for ext in ('*.csv', '*.CSV'):
-        files.extend(glob.glob(os.path.join(DATA_DIR, f"*大股東{ext}")))
+        files.extend(glob.glob(os.path.join(DATA_DIR, f"*大股東*{ext}"))) # 加入*讓檔名容錯率更高
     if not files: return pd.DataFrame()
     
     # 依照日期分組檔案 (把同一週的"增加檔"跟"減少檔"歸類在同一個 key)
@@ -57,8 +57,10 @@ def process_major_shareholders(DATA_DIR, target_level):
             df.columns = [re.sub(r'\s+', '', str(c)).replace('\ufeff', '') for c in df.columns]
             c_code = next((c for c in df.columns if '代號' in c or '代碼' in c), None)
             c_name = next((c for c in df.columns if '名稱' in c), None)
-            c_abs = next((c for c in df.columns if (target_level in c or target_num in c) and ('%' in c or '比例' in c) and '增減' not in c and '差' not in c), None)
-            c_delta = next((c for c in df.columns if (target_level in c or target_num in c) and ('增減' in c or '差' in c)), None)
+            
+            # 🎯 核心修復點：增加 "and '以下' not in c"，強制避開散戶欄位，只抓「超過」的大戶欄位
+            c_abs = next((c for c in df.columns if (target_level in c or target_num in c) and ('%' in c or '比例' in c) and '增減' not in c and '差' not in c and '以下' not in c), None)
+            c_delta = next((c for c in df.columns if (target_level in c or target_num in c) and ('增減' in c or '差' in c) and '以下' not in c), None)
             c_date = next((c for c in df.columns if '日期' in c), None)
             
             if not all([c_code, c_name, c_abs, c_delta]): continue
@@ -66,8 +68,10 @@ def process_major_shareholders(DATA_DIR, target_level):
             try:
                 df['股票代號'] = df[c_code].astype(str).str.extract(r'(\d+)', expand=False)
                 df['股票名稱'] = df[c_name].astype(str).str.replace(r'^\d+', '', regex=True).str.strip()
-                df['持股%'] = pd.to_numeric(df[c_abs].astype(str).str.replace('%', ''), errors='coerce')
-                df['增減%'] = pd.to_numeric(df[c_delta].astype(str).str.replace('+', '').str.replace('%', ''), errors='coerce')
+                df['持股%'] = pd.to_numeric(df[c_abs].astype(str).str.replace('%', '', regex=False), errors='coerce')
+                
+                # 🎯 移除先前的檔名強制正負號邏輯，回歸直接讀取 (因為抓對欄位後，原始資料的正負號本來就是準確的)
+                df['增減%'] = pd.to_numeric(df[c_delta].astype(str).str.replace('+', '', regex=False).str.replace('%', '', regex=False), errors='coerce')
                 
                 if detected_date is None and c_date and not df[c_date].dropna().empty:
                     raw_date = str(df[c_date].dropna().iloc[0]).replace('/', '').replace('-', '').strip()
@@ -76,15 +80,22 @@ def process_major_shareholders(DATA_DIR, target_level):
                 chunks.append(df[['股票代號', '股票名稱', '持股%', '增減%']].dropna(subset=['股票代號']))
             except: continue
         
-        # 💡 【優化重點】合併並去重：將該週的「增加檔」與「減少檔」合併，若有重複股票則保留第一筆
+        # 💡 合併並去重：將該週的「增加檔」與「減少檔」合併，若有重複股票則保留第一筆
         if chunks:
             comb = pd.concat(chunks, ignore_index=True)
             comb = comb.drop_duplicates(subset=['股票代號', '股票名稱'], keep='first').reset_index(drop=True)
             
             date_4 = detected_date if detected_date else prefix[-4:]
-            if date_4 not in all_dates_4: all_dates_4.append(date_4)
             comb = comb.rename(columns={'持股%': f"{date_4}持有%", '增減%': f"DELTA_{date_4}"})
-            merged.append(comb)
+            
+            if date_4 not in all_dates_4: 
+                all_dates_4.append(date_4)
+                merged.append(comb)
+            else:
+                idx = all_dates_4.index(date_4)
+                merged[idx] = pd.concat([merged[idx], comb]).drop_duplicates(subset=['股票代號', '股票名稱'], keep='first').reset_index(drop=True)
+
+    # ... 下半部維持你目前的最新寫法即可 ...
             
     if merged:
         master = merged[0]
