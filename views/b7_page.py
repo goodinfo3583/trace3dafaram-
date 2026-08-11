@@ -5,7 +5,7 @@ import glob
 import re
 
 # ==========================================
-# ⚙️ 區塊 7：董監持股運算引擎 (原邏輯)
+# ⚙️ 區塊 7：董監持股運算引擎
 # ==========================================
 def process_directors_data(DATA_DIR):
     """讀取並合併多個月份的董監事持股資料"""
@@ -122,7 +122,7 @@ def process_directors_data(DATA_DIR):
 # ==========================================
 def process_pledge_data(DATA_DIR):
     """讀取並合併所有名次的董監質押比資料，並只保留指定欄位"""
-    search_pattern = os.path.join(DATA_DIR, "*董監質押比*.csv")
+    search_pattern = os.path.join(DATA_DIR, "*董監質押*.csv")
     files = glob.glob(search_pattern)
     
     if not files: return pd.DataFrame()
@@ -141,36 +141,47 @@ def process_pledge_data(DATA_DIR):
             
     if not df_list: return pd.DataFrame()
     
-    # 垂直合併所有檔案 (包含 1-300名, 301-600名, 202606董監質押比(1-300名(高→低))_2.csv 等)
     merged_df = pd.concat(df_list, ignore_index=True)
     
-    # 定義您指定要擷取的目標欄位 (去除因連點產生的空字串)
+    # 🎯 任務 1: 解決重複與笛卡爾積問題
+    c_code = next((c for c in merged_df.columns if str(c).replace(" ", "") == "代號"), None)
+    c_month = next((c for c in merged_df.columns if str(c).replace(" ", "") == "持股資料月份"), None)
+    
+    if c_code and c_month:
+        merged_df = merged_df.dropna(subset=[c_code])
+        merged_df[c_code] = merged_df[c_code].astype(str).str.strip()
+        merged_df[c_month] = merged_df[c_month].astype(str).str.strip()
+        # 同一個代號且同一個月份的資料只保留第一筆 (剔除多個檔案堆疊造成的重複)
+        merged_df = merged_df.drop_duplicates(subset=[c_code, c_month], keep='first')
+    
+    # 🎯 任務 2 & 3: 定義擷取的目標欄位，並將「質押(%)」移至「名稱」後
     requested_cols = [
-        "排名", "代號", "名稱", "成交", "持股 資料 月份", 
+        "排名", "代號", "名稱", "全體 董監 質押 (%)", "成交", "持股 資料 月份", 
         "全體 董監 持股 (萬張)", "全體 董監 增減 張數", "全體 董監 持股 (%)", 
-        "全體 董監 質押 (萬張)", "全體 董監 質押 (%)"
+        "全體 董監 質押 (萬張)"
     ]
     
-    # 🎯 精準欄位對應機制：
-    # 為了防止原始檔案中的半形/全形空白干擾，我們用去除空白的方式來找出 DataFrame 實際對應的欄位名稱
+    # 精準欄位對應與重命名機制，確保欄位數據確實對準
     actual_cols = []
+    rename_dict = {}
     for req_c in requested_cols:
         req_clean = req_c.replace(" ", "")
         matched_col = next((c for c in merged_df.columns if str(c).replace(" ", "").replace('\u3000', '') == req_clean), None)
         if matched_col:
             actual_cols.append(matched_col)
+            rename_dict[matched_col] = req_c  # 建立新舊名稱對照表
             
-    # 只保留成功對應的欄位
     if actual_cols:
         merged_df = merged_df[actual_cols]
+        # 統一將顯示的欄位名稱轉為您指定的整齊名稱
+        merged_df = merged_df.rename(columns=rename_dict)
     
-    # 將「排名」轉換為數值並重新排序，確保 1~1969 名順序正確
-    rank_col = next((c for c in merged_df.columns if '排名' in c), None)
-    if rank_col:
-        merged_df[rank_col] = pd.to_numeric(merged_df[rank_col], errors='coerce')
-        # 移除沒有排名的無效行並重新排序
-        merged_df = merged_df.dropna(subset=[rank_col])
-        merged_df = merged_df.sort_values(by=rank_col, ascending=True)
+    # 將「排名」轉換為數值並重新排序
+    if "排名" in merged_df.columns:
+        merged_df["排名"] = pd.to_numeric(merged_df["排名"], errors='coerce')
+        merged_df = merged_df.dropna(subset=["排名"])
+        # 以排名為主，月份為輔排序 (這樣最新月份的第1名會在最上面，依序排列)
+        merged_df = merged_df.sort_values(by=["排名", "持股 資料 月份"], ascending=[True, False])
 
     return merged_df
 
@@ -189,7 +200,6 @@ def sync_pledge_data(DATA_DIR):
 # 🖼️ 前台畫面渲染 (支援雙 DataFrame 切換)
 # ==========================================
 def show_b7_page(DATA_DIR, STOCK_DICT):
-    # 檢查狀態，若無則載入
     if 'b7_main' not in st.session_state:
         with st.spinner("⏳ 載入董監持股數據中..."):
             sync_b7_data(DATA_DIR)
@@ -211,7 +221,6 @@ def show_b7_page(DATA_DIR, STOCK_DICT):
     </div>
     """, unsafe_allow_html=True)
 
-    # 建立兩個分頁標籤來切換 DataFrame
     tab1, tab2 = st.tabs(["📊 董監持股增減", "🔗 董監質押比排行"])
 
     # --- 分頁 1：原有的董監持股動態 ---
@@ -226,6 +235,6 @@ def show_b7_page(DATA_DIR, STOCK_DICT):
     with tab2:
         df_pledge = st.session_state['b7_pledge']
         if df_pledge.empty:
-            st.warning("⚠️ 找不到董監質押比資料，請確認 data 資料夾中存在如 `202606董監質押比(1-300名(高→低))_2.csv` 的檔案。")
+            st.warning("⚠️ 找不到董監質押比資料，請確認 data 資料夾中存在相關 CSV 檔案。")
         else:
             st.dataframe(df_pledge, use_container_width=True, hide_index=True)
