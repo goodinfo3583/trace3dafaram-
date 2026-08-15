@@ -192,7 +192,7 @@ def process_pledge_data(DATA_DIR):
 # ⚙️ 區塊 7：董監質押歷史趨勢引擎 (第二張表)
 # ==========================================
 def process_pledge_history_data(DATA_DIR):
-    """橫向展開歷史月份的質押比，避免笛卡爾積，支援彈性檔名"""
+    """橫向展開歷史月份的質押比，避免笛卡爾積，支援彈性檔名並自動降冪排序"""
     search_patterns = [
         os.path.join(DATA_DIR, "*質押比*.csv"),
         os.path.join(DATA_DIR, "*質押*.csv")
@@ -246,24 +246,33 @@ def process_pledge_history_data(DATA_DIR):
         m1, m2 = month_cols[0], month_cols[1]
         pivot_df['近月質押增減(%)'] = pivot_df[m1] - pivot_df[m2]
         
-    cols_order = [c_code, c_name]
-    if '近月質押增減(%)' in pivot_df.columns:
-        cols_order.append('近月質押增減(%)')
-    cols_order.extend(month_cols)
-    pivot_df = pivot_df[cols_order]
-    
+    # 將找到的月份欄位名稱補上「質押%」
     rename_dict = {c_code: "代號", c_name: "名稱"}
     for m in month_cols:
         rename_dict[m] = f"{m}質押%"
     pivot_df = pivot_df.rename(columns=rename_dict)
     
-    # 🎯 依照您的要求，強制新增這兩個欄位並先填入 None
-    pivot_df["26M07質押比%"] = None
-    pivot_df["26M05質押比%"] = None
+    # 🎯 確保 7 月與 5 月存在，並統一命名為 "XXMXX質押%" 格式 (不加"比")
+    if "26M07質押%" not in pivot_df.columns:
+        pivot_df["26M07質押%"] = None
+    if "26M05質押%" not in pivot_df.columns:
+        pivot_df["26M05質押%"] = None
+        
+    # 🎯 抓取所有代表月份的質押欄位，並強制降冪排序 (確保順序絕對是 07 -> 06 -> 05)
+    month_pledge_cols = [c for c in pivot_df.columns if "質押%" in c and "增減" not in c]
+    month_pledge_cols = sorted(month_pledge_cols, reverse=True) 
     
-    # 依照最新月份的質押比例由高至低排序 (如果找得到最新月份的話)
-    if month_cols:
-        latest_col = f"{month_cols[0]}質押%"
+    # 重新安排最終的表頭順序：代號、名稱、增減(%)、07月、06月、05月...
+    final_cols = ["代號", "名稱"]
+    if '近月質押增減(%)' in pivot_df.columns:
+        final_cols.append('近月質押增減(%)')
+    final_cols.extend(month_pledge_cols)
+    
+    pivot_df = pivot_df[final_cols]
+    
+    # 依照最新月份的質押比例由高至低排序
+    if month_pledge_cols:
+        latest_col = month_pledge_cols[0] # 取最左邊(最新)的月份
         if latest_col in pivot_df.columns:
             pivot_df = pivot_df.sort_values(by=latest_col, ascending=False)
 
