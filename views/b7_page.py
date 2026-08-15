@@ -1,3 +1,4 @@
+#views/b7_page.py
 import streamlit as st
 import pandas as pd
 import os
@@ -122,8 +123,8 @@ def process_directors_data(DATA_DIR):
 def process_pledge_data(DATA_DIR):
     """讀取並合併董監質押比資料，自動過濾僅保留最新月份"""
     search_patterns = [
-        os.path.join(DATA_DIR, "*質押比*.csv*"), # 支援結尾不小心多出 .csv 的情況
-        os.path.join(DATA_DIR, "*質押*.csv*")
+        os.path.join(DATA_DIR, "*質押比*.csv"),
+        os.path.join(DATA_DIR, "*質押*.csv")
     ]
     files = set()
     for pattern in search_patterns:
@@ -141,15 +142,14 @@ def process_pledge_data(DATA_DIR):
             except: pass
             
         if df is not None and not df.empty:
-            df.columns = [str(c).replace(' ', '').replace('\u3000', '').replace('\ufeff', '').replace('\xa0', '') for c in df.columns]
             df_list.append(df)
             
     if not df_list: return pd.DataFrame()
     
     merged_df = pd.concat(df_list, ignore_index=True)
     
-    c_code = next((c for c in merged_df.columns if "代號" in c), None)
-    c_month = next((c for c in merged_df.columns if "持股資料月份" in c), None)
+    c_code = next((c for c in merged_df.columns if str(c).replace(" ", "") == "代號"), None)
+    c_month = next((c for c in merged_df.columns if str(c).replace(" ", "") == "持股資料月份"), None)
     
     if c_code and c_month:
         merged_df = merged_df.dropna(subset=[c_code, c_month])
@@ -161,29 +161,23 @@ def process_pledge_data(DATA_DIR):
         merged_df = merged_df.drop_duplicates(subset=[c_code], keep='first')
     
     requested_cols = [
-        "排名", "代號", "名稱", "持股資料月份",
-        "全體董監持股(%)", "全體董監質押(%)", 
-        "全體董監持股(萬張)", "全體董監質押(萬張)", 
-        "全體董監增減張數"
+        "排名", "代號", "名稱", "持股 資料 月份",
+        "全體 董監 持股 (%)", "全體 董監 質押 (%)", 
+        "全體 董監 持股 (萬張)", "全體 董監 質押 (萬張)", 
+        "全體 董監 增減 張數"
     ]
     
     actual_cols = []
+    rename_dict = {}
     for req_c in requested_cols:
-        matched_col = next((c for c in merged_df.columns if req_c in c), None)
+        req_clean = req_c.replace(" ", "")
+        matched_col = next((c for c in merged_df.columns if str(c).replace(" ", "").replace('\u3000', '') == req_clean), None)
         if matched_col:
             actual_cols.append(matched_col)
+            rename_dict[matched_col] = req_c
             
     if actual_cols:
         merged_df = merged_df[actual_cols]
-        # 美化輸出欄位名稱
-        rename_dict = {
-            "持股資料月份": "持股 資料 月份",
-            "全體董監持股(%)": "全體 董監 持股 (%)", 
-            "全體董監質押(%)": "全體 董監 質押 (%)", 
-            "全體董監持股(萬張)": "全體 董監 持股 (萬張)", 
-            "全體董監質押(萬張)": "全體 董監 質押 (萬張)", 
-            "全體董監增減張數": "全體 董監 增減 張數"
-        }
         merged_df = merged_df.rename(columns=rename_dict)
     
     if "排名" in merged_df.columns:
@@ -200,8 +194,8 @@ def process_pledge_data(DATA_DIR):
 def process_pledge_history_data(DATA_DIR):
     """橫向展開歷史月份的質押比，避免笛卡爾積，支援彈性檔名並自動降冪排序"""
     search_patterns = [
-        os.path.join(DATA_DIR, "*質押比*.csv*"), # 放寬檔名檢查，包含 .csv.csv
-        os.path.join(DATA_DIR, "*質押*.csv*")
+        os.path.join(DATA_DIR, "*質押比*.csv"),
+        os.path.join(DATA_DIR, "*質押*.csv")
     ]
     files = set()
     for pattern in search_patterns:
@@ -218,18 +212,16 @@ def process_pledge_history_data(DATA_DIR):
                 break
             except: pass
         if df is not None and not df.empty:
-            # 確保所有檔案的欄位一律消除空白，避免抓不到
-            df.columns = [str(c).replace(' ', '').replace('\u3000', '').replace('\ufeff', '').replace('\xa0', '') for c in df.columns]
             df_list.append(df)
             
     if not df_list: return pd.DataFrame()
     
     merged_df = pd.concat(df_list, ignore_index=True)
     
-    c_code = next((c for c in merged_df.columns if "代號" in c), None)
-    c_name = next((c for c in merged_df.columns if "名稱" in c), None)
-    c_month = next((c for c in merged_df.columns if "持股資料月份" in c), None)
-    c_pledge = next((c for c in merged_df.columns if "全體董監質押(%)" in c), None)
+    c_code = next((c for c in merged_df.columns if "代號" in str(c).replace(" ", "")), None)
+    c_name = next((c for c in merged_df.columns if "名稱" in str(c).replace(" ", "")), None)
+    c_month = next((c for c in merged_df.columns if "持股資料月份" in str(c).replace(" ", "")), None)
+    c_pledge = next((c for c in merged_df.columns if "全體" in str(c) and "質押" in str(c) and "%" in str(c)), None)
     
     if not all([c_code, c_name, c_month, c_pledge]):
         return pd.DataFrame()
@@ -260,15 +252,13 @@ def process_pledge_history_data(DATA_DIR):
         rename_dict[m] = f"{m}質押%"
     pivot_df = pivot_df.rename(columns=rename_dict)
     
-    # 🎯 確保 7 月、6 月與 5 月存在，並統一命名為 "XXMXX質押%" 格式 (不加"比")
+    # 🎯 確保 7 月與 5 月存在，並統一命名為 "XXMXX質押%" 格式 (不加"比")
     if "26M07質押%" not in pivot_df.columns:
         pivot_df["26M07質押%"] = None
-    if "26M06質押%" not in pivot_df.columns:
-        pivot_df["26M06質押%"] = None    
     if "26M05質押%" not in pivot_df.columns:
         pivot_df["26M05質押%"] = None
         
-    # 🎯 抓取所有代表月份的質押欄位，並強制降冪排序 (順序必定為 07 -> 06 -> 05)
+    # 🎯 抓取所有代表月份的質押欄位，並強制降冪排序 (確保順序絕對是 07 -> 06 -> 05)
     month_pledge_cols = [c for c in pivot_df.columns if "質押%" in c and "增減" not in c]
     month_pledge_cols = sorted(month_pledge_cols, reverse=True) 
     
