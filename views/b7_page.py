@@ -122,13 +122,19 @@ def process_directors_data(DATA_DIR):
 # ==========================================
 def process_pledge_data(DATA_DIR):
     """讀取並合併董監質押比資料，自動過濾僅保留最新月份"""
-    search_pattern = os.path.join(DATA_DIR, "*董監質押*.csv")
-    files = glob.glob(search_pattern)
+    # 🛡️ 放寬搜尋條件，只要有質押或質押比都一網打盡
+    search_patterns = [
+        os.path.join(DATA_DIR, "*質押比*.csv"),
+        os.path.join(DATA_DIR, "*質押*.csv")
+    ]
+    files = set()
+    for pattern in search_patterns:
+        files.update(glob.glob(pattern))
     
     if not files: return pd.DataFrame()
     
     df_list = []
-    for f in files:
+    for f in list(files):
         df = None
         for enc in ['utf-8-sig', 'big5', 'cp950', 'utf-8']:
             try:
@@ -184,17 +190,23 @@ def process_pledge_data(DATA_DIR):
 
 
 # ==========================================
-# ⚙️ 區塊 7 新增：董監質押歷史趨勢引擎 (第二張表)
+# ⚙️ 區塊 7：董監質押歷史趨勢引擎 (第二張表)
 # ==========================================
 def process_pledge_history_data(DATA_DIR):
-    """橫向展開歷史月份的質押比，避免笛卡爾積"""
-    search_pattern = os.path.join(DATA_DIR, "*董監質押*.csv")
-    files = glob.glob(search_pattern)
-    
+    """橫向展開歷史月份的質押比，避免笛卡爾積，支援彈性檔名"""
+    # 🛡️ 放寬搜尋條件
+    search_patterns = [
+        os.path.join(DATA_DIR, "*質押比*.csv"),
+        os.path.join(DATA_DIR, "*質押*.csv")
+    ]
+    files = set()
+    for pattern in search_patterns:
+        files.update(glob.glob(pattern))
+        
     if not files: return pd.DataFrame()
     
     df_list = []
-    for f in files:
+    for f in list(files):
         df = None
         for enc in ['utf-8-sig', 'big5', 'cp950', 'utf-8']:
             try:
@@ -208,11 +220,13 @@ def process_pledge_history_data(DATA_DIR):
     
     merged_df = pd.concat(df_list, ignore_index=True)
     
-    # 鎖定必備欄位 (無視空白符號)
-    c_code = next((c for c in merged_df.columns if str(c).replace(" ", "") == "代號"), None)
-    c_name = next((c for c in merged_df.columns if str(c).replace(" ", "") == "名稱"), None)
-    c_month = next((c for c in merged_df.columns if str(c).replace(" ", "") == "持股資料月份"), None)
-    c_pledge = next((c for c in merged_df.columns if str(c).replace(" ", "").replace('\u3000', '') == "全體董監質押(%)"), None)
+    # 🛡️ 鎖定必備欄位 (用去空白與關鍵字方式找，確保完全精準)
+    c_code = next((c for c in merged_df.columns if "代號" in str(c).replace(" ", "")), None)
+    c_name = next((c for c in merged_df.columns if "名稱" in str(c).replace(" ", "")), None)
+    c_month = next((c for c in merged_df.columns if "持股資料月份" in str(c).replace(" ", "")), None)
+    
+    # 尋找包含「全體」、「質押」、「%」的欄位 (不管是否在最後一行都會成功鎖定)
+    c_pledge = next((c for c in merged_df.columns if "全體" in str(c) and "質押" in str(c) and "%" in str(c)), None)
     
     if not all([c_code, c_name, c_month, c_pledge]):
         return pd.DataFrame()
@@ -231,30 +245,33 @@ def process_pledge_history_data(DATA_DIR):
     # 🔄 樞紐分析：將月份拉成橫向表頭
     pivot_df = merged_df.pivot(index=[c_code, c_name], columns=c_month, values=c_pledge).reset_index()
     
-    # 取得所有月份欄位，由新排到舊 (例如：26M07, 26M06, 26M05)
+    # 取得所有月份欄位，由新排到舊降冪排列 (例如：26M07, 26M06, 26M05)
     month_cols = sorted([c for c in pivot_df.columns if c not in [c_code, c_name]], reverse=True)
     
-    # 自動計算近兩月增減差距
+    if not month_cols:
+        return pd.DataFrame()
+    
+    # 自動計算近月增減差距
     if len(month_cols) >= 2:
         m1, m2 = month_cols[0], month_cols[1]
         pivot_df['近月質押增減(%)'] = pivot_df[m1] - pivot_df[m2]
         
-    # 重新安排欄位順序：代號、名稱、增減(%)、最新月、上月...
+    # 重新安排欄位順序：代號、名稱、增減(%)、最新月、上月、上上月...
     cols_order = [c_code, c_name]
     if '近月質押增減(%)' in pivot_df.columns:
         cols_order.append('近月質押增減(%)')
     cols_order.extend(month_cols)
     pivot_df = pivot_df[cols_order]
     
-    # 重新命名欄位使其更易讀
+    # 將動態抓取到的表頭加上「質押%」，滿足例如 "26M05質押%"、"26M06質押%"
     rename_dict = {c_code: "代號", c_name: "名稱"}
     for m in month_cols:
-        rename_dict[m] = f"{m} 質押(%)"
+        rename_dict[m] = f"{m}質押%"
     pivot_df = pivot_df.rename(columns=rename_dict)
     
     # 依照最新月份的質押比例由高至低排序
     if month_cols:
-        latest_col = f"{month_cols[0]} 質押(%)"
+        latest_col = f"{month_cols[0]}質押%"
         pivot_df = pivot_df.sort_values(by=latest_col, ascending=False)
 
     return pivot_df
@@ -302,10 +319,9 @@ def show_b7_page(DATA_DIR, STOCK_DICT):
     </div>
     """, unsafe_allow_html=True)
 
-    # 🎯 建立三個分頁
-    tab1, tab2, tab3 = st.tabs(["🔹 董監質押比增減", "🔹 董監質押歷史趨勢", "🔹 董監持股比增減"])
+    tab1, tab2, tab3 = st.tabs(["🔹 董監最新質押比", "🔹 董監質押歷史趨勢", "🔹 董監持股比增減"])
 
-    # --- 分頁 1：董監質押比增減 (最新單月) ---
+    # --- 分頁 1：董監最新質押比 (最新單月) ---
     with tab1:
         df_pledge = st.session_state['b7_pledge']
         if df_pledge.empty:
@@ -317,7 +333,7 @@ def show_b7_page(DATA_DIR, STOCK_DICT):
     with tab2:
         df_history = st.session_state['b7_pledge_history']
         if df_history.empty:
-            st.warning("⚠️ 歷史質押資料不足或欄位無法解析。")
+            st.warning("⚠️ 歷史質押資料不足或檔案讀取異常，請確認檔名包含「質押比」。")
         else:
             st.dataframe(df_history, use_container_width=True, hide_index=True)
 
