@@ -195,7 +195,6 @@ def process_pledge_history_data(DATA_DIR):
     """橫向展開歷史月份的質押比，避免笛卡爾積，支援彈性檔名並自動降冪排序"""
     search_patterns = [
         os.path.join(DATA_DIR, "*質押比*.csv"),
-        os.path.join(DATA_DIR, "*質押*.csv")
     ]
     files = set()
     for pattern in search_patterns:
@@ -255,10 +254,12 @@ def process_pledge_history_data(DATA_DIR):
     # 🎯 確保 7 月與 5 月存在，並統一命名為 "XXMXX質押%" 格式 (不加"比")
     if "26M07質押%" not in pivot_df.columns:
         pivot_df["26M07質押%"] = None
+    if "26M06質押%" not in pivot_df.columns:
+        pivot_df["26M05質押%"] = None    
     if "26M05質押%" not in pivot_df.columns:
         pivot_df["26M05質押%"] = None
         
-    # 🎯 抓取所有代表月份的質押欄位，並強制降冪排序 (確保順序絕對是 07 -> 06 -> 05)
+    # 🎯 抓取所有代表月份的質押欄位，並強制降冪排序 (順序 07 -> 06 -> 05)
     month_pledge_cols = [c for c in pivot_df.columns if "質押%" in c and "增減" not in c]
     month_pledge_cols = sorted(month_pledge_cols, reverse=True) 
     
