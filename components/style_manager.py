@@ -702,11 +702,11 @@ def render_b5_top10_glass_card():
 </div>
 <div class="carousel-wrapper-b5">
 <div class="carousel-item-b5">
-    <div class="panel-title-b5"><span>📊 6周累積共振(千張/400張)</span><span class="date-badge-b5">📅 {date_str}</span></div>
+    <div class="panel-title-b5"><span>📊 6周累積共振(1000張/400張)</span><span class="date-badge-b5">📅 {date_str}</span></div>
     {h_6w}
 </div>
 <div class="carousel-item-b5">
-    <div class="panel-title-b5"><span>⚡ 週動能共振(千張/400張)</span><span class="date-badge-b5">📅 {date_str}</span></div>
+    <div class="panel-title-b5"><span>⚡ 週動能共振(1000張/400張)</span><span class="date-badge-b5">📅 {date_str}</span></div>
     {h_latest}
 </div>
 </div>
