@@ -122,7 +122,6 @@ def process_directors_data(DATA_DIR):
 # ==========================================
 def process_pledge_data(DATA_DIR):
     """讀取並合併董監質押比資料，自動過濾僅保留最新月份"""
-    # 🛡️ 放寬搜尋條件，只要有質押或質押比都一網打盡
     search_patterns = [
         os.path.join(DATA_DIR, "*質押比*.csv"),
         os.path.join(DATA_DIR, "*質押*.csv")
@@ -194,7 +193,6 @@ def process_pledge_data(DATA_DIR):
 # ==========================================
 def process_pledge_history_data(DATA_DIR):
     """橫向展開歷史月份的質押比，避免笛卡爾積，支援彈性檔名"""
-    # 🛡️ 放寬搜尋條件
     search_patterns = [
         os.path.join(DATA_DIR, "*質押比*.csv"),
         os.path.join(DATA_DIR, "*質押*.csv")
@@ -220,12 +218,9 @@ def process_pledge_history_data(DATA_DIR):
     
     merged_df = pd.concat(df_list, ignore_index=True)
     
-    # 🛡️ 鎖定必備欄位 (用去空白與關鍵字方式找，確保完全精準)
     c_code = next((c for c in merged_df.columns if "代號" in str(c).replace(" ", "")), None)
     c_name = next((c for c in merged_df.columns if "名稱" in str(c).replace(" ", "")), None)
     c_month = next((c for c in merged_df.columns if "持股資料月份" in str(c).replace(" ", "")), None)
-    
-    # 尋找包含「全體」、「質押」、「%」的欄位 (不管是否在最後一行都會成功鎖定)
     c_pledge = next((c for c in merged_df.columns if "全體" in str(c) and "質押" in str(c) and "%" in str(c)), None)
     
     if not all([c_code, c_name, c_month, c_pledge]):
@@ -236,43 +231,41 @@ def process_pledge_history_data(DATA_DIR):
     merged_df[c_name] = merged_df[c_name].astype(str).str.strip()
     merged_df[c_month] = merged_df[c_month].astype(str).str.strip()
     
-    # 確保質押比是數值格式
     merged_df[c_pledge] = pd.to_numeric(merged_df[c_pledge].astype(str).str.replace('%', '').str.replace(',', ''), errors='coerce')
     
-    # 🛡️ 核心防呆：同代號+同月份 僅保留第一筆，徹底杜絕笛卡爾積
     merged_df = merged_df.drop_duplicates(subset=[c_code, c_month], keep='first')
     
-    # 🔄 樞紐分析：將月份拉成橫向表頭
     pivot_df = merged_df.pivot(index=[c_code, c_name], columns=c_month, values=c_pledge).reset_index()
     
-    # 取得所有月份欄位，由新排到舊降冪排列 (例如：26M07, 26M06, 26M05)
     month_cols = sorted([c for c in pivot_df.columns if c not in [c_code, c_name]], reverse=True)
     
     if not month_cols:
         return pd.DataFrame()
     
-    # 自動計算近月增減差距
     if len(month_cols) >= 2:
         m1, m2 = month_cols[0], month_cols[1]
         pivot_df['近月質押增減(%)'] = pivot_df[m1] - pivot_df[m2]
         
-    # 重新安排欄位順序：代號、名稱、增減(%)、最新月、上月、上上月...
     cols_order = [c_code, c_name]
     if '近月質押增減(%)' in pivot_df.columns:
         cols_order.append('近月質押增減(%)')
     cols_order.extend(month_cols)
     pivot_df = pivot_df[cols_order]
     
-    # 將動態抓取到的表頭加上「質押%」，滿足例如 "26M05質押%"、"26M06質押%"
     rename_dict = {c_code: "代號", c_name: "名稱"}
     for m in month_cols:
         rename_dict[m] = f"{m}質押%"
     pivot_df = pivot_df.rename(columns=rename_dict)
     
-    # 依照最新月份的質押比例由高至低排序
+    # 🎯 依照您的要求，強制新增這兩個欄位並先填入 None
+    pivot_df["26M07質押比%"] = None
+    pivot_df["26M05質押比%"] = None
+    
+    # 依照最新月份的質押比例由高至低排序 (如果找得到最新月份的話)
     if month_cols:
         latest_col = f"{month_cols[0]}質押%"
-        pivot_df = pivot_df.sort_values(by=latest_col, ascending=False)
+        if latest_col in pivot_df.columns:
+            pivot_df = pivot_df.sort_values(by=latest_col, ascending=False)
 
     return pivot_df
 
@@ -321,7 +314,6 @@ def show_b7_page(DATA_DIR, STOCK_DICT):
 
     tab1, tab2, tab3 = st.tabs(["🔹 董監最新質押比", "🔹 董監質押歷史趨勢", "🔹 董監持股比增減"])
 
-    # --- 分頁 1：董監最新質押比 (最新單月) ---
     with tab1:
         df_pledge = st.session_state['b7_pledge']
         if df_pledge.empty:
@@ -329,7 +321,6 @@ def show_b7_page(DATA_DIR, STOCK_DICT):
         else:
             st.dataframe(df_pledge, use_container_width=True, hide_index=True)
             
-    # --- 分頁 2：董監質押歷史趨勢 (跨月橫向比較) ---
     with tab2:
         df_history = st.session_state['b7_pledge_history']
         if df_history.empty:
@@ -337,7 +328,6 @@ def show_b7_page(DATA_DIR, STOCK_DICT):
         else:
             st.dataframe(df_history, use_container_width=True, hide_index=True)
 
-    # --- 分頁 3：董監持股比增減 (原有的持股動態) ---
     with tab3:
         df_b7 = st.session_state['b7_main']
         if df_b7.empty:
