@@ -1,3 +1,4 @@
+#views/b7_page.py
 import streamlit as st
 import pandas as pd
 import os
@@ -160,11 +161,12 @@ def process_pledge_data(DATA_DIR):
         # 因為只剩下最新月份，同一代號必定只會有一筆，直接去重
         merged_df = merged_df.drop_duplicates(subset=[c_code], keep='first')
     
-    # 🎯 定義擷取的目標欄位，並將「質押(%)」移至「名稱」後
+    # 🎯 定義擷取的目標欄位，移除「成交」並按照指定順序重排
     requested_cols = [
-        "排名", "代號", "名稱", "全體 董監 質押 (%)", "成交", "持股 資料 月份", 
-        "全體 董監 持股 (萬張)", "全體 董監 增減 張數", "全體 董監 持股 (%)", 
-        "全體 董監 質押 (萬張)"
+        "排名", "代號", "名稱", "持股 資料 月份",
+        "全體 董監 持股 (%)", "全體 董監 質押 (%)", 
+        "全體 董監 持股 (萬張)", "全體 董監 質押 (萬張)", 
+        "全體 董監 增減 張數"
     ]
     
     # 精準欄位對應與重命名機制
@@ -226,20 +228,21 @@ def show_b7_page(DATA_DIR, STOCK_DICT):
     </div>
     """, unsafe_allow_html=True)
 
-    tab1, tab2 = st.tabs(["📊 董監持股增減", "🔗 董監最新質押比"])
+    # 🎯 對調 DataFrame 的顯示順序與更新表頭名稱
+    tab1, tab2 = st.tabs(["🔹 董監質押比增減", "🔹 董監持股比增減"])
 
-    # --- 分頁 1：原有的董監持股動態 ---
+    # --- 分頁 1：董監質押比增減 (僅最新月份) ---
     with tab1:
-        df_b7 = st.session_state['b7_main']
-        if df_b7.empty:
-            st.warning("⚠️ 在資料夾中找不到董監事持股資料，請確認檔名包含「神秘金字塔」與「董監事持股」。")
-        else:
-            st.dataframe(df_b7, use_container_width=True, hide_index=True)
-
-    # --- 分頁 2：新增的董監質押比 (僅最新月份) ---
-    with tab2:
         df_pledge = st.session_state['b7_pledge']
         if df_pledge.empty:
             st.warning("⚠️ 找不到董監質押比資料，請確認 data 資料夾中存在相關 CSV 檔案。")
         else:
             st.dataframe(df_pledge, use_container_width=True, hide_index=True)
+
+    # --- 分頁 2：董監持股比增減 (原有的董監持股動態) ---
+    with tab2:
+        df_b7 = st.session_state['b7_main']
+        if df_b7.empty:
+            st.warning("⚠️ 在資料夾中找不到董監事持股資料，請確認檔名包含「神秘金字塔」與「董監事持股」。")
+        else:
+            st.dataframe(df_b7, use_container_width=True, hide_index=True)
