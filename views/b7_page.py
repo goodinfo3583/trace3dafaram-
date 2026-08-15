@@ -40,7 +40,6 @@ def process_directors_data(DATA_DIR):
             
         if df is None or df.empty: continue
         
-        # 清理欄位名稱中的所有空白
         df.columns = [str(c).replace(' ', '').replace('\u3000', '').replace('\ufeff', '').replace('\xa0', '') for c in df.columns]
         
         c_id_name = next((c for c in df.columns if '代號' in c and '名稱' in c), None)
@@ -119,7 +118,7 @@ def process_directors_data(DATA_DIR):
 
 
 # ==========================================
-# ⚙️ 區塊 7 新增：董監質押比運算引擎
+# ⚙️ 區塊 7：董監質押比最新月份 (第一張表)
 # ==========================================
 def process_pledge_data(DATA_DIR):
     """讀取並合併董監質押比資料，自動過濾僅保留最新月份"""
@@ -144,7 +143,6 @@ def process_pledge_data(DATA_DIR):
     
     merged_df = pd.concat(df_list, ignore_index=True)
     
-    # 🎯 鎖定最新月份並排除重複與笛卡爾積問題
     c_code = next((c for c in merged_df.columns if str(c).replace(" ", "") == "代號"), None)
     c_month = next((c for c in merged_df.columns if str(c).replace(" ", "") == "持股資料月份"), None)
     
@@ -153,15 +151,10 @@ def process_pledge_data(DATA_DIR):
         merged_df[c_code] = merged_df[c_code].astype(str).str.strip()
         merged_df[c_month] = merged_df[c_month].astype(str).str.strip()
         
-        # 取得資料中最大的月份字串 (例如 "26M07" 會大於 "26M06")
         latest_month = merged_df[c_month].max()
-        # 僅保留最新月份的資料
         merged_df = merged_df[merged_df[c_month] == latest_month]
-        
-        # 因為只剩下最新月份，同一代號必定只會有一筆，直接去重
         merged_df = merged_df.drop_duplicates(subset=[c_code], keep='first')
     
-    # 🎯 定義擷取的目標欄位，移除「成交」並按照指定順序重排
     requested_cols = [
         "排名", "代號", "名稱", "持股 資料 月份",
         "全體 董監 持股 (%)", "全體 董監 質押 (%)", 
@@ -169,7 +162,6 @@ def process_pledge_data(DATA_DIR):
         "全體 董監 增減 張數"
     ]
     
-    # 精準欄位對應與重命名機制
     actual_cols = []
     rename_dict = {}
     for req_c in requested_cols:
@@ -177,20 +169,95 @@ def process_pledge_data(DATA_DIR):
         matched_col = next((c for c in merged_df.columns if str(c).replace(" ", "").replace('\u3000', '') == req_clean), None)
         if matched_col:
             actual_cols.append(matched_col)
-            rename_dict[matched_col] = req_c  # 建立新舊名稱對照表
+            rename_dict[matched_col] = req_c
             
     if actual_cols:
         merged_df = merged_df[actual_cols]
-        # 統一將顯示的欄位名稱轉為您指定的整齊名稱
         merged_df = merged_df.rename(columns=rename_dict)
     
-    # 將「排名」轉換為數值並重新排序
     if "排名" in merged_df.columns:
         merged_df["排名"] = pd.to_numeric(merged_df["排名"], errors='coerce')
         merged_df = merged_df.dropna(subset=["排名"])
         merged_df = merged_df.sort_values(by="排名", ascending=True)
 
     return merged_df
+
+
+# ==========================================
+# ⚙️ 區塊 7 新增：董監質押歷史趨勢引擎 (第二張表)
+# ==========================================
+def process_pledge_history_data(DATA_DIR):
+    """橫向展開歷史月份的質押比，避免笛卡爾積"""
+    search_pattern = os.path.join(DATA_DIR, "*董監質押*.csv")
+    files = glob.glob(search_pattern)
+    
+    if not files: return pd.DataFrame()
+    
+    df_list = []
+    for f in files:
+        df = None
+        for enc in ['utf-8-sig', 'big5', 'cp950', 'utf-8']:
+            try:
+                df = pd.read_csv(f, encoding=enc, header=0)
+                break
+            except: pass
+        if df is not None and not df.empty:
+            df_list.append(df)
+            
+    if not df_list: return pd.DataFrame()
+    
+    merged_df = pd.concat(df_list, ignore_index=True)
+    
+    # 鎖定必備欄位 (無視空白符號)
+    c_code = next((c for c in merged_df.columns if str(c).replace(" ", "") == "代號"), None)
+    c_name = next((c for c in merged_df.columns if str(c).replace(" ", "") == "名稱"), None)
+    c_month = next((c for c in merged_df.columns if str(c).replace(" ", "") == "持股資料月份"), None)
+    c_pledge = next((c for c in merged_df.columns if str(c).replace(" ", "").replace('\u3000', '') == "全體董監質押(%)"), None)
+    
+    if not all([c_code, c_name, c_month, c_pledge]):
+        return pd.DataFrame()
+        
+    merged_df = merged_df.dropna(subset=[c_code, c_month])
+    merged_df[c_code] = merged_df[c_code].astype(str).str.strip()
+    merged_df[c_name] = merged_df[c_name].astype(str).str.strip()
+    merged_df[c_month] = merged_df[c_month].astype(str).str.strip()
+    
+    # 確保質押比是數值格式
+    merged_df[c_pledge] = pd.to_numeric(merged_df[c_pledge].astype(str).str.replace('%', '').str.replace(',', ''), errors='coerce')
+    
+    # 🛡️ 核心防呆：同代號+同月份 僅保留第一筆，徹底杜絕笛卡爾積
+    merged_df = merged_df.drop_duplicates(subset=[c_code, c_month], keep='first')
+    
+    # 🔄 樞紐分析：將月份拉成橫向表頭
+    pivot_df = merged_df.pivot(index=[c_code, c_name], columns=c_month, values=c_pledge).reset_index()
+    
+    # 取得所有月份欄位，由新排到舊 (例如：26M07, 26M06, 26M05)
+    month_cols = sorted([c for c in pivot_df.columns if c not in [c_code, c_name]], reverse=True)
+    
+    # 自動計算近兩月增減差距
+    if len(month_cols) >= 2:
+        m1, m2 = month_cols[0], month_cols[1]
+        pivot_df['近月質押增減(%)'] = pivot_df[m1] - pivot_df[m2]
+        
+    # 重新安排欄位順序：代號、名稱、增減(%)、最新月、上月...
+    cols_order = [c_code, c_name]
+    if '近月質押增減(%)' in pivot_df.columns:
+        cols_order.append('近月質押增減(%)')
+    cols_order.extend(month_cols)
+    pivot_df = pivot_df[cols_order]
+    
+    # 重新命名欄位使其更易讀
+    rename_dict = {c_code: "代號", c_name: "名稱"}
+    for m in month_cols:
+        rename_dict[m] = f"{m} 質押(%)"
+    pivot_df = pivot_df.rename(columns=rename_dict)
+    
+    # 依照最新月份的質押比例由高至低排序
+    if month_cols:
+        latest_col = f"{month_cols[0]} 質押(%)"
+        pivot_df = pivot_df.sort_values(by=latest_col, ascending=False)
+
+    return pivot_df
 
 
 # ==========================================
@@ -202,9 +269,12 @@ def sync_b7_data(DATA_DIR):
 def sync_pledge_data(DATA_DIR):
     st.session_state['b7_pledge'] = process_pledge_data(DATA_DIR)
 
+def sync_pledge_history_data(DATA_DIR):
+    st.session_state['b7_pledge_history'] = process_pledge_history_data(DATA_DIR)
+
 
 # ==========================================
-# 🖼️ 前台畫面渲染 (支援雙 DataFrame 切換)
+# 🖼️ 前台畫面渲染 (三頁籤切換)
 # ==========================================
 def show_b7_page(DATA_DIR, STOCK_DICT):
     if 'b7_main' not in st.session_state:
@@ -212,8 +282,12 @@ def show_b7_page(DATA_DIR, STOCK_DICT):
             sync_b7_data(DATA_DIR)
             
     if 'b7_pledge' not in st.session_state:
-        with st.spinner("⏳ 載入董監質押比數據中..."):
+        with st.spinner("⏳ 載入董監質押最新數據中..."):
             sync_pledge_data(DATA_DIR)
+            
+    if 'b7_pledge_history' not in st.session_state:
+        with st.spinner("⏳ 載入董監質押歷史數據中..."):
+            sync_pledge_history_data(DATA_DIR)
             
     st.write("---")
     st.markdown("<div id='section-7'></div>", unsafe_allow_html=True)
@@ -228,19 +302,27 @@ def show_b7_page(DATA_DIR, STOCK_DICT):
     </div>
     """, unsafe_allow_html=True)
 
-    # 🎯 對調 DataFrame 的顯示順序與更新表頭名稱
-    tab1, tab2 = st.tabs(["🔹 董監質押比增減", "🔹 董監持股比增減"])
+    # 🎯 建立三個分頁
+    tab1, tab2, tab3 = st.tabs(["🔹 董監質押比增減", "🔹 董監質押歷史趨勢", "🔹 董監持股比增減"])
 
-    # --- 分頁 1：董監質押比增減 (僅最新月份) ---
+    # --- 分頁 1：董監質押比增減 (最新單月) ---
     with tab1:
         df_pledge = st.session_state['b7_pledge']
         if df_pledge.empty:
             st.warning("⚠️ 找不到董監質押比資料，請確認 data 資料夾中存在相關 CSV 檔案。")
         else:
             st.dataframe(df_pledge, use_container_width=True, hide_index=True)
-
-    # --- 分頁 2：董監持股比增減 (原有的董監持股動態) ---
+            
+    # --- 分頁 2：董監質押歷史趨勢 (跨月橫向比較) ---
     with tab2:
+        df_history = st.session_state['b7_pledge_history']
+        if df_history.empty:
+            st.warning("⚠️ 歷史質押資料不足或欄位無法解析。")
+        else:
+            st.dataframe(df_history, use_container_width=True, hide_index=True)
+
+    # --- 分頁 3：董監持股比增減 (原有的持股動態) ---
+    with tab3:
         df_b7 = st.session_state['b7_main']
         if df_b7.empty:
             st.warning("⚠️ 在資料夾中找不到董監事持股資料，請確認檔名包含「神秘金字塔」與「董監事持股」。")
