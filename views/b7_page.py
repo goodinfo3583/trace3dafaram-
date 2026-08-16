@@ -195,12 +195,12 @@ def process_pledge_data(DATA_DIR):
 
 
 # ==========================================
-# ⚙️ 區塊 7：董監質押歷史趨勢引擎 (第二張表 - 終極動態防呆版)
+# ⚙️ 區塊 7：董監質押歷史趨勢引擎 (第二張表 - 終極動態防呆 + 圖示版)
 # ==========================================
 def process_pledge_history_data(DATA_DIR):
     """
     不管未來累積了多少個月的檔案，系統自動降冪排好後，
-    永遠只擷取「最新的 5 個月份」顯示，確保表格精簡易讀。
+    永遠只擷取「最新的 5 個月份」，並加入視覺化的質押增減「動態」判斷。
     """
     search_patterns = [
         os.path.join(DATA_DIR, "*質押比*.csv*"), 
@@ -260,29 +260,45 @@ def process_pledge_history_data(DATA_DIR):
     if not month_cols:
         return pd.DataFrame()
         
-    # 🎯 核心升級：不管未來有幾十個月，我們只取最新的 5 個月！
+    # 🎯 取最新的 5 個月
     month_cols = month_cols[:5]
     
-    # 動態計算：永遠拿「最新的月份」減去「上一個月份」
+    # 動態計算與視覺化動態判斷
     if len(month_cols) >= 2:
         m1, m2 = month_cols[0], month_cols[1]
-        pivot_df['近月質押增減(%)'] = pivot_df[m1] - pivot_df[m2]
+        # 四捨五入到小數點第二位
+        pivot_df['近月質押增減(%)'] = (pivot_df[m1] - pivot_df[m2]).round(2)
         
-    # 動態重新命名：為篩選出的最近 5 個月份加上「質押%」字尾
+        # 🎯 質押動態判斷引擎 (質押增加=危險/紅，減少=安全/綠)
+        def get_pledge_trend(val):
+            if pd.isna(val): return "無"
+            if val >= 5.0: return "🚨 暴增"
+            if val >= 1.0: return "⚠️ 大增"
+            if val > 0: return "↗️ 微增"
+            if val == 0: return "➖ 持平"
+            if val <= -5.0: return "🌟 遽減"
+            if val <= -1.0: return "✅ 大減"
+            return "↘️ 微減"
+            
+        pivot_df['動態'] = pivot_df['近月質押增減(%)'].apply(get_pledge_trend)
+        
+    # 動態重新命名
     rename_dict = {"std_代號": "代號", "std_名稱": "名稱"}
     for m in month_cols:
         rename_dict[m] = f"{m}質押%"
     pivot_df = pivot_df.rename(columns=rename_dict)
     
-    # 動態安排最終的表頭順序
+    # 動態安排最終的表頭順序 (將動態安插在 名稱 與 增減 之間)
     final_cols = ["代號", "名稱"]
+    if '動態' in pivot_df.columns:
+        final_cols.append('動態')
     if '近月質押增減(%)' in pivot_df.columns:
         final_cols.append('近月質押增減(%)')
         
     dynamic_pledge_cols = [f"{m}質押%" for m in month_cols]
     final_cols.extend(dynamic_pledge_cols)
     
-    # 這個步驟會自動丟棄掉沒有在 final_cols 裡面的太舊月份
+    # 篩選欄位，丟棄過舊的月份
     pivot_df = pivot_df[final_cols]
     
     # 依照最新月份的質押比例由高至低排序
