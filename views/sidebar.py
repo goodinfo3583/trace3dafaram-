@@ -28,6 +28,8 @@ KEY_MAP = {
     'b5_400': ['b5_400', 'df_blk5'],
     'b5_1000': ['b5_1000', 'df_blk5_1000'],
     'b7_main': ['b7_main']
+    'b7_pledge': ['b7_pledge'],                 # 🟢 新增：董監最新質押比
+    'b7_pledge_history': ['b7_pledge_history']  # 🟢 新增：董監質押歷史趨勢
     # 新增其他變數載入頁面，如'b7_main': ['b7_main'],--步驟2
 }
 
@@ -85,20 +87,40 @@ def ensure_b1_to_b5_loaded(DATA_DIR):
             from views.b7_page import sync_b7_data
             sync_b7_data(DATA_DIR)
         except: pass
+    # 🟢 新增：B7 最新質押比 補載
+    if get_sidebar_df('b7_pledge').empty:
+        try:
+            from views.b7_page import sync_pledge_data
+            sync_pledge_data(DATA_DIR)
+        except: pass
+
+    # 🟢 新增：B7 質押歷史趨勢 補載
+    if get_sidebar_df('b7_pledge_history').empty:
+        try:
+            from views.b7_page import sync_pledge_history_data
+            sync_pledge_history_data(DATA_DIR)
+        except: pass
 # ==========================================
-# 🌟 快搜與顯示工具函數區 
+# 🌟 快搜各頁面與顯示工具函數區 
 # ==========================================
 def robust_search_engine(df, query):
     if df is None or df.empty: return pd.DataFrame()
     df = df.loc[:, ~df.columns.duplicated()].copy()
     query = str(query).strip()
     mask = pd.Series(False, index=df.index)
-    if '股票代號' in df.columns:
-        df['股票代號'] = df['股票代號'].astype(str).str.strip()
-        mask = mask | (df['股票代號'] == query)
-    if '股票名稱' in df.columns:
-        df['股票名稱'] = df['股票名稱'].astype(str).str.strip()
-        mask = mask | df['股票名稱'].str.contains(query, na=False, case=False)
+    
+    # 🟢 兼容 "股票代號" 或 "代號" (因 b7 的質押表欄位名為 "代號")
+    col_id = '股票代號' if '股票代號' in df.columns else ('代號' if '代號' in df.columns else None)
+    if col_id:
+        df[col_id] = df[col_id].astype(str).str.strip()
+        mask = mask | (df[col_id] == query)
+        
+    # 🟢 兼容 "股票名稱" 或 "名稱"
+    col_name = '股票名稱' if '股票名稱' in df.columns else ('名稱' if '名稱' in df.columns else None)
+    if col_name:
+        df[col_name] = df[col_name].astype(str).str.strip()
+        mask = mask | df[col_name].str.contains(query, na=False, case=False)
+        
     return df[mask]
 
 def scan_and_display(title, session_key, query):
@@ -994,7 +1016,10 @@ def render_sidebar_war_room(STOCK_DICT, DATA_DIR="data"):
             #區塊 7 新增--步驟4
             st.markdown("<hr style='border-color: #334155;'>", unsafe_allow_html=True)
             st.markdown("<h4 style='color: #FCD34D;'>👔 區塊 7：董監動向</h4>", unsafe_allow_html=True)
-            scan_and_display("董監持股與大股東質押變化", 'b7_main', search_query)
+            # 🟢 依序將三個表單渲染至側邊搜尋視窗中
+            scan_and_display("🔹 董監最新質押比", 'b7_pledge', search_query)
+            scan_and_display("🔹 董監質押歷史趨勢", 'b7_pledge_history', search_query)
+            scan_and_display("🔹 董監持股比增減", 'b7_main', search_query)
             
     # 💡 當搜尋列「沒有內容」時，顯示大盤總經
     if not search_query:
