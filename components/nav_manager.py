@@ -43,7 +43,20 @@ def inject_custom_header(is_logged_in=False):
             .nav-icon { width: 22px; height: 22px; margin-right: 5px; border-radius: 4px; object-fit: cover; position: relative; top: -2px; left: 0px; transition: all 0.3s ease-in-out; }
             .nav-text-link:hover .nav-icon { filter: drop-shadow(0px 0px 6px rgba(255, 215, 0, 0.9)) brightness(1.15); }
             
-            @media (max-width: 768px) { .nav-btn-container { padding: 5px 10px; } .nav-divider { display: none; } .nav-text-link { font-size: 14px; margin: 2px; } }
+            /* ⚡ 全域雷達總控按鈕樣式 */
+            .global-radar-toggle {
+                display: flex; align-items: center; cursor: pointer; padding: 4px 10px; margin-right: 15px;
+                background: rgba(15, 23, 42, 0.6); border: 1px solid #38BDF8; border-radius: 20px;
+                transition: all 0.3s ease; backdrop-filter: blur(4px);
+            }
+            .global-radar-toggle:hover {
+                background: rgba(56, 189, 248, 0.2); border-color: #FFD700; box-shadow: 0 0 10px rgba(56, 189, 248, 0.5);
+            }
+            .global-radar-toggle img { width: 18px; height: 18px; margin-right: 6px; border-radius: 50%; }
+            .global-radar-toggle span { color: #38BDF8; font-size: 13px; font-weight: bold; transition: color 0.3s; }
+            .global-radar-toggle:hover span { color: #FFD700; }
+
+            @media (max-width: 768px) { .nav-btn-container { padding: 5px 10px; } .nav-divider { display: none; } .nav-text-link { font-size: 14px; margin: 2px; } .global-radar-toggle { display: none; } }
             .stApp { margin-top: 50px !important; }
         `;
         parentDoc.head.appendChild(style);
@@ -52,6 +65,7 @@ def inject_custom_header(is_logged_in=False):
         headerDiv.id = 'custom-sticky-header';
         
         // 💡 2. 這裡原本寫死的文字，換成了 __LOGIN_TEXT__ 與 __B6_TEXT__
+        // 💡 3. 新增了 id="global-radar-btn" 的全域總控按鈕
         headerDiv.innerHTML = `
             <div class="disclaimer-bar">
                 <div class="disclaimer-item"><span class="disclaimer-title">使用聲明</span><div class="disclaimer-content">本平台僅供教育研究與籌碼觀察，絕不構成任何實質投資建議、勸誘或要約。所有資料源自公開數據，受限於網路技術，可能有延遲或錯誤。</div></div>
@@ -59,6 +73,13 @@ def inject_custom_header(is_logged_in=False):
                 <div class="disclaimer-item"><a href="#" data-target="NavToContact" class="disclaimer-title internal-nav" style="cursor: pointer;">聯絡我們</a></div>
                 <div class="disclaimer-item"><a href="#" data-target="登入專區" class="disclaimer-title internal-nav vip-login-btn" style="cursor: pointer; display: flex; align-items: center;">__LOGIN_TEXT__</a></div>
                 <div style="flex-grow: 1;"></div>
+                
+                <!-- ⚡ 全域玻璃卡片總控按鈕 -->
+                <div id="global-radar-btn" class="global-radar-toggle" title="收起所有玻璃卡片">
+                    <img src="app/static/15.png" alt="雷達總控">
+                    <span id="global-radar-text">收起雷達</span>
+                </div>
+
                 <div class="disclaimer-item" id="mobile-nav-toggle" title="收起選單" style="cursor: pointer; padding-right: 5px;"><span id="nav-toggle-icon" style="font-size: 18px; color: #38BDF8;">📜</span></div>
             </div>
             <div class="nav-btn-container" id="nav-btn-container">
@@ -77,6 +98,7 @@ def inject_custom_header(is_logged_in=False):
         parentDoc.body.insertBefore(headerDiv, parentDoc.body.firstChild);
 
         setTimeout(() => {
+            // ... (原本的導航與 Menu 收起邏輯不變)
             const navLinks = parentDoc.querySelectorAll('.internal-nav');
             navLinks.forEach(link => {
                 link.onclick = (e) => {
@@ -124,6 +146,43 @@ def inject_custom_header(is_logged_in=False):
                 };
             }
 
+            // 🎯 新增：全域玻璃卡片總控邏輯
+            const globalRadarBtn = parentDoc.getElementById('global-radar-btn');
+            const globalRadarText = parentDoc.getElementById('global-radar-text');
+            // 紀錄當前狀態，true 代表已經收起
+            let isAllMinimized = false; 
+
+            if (globalRadarBtn) {
+                globalRadarBtn.onclick = (e) => {
+                    e.preventDefault();
+                    
+                    // 抓出所有玻璃卡片的縮放 checkbox
+                    // 這裡的 ID 必須跟你 style_manager 裡面定義的 checkbox id 一模一樣
+                    const targetIds = ['min-b2-card', 'min-card', 'min-b4-card', 'min-b5-card'];
+                    
+                    // 切換狀態
+                    isAllMinimized = !isAllMinimized;
+                    
+                    targetIds.forEach(id => {
+                        const checkbox = parentDoc.getElementById(id);
+                        if (checkbox) {
+                            checkbox.checked = isAllMinimized;
+                        }
+                    });
+
+                    // 更改按鈕文字與提示
+                    if (isAllMinimized) {
+                        globalRadarText.innerText = '展開雷達';
+                        globalRadarBtn.title = "展開所有玻璃卡片";
+                        globalRadarText.style.color = '#FFD700'; // 變黃色提醒已收合
+                    } else {
+                        globalRadarText.innerText = '收起雷達';
+                        globalRadarBtn.title = "收起所有玻璃卡片";
+                        globalRadarText.style.color = '#38BDF8'; // 恢復藍色
+                    }
+                };
+            }
+
             setInterval(() => {
                 const allBtns = Array.from(parentDoc.querySelectorAll('button'));
                 allBtns.forEach(b => {
@@ -138,11 +197,9 @@ def inject_custom_header(is_logged_in=False):
     </script>
     """
     
-    # 💡 3. 這裡執行替換，把真正的狀態文字塞進 JS 裡面
     inject_js = inject_js.replace("__LOGIN_TEXT__", login_btn_text)
     inject_js = inject_js.replace("__B6_TEXT__", b6_text)
 
-    # 透過隱藏的 iframe 執行上述的 JavaScript 注入
     components.html(inject_js, height=0, width=0)
 
 # ==========================================
