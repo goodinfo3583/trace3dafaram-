@@ -121,10 +121,10 @@ def process_directors_data(DATA_DIR):
 # ⚙️ 區塊 7：董監質押比最新月份 (第一張表)
 # ==========================================
 def process_pledge_data(DATA_DIR):
-    """讀取並合併董監質押比資料，自動過濾僅保留最新月份"""
+    """讀取並自動堆疊所有檔案，動態過濾並僅保留最新月份資料"""
     search_patterns = [
-        os.path.join(DATA_DIR, "*質押比*.csv"),
-        os.path.join(DATA_DIR, "*質押*.csv")
+        os.path.join(DATA_DIR, "*質押比*.csv*"),
+        os.path.join(DATA_DIR, "*質押*.csv*")
     ]
     files = set()
     for pattern in search_patterns:
@@ -142,14 +142,17 @@ def process_pledge_data(DATA_DIR):
             except: pass
             
         if df is not None and not df.empty:
+            # 去除所有可能干擾的空白與隱形字元
+            df.columns = [str(c).replace(' ', '').replace('\u3000', '').replace('\ufeff', '').replace('\xa0', '') for c in df.columns]
             df_list.append(df)
             
     if not df_list: return pd.DataFrame()
     
+    # 這裡就是將不同名次 (1-300, 301-600...) 的檔案大融合的關鍵
     merged_df = pd.concat(df_list, ignore_index=True)
     
-    c_code = next((c for c in merged_df.columns if str(c).replace(" ", "") == "代號"), None)
-    c_month = next((c for c in merged_df.columns if str(c).replace(" ", "") == "持股資料月份"), None)
+    c_code = next((c for c in merged_df.columns if "代號" in c), None)
+    c_month = next((c for c in merged_df.columns if "持股資料月份" in c), None)
     
     if c_code and c_month:
         merged_df = merged_df.dropna(subset=[c_code, c_month])
@@ -161,23 +164,28 @@ def process_pledge_data(DATA_DIR):
         merged_df = merged_df.drop_duplicates(subset=[c_code], keep='first')
     
     requested_cols = [
-        "排名", "代號", "名稱", "持股 資料 月份",
-        "全體 董監 持股 (%)", "全體 董監 質押 (%)", 
-        "全體 董監 持股 (萬張)", "全體 董監 質押 (萬張)", 
-        "全體 董監 增減 張數"
+        "排名", "代號", "名稱", "持股資料月份",
+        "全體董監持股(%)", "全體董監質押(%)", 
+        "全體董監持股(萬張)", "全體董監質押(萬張)", 
+        "全體董監增減張數"
     ]
     
     actual_cols = []
-    rename_dict = {}
     for req_c in requested_cols:
-        req_clean = req_c.replace(" ", "")
-        matched_col = next((c for c in merged_df.columns if str(c).replace(" ", "").replace('\u3000', '') == req_clean), None)
+        matched_col = next((c for c in merged_df.columns if req_c in c), None)
         if matched_col:
             actual_cols.append(matched_col)
-            rename_dict[matched_col] = req_c
             
     if actual_cols:
         merged_df = merged_df[actual_cols]
+        rename_dict = {
+            "持股資料月份": "持股 資料 月份",
+            "全體董監持股(%)": "全體 董監 持股 (%)", 
+            "全體董監質押(%)": "全體 董監 質押 (%)", 
+            "全體董監持股(萬張)": "全體 董監 持股 (萬張)", 
+            "全體董監質押(萬張)": "全體 董監 質押 (萬張)", 
+            "全體董監增減張數": "全體 董監 增減 張數"
+        }
         merged_df = merged_df.rename(columns=rename_dict)
     
     if "排名" in merged_df.columns:
@@ -189,13 +197,16 @@ def process_pledge_data(DATA_DIR):
 
 
 # ==========================================
-# ⚙️ 區塊 7：董監質押歷史趨勢引擎 (第二張表)
+# ⚙️ 區塊 7：董監質押歷史趨勢引擎 (第二張表 - 終極動態防呆版)
 # ==========================================
 def process_pledge_history_data(DATA_DIR):
-    """橫向展開歷史月份的質押比，避免笛卡爾積，支援彈性檔名並自動降冪排序"""
+    """
+    不論未來丟入幾個月份、每個月份拆成幾個檔案 (例如7個檔案)
+    這支引擎會自動堆疊、自動去蕪存菁，並將「所有的月份」攤平成直欄自動降冪！
+    """
     search_patterns = [
-        os.path.join(DATA_DIR, "*質押比*.csv"),
-        os.path.join(DATA_DIR, "*質押*.csv")
+        os.path.join(DATA_DIR, "*質押比*.csv*"), 
+        os.path.join(DATA_DIR, "*質押*.csv*")
     ]
     files = set()
     for pattern in search_patterns:
@@ -211,68 +222,76 @@ def process_pledge_history_data(DATA_DIR):
                 df = pd.read_csv(f, encoding=enc, header=0)
                 break
             except: pass
+            
         if df is not None and not df.empty:
-            df_list.append(df)
+            df.columns = [str(c).replace(' ', '').replace('\u3000', '').replace('\ufeff', '').replace('\xa0', '') for c in df.columns]
+            
+            # 🎯 核心防呆：在每個檔案內部先將核心欄位更名，確保後續合併時 100% 不會錯位
+            c_code = next((c for c in df.columns if "代號" in c), None)
+            c_name = next((c for c in df.columns if "名稱" in c), None)
+            c_month = next((c for c in df.columns if "持股資料月份" in c), None)
+            c_pledge = next((c for c in df.columns if "全體董監質押(%)" in c), None)
+            
+            if all([c_code, c_name, c_month, c_pledge]):
+                df = df.rename(columns={
+                    c_code: "std_代號",
+                    c_name: "std_名稱",
+                    c_month: "std_持股資料月份",
+                    c_pledge: "std_質押比"
+                })
+                # 只保留我們需要的乾淨欄位，其餘不用的直接過濾
+                clean_df = df[["std_代號", "std_名稱", "std_持股資料月份", "std_質押比"]].copy()
+                df_list.append(clean_df)
             
     if not df_list: return pd.DataFrame()
     
+    # 這裡將所有的檔案 (例如 5月7個、6月7個...) 堆疊成上萬筆資料的超級大表
     merged_df = pd.concat(df_list, ignore_index=True)
     
-    c_code = next((c for c in merged_df.columns if "代號" in str(c).replace(" ", "")), None)
-    c_name = next((c for c in merged_df.columns if "名稱" in str(c).replace(" ", "")), None)
-    c_month = next((c for c in merged_df.columns if "持股資料月份" in str(c).replace(" ", "")), None)
-    c_pledge = next((c for c in merged_df.columns if "全體" in str(c) and "質押" in str(c) and "%" in str(c)), None)
+    merged_df = merged_df.dropna(subset=["std_代號", "std_持股資料月份"])
+    merged_df["std_代號"] = merged_df["std_代號"].astype(str).str.strip()
+    merged_df["std_名稱"] = merged_df["std_名稱"].astype(str).str.strip()
+    merged_df["std_持股資料月份"] = merged_df["std_持股資料月份"].astype(str).str.strip()
     
-    if not all([c_code, c_name, c_month, c_pledge]):
-        return pd.DataFrame()
-        
-    merged_df = merged_df.dropna(subset=[c_code, c_month])
-    merged_df[c_code] = merged_df[c_code].astype(str).str.strip()
-    merged_df[c_name] = merged_df[c_name].astype(str).str.strip()
-    merged_df[c_month] = merged_df[c_month].astype(str).str.strip()
+    # 清理數值格式
+    merged_df["std_質押比"] = pd.to_numeric(merged_df["std_質押比"].astype(str).str.replace('%', '').str.replace(',', ''), errors='coerce')
     
-    merged_df[c_pledge] = pd.to_numeric(merged_df[c_pledge].astype(str).str.replace('%', '').str.replace(',', ''), errors='coerce')
+    # 杜絕重複與笛卡爾積 (同月同代號只留一筆)
+    merged_df = merged_df.drop_duplicates(subset=["std_代號", "std_持股資料月份"], keep='first')
     
-    merged_df = merged_df.drop_duplicates(subset=[c_code, c_month], keep='first')
+    # 樞紐分析：自動把「出現過的所有月份」轉成直欄 (完全不寫死 05, 06, 07)
+    pivot_df = merged_df.pivot(index=["std_代號", "std_名稱"], columns="std_持股資料月份", values="std_質押比").reset_index()
     
-    pivot_df = merged_df.pivot(index=[c_code, c_name], columns=c_month, values=c_pledge).reset_index()
-    
-    month_cols = sorted([c for c in pivot_df.columns if c not in [c_code, c_name]], reverse=True)
+    # 動態抓出所有被轉成直欄的月份，並由新到舊排好 (reverse=True)
+    month_cols = sorted([c for c in pivot_df.columns if c not in ["std_代號", "std_名稱"]], reverse=True)
     
     if not month_cols:
         return pd.DataFrame()
     
+    # 動態計算：永遠拿「最新的月份」減去「上一個月份」
     if len(month_cols) >= 2:
         m1, m2 = month_cols[0], month_cols[1]
         pivot_df['近月質押增減(%)'] = pivot_df[m1] - pivot_df[m2]
         
-    # 將找到的月份欄位名稱補上「質押%」
-    rename_dict = {c_code: "代號", c_name: "名稱"}
+    # 動態重新命名：為所有自動抓到的月份加上「質押%」字尾
+    rename_dict = {"std_代號": "代號", "std_名稱": "名稱"}
     for m in month_cols:
         rename_dict[m] = f"{m}質押%"
     pivot_df = pivot_df.rename(columns=rename_dict)
     
-    # 🎯 確保 7 月與 5 月存在，並統一命名為 "XXMXX質押%" 格式 (不加"比")
-    if "26M07質押%" not in pivot_df.columns:
-        pivot_df["26M07質押%"] = None
-    if "26M05質押%" not in pivot_df.columns:
-        pivot_df["26M05質押%"] = None
-        
-    # 🎯 抓取所有代表月份的質押欄位，並強制降冪排序 (確保順序絕對是 07 -> 06 -> 05)
-    month_pledge_cols = [c for c in pivot_df.columns if "質押%" in c and "增減" not in c]
-    month_pledge_cols = sorted(month_pledge_cols, reverse=True) 
-    
-    # 重新安排最終的表頭順序：代號、名稱、增減(%)、07月、06月、05月...
+    # 動態安排最終的表頭順序：代號、名稱、增減(%)、最新月、上個月、上上個月...
     final_cols = ["代號", "名稱"]
     if '近月質押增減(%)' in pivot_df.columns:
         final_cols.append('近月質押增減(%)')
-    final_cols.extend(month_pledge_cols)
+        
+    dynamic_pledge_cols = [f"{m}質押%" for m in month_cols]
+    final_cols.extend(dynamic_pledge_cols)
     
     pivot_df = pivot_df[final_cols]
     
     # 依照最新月份的質押比例由高至低排序
-    if month_pledge_cols:
-        latest_col = month_pledge_cols[0] # 取最左邊(最新)的月份
+    if dynamic_pledge_cols:
+        latest_col = dynamic_pledge_cols[0] 
         if latest_col in pivot_df.columns:
             pivot_df = pivot_df.sort_values(by=latest_col, ascending=False)
 
