@@ -27,7 +27,7 @@ KEY_MAP = {
     'b4_margin_plus_vol': ['b4_margin_plus_vol', 'df_margin_plus_vol'],
     'b5_400': ['b5_400', 'df_blk5'],
     'b5_1000': ['b5_1000', 'df_blk5_1000'],
-    'b7_main': ['b7_main']
+    'b7_main': ['b7_main'],
     'b7_pledge': ['b7_pledge'],                 # 🟢 新增：董監最新質押比
     'b7_pledge_history': ['b7_pledge_history']  # 🟢 新增：董監質押歷史趨勢
     # 新增其他變數載入頁面，如'b7_main': ['b7_main'],--步驟2
