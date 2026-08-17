@@ -1,3 +1,4 @@
+#test_web.py
 import streamlit as st
 import pandas as pd
 import numpy as np
@@ -30,6 +31,7 @@ from views.b4_page import show_b4_page, sync_b4_data
 from views.b5_page import show_b5_page, sync_b5_data
 from views.b6_page import show_b6_page, sync_b6_data
 from views.b7_page import show_b7_page, sync_b7_data
+from views.watchlist_page import show_watchlist_page
 # ==========================================
 # 1. 網頁基本設定 & 目錄路徑初始化
 # ==========================================
@@ -144,6 +146,8 @@ elif current_page == "b6":
     show_b6_page(DATA_DIR)
 elif current_page == "b7":
     show_b7_page(DATA_DIR, STOCK_DICT)
+elif current_page == "watchlist":                # 👈 新增這一行
+    show_watchlist_page(STOCK_DICT)              # 👈 新增這一行
 # 渲染側邊欄
 with st.sidebar:
     render_sidebar_war_room(STOCK_DICT, DATA_DIR)
