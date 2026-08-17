@@ -4,7 +4,9 @@ import streamlit.components.v1 as components
 # 💡 1. 這裡加上 is_logged_in=False 參數
 def inject_custom_header(is_logged_in=False):
     """注入客製化懸浮頂部導航與隱藏側邊欄邏輯"""
-
+    # 👇 新增這兩行：根據是否登入，決定按鈕要顯示的文字；並定義 B6 區塊的名稱
+    login_btn_text = "解鎖 / 登出" if is_logged_in else "登入專區"
+    b6_text = "鉅額交易"
 
     
     inject_js = """
