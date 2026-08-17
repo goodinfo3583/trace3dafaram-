@@ -75,7 +75,7 @@ def inject_custom_header(is_logged_in=False):
                 <div style="flex-grow: 1;"></div>
                 
                 <!-- ⚡ 全域玻璃卡片總控按鈕 -->
-                <div id="global-radar-btn" class="global-radar-toggle" title="收起所有玻璃卡片">
+                <div id="global-radar-btn" class="global-radar-toggle" title="收起卡片">
                     <img src="app/static/16.png" alt="雷達總控">
                     <span id="global-radar-text">收起雷達</span>
                 </div>
@@ -173,11 +173,11 @@ def inject_custom_header(is_logged_in=False):
                     // 更改按鈕文字與提示
                     if (isAllMinimized) {
                         globalRadarText.innerText = '展開雷達';
-                        globalRadarBtn.title = "展開所有玻璃卡片";
+                        globalRadarBtn.title = "展開卡片";
                         globalRadarText.style.color = '#FFD700'; // 變黃色提醒已收合
                     } else {
                         globalRadarText.innerText = '收起雷達';
-                        globalRadarBtn.title = "收起所有玻璃卡片";
+                        globalRadarBtn.title = "收起卡片";
                         globalRadarText.style.color = '#38BDF8'; // 恢復藍色
                     }
                 };
