@@ -76,7 +76,7 @@ def inject_custom_header(is_logged_in=False):
                 
                 <!-- ⚡ 全域玻璃卡片總控按鈕 -->
                 <div id="global-radar-btn" class="global-radar-toggle" title="收起卡片">
-                    <img src="app/static/16.png" alt="雷達總控">
+                    <img src="app/static/17.png" alt="雷達總控">
                     <span id="global-radar-text">收起雷達</span>
                 </div>
 
