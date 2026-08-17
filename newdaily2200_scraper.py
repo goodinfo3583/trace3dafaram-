@@ -28,7 +28,7 @@ TARGETS = {
     "融券增加幅度(5日累計排名)": "https://goodinfo.tw/tw/StockList.asp?RPT_TIME=&MARKET_CAT=%E7%86%B1%E9%96%80%E6%8E%92%E8%A1%8C&INDUSTRY_CAT=%E8%9E%8D%E5%88%B8%E5%A2%9E%E5%8A%A0%E5%B9%85%E5%BA%A6+%285%E6%97%A5%29%40%40%E8%9E%8D%E5%88%B8%E5%A2%9E%E6%B8%9B%E5%B9%85%E5%BA%A6%40%40%E5%A2%9E%E5%8A%A0%E5%B9%85%E5%BA%A6+%E2%80%93+5%E6%97%A5",
     "借券賣出減少幅度(5日累計排名)" :"https://goodinfo.tw/tw/StockList.asp?RPT_TIME=&MARKET_CAT=%E7%86%B1%E9%96%80%E6%8E%92%E8%A1%8C&INDUSTRY_CAT=%E5%80%9F%E5%88%B8%E8%B3%A3%E5%87%BA%E6%B8%9B%E5%B0%91%E5%B9%85%E5%BA%A6+%285%E6%97%A5%29%40%40%E5%80%9F%E5%88%B8%E8%B3%A3%E5%87%BA%E5%A2%9E%E6%B8%9B%E5%B9%85%E5%BA%A6%40%40%E6%B8%9B%E5%B0%91%E5%B9%85%E5%BA%A6+%E2%80%93+5%E6%97%A5",
     "融資增加幅度(5日累計排名)": "https://goodinfo.tw/tw/StockList.asp?RPT_TIME=&MARKET_CAT=%E7%86%B1%E9%96%80%E6%8E%92%E8%A1%8C&INDUSTRY_CAT=%E8%9E%8D%E8%B3%87%E5%A2%9E%E5%8A%A0%E5%B9%85%E5%BA%A6+%283%E6%97%A5%29%40%40%E8%9E%8D%E8%B3%87%E5%A2%9E%E6%B8%9B%E5%B9%85%E5%BA%A6%40%40%E5%A2%9E%E5%8A%A0%E5%B9%85%E5%BA%A6+%E2%80%93+3%E6%97%A5",
-    "借券賣出增加幅度(5日累計排名)": "https://goodinfo.tw/tw/StockList.asp?RPT_TIME=&MARKET_CAT=%E7%86%B1%E9%96%80%E6%8E%92%E8%A1%8C&INDUSTRY_CAT=%E5%80%9F%E5%88%B8%E8%B3%A3%E5%87%BA%E5%A2%9E%E5%8A%A0%E5%B9%85%E5%BA%A6+%285%E6%97%A5%29%40%40%E5%80%9F%E5%88%B8%E8%B3%A3%E5%87%BA%E5%A2%9E%E6%B8%9B%E5%B9%85%E5%BA%A6%40%40%E5%A2%9E%E5%8A%A0%E5%B9%85%E5%BA%A6+%E2%80%93+5%E6%97%A5", # ⚠️ 這裡原本少了一個逗號，已補上！
+    "借券賣出增加幅度(5日累計排名)": "https://goodinfo.tw/tw/StockList.asp?RPT_TIME=&MARKET_CAT=%E7%86%B1%E9%96%80%E6%8E%92%E8%A1%8C&INDUSTRY_CAT=%E5%80%9F%E5%88%B8%E8%B3%A3%E5%87%BA%E5%A2%9E%E5%8A%A0%E5%B9%85%E5%BA%A6+%285%E6%97%A5%29%40%40%E5%80%9F%E5%88%B8%E8%B3%A3%E5%87%BA%E5%A2%9E%E6%B8%9B%E5%B9%85%E5%BA%A6%40%40%E5%A2%9E%E5%8A%A0%E5%B9%85%E5%BA%A6+%E2%80%93+5%E6%97%A5",
 }
 
 # ==========================================
@@ -73,7 +73,6 @@ for index, (name_suffix, url) in enumerate(TARGETS.items()):
     
     print(f"[{index+1}/{len(TARGETS)}] 正在擷取: {name_suffix}")
     
-# (前略...保持不變)
     try:
         driver.get(url)
             
@@ -82,10 +81,8 @@ for index, (name_suffix, url) in enumerate(TARGETS.items()):
         # ==============================================================
         target_start = None
             
-        # 尋找檔名中是否有 "數字-數字名" 的結構 (例如 "1801-1967名")
         match = re.search(r'(\d+)-\d+名', name_suffix)
             
-        # 只要有抓到數字，而且不是預設的第 1 頁 (1-300名)，就將起始名次設定給 target_start
         if match and match.group(1) != "1":
             target_start = match.group(1)
                 
@@ -95,7 +92,6 @@ for index, (name_suffix, url) in enumerate(TARGETS.items()):
             try:
                 options_elements = driver.find_elements(By.TAG_NAME, "option")
                 for opt in options_elements:
-                    # 只要 Goodinfo 下拉選單的文字包含我們的「起始數字 (例如 1801)」，就點擊它！
                     if target_start in opt.text:
                         opt.click()
                         parent_select = opt.find_element(By.XPATH, "..")
@@ -110,8 +106,6 @@ for index, (name_suffix, url) in enumerate(TARGETS.items()):
         print(" └─ 正在等待網頁驗證、略過廣告與表格載入 (最長等待 60 秒)...")
         target_df = None
             
-        # (後略...保持不變)
-        
         for i in range(60): 
             try:
                 html = driver.page_source
@@ -125,7 +119,8 @@ for index, (name_suffix, url) in enumerate(TARGETS.items()):
                     
                 tables = pd.read_html(StringIO(html))
                 
-                for df in tables:
+                # ⚠️ 注意這裡改用了 table_idx，避免跟外層等待秒數的迴圈變數 i 衝突
+                for table_idx, df in enumerate(tables): 
                     if isinstance(df.columns, pd.MultiIndex):
                         df.columns = df.columns.get_level_values(-1)
                     
@@ -135,7 +130,18 @@ for index, (name_suffix, url) in enumerate(TARGETS.items()):
                     has_goodinfo_cols = any('代號' in col or '名稱' in col for col in df.columns)
                     has_twse_cols = any('項目' in col or '今日餘額' in col for col in df.columns)
                     
-                    if has_goodinfo_cols or has_twse_cols:
+                    # =========================================================
+                    # 🌟 核心修復：處理 TWSE Vue/Element UI 的分離式表格 (標題與資料分家)
+                    # =========================================================
+                    if has_twse_cols and len(df) == 0:
+                        # 發現了「有對的標題，但沒有資料」的表格，去拿它的下一個表！
+                        if table_idx + 1 < len(tables) and len(tables[table_idx+1]) >= 2:
+                            target_df = tables[table_idx+1].copy()
+                            target_df.columns = df.columns # 把正確的標題蓋上去
+                            break
+                            
+                    # 正常的表格邏輯 (如 Goodinfo)
+                    elif has_goodinfo_cols or has_twse_cols:
                         if len(df) >= 2:  
                             target_df = df
                             break 
