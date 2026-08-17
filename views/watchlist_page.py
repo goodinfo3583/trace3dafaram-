@@ -41,21 +41,34 @@ def show_watchlist_page(STOCK_DICT=None):
     st.subheader("➕ 新增追蹤標的")
     col1, col2 = st.columns([3, 1])
     with col1:
-        new_stock = st.text_input("請輸入股票代號 (例如: 2330 或 2330台積電)", key="new_stock_input")
+        new_stock = st.text_input("請輸入股票代號或名稱 (例如: 2330 或 台積電)", key="new_stock_input")
     with col2:
         st.markdown("<br>", unsafe_allow_html=True)
         if st.button("加入追蹤", use_container_width=True):
             if new_stock:
-                if new_stock not in watchlist:
-                    watchlist.append(new_stock)
+                query_clean = new_stock.strip()
+                final_stock_name = query_clean # 預設為使用者輸入的字串
+                
+                # 🔍 核心修改：透過 STOCK_DICT 尋找完整名稱 (代號 + 名稱)
+                if STOCK_DICT:
+                    if query_clean in STOCK_DICT:
+                        final_stock_name = f"{STOCK_DICT[query_clean]['id']} {STOCK_DICT[query_clean]['name']}"
+                    else:
+                        # 模糊比對：只打代號(3413) 或 只打名稱(京鼎) 都能找到對應資料
+                        for k, v in STOCK_DICT.items():
+                            if query_clean in k or query_clean == v["id"] or query_clean == v["name"]:
+                                final_stock_name = f"{v['id']} {v['name']}"
+                                break
+
+                # 檢查是否已經在追蹤名單內
+                if final_stock_name not in watchlist:
+                    watchlist.append(final_stock_name)
                     save_user_watchlist(username, watchlist)
-                    st.success(f"已將「{new_stock}」加入追蹤名單！")
+                    st.success(f"已將「{final_stock_name}」加入追蹤名單！")
                     time.sleep(1) # 給點時間顯示成功訊息
                     st.rerun()
                 else:
-                    st.info("該標的已經在你的追蹤名單中囉！")
-
-    st.divider()
+                    st.info(f"「{final_stock_name}」已經在你的追蹤名單中囉！")
 
     # 3. 顯示追蹤名單與操作按鈕
     st.subheader("📋 目前追蹤名單")
