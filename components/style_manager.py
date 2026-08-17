@@ -130,7 +130,7 @@ def render_marquee():
         return f"data:{mime_type};base64,{encoded_string}"
 
     image_folder = "static" 
-    image_files = ["沙漠之城.png", "法人意向.png", "月下綠洲跑馬燈.png", "組合化學晶礦.png", "鐵風堡b.png"]
+    image_files = ["沙漠之城.png", "法人意向.png", "月影綠洲.png", "組合化學晶礦.png", "鐵風堡b.png"]
     
     total_images = len(image_files)
     time_per_slide = 5  
