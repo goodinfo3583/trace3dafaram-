@@ -70,10 +70,10 @@ def inject_custom_header(is_logged_in=False):
     
     headerDiv.innerHTML = `
         <div class="disclaimer-bar">
-            <div class="disclaimer-item"><span class="disclaimer-title">使用聲明</span><div class="disclaimer-content">本平台僅供教育研究與籌碼觀察，絕不構成任何實質投資建議、勸誘或要約。所有資料源自公開數據，受限於網路技術，可能有延遲或錯誤。</div></div>
-            <div class="disclaimer-item"><span class="disclaimer-title">隱私政策</span><div class="disclaimer-content"><b>1. 蒐集目的與範圍：</b><br>本平台依個資法蒐集您的識別資料僅供維持系統安全與優化服務使用。<br><b>2. 資料利用：</b><br>您的資料絕不向第三方洩露。<br><b>3. 資料刪除：</b><br>您可透過「聯絡我們」請求刪除資料。<br><b>4. 政策修訂：</b><br>本站保留修改政策之權利，繼續使用即視為同意。</b></div></div>
+            <div class="disclaimer-item"><span class="disclaimer-title">聲明</span><div class="disclaimer-content">本平台僅供教育研究與籌碼觀察，絕不構成任何實質投資建議、勸誘或要約。所有資料源自公開數據，受限於網路技術，可能有延遲或錯誤。</div></div>
+            <div class="disclaimer-item"><span class="disclaimer-title">隱私</span><div class="disclaimer-content"><b>1. 蒐集目的與範圍：</b><br>本平台依個資法蒐集您的識別資料僅供維持系統安全與優化服務使用。<br><b>2. 資料利用：</b><br>您的資料絕不向第三方洩露。<br><b>3. 資料刪除：</b><br>您可透過「聯絡我們」請求刪除資料。<br><b>4. 政策修訂：</b><br>本站保留修改政策之權利，繼續使用即視為同意。</b></div></div>
             <div class="disclaimer-item"><a href="#" data-target="NavToContact" class="disclaimer-title internal-nav" style="cursor: pointer;">聯絡我們</a></div>
-            <div class="disclaimer-item"><a href="#" data-target="登入專區" class="disclaimer-title internal-nav vip-login-btn" style="cursor: pointer; display: flex; align-items: center;">__LOGIN_TEXT__</a></div>
+            <div class="disclaimer-item"><a href="#" data-target="登入" class="disclaimer-title internal-nav vip-login-btn" style="cursor: pointer; display: flex; align-items: center;">__LOGIN_TEXT__</a></div>
             <div style="flex-grow: 1;"></div>
             
             <div id="global-radar-btn" class="global-radar-toggle" title="收起卡片">
@@ -84,10 +84,10 @@ def inject_custom_header(is_logged_in=False):
             <div class="disclaimer-item" id="mobile-nav-toggle" title="收起選單" style="cursor: pointer; padding-right: 5px;"><span id="nav-toggle-icon" style="font-size: 18px; color: #38BDF8;">📜</span></div>
         </div>
         <div class="nav-btn-container" id="nav-btn-container">
-            <a href="#" id="custom-sidebar-toggle" class="nav-text-link"><img src="app/static/iconarrow1.png" class="nav-icon" alt="icon">呼叫側邊欄</a><span class="nav-divider">|</span>
+            <a href="#" id="custom-sidebar-toggle" class="nav-text-link"><img src="app/static/iconarrow1.png" class="nav-icon" alt="icon">呼叫側欄</a><span class="nav-divider">|</span>
             <a href="#" data-target="NavToNews" class="nav-text-link internal-nav"><img src="app/static/magicbook2.png" class="nav-icon" alt="icon">市場消息</a><span class="nav-divider">|</span>
             <a href="#" data-target="NavToPool" class="nav-text-link internal-nav"><img src="app/static/magicbookfire2.png" class="nav-icon" alt="icon">觀察名單</a><span class="nav-divider">|</span>
-            <a href="#" data-target="NavToWatchlist" class="nav-text-link internal-nav"><img src="app/static/magicbookleaf.png" class="nav-icon" alt="icon">追蹤名單</a><span class="nav-divider">|</span>
+            <a href="#" data-target="NavToWatchlist" class="nav-text-link internal-nav"><img src="app/static/magicbookleaf.png" class="nav-icon" alt="icon">建立名單</a><span class="nav-divider">|</span>
             <a href="#" data-target="NavToB1" class="nav-text-link internal-nav"><img src="app/static/magicbookleaf.png" class="nav-icon" alt="icon">法人動向</a><span class="nav-divider">|</span>
             <a href="#" data-target="NavToB2" class="nav-text-link internal-nav"><img src="app/static/magicbookwind.png" class="nav-icon" alt="icon">法人掃貨</a><span class="nav-divider">|</span>
             <a href="#" data-target="NavToB3" class="nav-text-link internal-nav"><img src="app/static/magicbookwater.png" class="nav-icon" alt="icon">法人連買</a><span class="nav-divider">|</span>
@@ -178,7 +178,7 @@ def inject_custom_header(is_logged_in=False):
         setInterval(() => {
             const allBtns = Array.from(parentDoc.querySelectorAll('button'));
             allBtns.forEach(b => {
-                if(b.textContent.includes('NavTo') || b.textContent.includes('登入專區')) { 
+                if(b.textContent.includes('NavTo') || b.textContent.includes('登入')) { 
                     const wrapper = b.closest('div[data-testid="stElementContainer"]');
                     if (wrapper) wrapper.style.display = 'none';
                 }
