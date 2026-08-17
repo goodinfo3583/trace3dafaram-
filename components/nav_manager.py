@@ -91,6 +91,7 @@ def inject_custom_header(is_logged_in=False):
                 <a href="#" data-target="NavToB5" class="nav-text-link internal-nav"><img src="app/static/wirtleg.png" class="nav-icon" alt="icon">大腿動向</a><span class="nav-divider">|</span>
                 <a href="#" data-target="NavToB6" class="nav-text-link internal-nav"><img src="app/static/magicbookfire.png" class="nav-icon" alt="icon">__B6_TEXT__</a>
                 <a href="#" data-target="NavToB7" class="nav-text-link internal-nav"><img src="app/static/35.png" class="nav-icon" alt="icon">董監動向</a><span class="nav-divider">|</span>
+                <a href="#" data-target="NavToWatchlist" class="nav-text-link internal-nav"><img src="app/static/magicbookleaf.png" class="nav-icon" alt="icon">建立名單</a><span class="nav-divider">|</span>
             </div>
         `;
         parentDoc.body.insertBefore(headerDiv, parentDoc.body.firstChild);
@@ -217,6 +218,7 @@ def render_proxy_buttons():
         st.button("NavToContact", on_click=change_page, args=("contact",))
         st.button("NavToNews", on_click=change_page, args=("news",))
         st.button("NavToPool", on_click=change_page, args=("pool",))
+        st.button("NavToWatchlist", on_click=change_page, args=("watchlist",)) # 👈
         st.button("NavToB1", on_click=change_page, args=("b1",))
         st.button("NavToB2", on_click=change_page, args=("b2",))
         st.button("NavToB3", on_click=change_page, args=("b3",))

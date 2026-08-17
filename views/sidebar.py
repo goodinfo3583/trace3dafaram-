@@ -792,6 +792,39 @@ def fetch_macro_indicators():
 @st.fragment
 def render_sidebar_war_room(STOCK_DICT, DATA_DIR="data"):
     st.markdown("<div id='section-search'></div>", unsafe_allow_html=True)
+    # ==========================================
+    # 🌟 新增：追蹤名單聯動顯示區塊 (放在最頂端)
+    # ==========================================
+    if st.session_state.get("logged_in", False):
+        selected_stock = st.session_state.get("selected_watch_stock", None)
+        
+        if selected_stock:
+            st.markdown(f"### 🎯 焦點標的：{selected_stock}")
+            
+            # 萃取出純數字代號
+            stock_code_match = re.search(r'\d+', selected_stock)
+            if stock_code_match:
+                stock_code = stock_code_match.group()
+                
+                # 建立各大財經網站的快速連結 (使用 columns 橫排，節省空間)
+                col_l1, col_l2, col_l3 = st.columns(3)
+                with col_l1: 
+                    st.markdown(f"[🔗Goodinfo](https://goodinfo.tw/tw/StockDetail.asp?STOCK_ID={stock_code})")
+                with col_l2: 
+                    st.markdown(f"[🔗Yahoo](https://tw.stock.yahoo.com/quote/{stock_code})")
+                with col_l3: 
+                    st.markdown(f"[🔗Fugle](https://www.fugle.tw/ai/{stock_code})")
+            else:
+                st.info("無法解析股票代碼，請確認追蹤名稱中包含數字代號。")
+            
+            # 關閉焦點標的的按鈕 (加上 key 避免與其他按鈕衝突)
+            st.write("") # 空一行
+            if st.button("❌ 關閉焦點", use_container_width=True, key="close_focus_btn"):
+                st.session_state["selected_watch_stock"] = None
+                st.rerun()
+                
+            st.markdown("<hr style='border-color: #38BDF8; margin: 15px 0px;'>", unsafe_allow_html=True)
+    # ==========================================
 
     st.markdown("""
     <div style="background: linear-gradient(90deg, rgba(15,23,42,1) 0%, rgba(14,165,233,0.3) 50%, rgba(15,23,42,1) 100%); 
