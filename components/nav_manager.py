@@ -72,13 +72,13 @@ def inject_custom_header(is_logged_in=False):
         <div class="disclaimer-bar">
             <div class="disclaimer-item"><span class="disclaimer-title">聲明</span><div class="disclaimer-content">本平台僅供教育研究與籌碼觀察，絕不構成任何實質投資建議、勸誘或要約。所有資料源自公開數據，受限於網路技術，可能有延遲或錯誤。</div></div>
             <div class="disclaimer-item"><span class="disclaimer-title">隱私權</span><div class="disclaimer-content"><b>1. 蒐集目的與範圍：</b><br>本平台依個資法蒐集您的識別資料僅供維持系統安全與優化服務使用。<br><b>2. 資料利用：</b><br>您的資料絕不向第三方洩露。<br><b>3. 資料刪除：</b><br>您可透過「聯絡我們」請求刪除資料。<br><b>4. 政策修訂：</b><br>本站保留修改政策之權利，繼續使用即視為同意。</b></div></div>
-            <div class="disclaimer-item"><a href="#" data-target="NavToContact" class="disclaimer-title internal-nav" style="cursor: pointer;">📧聯絡我們</a></div>
+            <div class="disclaimer-item"><a href="#" data-target="NavToContact" class="disclaimer-title internal-nav" style="cursor: pointer;">📧訊息</a></div>
             <div class="disclaimer-item"><a href="#" data-target="登入" class="disclaimer-title internal-nav vip-login-btn" style="cursor: pointer; display: flex; align-items: center;">__LOGIN_TEXT__</a></div>
             <div style="flex-grow: 1;"></div>
             
             <div id="global-radar-btn" class="global-radar-toggle" title="收起卡片">
                 <img src="app/static/17.png" alt="雷達總控">
-                <span id="global-radar-text">收起雷達</span>
+                <span id="global-radar-text">排行</span>
             </div>
 
             <div class="disclaimer-item" id="mobile-nav-toggle" title="收起選單" style="cursor: pointer; padding-right: 5px;"><span id="nav-toggle-icon" style="font-size: 18px; color: #38BDF8;">📜</span></div>
@@ -163,11 +163,11 @@ def inject_custom_header(is_logged_in=False):
                     }
                 });
                 if (isAllMinimized) {
-                    globalRadarText.innerText = '展開雷達';
+                    globalRadarText.innerText = '排行';
                     globalRadarBtn.title = "展開卡片";
                     globalRadarText.style.color = '#FFD700'; 
                 } else {
-                    globalRadarText.innerText = '收起雷達';
+                    globalRadarText.innerText = '排行';
                     globalRadarBtn.title = "收起卡片";
                     globalRadarText.style.color = '#38BDF8'; 
                 }
