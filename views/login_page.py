@@ -52,12 +52,17 @@ def show_login_page():
             if submit:
                 try:
                     valid_passwords = st.secrets["passwords"]
-                    if username in valid_passwords and valid_passwords[username] == password:
+                    
+                    # 🛡️ 防呆機制：清除使用者輸入前後的不小心按到的空白，並把密碼強制轉成字串
+                    clean_user = username.strip()
+                    clean_pass = password.strip()
+                    
+                    # 進行比對
+                    if clean_user in valid_passwords and str(valid_passwords[clean_user]) == clean_pass:
                         st.session_state["logged_in"] = True
-                        st.session_state["username"] = username
+                        st.session_state["username"] = clean_user
                         st.success("「驗證成功！大門已開啟，請進...」")
                         time.sleep(1.5)
-
                         st.rerun()
                     else:
                         st.error("守衛：「這張邀請函是假的！請重新確認！」")
