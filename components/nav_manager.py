@@ -1,7 +1,6 @@
 # components/nav_manager.py
 import streamlit.components.v1 as components
 
-# 💡 1. 這裡加上 is_logged_in=False 參數
 def inject_custom_header(is_logged_in=False):
     """注入客製化懸浮頂部導航與隱藏側邊欄邏輯"""
     login_btn_text = "登出" if is_logged_in else "登入"
@@ -11,16 +10,14 @@ def inject_custom_header(is_logged_in=False):
     <script>
     const parentDoc = window.parent.document;
 
-    // 🚨 關鍵修正：強制清除舊的導覽列與樣式，讓隱藏腳本與按鈕綁定每次都能「重新啟動」！
     const oldHeader = parentDoc.getElementById('custom-sticky-header');
     if (oldHeader) oldHeader.remove();
     
     const oldStyle = parentDoc.getElementById('custom-nav-style');
     if (oldStyle) oldStyle.remove();
 
-    // 重新建立全新的樣式與導覽列
     const style = parentDoc.createElement('style');
-    style.id = 'custom-nav-style'; // 👈 補上 ID 方便下次辨識並移除
+    style.id = 'custom-nav-style'; 
     style.innerHTML = `
         [data-testid="stHeader"] { display: none !important; }
         [data-testid="stToolbar"] { display: none !important; }
@@ -60,7 +57,7 @@ def inject_custom_header(is_logged_in=False):
         .global-radar-toggle span { color: #38BDF8; font-size: 13px; font-weight: bold; transition: color 0.3s; }
         .global-radar-toggle:hover span { color: #FFD700; }
 
-        @media (max-width: 768px) { .nav-btn-container { padding: 5px 10px; } .nav-divider { display: none; } .nav-text-link { font-size: 14px; margin: 2px; } .global-radar-toggle { display: none; } }
+        @media (max-width: 768px) { .nav-btn-container { padding: 5px 10px; } .nav-divider { display: none; } .nav-text-link { font-size: 14px; margin: 2px; } .global-radar-toggle { display: flex; } }
         .stApp { margin-top: 50px !important; }
     `;
     parentDoc.head.appendChild(style);
@@ -76,7 +73,7 @@ def inject_custom_header(is_logged_in=False):
             <div class="disclaimer-item"><a href="#" data-target="登入" class="disclaimer-title internal-nav vip-login-btn" style="cursor: pointer; display: flex; align-items: center;">__LOGIN_TEXT__</a></div>
             <div style="flex-grow: 1;"></div>
             
-            <div id="global-radar-btn" class="global-radar-toggle" title="收起卡片">
+            <div id="global-radar-btn" class="global-radar-toggle" title="開關所有雷達卡片">
                 <img src="app/static/17.png" alt="雷達總控">
                 <span id="global-radar-text">排行</span>
             </div>
@@ -147,34 +144,38 @@ def inject_custom_header(is_logged_in=False):
             };
         }
 
+        // 🎯 核心改動：改為控制完全隱藏 (close-xxx-card)
         const globalRadarBtn = parentDoc.getElementById('global-radar-btn');
         const globalRadarText = parentDoc.getElementById('global-radar-text');
-        let isAllMinimized = false; 
+        // 預設為 true，代表一開始進畫面就是「已隱藏」狀態
+        let isAllHidden = true; 
 
         if (globalRadarBtn) {
+            // 執行一次初始化（讓畫面載入時自動先關閉卡片，如果你希望預設開啟，就把 isAllHidden 設為 false，並把下一行註解掉）
+            
             globalRadarBtn.onclick = (e) => {
                 e.preventDefault();
-                const targetIds = ['min-b2-card', 'min-card', 'min-b4-card', 'min-b5-card'];
-                isAllMinimized = !isAllMinimized;
+                // 注意這裡的 id 變成 close-xxx-card 了
+                const targetIds = ['close-b2-card', 'close-card', 'close-b4-card', 'close-b5-card'];
+                isAllHidden = !isAllHidden;
+                
                 targetIds.forEach(id => {
                     const checkbox = parentDoc.getElementById(id);
                     if (checkbox) {
-                        checkbox.checked = isAllMinimized;
+                        checkbox.checked = isAllHidden;
                     }
                 });
-                if (isAllMinimized) {
-                    globalRadarText.innerText = '排行';
-                    globalRadarBtn.title = "展開卡片";
+                
+                if (isAllHidden) {
+                    globalRadarText.innerText = '顯示排行';
                     globalRadarText.style.color = '#FFD700'; 
                 } else {
-                    globalRadarText.innerText = '排行';
-                    globalRadarBtn.title = "收起卡片";
+                    globalRadarText.innerText = '關閉排行';
                     globalRadarText.style.color = '#38BDF8'; 
                 }
             };
         }
 
-        // 🚨 這裡負責無限循環檢查，把您截圖中的醜醜原生按鈕隱藏起來
         setInterval(() => {
             const allBtns = Array.from(parentDoc.querySelectorAll('button'));
             allBtns.forEach(b => {
@@ -193,24 +194,19 @@ def inject_custom_header(is_logged_in=False):
     inject_js = inject_js.replace("__B6_TEXT__", b6_text)
 
     components.html(inject_js, height=0, width=0)
+
 # ==========================================
-# (下方隱形切換按鈕 def render_proxy_buttons(): 維持不變)
-
-
-# 放在 components/nav_manager.py 的最下方
 import streamlit as st
 
 def render_proxy_buttons():
-    """幕後無縫換頁引擎 (隱藏的切換按鈕)"""
     def change_page(page_name):
         st.query_params["page"] = page_name 
 
     with st.container():
-        # 建立隱形按鈕，這裡的字串必須對應你 JS 裡面的 data-target
         st.button("NavToContact", on_click=change_page, args=("contact",))
         st.button("NavToNews", on_click=change_page, args=("news",))
         st.button("NavToPool", on_click=change_page, args=("pool",))
-        st.button("NavToWatchlist", on_click=change_page, args=("watchlist",)) # 👈
+        st.button("NavToWatchlist", on_click=change_page, args=("watchlist",)) 
         st.button("NavToB1", on_click=change_page, args=("b1",))
         st.button("NavToB2", on_click=change_page, args=("b2",))
         st.button("NavToB3", on_click=change_page, args=("b3",))
