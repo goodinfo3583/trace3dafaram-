@@ -219,7 +219,7 @@ def render_b2_top10_glass_card():
                 else: short_status = cs[:3]
 
                 html += (
-                    f"<li style='display: flex; align-items: center; justify-content: space-between; margin-bottom: 2px; font-size: 13px; line-height: 1.3;'>"
+                    f"<li style='display: flex; align-items: center; justify-content: space-between; margin-bottom: 4px; font-size: 13px; line-height: 1.4;'>"
                     f"  <div style='display: flex; align-items: center; width: 50%; overflow: hidden;'>"
                     f"      <b style='color:#FFF; width:22px; flex-shrink: 0;'>{i+1}.</b>"
                     f"      <span style='white-space:nowrap; overflow:hidden; text-overflow:ellipsis;'>{row['股票代號']}{row['股票名稱']}</span>"
