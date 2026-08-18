@@ -358,7 +358,6 @@ def render_top10_glass_card():
 """
         st.markdown(card_html, unsafe_allow_html=True)
     except Exception as e: pass
-        pass
 
 #b4 資券玻璃卡片
 def render_b4_top10_glass_card():
@@ -445,7 +444,6 @@ def render_b4_top10_glass_card():
 """
         st.markdown(card_html, unsafe_allow_html=True)
     except Exception as e: pass
-        pass
 
 #B5 大腿動向玻璃卡片
 def render_b5_top10_glass_card():
