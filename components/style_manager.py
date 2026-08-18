@@ -219,7 +219,7 @@ def render_b2_top10_glass_card():
                 else: short_status = cs[:3]
 
                 html += (
-                    f"<li style='display: flex; align-items: center; justify-content: space-between; margin-bottom: 4px; font-size: 13px; line-height: 1.4;'>"
+                    f"<li style='display: flex; align-items: center; justify-content: space-between; margin-bottom: 2px; font-size: 13px; line-height: 1.4;'>"
                     f"  <div style='display: flex; align-items: center; width: 50%; overflow: hidden;'>"
                     f"      <b style='color:#FFF; width:22px; flex-shrink: 0;'>{i+1}.</b>"
                     f"      <span style='white-space:nowrap; overflow:hidden; text-overflow:ellipsis;'>{row['股票代號']}{row['股票名稱']}</span>"
@@ -235,13 +235,13 @@ def render_b2_top10_glass_card():
         h_23, h_24 = make_list_html(df_23, c23), make_list_html(df_24, c24)
 
         card_html = f"""
-<input type="checkbox" id="close-b2-card" style="display:none;" checked>
+<input type="checkbox" id="close-b2-card" style="display:none;">
 <input type="checkbox" id="min-b2-card" style="display:none;">
 <input type="checkbox" id="pause-b2-card" style="display:none;">
 <style>
 #close-b2-card:checked ~ #b2-top10-card {{ display: none !important; }}
 #min-b2-card:checked ~ #b2-top10-card .carousel-wrapper-b2 {{ max-height: 0; opacity: 0; margin-top: 0; }}
-#min-b2-card:checked ~ #b2-top10-card {{ padding-bottom: 8px; width: 150px; height: auto; }}
+#min-b2-card:checked ~ #b2-top10-card {{ padding-bottom: 8px; width: 150px; }}
 #min-b2-card:checked ~ #b2-top10-card .min-icon-b2::after {{ content: '□'; font-size: 14px; }}
 #min-b2-card:not(:checked) ~ #b2-top10-card .min-icon-b2::after {{ content: '_'; font-size: 14px; position: relative; top: -3px; }}
 #pause-b2-card:checked ~ #b2-top10-card .carousel-item-b2 {{ animation-play-state: paused !important; }}
@@ -249,25 +249,22 @@ def render_b2_top10_glass_card():
 #pause-b2-card:not(:checked) ~ #b2-top10-card .pause-icon-b2::after {{ content: '⏸'; font-size: 11px; }}
 
 @keyframes slideInDownB2 {{ from {{ transform: translateY(-50%); opacity: 0; }} to {{ transform: translateY(0); opacity: 1; }} }}
-.glass-panel-b2 {{ position: fixed; top: 75px; left: 83.5%; width: 15.5vw; min-width: 220px; background: rgba(30, 20, 20, 0.88); backdrop-filter: blur(12px); -webkit-backdrop-filter: blur(12px); border: 1px solid rgba(255, 76, 76, 0.35); border-radius: 12px; padding: 10px 12px; z-index: 999998; color: #E2E8F0; box-shadow: 0 4px 15px rgba(0, 0, 0, 0.6); animation: slideInDownB2 0.9s cubic-bezier(0.25, 0.8, 0.25, 1); transition: all 0.3s ease; box-sizing: border-box; }}
-.header-bar-b2 {{ display: flex; justify-content: space-between; align-items: center; border-bottom: 1px solid rgba(255,255,255,0.1); padding-bottom: 6px; margin-bottom: 8px; cursor: default; }}
+.glass-panel-b2 {{ position: fixed; top: 12vh; left: 83.5%; width: 15.5vw; min-width: 220px; background: rgba(30, 20, 20, 0.88); backdrop-filter: blur(12px); -webkit-backdrop-filter: blur(12px); border: 1px solid rgba(255, 76, 76, 0.35); border-radius: 12px; padding: 10px 12px; z-index: 999998; color: #E2E8F0; box-shadow: 0 4px 15px rgba(0, 0, 0, 0.6); animation: slideInDownB2 0.9s cubic-bezier(0.25, 0.8, 0.25, 1); transition: all 0.3s ease; box-sizing: border-box; }}
+.header-bar-b2 {{ display: flex; justify-content: space-between; align-items: center; border-bottom: 1px solid rgba(255,255,255,0.1); padding-bottom: 4px; margin-bottom: 6px; cursor: default; }}
 .header-title-b2 {{ font-size: 13px; font-weight: bold; color: #FF7676; white-space:nowrap; }}
 .action-btns-b2 {{ display: flex; gap: 8px; align-items: center; }}
 .action-btn-b2 {{ cursor: pointer; color: #94A3B8; font-weight: bold; transition: color 0.2s; user-select: none; display: flex; align-items: center; justify-content: center; }}
 .action-btn-b2:hover {{ color: #FF4C4C; }}
-.panel-title-b2 {{ margin: 0 0 8px 0; font-size: 12.5px; font-weight: bold; color: #FF4C4C; display: flex; justify-content: space-between; align-items: flex-end; }}
+.panel-title-b2 {{ margin: 0 0 6px 0; font-size: 12.5px; font-weight: bold; color: #FF4C4C; display: flex; justify-content: space-between; align-items: flex-end; }}
 .date-badge-b2 {{ font-size: 10px; color: #94A3B8; font-weight: normal; }}
-.carousel-wrapper-b2 {{ position: relative; max-height: 295px; height: 295px; overflow: hidden; transition: all 0.3s ease; opacity: 1; }}
+.carousel-wrapper-b2 {{ position: relative; max-height: 215px; height: 215px; overflow: hidden; transition: all 0.3s ease; opacity: 1; }}
 .carousel-item-b2 {{ position: absolute; top: 0; left: 0; width: 100%; opacity: 0; animation: fadeSwitchB2 20s infinite; }}
 .carousel-item-b2:nth-child(1) {{ animation-delay: 0s; }}
 .carousel-item-b2:nth-child(2) {{ animation-delay: 5s; }}
 .carousel-item-b2:nth-child(3) {{ animation-delay: 10s; }}
 .carousel-item-b2:nth-child(4) {{ animation-delay: 15s; }}
 @keyframes fadeSwitchB2 {{ 0%, 22% {{ opacity: 1; z-index: 2; }} 25%, 97% {{ opacity: 0; z-index: 1; }} 100% {{ opacity: 1; z-index: 2; }} }}
-
-@media (max-width: 1200px) {{ 
-    .glass-panel-b2 {{ position: relative; top: auto; left: auto; width: 90%; max-width: 350px; margin: 10px auto; display: block; }} 
-}}
+@media (max-width: 1200px) {{ .glass-panel-b2 {{ display: none !important; }} }}
 </style>
 <div class="glass-panel-b2" id="b2-top10-card">
 <div class="header-bar-b2"><span class="header-title-b2">🚀 法人掃貨</span>
@@ -310,11 +307,11 @@ def render_top10_glass_card():
 
         def make_list_html(df, col_days, unit):
             if df is None or df.empty: return "<p style='font-size:13px; text-align:center; color:#94A3B8; margin-top:40px;'>無資料</p>"
-            html = "<ul style='padding-left: 0px; margin: 0; font-size: 13px; line-height: 1.4; list-style-type: none;'>"
+            html = "<ul style='padding-left: 0px; margin: 0; font-size: 13px; line-height: 1.3; list-style-type: none;'>"
             for i, row in enumerate(df.to_dict('records')):
                 val, status = row.get(col_days, 0), row.get('狀態動態', '')
                 html += (
-                    f"<li style='display:flex; justify-content:space-between; margin-bottom:4px;'>"
+                    f"<li style='display:flex; justify-content:space-between; margin-bottom:2px;'>"
                     f"<div style='display:flex; width:65%; overflow:hidden;'>"
                     f"<b style='color:#FFF; display:inline-block; width:22px; flex-shrink:0;'>{i+1}.</b>"
                     f"<span style='white-space:nowrap; overflow:hidden; text-overflow:ellipsis;'>{row['股票代號']}{row['股票名稱']}</span>"
@@ -331,13 +328,13 @@ def render_top10_glass_card():
         fo_wk_html, it_wk_html = make_list_html(fo_wk_df, "最新連買週數", "週"), make_list_html(it_wk_df, "最新連買週數", "週")
 
         card_html = f"""
-<input type="checkbox" id="close-card" style="display:none;" checked>
+<input type="checkbox" id="close-card" style="display:none;">
 <input type="checkbox" id="min-card" style="display:none;">
 <input type="checkbox" id="pause-card" style="display:none;">
 <style>
 #close-card:checked ~ #b3-top10-card {{ display: none !important; }}
 #min-card:checked ~ #b3-top10-card .carousel-wrapper {{ max-height: 0; opacity: 0; margin-top: 0; }}
-#min-card:checked ~ #b3-top10-card {{ padding-bottom: 8px; width: 150px; height: auto; }}
+#min-card:checked ~ #b3-top10-card {{ padding-bottom: 8px; width: 150px; }}
 #min-card:checked ~ #b3-top10-card .min-icon::after {{ content: '□'; font-size: 14px; }}
 #min-card:not(:checked) ~ #b3-top10-card .min-icon::after {{ content: '_'; font-size: 14px; position: relative; top: -3px; }}
 #pause-card:checked ~ #b3-top10-card .carousel-item {{ animation-play-state: paused !important; }}
@@ -345,26 +342,23 @@ def render_top10_glass_card():
 #pause-card:not(:checked) ~ #b3-top10-card .pause-icon::after {{ content: '⏸'; font-size: 11px; }}
 
 @keyframes slideInDownB3 {{ from {{ transform: translateY(-50%); opacity: 0; }} to {{ transform: translateY(0); opacity: 1; }} }}
-.glass-panel {{ position: fixed; top: 75px; left: 67%; width: 15.5vw; min-width: 220px; background: rgba(15, 23, 42, 0.88); backdrop-filter: blur(12px); -webkit-backdrop-filter: blur(12px); border: 1px solid rgba(0, 210, 255, 0.35); border-radius: 12px; padding: 10px 12px; z-index: 999999; color: #E2E8F0; box-shadow: 0 4px 15px rgba(0, 0, 0, 0.6); animation: slideInDownB3 0.8s cubic-bezier(0.25, 0.8, 0.25, 1); transition: all 0.3s ease; box-sizing: border-box; }}
-.header-bar {{ display: flex; justify-content: space-between; align-items: center; border-bottom: 1px solid rgba(255,255,255,0.1); padding-bottom: 6px; margin-bottom: 8px; cursor: default; }}
+.glass-panel {{ position: fixed; top: 12vh; left: 67%; width: 15.5vw; min-width: 220px; background: rgba(15, 23, 42, 0.88); backdrop-filter: blur(12px); -webkit-backdrop-filter: blur(12px); border: 1px solid rgba(0, 210, 255, 0.35); border-radius: 12px; padding: 10px 12px; z-index: 999999; color: #E2E8F0; box-shadow: 0 4px 15px rgba(0, 0, 0, 0.6); animation: slideInDownB3 0.8s cubic-bezier(0.25, 0.8, 0.25, 1); transition: all 0.3s ease; box-sizing: border-box; }}
+.header-bar {{ display: flex; justify-content: space-between; align-items: center; border-bottom: 1px solid rgba(255,255,255,0.1); padding-bottom: 4px; margin-bottom: 6px; cursor: default; }}
 .header-title {{ font-size: 13px; font-weight: bold; color: #64748B; white-space:nowrap; }}
 .action-btns {{ display: flex; gap: 8px; align-items: center; }}
 .action-btn {{ cursor: pointer; color: #94A3B8; font-weight: bold; transition: color 0.2s; user-select: none; display: flex; align-items: center; justify-content: center; }}
 .action-btn:hover {{ color: #00D2FF; }}
 .close-btn:hover {{ color: #FF4C4C; }}
-.panel-title {{ margin: 0 0 8px 0; font-size: 12.5px; font-weight: bold; color: #00D2FF; display: flex; justify-content: space-between; align-items: flex-end; }}
+.panel-title {{ margin: 0 0 6px 0; font-size: 12.5px; font-weight: bold; color: #00D2FF; display: flex; justify-content: space-between; align-items: flex-end; }}
 .date-badge {{ font-size: 10px; color: #94A3B8; font-weight: normal; }}
-.carousel-wrapper {{ position: relative; max-height: 295px; height: 295px; overflow: hidden; transition: all 0.3s ease; opacity: 1; }}
+.carousel-wrapper {{ position: relative; max-height: 215px; height: 215px; overflow: hidden; transition: all 0.3s ease; opacity: 1; }}
 .carousel-item {{ position: absolute; top: 0; left: 0; width: 100%; opacity: 0; animation: fadeSwitch 20s infinite; }}
 .carousel-item:nth-child(1) {{ animation-delay: 0s; }}
 .carousel-item:nth-child(2) {{ animation-delay: 5s; }}
 .carousel-item:nth-child(3) {{ animation-delay: 10s; }}
 .carousel-item:nth-child(4) {{ animation-delay: 15s; }}
 @keyframes fadeSwitch {{ 0%, 22% {{ opacity: 1; z-index: 2; }} 25%, 97% {{ opacity: 0; z-index: 1; }} 100% {{ opacity: 1; z-index: 2; }} }}
-
-@media (max-width: 1200px) {{ 
-    .glass-panel {{ position: relative; top: auto; left: auto; width: 90%; max-width: 350px; margin: 10px auto; display: block; }} 
-}}
+@media (max-width: 1200px) {{ .glass-panel {{ display: none !important; }} }}
 </style>
 <div class="glass-panel" id="b3-top10-card">
 <div class="header-bar"><span class="header-title">📊 法人連買</span>
@@ -411,7 +405,7 @@ def render_b4_top10_glass_card():
                 short_status = status[:4] if len(status) > 4 else status
                 pct_color = "#FF4C4C" if theme == 'sq' else "#00e676"
                 html += (
-                    f"<li style='display: flex; align-items: center; justify-content: space-between; margin-bottom: 4px; font-size: 13px; line-height: 1.4;'>"
+                    f"<li style='display: flex; align-items: center; justify-content: space-between; margin-bottom: 2px; font-size: 13px; line-height: 1.3;'>"
                     f"  <div style='display: flex; align-items: center; width: 55%; overflow: hidden;'>"
                     f"      <b style='color:#FFF; width:22px; flex-shrink: 0;'>{start_idx + i + 1}.</b>"
                     f"      <span style='white-space:nowrap; overflow:hidden; text-overflow:ellipsis;'>{row['代號']}{row['名稱']}</span>"
@@ -427,13 +421,13 @@ def render_b4_top10_glass_card():
         h_rk_1_10, h_rk_11_20 = make_radar_html(pure_rk, 0, 'rk'), make_radar_html(pure_rk, 10, 'rk')
 
         card_html = f"""
-<input type="checkbox" id="close-b4-card" style="display:none;" checked>
+<input type="checkbox" id="close-b4-card" style="display:none;">
 <input type="checkbox" id="min-b4-card" style="display:none;">
 <input type="checkbox" id="pause-b4-card" style="display:none;">
 <style>
 #close-b4-card:checked ~ #b4-top10-card {{ display: none !important; }}
 #min-b4-card:checked ~ #b4-top10-card .carousel-wrapper-b4 {{ max-height: 0; opacity: 0; margin-top: 0; }}
-#min-b4-card:checked ~ #b4-top10-card {{ padding-bottom: 8px; width: 150px; height: auto; }}
+#min-b4-card:checked ~ #b4-top10-card {{ padding-bottom: 8px; width: 150px; }}
 #min-b4-card:checked ~ #b4-top10-card .min-icon-b4::after {{ content: '□'; font-size: 14px; }}
 #min-b4-card:not(:checked) ~ #b4-top10-card .min-icon-b4::after {{ content: '_'; font-size: 14px; position: relative; top: -3px; }}
 #pause-b4-card:checked ~ #b4-top10-card .carousel-item-b4 {{ animation-play-state: paused !important; }}
@@ -442,27 +436,23 @@ def render_b4_top10_glass_card():
 
 @keyframes slideInDownB4 {{ from {{ transform: translateY(-50%); opacity: 0; }} to {{ transform: translateY(0); opacity: 1; }} }}
 @keyframes radarBreath {{ 0%, 49.9% {{ border-color: rgba(188, 19, 254, 0.4); box-shadow: 0 4px 15px rgba(188, 19, 254, 0.15); }} 50%, 100% {{ border-color: rgba(0, 230, 118, 0.4); box-shadow: 0 4px 15px rgba(0, 230, 118, 0.1); }} }}
-.glass-panel-b4 {{ position: fixed; top: 75px; left: 34%; width: 15.5vw; min-width: 220px; background: rgba(20, 22, 35, 0.88); backdrop-filter: blur(12px); -webkit-backdrop-filter: blur(12px); border: 1px solid rgba(188, 19, 254, 0.35); border-radius: 12px; padding: 10px 12px; z-index: 999997; color: #E2E8F0; animation: slideInDownB4 0.6s cubic-bezier(0.25, 0.8, 0.25, 1), radarBreath 20s infinite; transition: all 0.3s ease; box-sizing: border-box; }}
-.header-bar-b4 {{ display: flex; justify-content: space-between; align-items: center; border-bottom: 1px solid rgba(255,255,255,0.1); padding-bottom: 6px; margin-bottom: 8px; cursor: default; }}
+.glass-panel-b4 {{ position: fixed; top: 12vh; left: 34%; width: 15.5vw; min-width: 220px; background: rgba(20, 22, 35, 0.88); backdrop-filter: blur(12px); -webkit-backdrop-filter: blur(12px); border: 1px solid rgba(188, 19, 254, 0.35); border-radius: 12px; padding: 10px 12px; z-index: 999997; color: #E2E8F0; animation: slideInDownB4 0.6s cubic-bezier(0.25, 0.8, 0.25, 1), radarBreath 20s infinite; transition: all 0.3s ease; box-sizing: border-box; }}
+.header-bar-b4 {{ display: flex; justify-content: space-between; align-items: center; border-bottom: 1px solid rgba(255,255,255,0.1); padding-bottom: 4px; margin-bottom: 6px; cursor: default; }}
 .header-title-b4 {{ font-size: 13px; font-weight: bold; color: #E2E8F0; white-space:nowrap; }}
 .action-btns-b4 {{ display: flex; gap: 8px; align-items: center; }}
 .action-btn-b4 {{ cursor: pointer; color: #94A3B8; font-weight: bold; transition: color 0.2s; user-select: none; display: flex; align-items: center; justify-content: center; }}
 .action-btn-b4:hover {{ color: #00D2FF; }}
-.panel-title-b4 {{ margin: 0 0 8px 0; font-size: 12.5px; font-weight: bold; color: #bc13fe; display: flex; justify-content: space-between; align-items: flex-end; }}
+.panel-title-b4 {{ margin: 0 0 6px 0; font-size: 12.5px; font-weight: bold; color: #bc13fe; display: flex; justify-content: space-between; align-items: flex-end; }}
 .panel-title-b4.risk {{ color: #00e676; }}
 .date-badge-b4 {{ font-size: 10px; color: #94A3B8; font-weight: normal; }}
-.carousel-wrapper-b4 {{ position: relative; max-height: 295px; height: 295px; overflow: hidden; transition: all 0.3s ease; opacity: 1; }}
+.carousel-wrapper-b4 {{ position: relative; max-height: 215px; height: 215px; overflow: hidden; transition: all 0.3s ease; opacity: 1; }}
 .carousel-item-b4 {{ position: absolute; top: 0; left: 0; width: 100%; opacity: 0; animation: fadeSwitchB4 20s infinite; }}
 .carousel-item-b4:nth-child(1) {{ animation-delay: 0s; }}
 .carousel-item-b4:nth-child(2) {{ animation-delay: 5s; }}
 .carousel-item-b4:nth-child(3) {{ animation-delay: 10s; }}
 .carousel-item-b4:nth-child(4) {{ animation-delay: 15s; }}
 @keyframes fadeSwitchB4 {{ 0%, 22% {{ opacity: 1; z-index: 2; }} 25%, 97% {{ opacity: 0; z-index: 1; }} 100% {{ opacity: 1; z-index: 2; }} }}
-
-/* 📱 手機版排版 */
-@media (max-width: 1200px) {{ 
-    .glass-panel-b4 {{ position: relative; top: auto; left: auto; width: 90%; max-width: 350px; margin: 10px auto; display: block; }} 
-}}
+@media (max-width: 1200px) {{ .glass-panel-b4 {{ display: none !important; }} }}
 </style>
 <div class="glass-panel-b4" id="b4-top10-card">
 <div class="header-bar-b4"><span class="header-title-b4">📡 資券雷達</span>
@@ -536,7 +526,7 @@ def render_b5_top10_glass_card():
                     s1, s2 = unify_status_text(row.get('狀態(千)', '')), unify_status_text(row.get('狀態(四)', ''))
                     info_html = f"<div style='display:flex; width:45%; justify-content:flex-end; color:#F59E0B; font-size:10px;'><span style='width:40px; text-align:right;'>{s1}</span><span style='color:#94A3B8; font-size:9px; margin:0 2px;'>/</span><span style='width:40px; text-align:right;'>{s2}</span></div>"
                 html += (
-                    f"<li style='display:flex; align-items:center; justify-content:space-between; margin-bottom:4px; font-size:13px; line-height:1.4;'>"
+                    f"<li style='display:flex; align-items:center; justify-content:space-between; margin-bottom:2px; font-size:13px; line-height:1.3;'>"
                     f"  <div style='display:flex; align-items:center; width:55%; overflow:hidden;'>"
                     f"      <b style='color:#FFF; width:22px; flex-shrink:0;'>{i+1}.</b>"
                     f"      <span style='white-space:nowrap; overflow:hidden; text-overflow:ellipsis;'>{row['股票代號']}{row['股票名稱']}</span>"
@@ -548,13 +538,13 @@ def render_b5_top10_glass_card():
         h_6w, h_latest = make_resonance_html(top10_6w, True), make_resonance_html(top10_latest, False)
 
         card_html = f"""
-<input type="checkbox" id="close-b5-card" style="display:none;" checked>
+<input type="checkbox" id="close-b5-card" style="display:none;">
 <input type="checkbox" id="min-b5-card" style="display:none;">
 <input type="checkbox" id="pause-b5-card" style="display:none;">
 <style>
 #close-b5-card:checked ~ #b5-top10-card {{ display: none !important; }}
 #min-b5-card:checked ~ #b5-top10-card .carousel-wrapper-b5 {{ max-height: 0; opacity: 0; margin-top: 0; }}
-#min-b5-card:checked ~ #b5-top10-card {{ padding-bottom: 8px; width: 150px; height: auto; }}
+#min-b5-card:checked ~ #b5-top10-card {{ padding-bottom: 8px; width: 150px; }}
 #min-b5-card:checked ~ #b5-top10-card .min-icon-b5::after {{ content: '□'; font-size: 14px; }}
 #min-b5-card:not(:checked) ~ #b5-top10-card .min-icon-b5::after {{ content: '_'; font-size: 14px; position: relative; top: -3px; }}
 #pause-b5-card:checked ~ #b5-top10-card .carousel-item-b5 {{ animation-play-state: paused !important; }}
@@ -562,23 +552,20 @@ def render_b5_top10_glass_card():
 #pause-b5-card:not(:checked) ~ #b5-top10-card .pause-icon-b5::after {{ content: '⏸'; font-size: 11px; }}
 
 @keyframes slideInDownB5 {{ from {{ transform: translateY(-50%); opacity: 0; }} to {{ transform: translateY(0); opacity: 1; }} }}
-.glass-panel-b5 {{ position: fixed; top: 75px; left: 50.5%; width: 15.5vw; min-width: 220px; background: rgba(30, 25, 10, 0.88); backdrop-filter: blur(12px); -webkit-backdrop-filter: blur(12px); border: 1px solid rgba(245, 158, 11, 0.4); border-radius: 12px; padding: 10px 12px; z-index: 999996; color: #E2E8F0; box-shadow: 0 4px 15px rgba(245, 158, 11, 0.2); animation: slideInDownB5 0.7s cubic-bezier(0.25, 0.8, 0.25, 1); transition: all 0.3s ease; box-sizing: border-box; }}
-.header-bar-b5 {{ display: flex; justify-content: space-between; align-items: center; border-bottom: 1px solid rgba(255,255,255,0.1); padding-bottom: 6px; margin-bottom: 8px; cursor: default; }}
+.glass-panel-b5 {{ position: fixed; top: 12vh; left: 50.5%; width: 15.5vw; min-width: 220px; background: rgba(30, 25, 10, 0.88); backdrop-filter: blur(12px); -webkit-backdrop-filter: blur(12px); border: 1px solid rgba(245, 158, 11, 0.4); border-radius: 12px; padding: 10px 12px; z-index: 999996; color: #E2E8F0; box-shadow: 0 4px 15px rgba(245, 158, 11, 0.2); animation: slideInDownB5 0.7s cubic-bezier(0.25, 0.8, 0.25, 1); transition: all 0.3s ease; box-sizing: border-box; }}
+.header-bar-b5 {{ display: flex; justify-content: space-between; align-items: center; border-bottom: 1px solid rgba(255,255,255,0.1); padding-bottom: 4px; margin-bottom: 6px; cursor: default; }}
 .header-title-b5 {{ font-size: 13px; font-weight: bold; color: #FCD34D; white-space:nowrap; }}
 .action-btns-b5 {{ display: flex; gap: 8px; align-items: center; }}
 .action-btn-b5 {{ cursor: pointer; color: #94A3B8; font-weight: bold; transition: color 0.2s; user-select: none; display: flex; align-items: center; justify-content: center; }}
 .action-btn-b5:hover {{ color: #F59E0B; }}
 .panel-title-b5 {{ margin: 0 0 8px 0; font-size: 12.5px; font-weight: bold; color: #F59E0B; display: flex; justify-content: space-between; align-items: flex-end; }}
 .date-badge-b5 {{ font-size: 10px; color: #94A3B8; font-weight: normal; }}
-.carousel-wrapper-b5 {{ position: relative; max-height: 295px; height: 295px; overflow: hidden; transition: all 0.3s ease; opacity: 1; }}
+.carousel-wrapper-b5 {{ position: relative; max-height: 215px; height: 215px; overflow: hidden; transition: all 0.3s ease; opacity: 1; }}
 .carousel-item-b5 {{ position: absolute; top: 0; left: 0; width: 100%; opacity: 0; animation: fadeSwitchB5 10s infinite; }}
 .carousel-item-b5:nth-child(1) {{ animation-delay: 0s; }}
 .carousel-item-b5:nth-child(2) {{ animation-delay: 5s; }}
 @keyframes fadeSwitchB5 {{ 0%, 45% {{ opacity: 1; z-index: 2; }} 50%, 95% {{ opacity: 0; z-index: 1; }} 100% {{ opacity: 1; z-index: 2; }} }}
-
-@media (max-width: 1200px) {{ 
-    .glass-panel-b5 {{ position: relative; top: auto; left: auto; width: 90%; max-width: 350px; margin: 10px auto; display: block; }} 
-}}
+@media (max-width: 1200px) {{ .glass-panel-b5 {{ display: none !important; }} }}
 </style>
 <div class="glass-panel-b5" id="b5-top10-card">
 <div class="header-bar-b5"><span class="header-title-b5">🔥 大腿共振</span>
