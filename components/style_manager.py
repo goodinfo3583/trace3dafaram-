@@ -219,7 +219,7 @@ def render_b2_top10_glass_card():
                 else: short_status = cs[:3]
 
                 html += (
-                    f"<li style='display: flex; align-items: center; justify-content: space-between; margin-bottom: 4px; font-size: 13px; line-height: 1.4;'>"
+                    f"<li style='display: flex; align-items: center; justify-content: space-between; margin-bottom: 2px; font-size: 13px; line-height: 1.4;'>"
                     f"  <div style='display: flex; align-items: center; width: 50%; overflow: hidden;'>"
                     f"      <b style='color:#FFF; width:22px; flex-shrink: 0;'>{i+1}.</b>"
                     f"      <span style='white-space:nowrap; overflow:hidden; text-overflow:ellipsis;'>{row['股票代號']}{row['股票名稱']}</span>"
@@ -235,13 +235,13 @@ def render_b2_top10_glass_card():
         h_23, h_24 = make_list_html(df_23, c23), make_list_html(df_24, c24)
 
         card_html = f"""
-<input type="checkbox" id="close-b2-card" style="display:none;" checked>
+<input type="checkbox" id="close-b2-card" style="display:none;">
 <input type="checkbox" id="min-b2-card" style="display:none;">
 <input type="checkbox" id="pause-b2-card" style="display:none;">
 <style>
 #close-b2-card:checked ~ #b2-top10-card {{ display: none !important; }}
 #min-b2-card:checked ~ #b2-top10-card .carousel-wrapper-b2 {{ max-height: 0; opacity: 0; margin-top: 0; }}
-#min-b2-card:checked ~ #b2-top10-card {{ padding-bottom: 8px; width: 150px; height: auto; }}
+#min-b2-card:checked ~ #b2-top10-card {{ padding-bottom: 8px; width: 150px; }}
 #min-b2-card:checked ~ #b2-top10-card .min-icon-b2::after {{ content: '□'; font-size: 14px; }}
 #min-b2-card:not(:checked) ~ #b2-top10-card .min-icon-b2::after {{ content: '_'; font-size: 14px; position: relative; top: -3px; }}
 #pause-b2-card:checked ~ #b2-top10-card .carousel-item-b2 {{ animation-play-state: paused !important; }}
@@ -249,25 +249,22 @@ def render_b2_top10_glass_card():
 #pause-b2-card:not(:checked) ~ #b2-top10-card .pause-icon-b2::after {{ content: '⏸'; font-size: 11px; }}
 
 @keyframes slideInDownB2 {{ from {{ transform: translateY(-50%); opacity: 0; }} to {{ transform: translateY(0); opacity: 1; }} }}
-.glass-panel-b2 {{ position: fixed; top: 75px; left: 83.5%; width: 15.5vw; min-width: 220px; background: rgba(30, 20, 20, 0.88); backdrop-filter: blur(12px); -webkit-backdrop-filter: blur(12px); border: 1px solid rgba(255, 76, 76, 0.35); border-radius: 12px; padding: 10px 12px; z-index: 999998; color: #E2E8F0; box-shadow: 0 4px 15px rgba(0, 0, 0, 0.6); animation: slideInDownB2 0.9s cubic-bezier(0.25, 0.8, 0.25, 1); transition: all 0.3s ease; box-sizing: border-box; }}
-.header-bar-b2 {{ display: flex; justify-content: space-between; align-items: center; border-bottom: 1px solid rgba(255,255,255,0.1); padding-bottom: 6px; margin-bottom: 8px; cursor: default; }}
+.glass-panel-b2 {{ position: fixed; top: 12vh; left: 83.5%; width: 15.5vw; min-width: 220px; background: rgba(30, 20, 20, 0.88); backdrop-filter: blur(12px); -webkit-backdrop-filter: blur(12px); border: 1px solid rgba(255, 76, 76, 0.35); border-radius: 12px; padding: 10px 12px; z-index: 999998; color: #E2E8F0; box-shadow: 0 4px 15px rgba(0, 0, 0, 0.6); animation: slideInDownB2 0.9s cubic-bezier(0.25, 0.8, 0.25, 1); transition: all 0.3s ease; box-sizing: border-box; }}
+.header-bar-b2 {{ display: flex; justify-content: space-between; align-items: center; border-bottom: 1px solid rgba(255,255,255,0.1); padding-bottom: 4px; margin-bottom: 6px; cursor: default; }}
 .header-title-b2 {{ font-size: 13px; font-weight: bold; color: #FF7676; white-space:nowrap; }}
 .action-btns-b2 {{ display: flex; gap: 8px; align-items: center; }}
 .action-btn-b2 {{ cursor: pointer; color: #94A3B8; font-weight: bold; transition: color 0.2s; user-select: none; display: flex; align-items: center; justify-content: center; }}
 .action-btn-b2:hover {{ color: #FF4C4C; }}
-.panel-title-b2 {{ margin: 0 0 8px 0; font-size: 12.5px; font-weight: bold; color: #FF4C4C; display: flex; justify-content: space-between; align-items: flex-end; }}
+.panel-title-b2 {{ margin: 0 0 6px 0; font-size: 12.5px; font-weight: bold; color: #FF4C4C; display: flex; justify-content: space-between; align-items: flex-end; }}
 .date-badge-b2 {{ font-size: 10px; color: #94A3B8; font-weight: normal; }}
-.carousel-wrapper-b2 {{ position: relative; max-height: 295px; height: 295px; overflow: hidden; transition: all 0.3s ease; opacity: 1; }}
+.carousel-wrapper-b2 {{ position: relative; max-height: 215px; height: 215px; overflow: hidden; transition: all 0.3s ease; opacity: 1; }}
 .carousel-item-b2 {{ position: absolute; top: 0; left: 0; width: 100%; opacity: 0; animation: fadeSwitchB2 20s infinite; }}
 .carousel-item-b2:nth-child(1) {{ animation-delay: 0s; }}
 .carousel-item-b2:nth-child(2) {{ animation-delay: 5s; }}
 .carousel-item-b2:nth-child(3) {{ animation-delay: 10s; }}
 .carousel-item-b2:nth-child(4) {{ animation-delay: 15s; }}
 @keyframes fadeSwitchB2 {{ 0%, 22% {{ opacity: 1; z-index: 2; }} 25%, 97% {{ opacity: 0; z-index: 1; }} 100% {{ opacity: 1; z-index: 2; }} }}
-
-@media (max-width: 1200px) {{ 
-    .glass-panel-b2 {{ position: relative; top: auto; left: auto; width: 90%; max-width: 350px; margin: 10px auto; display: block; }} 
-}}
+@media (max-width: 1200px) {{ .glass-panel-b2 {{ display: none !important; }} }}
 </style>
 <div class="glass-panel-b2" id="b2-top10-card">
 <div class="header-bar-b2"><span class="header-title-b2">🚀 法人掃貨</span>
