@@ -237,33 +237,42 @@ def render_b2_top10_glass_card():
         card_html = f"""
 <input type="checkbox" id="close-b2-card" style="display:none;">
 <input type="checkbox" id="min-b2-card" style="display:none;">
+<input type="checkbox" id="pause-b2-card" style="display:none;">
 <style>
 #close-b2-card:checked ~ #b2-top10-card {{ display: none !important; }}
 #min-b2-card:checked ~ #b2-top10-card .carousel-wrapper-b2 {{ max-height: 0; opacity: 0; margin-top: 0; }}
-#min-b2-card:checked ~ #b2-top10-card {{ padding-bottom: 8px; width: 180px; }}
+#min-b2-card:checked ~ #b2-top10-card {{ padding-bottom: 8px; width: 150px; }}
 #min-b2-card:checked ~ #b2-top10-card .min-icon-b2::after {{ content: '□'; font-size: 14px; }}
 #min-b2-card:not(:checked) ~ #b2-top10-card .min-icon-b2::after {{ content: '_'; font-size: 14px; position: relative; top: -3px; }}
+#pause-b2-card:checked ~ #b2-top10-card .carousel-item-b2 {{ animation-play-state: paused !important; }}
+#pause-b2-card:checked ~ #b2-top10-card .pause-icon-b2::after {{ content: '▶'; font-size: 11px; color: #FFD700; }}
+#pause-b2-card:not(:checked) ~ #b2-top10-card .pause-icon-b2::after {{ content: '⏸'; font-size: 11px; }}
+
 @keyframes slideInDownB2 {{ from {{ transform: translateY(-50%); opacity: 0; }} to {{ transform: translateY(0); opacity: 1; }} }}
-.glass-panel-b2 {{ position: fixed; top: 12vh; left: 74%; width: 23vw; background: rgba(30, 20, 20, 0.88); backdrop-filter: blur(12px); -webkit-backdrop-filter: blur(12px); border: 1px solid rgba(255, 76, 76, 0.35); border-radius: 12px; padding: 10px 14px; z-index: 999998; color: #E2E8F0; box-shadow: 0 4px 15px rgba(0, 0, 0, 0.6); animation: slideInDownB2 0.9s cubic-bezier(0.25, 0.8, 0.25, 1); transition: all 0.3s ease; box-sizing: border-box; }}
+.glass-panel-b2 {{ position: fixed; top: 12vh; left: 83.5%; width: 15.5vw; min-width: 220px; background: rgba(30, 20, 20, 0.88); backdrop-filter: blur(12px); -webkit-backdrop-filter: blur(12px); border: 1px solid rgba(255, 76, 76, 0.35); border-radius: 12px; padding: 10px 12px; z-index: 999998; color: #E2E8F0; box-shadow: 0 4px 15px rgba(0, 0, 0, 0.6); animation: slideInDownB2 0.9s cubic-bezier(0.25, 0.8, 0.25, 1); transition: all 0.3s ease; box-sizing: border-box; }}
 .header-bar-b2 {{ display: flex; justify-content: space-between; align-items: center; border-bottom: 1px solid rgba(255,255,255,0.1); padding-bottom: 4px; margin-bottom: 6px; cursor: default; }}
 .header-title-b2 {{ font-size: 13px; font-weight: bold; color: #FF7676; white-space:nowrap; }}
 .action-btns-b2 {{ display: flex; gap: 8px; align-items: center; }}
-.action-btn-b2 {{ cursor: pointer; color: #94A3B8; font-weight: bold; transition: color 0.2s; user-select: none; }}
+.action-btn-b2 {{ cursor: pointer; color: #94A3B8; font-weight: bold; transition: color 0.2s; user-select: none; display: flex; align-items: center; justify-content: center; }}
 .action-btn-b2:hover {{ color: #FF4C4C; }}
-.panel-title-b2 {{ margin: 0 0 6px 0; font-size: 13px; font-weight: bold; color: #FF4C4C; display: flex; justify-content: space-between; align-items: flex-end; }}
+.panel-title-b2 {{ margin: 0 0 6px 0; font-size: 12.5px; font-weight: bold; color: #FF4C4C; display: flex; justify-content: space-between; align-items: flex-end; }}
 .date-badge-b2 {{ font-size: 10px; color: #94A3B8; font-weight: normal; }}
-.carousel-wrapper-b2 {{ position: relative; max-height: 220px; height: 220px; overflow: hidden; transition: all 0.3s ease; opacity: 1; }}
+.carousel-wrapper-b2 {{ position: relative; max-height: 215px; height: 215px; overflow: hidden; transition: all 0.3s ease; opacity: 1; }}
 .carousel-item-b2 {{ position: absolute; top: 0; left: 0; width: 100%; opacity: 0; animation: fadeSwitchB2 20s infinite; }}
 .carousel-item-b2:nth-child(1) {{ animation-delay: 0s; }}
 .carousel-item-b2:nth-child(2) {{ animation-delay: 5s; }}
 .carousel-item-b2:nth-child(3) {{ animation-delay: 10s; }}
 .carousel-item-b2:nth-child(4) {{ animation-delay: 15s; }}
 @keyframes fadeSwitchB2 {{ 0%, 22% {{ opacity: 1; z-index: 2; }} 25%, 97% {{ opacity: 0; z-index: 1; }} 100% {{ opacity: 1; z-index: 2; }} }}
-@media (max-width: 1024px) {{ .glass-panel-b2 {{ display: none !important; }} }}
+@media (max-width: 1200px) {{ .glass-panel-b2 {{ display: none !important; }} }}
 </style>
 <div class="glass-panel-b2" id="b2-top10-card">
-<div class="header-bar-b2"><span class="header-title-b2">🚀 法人暴力掃貨</span>
-<div class="action-btns-b2"><label for="min-b2-card" class="action-btn-b2 min-icon-b2" title="縮放"></label><label for="close-b2-card" class="action-btn-b2" title="關閉">✕</label></div></div>
+<div class="header-bar-b2"><span class="header-title-b2">🚀 法人掃貨</span>
+<div class="action-btns-b2">
+<label for="pause-b2-card" class="action-btn-b2 pause-icon-b2" title="暫停/播放輪播"></label>
+<label for="min-b2-card" class="action-btn-b2 min-icon-b2" title="縮放"></label>
+<label for="close-b2-card" class="action-btn-b2" title="關閉">✕</label>
+</div></div>
 <div class="carousel-wrapper-b2">
 <div class="carousel-item-b2"><div class="panel-title-b2"><span>外資買超(成交%)</span><span class="date-badge-b2">{d21}</span></div>{h_21}</div>
 <div class="carousel-item-b2"><div class="panel-title-b2"><span>投信買超(成交%)</span><span class="date-badge-b2">{d22}</span></div>{h_22}</div>
@@ -321,34 +330,43 @@ def render_top10_glass_card():
         card_html = f"""
 <input type="checkbox" id="close-card" style="display:none;">
 <input type="checkbox" id="min-card" style="display:none;">
+<input type="checkbox" id="pause-card" style="display:none;">
 <style>
 #close-card:checked ~ #b3-top10-card {{ display: none !important; }}
 #min-card:checked ~ #b3-top10-card .carousel-wrapper {{ max-height: 0; opacity: 0; margin-top: 0; }}
-#min-card:checked ~ #b3-top10-card {{ padding-bottom: 8px; width: 180px; }}
+#min-card:checked ~ #b3-top10-card {{ padding-bottom: 8px; width: 150px; }}
 #min-card:checked ~ #b3-top10-card .min-icon::after {{ content: '□'; font-size: 14px; }}
 #min-card:not(:checked) ~ #b3-top10-card .min-icon::after {{ content: '_'; font-size: 14px; position: relative; top: -3px; }}
+#pause-card:checked ~ #b3-top10-card .carousel-item {{ animation-play-state: paused !important; }}
+#pause-card:checked ~ #b3-top10-card .pause-icon::after {{ content: '▶'; font-size: 11px; color: #FFD700; }}
+#pause-card:not(:checked) ~ #b3-top10-card .pause-icon::after {{ content: '⏸'; font-size: 11px; }}
+
 @keyframes slideInDownB3 {{ from {{ transform: translateY(-50%); opacity: 0; }} to {{ transform: translateY(0); opacity: 1; }} }}
-.glass-panel {{ position: fixed; top: 12vh; left: 50%; width: 23vw; background: rgba(15, 23, 42, 0.88); backdrop-filter: blur(12px); -webkit-backdrop-filter: blur(12px); border: 1px solid rgba(0, 210, 255, 0.35); border-radius: 12px; padding: 10px 14px; z-index: 999999; color: #E2E8F0; box-shadow: 0 4px 15px rgba(0, 0, 0, 0.6); animation: slideInDownB3 0.8s cubic-bezier(0.25, 0.8, 0.25, 1); transition: all 0.3s ease; box-sizing: border-box; }}
+.glass-panel {{ position: fixed; top: 12vh; left: 67%; width: 15.5vw; min-width: 220px; background: rgba(15, 23, 42, 0.88); backdrop-filter: blur(12px); -webkit-backdrop-filter: blur(12px); border: 1px solid rgba(0, 210, 255, 0.35); border-radius: 12px; padding: 10px 12px; z-index: 999999; color: #E2E8F0; box-shadow: 0 4px 15px rgba(0, 0, 0, 0.6); animation: slideInDownB3 0.8s cubic-bezier(0.25, 0.8, 0.25, 1); transition: all 0.3s ease; box-sizing: border-box; }}
 .header-bar {{ display: flex; justify-content: space-between; align-items: center; border-bottom: 1px solid rgba(255,255,255,0.1); padding-bottom: 4px; margin-bottom: 6px; cursor: default; }}
 .header-title {{ font-size: 13px; font-weight: bold; color: #64748B; white-space:nowrap; }}
 .action-btns {{ display: flex; gap: 8px; align-items: center; }}
-.action-btn {{ cursor: pointer; color: #94A3B8; font-weight: bold; transition: color 0.2s; user-select: none; }}
+.action-btn {{ cursor: pointer; color: #94A3B8; font-weight: bold; transition: color 0.2s; user-select: none; display: flex; align-items: center; justify-content: center; }}
 .action-btn:hover {{ color: #00D2FF; }}
 .close-btn:hover {{ color: #FF4C4C; }}
-.panel-title {{ margin: 0 0 6px 0; font-size: 13px; font-weight: bold; color: #00D2FF; display: flex; justify-content: space-between; align-items: flex-end; }}
+.panel-title {{ margin: 0 0 6px 0; font-size: 12.5px; font-weight: bold; color: #00D2FF; display: flex; justify-content: space-between; align-items: flex-end; }}
 .date-badge {{ font-size: 10px; color: #94A3B8; font-weight: normal; }}
-.carousel-wrapper {{ position: relative; max-height: 220px; height: 220px; overflow: hidden; transition: all 0.3s ease; opacity: 1; }}
+.carousel-wrapper {{ position: relative; max-height: 215px; height: 215px; overflow: hidden; transition: all 0.3s ease; opacity: 1; }}
 .carousel-item {{ position: absolute; top: 0; left: 0; width: 100%; opacity: 0; animation: fadeSwitch 20s infinite; }}
 .carousel-item:nth-child(1) {{ animation-delay: 0s; }}
 .carousel-item:nth-child(2) {{ animation-delay: 5s; }}
 .carousel-item:nth-child(3) {{ animation-delay: 10s; }}
 .carousel-item:nth-child(4) {{ animation-delay: 15s; }}
 @keyframes fadeSwitch {{ 0%, 22% {{ opacity: 1; z-index: 2; }} 25%, 97% {{ opacity: 0; z-index: 1; }} 100% {{ opacity: 1; z-index: 2; }} }}
-@media (max-width: 1024px) {{ .glass-panel {{ display: none !important; }} }}
+@media (max-width: 1200px) {{ .glass-panel {{ display: none !important; }} }}
 </style>
 <div class="glass-panel" id="b3-top10-card">
-<div class="header-bar"><span class="header-title">📊 籌碼強勢連買</span>
-<div class="action-btns"><label for="min-card" class="action-btn min-icon" title="縮放"></label><label for="close-card" class="action-btn close-btn" title="關閉">✕</label></div></div>
+<div class="header-bar"><span class="header-title">📊 法人連買</span>
+<div class="action-btns">
+<label for="pause-card" class="action-btn pause-icon" title="暫停/播放輪播"></label>
+<label for="min-card" class="action-btn min-icon" title="縮放"></label>
+<label for="close-card" class="action-btn close-btn" title="關閉">✕</label>
+</div></div>
 <div class="carousel-wrapper">
 <div class="carousel-item"><div class="panel-title"><span>🌐 外資日連買</span><span class="date-badge">{d_fo_day}</span></div>{fo_day_html}</div>
 <div class="carousel-item"><div class="panel-title"><span>🏦 投信日連買</span><span class="date-badge">{d_it_day}</span></div>{it_day_html}</div>
@@ -379,8 +397,7 @@ def render_b4_top10_glass_card():
 
         def make_radar_html(df, start_idx, theme):
             sub_df = df.iloc[start_idx : start_idx+10]
-            if sub_df.empty: return "<p style='font-size:13px; text-align:center; color:#94A3B8; margin-top:40px;'>該區間尚無目標</p>"
-            
+            if sub_df.empty: return "<p style='font-size:13px; text-align:center; color:#94A3B8; margin-top:40px;'>尚無目標</p>"
             html = "<ul style='padding-left: 0; margin: 0; list-style-type: none;'>"
             for i, row in enumerate(sub_df.to_dict('records')):
                 status = row.get('軋空評估', '') if theme == 'sq' else row.get('套牢評估', '')
@@ -406,35 +423,44 @@ def render_b4_top10_glass_card():
         card_html = f"""
 <input type="checkbox" id="close-b4-card" style="display:none;">
 <input type="checkbox" id="min-b4-card" style="display:none;">
+<input type="checkbox" id="pause-b4-card" style="display:none;">
 <style>
 #close-b4-card:checked ~ #b4-top10-card {{ display: none !important; }}
 #min-b4-card:checked ~ #b4-top10-card .carousel-wrapper-b4 {{ max-height: 0; opacity: 0; margin-top: 0; }}
-#min-b4-card:checked ~ #b4-top10-card {{ padding-bottom: 8px; width: 180px; }}
+#min-b4-card:checked ~ #b4-top10-card {{ padding-bottom: 8px; width: 150px; }}
 #min-b4-card:checked ~ #b4-top10-card .min-icon-b4::after {{ content: '□'; font-size: 14px; }}
 #min-b4-card:not(:checked) ~ #b4-top10-card .min-icon-b4::after {{ content: '_'; font-size: 14px; position: relative; top: -3px; }}
+#pause-b4-card:checked ~ #b4-top10-card .carousel-item-b4 {{ animation-play-state: paused !important; }}
+#pause-b4-card:checked ~ #b4-top10-card .pause-icon-b4::after {{ content: '▶'; font-size: 11px; color: #FFD700; }}
+#pause-b4-card:not(:checked) ~ #b4-top10-card .pause-icon-b4::after {{ content: '⏸'; font-size: 11px; }}
+
 @keyframes slideInDownB4 {{ from {{ transform: translateY(-50%); opacity: 0; }} to {{ transform: translateY(0); opacity: 1; }} }}
 @keyframes radarBreath {{ 0%, 49.9% {{ border-color: rgba(188, 19, 254, 0.4); box-shadow: 0 4px 15px rgba(188, 19, 254, 0.15); }} 50%, 100% {{ border-color: rgba(0, 230, 118, 0.4); box-shadow: 0 4px 15px rgba(0, 230, 118, 0.1); }} }}
-.glass-panel-b4 {{ position: fixed; top: 12vh; left: 2%; width: 23vw; background: rgba(20, 22, 35, 0.88); backdrop-filter: blur(12px); -webkit-backdrop-filter: blur(12px); border: 1px solid rgba(188, 19, 254, 0.35); border-radius: 12px; padding: 10px 14px; z-index: 999997; color: #E2E8F0; animation: slideInDownB4 0.6s cubic-bezier(0.25, 0.8, 0.25, 1), radarBreath 20s infinite; transition: all 0.3s ease; box-sizing: border-box; }}
+.glass-panel-b4 {{ position: fixed; top: 12vh; left: 34%; width: 15.5vw; min-width: 220px; background: rgba(20, 22, 35, 0.88); backdrop-filter: blur(12px); -webkit-backdrop-filter: blur(12px); border: 1px solid rgba(188, 19, 254, 0.35); border-radius: 12px; padding: 10px 12px; z-index: 999997; color: #E2E8F0; animation: slideInDownB4 0.6s cubic-bezier(0.25, 0.8, 0.25, 1), radarBreath 20s infinite; transition: all 0.3s ease; box-sizing: border-box; }}
 .header-bar-b4 {{ display: flex; justify-content: space-between; align-items: center; border-bottom: 1px solid rgba(255,255,255,0.1); padding-bottom: 4px; margin-bottom: 6px; cursor: default; }}
 .header-title-b4 {{ font-size: 13px; font-weight: bold; color: #E2E8F0; white-space:nowrap; }}
 .action-btns-b4 {{ display: flex; gap: 8px; align-items: center; }}
-.action-btn-b4 {{ cursor: pointer; color: #94A3B8; font-weight: bold; transition: color 0.2s; user-select: none; }}
+.action-btn-b4 {{ cursor: pointer; color: #94A3B8; font-weight: bold; transition: color 0.2s; user-select: none; display: flex; align-items: center; justify-content: center; }}
 .action-btn-b4:hover {{ color: #00D2FF; }}
-.panel-title-b4 {{ margin: 0 0 6px 0; font-size: 13px; font-weight: bold; color: #bc13fe; display: flex; justify-content: space-between; align-items: flex-end; }}
+.panel-title-b4 {{ margin: 0 0 6px 0; font-size: 12.5px; font-weight: bold; color: #bc13fe; display: flex; justify-content: space-between; align-items: flex-end; }}
 .panel-title-b4.risk {{ color: #00e676; }}
 .date-badge-b4 {{ font-size: 10px; color: #94A3B8; font-weight: normal; }}
-.carousel-wrapper-b4 {{ position: relative; max-height: 220px; height: 220px; overflow: hidden; transition: all 0.3s ease; opacity: 1; }}
+.carousel-wrapper-b4 {{ position: relative; max-height: 215px; height: 215px; overflow: hidden; transition: all 0.3s ease; opacity: 1; }}
 .carousel-item-b4 {{ position: absolute; top: 0; left: 0; width: 100%; opacity: 0; animation: fadeSwitchB4 20s infinite; }}
 .carousel-item-b4:nth-child(1) {{ animation-delay: 0s; }}
 .carousel-item-b4:nth-child(2) {{ animation-delay: 5s; }}
 .carousel-item-b4:nth-child(3) {{ animation-delay: 10s; }}
 .carousel-item-b4:nth-child(4) {{ animation-delay: 15s; }}
 @keyframes fadeSwitchB4 {{ 0%, 22% {{ opacity: 1; z-index: 2; }} 25%, 97% {{ opacity: 0; z-index: 1; }} 100% {{ opacity: 1; z-index: 2; }} }}
-@media (max-width: 1024px) {{ .glass-panel-b4 {{ display: none !important; }} }}
+@media (max-width: 1200px) {{ .glass-panel-b4 {{ display: none !important; }} }}
 </style>
 <div class="glass-panel-b4" id="b4-top10-card">
-<div class="header-bar-b4"><span class="header-title-b4">📡 資券雙雷達</span>
-<div class="action-btns-b4"><label for="min-b4-card" class="action-btn-b4 min-icon-b4" title="縮放"></label><label for="close-b4-card" class="action-btn-b4" title="關閉">✕</label></div></div>
+<div class="header-bar-b4"><span class="header-title-b4">📡 資券雷達</span>
+<div class="action-btns-b4">
+<label for="pause-b4-card" class="action-btn-b4 pause-icon-b4" title="暫停/播放輪播"></label>
+<label for="min-b4-card" class="action-btn-b4 min-icon-b4" title="縮放"></label>
+<label for="close-b4-card" class="action-btn-b4" title="關閉">✕</label>
+</div></div>
 <div class="carousel-wrapper-b4">
 <div class="carousel-item-b4"><div class="panel-title-b4"><span>🚀 軋空(1-10)</span><span class="date-badge-b4">{date_sq}</span></div>{h_sq_1_10}</div>
 <div class="carousel-item-b4"><div class="panel-title-b4"><span>🚀 軋空(11-20)</span><span class="date-badge-b4">{date_sq}</span></div>{h_sq_11_20}</div>
@@ -495,10 +521,10 @@ def render_b5_top10_glass_card():
             for i, row in enumerate(df.to_dict('records')):
                 if is_6w:
                     v1, v2 = row['6周(千)_val'], row['6周(四)_val']
-                    info_html = f"<div style='display:flex; width:45%; justify-content:flex-end; color:#F59E0B; font-weight:bold; font-size:12px;'><span style='width:45px; text-align:right;'>{v1:.1f}%</span><span style='color:#94A3B8; font-size:10px; margin:0 2px;'>/</span><span style='width:45px; text-align:right;'>{v2:.1f}%</span></div>"
+                    info_html = f"<div style='display:flex; width:45%; justify-content:flex-end; color:#F59E0B; font-weight:bold; font-size:11px;'><span style='width:40px; text-align:right;'>{v1:.1f}%</span><span style='color:#94A3B8; font-size:9px; margin:0 2px;'>/</span><span style='width:40px; text-align:right;'>{v2:.1f}%</span></div>"
                 else:
                     s1, s2 = unify_status_text(row.get('狀態(千)', '')), unify_status_text(row.get('狀態(四)', ''))
-                    info_html = f"<div style='display:flex; width:45%; justify-content:flex-end; color:#F59E0B; font-size:11px;'><span style='width:45px; text-align:right;'>{s1}</span><span style='color:#94A3B8; font-size:10px; margin:0 2px;'>/</span><span style='width:45px; text-align:right;'>{s2}</span></div>"
+                    info_html = f"<div style='display:flex; width:45%; justify-content:flex-end; color:#F59E0B; font-size:10px;'><span style='width:40px; text-align:right;'>{s1}</span><span style='color:#94A3B8; font-size:9px; margin:0 2px;'>/</span><span style='width:40px; text-align:right;'>{s2}</span></div>"
                 html += (
                     f"<li style='display:flex; align-items:center; justify-content:space-between; margin-bottom:2px; font-size:13px; line-height:1.3;'>"
                     f"  <div style='display:flex; align-items:center; width:55%; overflow:hidden;'>"
@@ -514,31 +540,40 @@ def render_b5_top10_glass_card():
         card_html = f"""
 <input type="checkbox" id="close-b5-card" style="display:none;">
 <input type="checkbox" id="min-b5-card" style="display:none;">
+<input type="checkbox" id="pause-b5-card" style="display:none;">
 <style>
 #close-b5-card:checked ~ #b5-top10-card {{ display: none !important; }}
 #min-b5-card:checked ~ #b5-top10-card .carousel-wrapper-b5 {{ max-height: 0; opacity: 0; margin-top: 0; }}
-#min-b5-card:checked ~ #b5-top10-card {{ padding-bottom: 8px; width: 180px; }}
+#min-b5-card:checked ~ #b5-top10-card {{ padding-bottom: 8px; width: 150px; }}
 #min-b5-card:checked ~ #b5-top10-card .min-icon-b5::after {{ content: '□'; font-size: 14px; }}
 #min-b5-card:not(:checked) ~ #b5-top10-card .min-icon-b5::after {{ content: '_'; font-size: 14px; position: relative; top: -3px; }}
+#pause-b5-card:checked ~ #b5-top10-card .carousel-item-b5 {{ animation-play-state: paused !important; }}
+#pause-b5-card:checked ~ #b5-top10-card .pause-icon-b5::after {{ content: '▶'; font-size: 11px; color: #FFD700; }}
+#pause-b5-card:not(:checked) ~ #b5-top10-card .pause-icon-b5::after {{ content: '⏸'; font-size: 11px; }}
+
 @keyframes slideInDownB5 {{ from {{ transform: translateY(-50%); opacity: 0; }} to {{ transform: translateY(0); opacity: 1; }} }}
-.glass-panel-b5 {{ position: fixed; top: 12vh; left: 26%; width: 23vw; background: rgba(30, 25, 10, 0.88); backdrop-filter: blur(12px); -webkit-backdrop-filter: blur(12px); border: 1px solid rgba(245, 158, 11, 0.4); border-radius: 12px; padding: 10px 14px; z-index: 999996; color: #E2E8F0; box-shadow: 0 4px 15px rgba(245, 158, 11, 0.2); animation: slideInDownB5 0.7s cubic-bezier(0.25, 0.8, 0.25, 1); transition: all 0.3s ease; box-sizing: border-box; }}
+.glass-panel-b5 {{ position: fixed; top: 12vh; left: 50.5%; width: 15.5vw; min-width: 220px; background: rgba(30, 25, 10, 0.88); backdrop-filter: blur(12px); -webkit-backdrop-filter: blur(12px); border: 1px solid rgba(245, 158, 11, 0.4); border-radius: 12px; padding: 10px 12px; z-index: 999996; color: #E2E8F0; box-shadow: 0 4px 15px rgba(245, 158, 11, 0.2); animation: slideInDownB5 0.7s cubic-bezier(0.25, 0.8, 0.25, 1); transition: all 0.3s ease; box-sizing: border-box; }}
 .header-bar-b5 {{ display: flex; justify-content: space-between; align-items: center; border-bottom: 1px solid rgba(255,255,255,0.1); padding-bottom: 4px; margin-bottom: 6px; cursor: default; }}
 .header-title-b5 {{ font-size: 13px; font-weight: bold; color: #FCD34D; white-space:nowrap; }}
 .action-btns-b5 {{ display: flex; gap: 8px; align-items: center; }}
-.action-btn-b5 {{ cursor: pointer; color: #94A3B8; font-weight: bold; transition: color 0.2s; user-select: none; }}
+.action-btn-b5 {{ cursor: pointer; color: #94A3B8; font-weight: bold; transition: color 0.2s; user-select: none; display: flex; align-items: center; justify-content: center; }}
 .action-btn-b5:hover {{ color: #F59E0B; }}
-.panel-title-b5 {{ margin: 0 0 10px 0; font-size: 13px; font-weight: bold; color: #F59E0B; display: flex; justify-content: space-between; align-items: flex-end; }}
+.panel-title-b5 {{ margin: 0 0 8px 0; font-size: 12.5px; font-weight: bold; color: #F59E0B; display: flex; justify-content: space-between; align-items: flex-end; }}
 .date-badge-b5 {{ font-size: 10px; color: #94A3B8; font-weight: normal; }}
-.carousel-wrapper-b5 {{ position: relative; max-height: 220px; height: 220px; overflow: hidden; transition: all 0.3s ease; opacity: 1; }}
+.carousel-wrapper-b5 {{ position: relative; max-height: 215px; height: 215px; overflow: hidden; transition: all 0.3s ease; opacity: 1; }}
 .carousel-item-b5 {{ position: absolute; top: 0; left: 0; width: 100%; opacity: 0; animation: fadeSwitchB5 10s infinite; }}
 .carousel-item-b5:nth-child(1) {{ animation-delay: 0s; }}
 .carousel-item-b5:nth-child(2) {{ animation-delay: 5s; }}
 @keyframes fadeSwitchB5 {{ 0%, 45% {{ opacity: 1; z-index: 2; }} 50%, 95% {{ opacity: 0; z-index: 1; }} 100% {{ opacity: 1; z-index: 2; }} }}
-@media (max-width: 1024px) {{ .glass-panel-b5 {{ display: none !important; }} }}
+@media (max-width: 1200px) {{ .glass-panel-b5 {{ display: none !important; }} }}
 </style>
 <div class="glass-panel-b5" id="b5-top10-card">
-<div class="header-bar-b5"><span class="header-title-b5">🔥 大腿雙向共振</span>
-<div class="action-btns-b5"><label for="min-b5-card" class="action-btn-b5 min-icon-b5" title="縮放"></label><label for="close-b5-card" class="action-btn-b5" title="關閉">✕</label></div></div>
+<div class="header-bar-b5"><span class="header-title-b5">🔥 大腿共振</span>
+<div class="action-btns-b5">
+<label for="pause-b5-card" class="action-btn-b5 pause-icon-b5" title="暫停/播放輪播"></label>
+<label for="min-b5-card" class="action-btn-b5 min-icon-b5" title="縮放"></label>
+<label for="close-b5-card" class="action-btn-b5" title="關閉">✕</label>
+</div></div>
 <div class="carousel-wrapper-b5">
 <div class="carousel-item-b5"><div class="panel-title-b5"><span>📊 6周累積(千/400)</span><span class="date-badge-b5">{date_str}</span></div>{h_6w}</div>
 <div class="carousel-item-b5"><div class="panel-title-b5"><span>⚡ 週動能(千/400)</span><span class="date-badge-b5">{date_str}</span></div>{h_latest}</div>
