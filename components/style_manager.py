@@ -235,7 +235,7 @@ def render_b2_top10_glass_card():
         h_23, h_24 = make_list_html(df_23, c23), make_list_html(df_24, c24)
 
         card_html = f"""
-<input type="checkbox" id="close-b2-card" style="display:none;" checked>
+<input type="checkbox" id="close-b2-card" style="display:none;">
 <input type="checkbox" id="min-b2-card" style="display:none;">
 <input type="checkbox" id="pause-b2-card" style="display:none;">
 <style>
@@ -265,8 +265,8 @@ def render_b2_top10_glass_card():
 .carousel-item-b2:nth-child(4) {{ animation-delay: 15s; }}
 @keyframes fadeSwitchB2 {{ 0%, 22% {{ opacity: 1; z-index: 2; }} 25%, 97% {{ opacity: 0; z-index: 1; }} 100% {{ opacity: 1; z-index: 2; }} }}
 
-@media (max-width: 1200px) {{ 
-    .glass-panel-b2 {{ position: relative; top: auto; left: auto; width: 90%; max-width: 350px; margin: 10px auto; display: block; }} 
+@media (max-width: 1200px) {{
+    .glass-panel-b2 {{ position: relative; top: auto; left: auto; width: 90%; max-width: 350px; margin: 10px auto; display: block; }}
 }}
 </style>
 <div class="glass-panel-b2" id="b2-top10-card">
@@ -331,7 +331,7 @@ def render_top10_glass_card():
         fo_wk_html, it_wk_html = make_list_html(fo_wk_df, "最新連買週數", "週"), make_list_html(it_wk_df, "最新連買週數", "週")
 
         card_html = f"""
-<input type="checkbox" id="close-card" style="display:none;" checked>
+<input type="checkbox" id="close-card" style="display:none;">
 <input type="checkbox" id="min-card" style="display:none;">
 <input type="checkbox" id="pause-card" style="display:none;">
 <style>
@@ -362,8 +362,8 @@ def render_top10_glass_card():
 .carousel-item:nth-child(4) {{ animation-delay: 15s; }}
 @keyframes fadeSwitch {{ 0%, 22% {{ opacity: 1; z-index: 2; }} 25%, 97% {{ opacity: 0; z-index: 1; }} 100% {{ opacity: 1; z-index: 2; }} }}
 
-@media (max-width: 1200px) {{ 
-    .glass-panel {{ position: relative; top: auto; left: auto; width: 90%; max-width: 350px; margin: 10px auto; display: block; }} 
+@media (max-width: 1200px) {{
+    .glass-panel {{ position: relative; top: auto; left: auto; width: 90%; max-width: 350px; margin: 10px auto; display: block; }}
 }}
 </style>
 <div class="glass-panel" id="b3-top10-card">
@@ -427,7 +427,7 @@ def render_b4_top10_glass_card():
         h_rk_1_10, h_rk_11_20 = make_radar_html(pure_rk, 0, 'rk'), make_radar_html(pure_rk, 10, 'rk')
 
         card_html = f"""
-<input type="checkbox" id="close-b4-card" style="display:none;" checked>
+<input type="checkbox" id="close-b4-card" style="display:none;">
 <input type="checkbox" id="min-b4-card" style="display:none;">
 <input type="checkbox" id="pause-b4-card" style="display:none;">
 <style>
@@ -459,9 +459,8 @@ def render_b4_top10_glass_card():
 .carousel-item-b4:nth-child(4) {{ animation-delay: 15s; }}
 @keyframes fadeSwitchB4 {{ 0%, 22% {{ opacity: 1; z-index: 2; }} 25%, 97% {{ opacity: 0; z-index: 1; }} 100% {{ opacity: 1; z-index: 2; }} }}
 
-/* 📱 手機版排版 */
-@media (max-width: 1200px) {{ 
-    .glass-panel-b4 {{ position: relative; top: auto; left: auto; width: 90%; max-width: 350px; margin: 10px auto; display: block; }} 
+@media (max-width: 1200px) {{
+    .glass-panel-b4 {{ position: relative; top: auto; left: auto; width: 90%; max-width: 350px; margin: 10px auto; display: block; }}
 }}
 </style>
 <div class="glass-panel-b4" id="b4-top10-card">
@@ -480,7 +479,7 @@ def render_b4_top10_glass_card():
 """
         st.markdown(card_html, unsafe_allow_html=True)
     except Exception as e: pass
-
+    
 #B5 大腿動向玻璃卡片
 def render_b5_top10_glass_card():
     import pandas as pd
@@ -548,7 +547,7 @@ def render_b5_top10_glass_card():
         h_6w, h_latest = make_resonance_html(top10_6w, True), make_resonance_html(top10_latest, False)
 
         card_html = f"""
-<input type="checkbox" id="close-b5-card" style="display:none;" checked>
+<input type="checkbox" id="close-b5-card" style="display:none;">
 <input type="checkbox" id="min-b5-card" style="display:none;">
 <input type="checkbox" id="pause-b5-card" style="display:none;">
 <style>
@@ -576,8 +575,8 @@ def render_b5_top10_glass_card():
 .carousel-item-b5:nth-child(2) {{ animation-delay: 5s; }}
 @keyframes fadeSwitchB5 {{ 0%, 45% {{ opacity: 1; z-index: 2; }} 50%, 95% {{ opacity: 0; z-index: 1; }} 100% {{ opacity: 1; z-index: 2; }} }}
 
-@media (max-width: 1200px) {{ 
-    .glass-panel-b5 {{ position: relative; top: auto; left: auto; width: 90%; max-width: 350px; margin: 10px auto; display: block; }} 
+@media (max-width: 1200px) {{
+    .glass-panel-b5 {{ position: relative; top: auto; left: auto; width: 90%; max-width: 350px; margin: 10px auto; display: block; }}
 }}
 </style>
 <div class="glass-panel-b5" id="b5-top10-card">

@@ -148,7 +148,7 @@ def inject_custom_header(is_logged_in=False):
         const globalRadarBtn = parentDoc.getElementById('global-radar-btn');
         const globalRadarText = parentDoc.getElementById('global-radar-text');
         // 預設為 true，代表一開始進畫面就是「已隱藏」狀態
-        let isAllHidden = true; 
+        let isAllHidden = false; 
 
         if (globalRadarBtn) {
             // 執行一次初始化（讓畫面載入時自動先關閉卡片，如果你希望預設開啟，就把 isAllHidden 設為 false，並把下一行註解掉）
