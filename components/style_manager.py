@@ -218,9 +218,8 @@ def render_b2_top10_glass_card():
                 elif "趨緩" in cs: short_status = "⚠️趨緩"
                 else: short_status = cs[:3]
 
-                # 💡 修改點：行距放大 margin-bottom: 9px; line-height: 1.5; font-size: 13.5px;
                 html += (
-                    f"<li style='display: flex; align-items: center; justify-content: space-between; margin-bottom: 9px; font-size: 13.5px; line-height: 1.5;'>"
+                    f"<li style='display: flex; align-items: center; justify-content: space-between; margin-bottom: 6px; font-size: 13.5px; line-height: 1.4;'>"
                     f"  <div style='display: flex; align-items: center; width: 50%; overflow: hidden;'>"
                     f"      <b style='color:#FFF; width:22px; flex-shrink: 0;'>{i+1}.</b>"
                     f"      <span style='white-space:nowrap; overflow:hidden; text-overflow:ellipsis;'>{row['股票代號']}{row['股票名稱']}</span>"
@@ -257,15 +256,14 @@ def render_b2_top10_glass_card():
 .action-btn-b2:hover {{ color: #FF4C4C; }}
 .panel-title-b2 {{ margin: 0 0 8px 0; font-size: 12.5px; font-weight: bold; color: #FF4C4C; display: flex; justify-content: space-between; align-items: flex-end; }}
 .date-badge-b2 {{ font-size: 10px; color: #94A3B8; font-weight: normal; }}
-/* 💡 修改點：高度放大到 370px 以容納 10 檔與加寬的行距 */
-.carousel-wrapper-b2 {{ position: relative; max-height: 370px; height: 370px; overflow: hidden; transition: all 0.3s ease; opacity: 1; }}
+/* 💡 修改點：縮減容器高度，收緊下方留白 */
+.carousel-wrapper-b2 {{ position: relative; max-height: 285px; height: 285px; overflow: hidden; transition: all 0.3s ease; opacity: 1; }}
 .carousel-item-b2 {{ position: absolute; top: 0; left: 0; width: 100%; opacity: 0; animation: fadeSwitchB2 20s infinite; }}
 .carousel-item-b2:nth-child(1) {{ animation-delay: 0s; }}
 .carousel-item-b2:nth-child(2) {{ animation-delay: 5s; }}
 .carousel-item-b2:nth-child(3) {{ animation-delay: 10s; }}
 .carousel-item-b2:nth-child(4) {{ animation-delay: 15s; }}
 @keyframes fadeSwitchB2 {{ 0%, 22% {{ opacity: 1; z-index: 2; }} 25%, 97% {{ opacity: 0; z-index: 1; }} 100% {{ opacity: 1; z-index: 2; }} }}
-/* 💡 修改點：移除了 @media 之前的空白斷行 */
 @media (max-width: 1200px) {{ .glass-panel-b2 {{ position: relative; top: auto; left: auto; width: 90%; max-width: 350px; margin: 10px auto; display: block; }} }}
 </style>
 <div class="glass-panel-b2" id="b2-top10-card">
@@ -312,14 +310,14 @@ def render_top10_glass_card():
             html = "<ul style='padding-left: 0px; margin: 0; list-style-type: none;'>"
             for i, row in enumerate(df.to_dict('records')):
                 val, status = row.get(col_days, 0), row.get('狀態動態', '')
-                # 💡 修改點：行距放大 margin-bottom: 9px; line-height: 1.5; font-size: 13.5px;
+                # 💡 修改點：在右側 div 加上 white-space:nowrap; 強制「天」不換行，並將寬度調為 45% 以容納
                 html += (
-                    f"<li style='display:flex; justify-content:space-between; margin-bottom:9px; font-size: 13.5px; line-height: 1.5;'>"
-                    f"<div style='display:flex; width:65%; overflow:hidden;'>"
+                    f"<li style='display:flex; justify-content:space-between; align-items:center; margin-bottom:6px; font-size: 13.5px; line-height: 1.4;'>"
+                    f"<div style='display:flex; width:55%; overflow:hidden;'>"
                     f"<b style='color:#FFF; display:inline-block; width:22px; flex-shrink:0;'>{i+1}.</b>"
                     f"<span style='white-space:nowrap; overflow:hidden; text-overflow:ellipsis;'>{row['股票代號']}{row['股票名稱']}</span>"
                     f"</div>"
-                    f"<div style='width:35%; text-align:right;'>"
+                    f"<div style='width:45%; text-align:right; white-space:nowrap;'>"
                     f"<span style='color:#FFD700; font-size: 11px; margin-right:4px;'>{status}</span>"
                     f"<span style='color:#00D2FF; font-weight:bold;'>{val}{unit}</span>"
                     f"</div></li>"
@@ -353,15 +351,14 @@ def render_top10_glass_card():
 .close-btn:hover {{ color: #FF4C4C; }}
 .panel-title {{ margin: 0 0 8px 0; font-size: 12.5px; font-weight: bold; color: #00D2FF; display: flex; justify-content: space-between; align-items: flex-end; }}
 .date-badge {{ font-size: 10px; color: #94A3B8; font-weight: normal; }}
-/* 💡 修改點：高度放大到 370px */
-.carousel-wrapper {{ position: relative; max-height: 370px; height: 370px; overflow: hidden; transition: all 0.3s ease; opacity: 1; }}
+/* 💡 修改點：縮減容器高度，收緊下方留白 */
+.carousel-wrapper {{ position: relative; max-height: 285px; height: 285px; overflow: hidden; transition: all 0.3s ease; opacity: 1; }}
 .carousel-item {{ position: absolute; top: 0; left: 0; width: 100%; opacity: 0; animation: fadeSwitch 20s infinite; }}
 .carousel-item:nth-child(1) {{ animation-delay: 0s; }}
 .carousel-item:nth-child(2) {{ animation-delay: 5s; }}
 .carousel-item:nth-child(3) {{ animation-delay: 10s; }}
 .carousel-item:nth-child(4) {{ animation-delay: 15s; }}
 @keyframes fadeSwitch {{ 0%, 22% {{ opacity: 1; z-index: 2; }} 25%, 97% {{ opacity: 0; z-index: 1; }} 100% {{ opacity: 1; z-index: 2; }} }}
-/* 💡 修改點：移除了 @media 之前的空白斷行 */
 @media (max-width: 1200px) {{ .glass-panel {{ position: relative; top: auto; left: auto; width: 90%; max-width: 350px; margin: 10px auto; display: block; }} }}
 </style>
 <div class="glass-panel" id="b3-top10-card">
@@ -380,7 +377,7 @@ def render_top10_glass_card():
 """
         st.markdown(card_html, unsafe_allow_html=True)
     except Exception as e: pass
-
+    
 #b4 資券玻璃卡片
 def render_b4_top10_glass_card():
     import pandas as pd
@@ -406,11 +403,12 @@ def render_b4_top10_glass_card():
             for i, row in enumerate(sub_df.to_dict('records')):
                 status = row.get('軋空評估', '') if theme == 'sq' else row.get('套牢評估', '')
                 pct = row.get('漲跌幅', 0.0)
-                short_status = status[:4] if len(status) > 4 else status
+                # 💡 修改點：把長度限制從 4 放寬到 7，確保「☠️ 極危」不會被切斷
+                short_status = status[:7] if len(status) > 7 else status
                 pct_color = "#FF4C4C" if theme == 'sq' else "#00e676"
-                # 💡 修改點：行距放大 margin-bottom: 9px; line-height: 1.5; font-size: 13.5px;
+                
                 html += (
-                    f"<li style='display: flex; align-items: center; justify-content: space-between; margin-bottom: 9px; font-size: 13.5px; line-height: 1.5;'>"
+                    f"<li style='display: flex; align-items: center; justify-content: space-between; margin-bottom: 6px; font-size: 13.5px; line-height: 1.4;'>"
                     f"  <div style='display: flex; align-items: center; width: 55%; overflow: hidden;'>"
                     f"      <b style='color:#FFF; width:22px; flex-shrink: 0;'>{start_idx + i + 1}.</b>"
                     f"      <span style='white-space:nowrap; overflow:hidden; text-overflow:ellipsis;'>{row['代號']}{row['名稱']}</span>"
@@ -449,15 +447,14 @@ def render_b4_top10_glass_card():
 .panel-title-b4 {{ margin: 0 0 8px 0; font-size: 12.5px; font-weight: bold; color: #bc13fe; display: flex; justify-content: space-between; align-items: flex-end; }}
 .panel-title-b4.risk {{ color: #00e676; }}
 .date-badge-b4 {{ font-size: 10px; color: #94A3B8; font-weight: normal; }}
-/* 💡 修改點：高度放大到 370px */
-.carousel-wrapper-b4 {{ position: relative; max-height: 370px; height: 370px; overflow: hidden; transition: all 0.3s ease; opacity: 1; }}
+/* 💡 修改點：縮減容器高度，收緊下方留白 */
+.carousel-wrapper-b4 {{ position: relative; max-height: 285px; height: 285px; overflow: hidden; transition: all 0.3s ease; opacity: 1; }}
 .carousel-item-b4 {{ position: absolute; top: 0; left: 0; width: 100%; opacity: 0; animation: fadeSwitchB4 20s infinite; }}
 .carousel-item-b4:nth-child(1) {{ animation-delay: 0s; }}
 .carousel-item-b4:nth-child(2) {{ animation-delay: 5s; }}
 .carousel-item-b4:nth-child(3) {{ animation-delay: 10s; }}
 .carousel-item-b4:nth-child(4) {{ animation-delay: 15s; }}
 @keyframes fadeSwitchB4 {{ 0%, 22% {{ opacity: 1; z-index: 2; }} 25%, 97% {{ opacity: 0; z-index: 1; }} 100% {{ opacity: 1; z-index: 2; }} }}
-/* 💡 修改點：移除了 @media 之前的空白斷行 */
 @media (max-width: 1200px) {{ .glass-panel-b4 {{ position: relative; top: auto; left: auto; width: 90%; max-width: 350px; margin: 10px auto; display: block; }} }}
 </style>
 <div class="glass-panel-b4" id="b4-top10-card">
@@ -532,9 +529,8 @@ def render_b5_top10_glass_card():
                     s1, s2 = unify_status_text(row.get('狀態(千)', '')), unify_status_text(row.get('狀態(四)', ''))
                     info_html = f"<div style='display:flex; width:45%; justify-content:flex-end; color:#F59E0B; font-size:10px;'><span style='width:40px; text-align:right;'>{s1}</span><span style='color:#94A3B8; font-size:9px; margin:0 2px;'>/</span><span style='width:40px; text-align:right;'>{s2}</span></div>"
                 
-                # 💡 修改點：行距放大 margin-bottom: 9px; line-height: 1.5; font-size: 13.5px;
                 html += (
-                    f"<li style='display:flex; align-items:center; justify-content:space-between; margin-bottom:9px; font-size:13.5px; line-height:1.5;'>"
+                    f"<li style='display:flex; align-items:center; justify-content:space-between; margin-bottom:6px; font-size:13.5px; line-height:1.4;'>"
                     f"  <div style='display:flex; align-items:center; width:55%; overflow:hidden;'>"
                     f"      <b style='color:#FFF; width:22px; flex-shrink:0;'>{i+1}.</b>"
                     f"      <span style='white-space:nowrap; overflow:hidden; text-overflow:ellipsis;'>{row['股票代號']}{row['股票名稱']}</span>"
@@ -567,13 +563,12 @@ def render_b5_top10_glass_card():
 .action-btn-b5:hover {{ color: #F59E0B; }}
 .panel-title-b5 {{ margin: 0 0 8px 0; font-size: 12.5px; font-weight: bold; color: #F59E0B; display: flex; justify-content: space-between; align-items: flex-end; }}
 .date-badge-b5 {{ font-size: 10px; color: #94A3B8; font-weight: normal; }}
-/* 💡 修改點：高度放大到 370px */
-.carousel-wrapper-b5 {{ position: relative; max-height: 370px; height: 370px; overflow: hidden; transition: all 0.3s ease; opacity: 1; }}
+/* 💡 修改點：縮減容器高度，收緊下方留白 */
+.carousel-wrapper-b5 {{ position: relative; max-height: 285px; height: 285px; overflow: hidden; transition: all 0.3s ease; opacity: 1; }}
 .carousel-item-b5 {{ position: absolute; top: 0; left: 0; width: 100%; opacity: 0; animation: fadeSwitchB5 10s infinite; }}
 .carousel-item-b5:nth-child(1) {{ animation-delay: 0s; }}
 .carousel-item-b5:nth-child(2) {{ animation-delay: 5s; }}
 @keyframes fadeSwitchB5 {{ 0%, 45% {{ opacity: 1; z-index: 2; }} 50%, 95% {{ opacity: 0; z-index: 1; }} 100% {{ opacity: 1; z-index: 2; }} }}
-/* 💡 修改點：移除了 @media 之前的空白斷行 */
 @media (max-width: 1200px) {{ .glass-panel-b5 {{ position: relative; top: auto; left: auto; width: 90%; max-width: 350px; margin: 10px auto; display: block; }} }}
 </style>
 <div class="glass-panel-b5" id="b5-top10-card">
