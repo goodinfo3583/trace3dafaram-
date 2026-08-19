@@ -26,14 +26,14 @@ def inject_custom_header(is_logged_in=False):
         #custom-sticky-header { position: fixed; top: 0; left: 0; width: 100%; z-index: 1000005; background: transparent !important; pointer-events: none; }
         
         .disclaimer-bar, .nav-btn-container { pointer-events: auto; }
-        .disclaimer-bar { display: flex; align-items: center; background: transparent !important; padding: 0px 15px; border: none !important; }
+        .disclaimer-bar { display: flex; align-items: center; background: transparent !important; padding: 0px 15px; border: none !important; gap: 4px; }
         
-        /* ⚙️ 頂部系統列圖示共通樣式 */
-        .system-menu { position: relative; padding: 6px 10px; cursor: pointer; background: transparent !important; display: flex; align-items: center; }
+        /* ⚙️ 頂部圖示共通樣式 (包含系統與工具箱) */
+        .system-menu { position: relative; padding: 6px 8px; cursor: pointer; background: transparent !important; display: flex; align-items: center; justify-content: center; }
         .system-icon { width: 22px; height: 22px; object-fit: contain; filter: drop-shadow(1px 1px 2px rgba(0,0,0,0.8)); transition: all 0.3s cubic-bezier(0.175, 0.885, 0.32, 1.275); }
         .system-menu:hover .system-icon { filter: drop-shadow(0px 0px 8px rgba(0, 210, 255, 0.9)); transform: scale(1.15); }
         
-        /* 🌟 專屬特效：搜尋與側欄按鈕的「定時反光/高光提示」 */
+        /* 🌟 專屬特效：定時反光/高光提示 */
         @keyframes periodicGlow {
             0%, 82% { filter: brightness(1) drop-shadow(1px 1px 2px rgba(0,0,0,0.8)); transform: scale(1); }
             88% { filter: brightness(1.7) drop-shadow(0 0 12px rgba(56, 189, 248, 1)); transform: scale(1.2); }
@@ -41,20 +41,12 @@ def inject_custom_header(is_logged_in=False):
             100% { filter: brightness(1) drop-shadow(1px 1px 2px rgba(0,0,0,0.8)); }
         }
         
-        /* 綁定動畫到側欄按鈕的圖示上 */
-        #custom-sidebar-toggle .system-icon {
-            animation: periodicGlow 5s infinite ease-in-out; 
-        }
-        /* 滑鼠停在上面時暫停閃爍，維持發亮 */
-        #custom-sidebar-toggle:hover .system-icon {
-            animation-play-state: paused;
-            filter: brightness(1.2) drop-shadow(0px 0px 8px rgba(0, 210, 255, 0.9));
-            transform: scale(1.15);
-        }
+        #custom-sidebar-toggle .system-icon { animation: periodicGlow 5s infinite ease-in-out; }
+        #custom-sidebar-toggle:hover .system-icon { animation-play-state: paused; filter: brightness(1.2) drop-shadow(0px 0px 8px rgba(0, 210, 255, 0.9)); transform: scale(1.15); }
 
         /* 下拉選單 */
         .system-dropdown { position: absolute; top: 100%; left: 10px; width: 280px; background-color: rgba(17, 22, 34, 0.95); border: 1px solid rgba(255,255,255,0.1); border-top: none; border-radius: 0 0 8px 8px; padding: 0; max-height: 0; opacity: 0; overflow: hidden; transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1); box-shadow: 0px 8px 20px rgba(0,0,0,0.8); z-index: 1000010; backdrop-filter: blur(10px); }
-        .system-menu:hover .system-dropdown { max-height: 500px; opacity: 1; padding: 8px 0; }
+        .system-menu:hover .system-dropdown { max-height: 600px; opacity: 1; padding: 8px 0; }
         
         .dropdown-item { padding: 10px 15px; border-bottom: 1px solid rgba(255,255,255,0.05); }
         .dropdown-item:last-child { border-bottom: none; }
@@ -69,7 +61,11 @@ def inject_custom_header(is_logged_in=False):
         .vip-login-btn { color: #FFD700 !important; font-size: 14px; justify-content: center; margin-top: 2px; }
         .vip-login-btn:hover { text-shadow: 0 0 10px rgba(255, 215, 0, 0.8); }
 
-        /* 💎 懸浮式導覽列 */
+        /* 未解鎖/開發中 道具效果 */
+        .locked-item { opacity: 0.5; filter: grayscale(50%); cursor: not-allowed; }
+        .locked-item:hover { background-color: transparent; opacity: 0.8; filter: grayscale(0%); }
+
+        /* 💎 懸浮式導覽列 (純粹的籌碼動向儀表板) */
         .nav-btn-container { 
             display: flex; flex-wrap: wrap; justify-content: flex-end; align-items: center; 
             padding: 8px 15px; gap: 6px; 
@@ -82,7 +78,6 @@ def inject_custom_header(is_logged_in=False):
             width: fit-content; margin-left: auto;
         }
         
-        /* ✨ 導覽列按鈕與流光特效 */
         .nav-text-link { 
             position: relative; overflow: hidden;
             text-decoration: none !important; color: #CBD5E1 !important; font-size: 15px; font-weight: 600; 
@@ -122,10 +117,7 @@ def inject_custom_header(is_logged_in=False):
             display: flex; align-items: center; justify-content: center; cursor: pointer; 
             margin-right: 15px; background: transparent; border: none; padding: 6px 10px;
         }
-        .global-radar-toggle img { 
-            width: 22px; height: 22px; object-fit: contain; transition: all 0.4s ease; 
-            animation: floatAndPulse 3s infinite ease-in-out; 
-        }
+        .global-radar-toggle img { width: 22px; height: 22px; object-fit: contain; transition: all 0.4s ease; animation: floatAndPulse 3s infinite ease-in-out; }
         .global-radar-toggle:hover img { transform: scale(1.15); filter: drop-shadow(0 0 15px rgba(255, 215, 0, 1)); animation-play-state: paused; }
         .global-radar-toggle img.is-hidden { animation: none; opacity: 0.3; filter: grayscale(100%); transform: scale(0.9); }
 
@@ -161,6 +153,7 @@ def inject_custom_header(is_logged_in=False):
     headerDiv.innerHTML = `
         <div class="disclaimer-bar">
             
+            <!-- ⚙️ 系統設定 -->
             <div class="system-menu">
                 <div class="system-menu-title" title="系統與聲明">
                     <img src="app/static/icon-system.png" class="system-icon" alt="系統">
@@ -180,17 +173,53 @@ def inject_custom_header(is_logged_in=False):
                     </div>
                     <div class="dropdown-item">
                         <span class="dropdown-title"><img src="app/static/icon-agree.png" class="menu-icon" alt="disclaimer"> 平台聲明</span>
-                        <p class="dropdown-text">本平台僅供教育研究與籌碼觀察，絕不構成實質投資建議。資料源自公開數據，可能有延遲或錯誤。</p>
+                        <p class="dropdown-text">本平台僅供教育研究與籌碼觀察，絕不構成實質投資建議。</p>
                     </div>
                     <div class="dropdown-item" style="border-bottom: none;">
                         <span class="dropdown-title"><img src="app/static/icon-agree.png" class="menu-icon" alt="privacy"> 隱私政策</span>
-                        <p class="dropdown-text">依個資法蒐集識別資料僅供優化服務，絕不外流。可透過聯絡我們請求刪除資料。</p>
+                        <p class="dropdown-text">依個資法蒐集識別資料僅供優化服務，絕不外流。</p>
+                    </div>
+                </div>
+            </div>
+
+            <!-- 🎒 工具箱 / 擴充功能 (取代原本零散的按鈕) -->
+            <div class="system-menu">
+                <div class="system-menu-title" title="工具與擴充模組">
+                    <img src="app/static/icon-toolbox.png" class="system-icon" alt="工具箱">
+                </div>
+                
+                <div class="system-dropdown">
+                    <div class="dropdown-item actionable">
+                        <a href="#" data-target="NavToNews" class="dropdown-title internal-nav">
+                            <img src="app/static/icon-news.png" class="menu-icon" alt="news"> 市場消息
+                        </a>
+                        <p class="dropdown-text">掌握最新市場動態與總經快訊。</p>
+                    </div>
+                    <div class="dropdown-item actionable">
+                        <a href="#" data-target="NavToWatchlist" class="dropdown-title internal-nav">
+                            <img src="app/static/icon-create.png" class="menu-icon" alt="create"> 建立名單
+                        </a>
+                        <p class="dropdown-text">自訂與管理您的專屬觀察清單。</p>
+                    </div>
+                    
+                    <!-- 🔓 預告未來功能，增加遊戲期待感 -->
+                    <div class="dropdown-item locked-item">
+                        <span class="dropdown-title">
+                            <img src="app/static/icon-lock.png" class="menu-icon" alt="lock"> 權重與回測 (未解鎖)
+                        </span>
+                        <p class="dropdown-text">自訂B1-B7籌碼權重與未來勝率回測模擬。</p>
+                    </div>
+                    <div class="dropdown-item locked-item" style="border-bottom: none;">
+                        <span class="dropdown-title">
+                            <img src="app/static/icon-lock.png" class="menu-icon" alt="game"> 命運酒館 (開發中)
+                        </span>
+                        <p class="dropdown-text">塔羅占卜、主力追蹤等更多沉浸式互動副本。</p>
                     </div>
                 </div>
             </div>
 
             <div id="custom-sidebar-toggle" class="system-menu" title="搜尋與側欄功能">
-                <img src="app/static/icon-globalresearch.png" class="system-icon" alt="搜尋">
+                <img src="app/static/icon-search.png" class="system-icon" alt="搜尋">
             </div>
 
             <div style="flex-grow: 1;"></div>
@@ -202,17 +231,16 @@ def inject_custom_header(is_logged_in=False):
             <div class="disclaimer-item" id="mobile-nav-toggle" title="收起選單" style="cursor: pointer; padding-right: 5px;"><span id="nav-toggle-icon" style="font-size: 18px; color: #38BDF8;">📜</span></div>
         </div>
         
+        <!-- 💡 核心導覽列：觀察名單回歸主戰場 -->
         <div class="nav-btn-container" id="nav-btn-container">
-            <a href="#" data-target="NavToNews" class="nav-text-link internal-nav"><img src="app/static/magicbook2.png" class="nav-icon" alt="icon">市場消息</a><span class="nav-divider">|</span>
             <a href="#" data-target="NavToPool" class="nav-text-link internal-nav"><img src="app/static/magicbookfire2.png" class="nav-icon" alt="icon">觀察名單</a><span class="nav-divider">|</span>
-            <a href="#" data-target="NavToWatchlist" class="nav-text-link internal-nav"><img src="app/static/magicbookleaf.png" class="nav-icon" alt="icon">建立名單</a><span class="nav-divider">|</span>
             <a href="#" data-target="NavToB1" class="nav-text-link internal-nav"><img src="app/static/magicbookleaf.png" class="nav-icon" alt="icon">法人動向</a><span class="nav-divider">|</span>
             <a href="#" data-target="NavToB2" class="nav-text-link internal-nav"><img src="app/static/magicbookwind.png" class="nav-icon" alt="icon">法人掃貨</a><span class="nav-divider">|</span>
             <a href="#" data-target="NavToB3" class="nav-text-link internal-nav"><img src="app/static/magicbookwater.png" class="nav-icon" alt="icon">法人連買</a><span class="nav-divider">|</span>
             <a href="#" data-target="NavToB4" class="nav-text-link internal-nav"><img src="app/static/magicbookground.png" class="nav-icon" alt="icon">資券動向</a><span class="nav-divider">|</span>
             <a href="#" data-target="NavToB5" class="nav-text-link internal-nav"><img src="app/static/wirtleg.png" class="nav-icon" alt="icon">大腿動向</a><span class="nav-divider">|</span>
             <a href="#" data-target="NavToB6" class="nav-text-link internal-nav"><img src="app/static/magicbookfire.png" class="nav-icon" alt="icon">__B6_TEXT__</a><span class="nav-divider">|</span>
-            <a href="#" data-target="NavToB7" class="nav-text-link internal-nav"><img src="app/static/icon-b7.png" class="nav-icon" alt="icon">董監動向</a>
+            <a href="#" data-target="NavToB7" class="nav-text-link internal-nav"><img src="app/static/35.png" class="nav-icon" alt="icon">董監動向</a>
         </div>
     `;
     parentDoc.body.insertBefore(headerDiv, parentDoc.body.firstChild);
