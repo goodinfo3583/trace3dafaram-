@@ -34,7 +34,7 @@ def inject_custom_header(is_logged_in=False):
         .system-icon { width: 22px; height: 22px; object-fit: contain; filter: drop-shadow(1px 1px 2px rgba(0,0,0,0.8)); transition: all 0.3s; }
         .system-menu:hover .system-icon { filter: drop-shadow(0px 0px 8px rgba(0, 210, 255, 0.9)); }
         
-        .system-dropdown { position: absolute; top: 100%; left: 10px; width: 280px; background-color: rgba(17, 22, 34, 0.95); border: 1px solid #1E293B; border-top: none; border-radius: 0 0 8px 8px; padding: 0; max-height: 0; opacity: 0; overflow: hidden; transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1); box-shadow: 0px 8px 20px rgba(0,0,0,0.8); z-index: 1000; }
+        .system-dropdown { position: absolute; top: 100%; left: 10px; width: 280px; background-color: rgba(17, 22, 34, 0.95); border: 1px solid rgba(255,255,255,0.1); border-top: none; border-radius: 0 0 8px 8px; padding: 0; max-height: 0; opacity: 0; overflow: hidden; transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1); box-shadow: 0px 8px 20px rgba(0,0,0,0.8); z-index: 1000; backdrop-filter: blur(10px); }
         .system-menu:hover .system-dropdown { max-height: 500px; opacity: 1; padding: 8px 0; }
         
         .dropdown-item { padding: 10px 15px; border-bottom: 1px solid rgba(255,255,255,0.05); }
@@ -47,34 +47,84 @@ def inject_custom_header(is_logged_in=False):
         .dropdown-text { font-size: 11px; color: #94A3B8; line-height: 1.5; margin: 0; padding-left: 26px; }
         
         /* 懸停效果 */
-        .dropdown-item:hover { background-color: rgba(255,255,255,0.03); }
+        .dropdown-item:hover { background-color: rgba(255,255,255,0.05); }
         .dropdown-item.actionable:hover .dropdown-title { color: #FFD700; }
         
         .vip-login-btn { color: #FFD700 !important; font-size: 14px; justify-content: center; margin-top: 2px; }
         .vip-login-btn:hover { text-shadow: 0 0 10px rgba(255, 215, 0, 0.8); }
 
-        .nav-btn-container { display: flex; flex-wrap: wrap; justify-content: flex-end; align-items: center; padding: 8px 15px; background: transparent !important; gap: 6px; border: none !important; transition: all 0.3s ease-in-out; }
-        .nav-text-link { text-decoration: none !important; color: #94A3B8 !important; font-size: 16px; font-weight: 600; padding: 4px 6px; transition: all 0.2s ease-in-out; text-shadow: 1px 1px 4px rgba(0,0,0,1), -1px -1px 4px rgba(0,0,0,1); cursor: pointer; display: flex; align-items: center; }
-        .nav-text-link:hover { color: #FFD700 !important; text-shadow: 0 0 12px rgba(255, 215, 0, 0.8); transform: scale(1.08); }
-        .nav-divider { color: #334155; font-size: 16px; user-select: none; }
+        /* 💎 沉浸式導覽列：磨砂玻璃白底色 */
+        .nav-btn-container { 
+            display: flex; flex-wrap: wrap; justify-content: flex-end; align-items: center; 
+            padding: 8px 15px; gap: 6px; 
+            background: rgba(255, 255, 255, 0.06) !important; /* 微白的透明底色 */
+            backdrop-filter: blur(8px); /* 磨砂玻璃效果 */
+            -webkit-backdrop-filter: blur(8px);
+            border-bottom: 1px solid rgba(255, 255, 255, 0.1) !important; /* 細緻的邊框反光 */
+            box-shadow: 0 4px 20px rgba(0,0,0,0.4);
+            transition: all 0.3s ease-in-out; 
+        }
+        
+        .nav-text-link { 
+            text-decoration: none !important; color: #CBD5E1 !important; font-size: 15px; font-weight: 600; 
+            padding: 6px 10px; border-radius: 6px; transition: all 0.3s ease-in-out; 
+            text-shadow: 1px 1px 3px rgba(0,0,0,0.8); cursor: pointer; display: flex; align-items: center; 
+        }
+        
+        /* 遊戲化按鈕懸停：背景微微發亮 */
+        .nav-text-link:hover { 
+            color: #FFD700 !important; text-shadow: 0 0 10px rgba(255, 215, 0, 0.8); 
+            background: rgba(255, 255, 255, 0.1); transform: translateY(-2px); 
+        }
+        
+        .nav-divider { color: rgba(255, 255, 255, 0.2); font-size: 16px; user-select: none; margin: 0 2px; }
         #custom-sidebar-toggle { color: #38BDF8 !important; }
 
-        .nav-icon { width: 22px; height: 22px; margin-right: 5px; border-radius: 4px; object-fit: cover; position: relative; top: -2px; left: 0px; transition: all 0.3s ease-in-out; }
-        .nav-text-link:hover .nav-icon { filter: drop-shadow(0px 0px 6px rgba(255, 215, 0, 0.9)) brightness(1.15); }
+        .nav-icon { width: 20px; height: 20px; margin-right: 6px; object-fit: contain; position: relative; top: -1px; transition: all 0.3s ease-in-out; }
+        .nav-text-link:hover .nav-icon { filter: drop-shadow(0px 0px 6px rgba(255, 215, 0, 0.9)) brightness(1.2); }
         
-        /* 💡 圓形純圖示雷達按鈕 */
+        /* 🌟 靈動特效動畫：呼吸與浮動 */
+        @keyframes floatAndPulse {
+            0% { transform: translateY(0px) scale(1); filter: drop-shadow(0 0 5px rgba(56, 189, 248, 0.4)); }
+            50% { transform: translateY(-4px) scale(1.05); filter: drop-shadow(0 0 12px rgba(56, 189, 248, 0.9)); }
+            100% { transform: translateY(0px) scale(1); filter: drop-shadow(0 0 5px rgba(56, 189, 248, 0.4)); }
+        }
+
+        /* 💡 移除生硬外框的純圖示雷達按鈕 */
         .global-radar-toggle {
             display: flex; align-items: center; justify-content: center; cursor: pointer; 
-            width: 34px; height: 34px; margin-right: 15px;
-            background: rgba(15, 23, 42, 0.6); border: 1px solid #38BDF8; border-radius: 50%;
-            transition: all 0.3s ease; backdrop-filter: blur(4px);
+            width: 38px; height: 38px; margin-right: 15px;
+            background: transparent; border: none; /* 移除外框與背景 */
         }
-        .global-radar-toggle:hover {
-            background: rgba(56, 189, 248, 0.2); border-color: #FFD700; box-shadow: 0 0 10px rgba(56, 189, 248, 0.5); transform: scale(1.1);
+        
+        .global-radar-toggle img { 
+            width: 26px; height: 26px; object-fit: contain; transition: all 0.4s cubic-bezier(0.175, 0.885, 0.32, 1.275); 
+            animation: floatAndPulse 3s infinite ease-in-out; /* 套用靈動特效 */
         }
-        .global-radar-toggle img { width: 18px; height: 18px; object-fit: contain; transition: all 0.3s; }
+        
+        .global-radar-toggle:hover img {
+            transform: scale(1.2); filter: drop-shadow(0 0 15px rgba(255, 215, 0, 1));
+            animation-play-state: paused; /* 滑鼠移上去時暫停浮動，專注於放大 */
+        }
 
-        @media (max-width: 768px) { .nav-btn-container { padding: 5px 10px; } .nav-divider { display: none; } .nav-text-link { font-size: 14px; margin: 2px; } .global-radar-toggle { display: flex; } }
+        /* 停止狀態的 class */
+        .global-radar-toggle img.is-hidden {
+            animation: none; /* 隱藏時關閉動畫 */
+            opacity: 0.3;
+            filter: grayscale(100%);
+            transform: scale(0.9);
+        }
+
+        @media (max-width: 768px) { 
+            .nav-btn-container { 
+                padding: 10px; flex-direction: column; align-items: flex-start; 
+                background: rgba(15, 20, 30, 0.85) !important; /* 手機版展開時用稍深的玻璃底色 */
+                border-radius: 0 0 12px 12px; border: 1px solid rgba(255,255,255,0.1);
+            } 
+            .nav-divider { display: none; } 
+            .nav-text-link { font-size: 15px; margin: 4px 0; width: 100%; } 
+            .global-radar-toggle { display: flex; } 
+        }
         .stApp { margin-top: 50px !important; }
     `;
     parentDoc.head.appendChild(style);
@@ -127,7 +177,7 @@ def inject_custom_header(is_logged_in=False):
 
             <div style="flex-grow: 1;"></div>
             
-            <!-- 💡 雷達總控按鈕 (純圓形圖示) -->
+            <!-- 💡 雷達總控按鈕 (靈動特效圖示) -->
             <div id="global-radar-btn" class="global-radar-toggle" title="開關排行卡片">
                 <img src="app/static/icon-card.png" alt="雷達總控" id="global-radar-img">
             </div>
@@ -146,7 +196,7 @@ def inject_custom_header(is_logged_in=False):
             <a href="#" data-target="NavToB4" class="nav-text-link internal-nav"><img src="app/static/magicbookground.png" class="nav-icon" alt="icon">資券動向</a><span class="nav-divider">|</span>
             <a href="#" data-target="NavToB5" class="nav-text-link internal-nav"><img src="app/static/wirtleg.png" class="nav-icon" alt="icon">大腿動向</a><span class="nav-divider">|</span>
             <a href="#" data-target="NavToB6" class="nav-text-link internal-nav"><img src="app/static/magicbookfire.png" class="nav-icon" alt="icon">__B6_TEXT__</a>
-            <a href="#" data-target="NavToB7" class="nav-text-link internal-nav"><img src="app/static/35.png" class="nav-icon" alt="icon">董監動向</a><span class="nav-divider">|</span>
+            <a href="#" data-target="NavToB7" class="nav-text-link internal-nav"><img src="app/static/35.png" class="nav-icon" alt="icon">董監動向</a>
         </div>
     `;
     parentDoc.body.insertBefore(headerDiv, parentDoc.body.firstChild);
@@ -216,13 +266,11 @@ def inject_custom_header(is_logged_in=False):
                     }
                 });
                 
-                // 💡 修改：由於文字移除了，改用邊框顏色與透明度來暗示開關狀態
+                // 💡 修改：透過 toggle class 來開關動畫與透明度
                 if (isAllHidden) {
-                    globalRadarBtn.style.borderColor = '#64748B'; 
-                    globalRadarImg.style.opacity = '0.4';
+                    globalRadarImg.classList.add('is-hidden');
                 } else {
-                    globalRadarBtn.style.borderColor = '#38BDF8';
-                    globalRadarImg.style.opacity = '1';
+                    globalRadarImg.classList.remove('is-hidden');
                 }
             };
         }
