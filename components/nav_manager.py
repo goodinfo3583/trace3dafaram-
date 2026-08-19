@@ -191,13 +191,13 @@ def inject_custom_header(is_logged_in=False):
                 <div class="system-dropdown">
                     <div class="dropdown-item actionable">
                         <a href="#" data-target="NavToNews" class="dropdown-title internal-nav">
-                            <img src="app/static/icon-news.png" class="menu-icon" alt="news"> 市場消息
+                            <img src="app/static/magicbook2.png" class="menu-icon" alt="news"> 市場消息
                         </a>
                         <p class="dropdown-text">掌握最新市場動態與總經快訊。</p>
                     </div>
                     <div class="dropdown-item actionable">
                         <a href="#" data-target="NavToWatchlist" class="dropdown-title internal-nav">
-                            <img src="app/static/icon-create.png" class="menu-icon" alt="create"> 建立名單
+                            <img src="app/static/icon-watchlist.png" class="menu-icon" alt="create"> 建立名單
                         </a>
                         <p class="dropdown-text">自訂與管理您的專屬觀察清單。</p>
                     </div>
@@ -205,15 +205,15 @@ def inject_custom_header(is_logged_in=False):
                     <!-- 🔓 預告未來功能，增加遊戲期待感 -->
                     <div class="dropdown-item locked-item">
                         <span class="dropdown-title">
-                            <img src="app/static/icon-lock.png" class="menu-icon" alt="lock"> 權重與回測 (未解鎖)
+                            <img src="app/static/icon-podiumaward.png" class="menu-icon" alt="lock"> 權重與回測 (未解鎖)
                         </span>
-                        <p class="dropdown-text">自訂B1-B7籌碼權重與未來勝率回測模擬。</p>
+                        <p class="dropdown-text">自訂計分籌碼權重與未來勝率回測模擬。</p>
                     </div>
                     <div class="dropdown-item locked-item" style="border-bottom: none;">
                         <span class="dropdown-title">
-                            <img src="app/static/icon-lock.png" class="menu-icon" alt="game"> 命運酒館 (開發中)
+                            <img src="app/static/icon-chessknightalt.png" class="menu-icon" alt="game"> 命運酒館 (開發中)
                         </span>
-                        <p class="dropdown-text">塔羅占卜、主力追蹤等更多沉浸式互動副本。</p>
+                        <p class="dropdown-text">休息一下別殺進殺出占個卜、主力追蹤等更多互動功能。</p>
                     </div>
                 </div>
             </div>
