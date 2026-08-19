@@ -28,12 +28,12 @@ def inject_custom_header(is_logged_in=False):
         .disclaimer-bar, .nav-btn-container { pointer-events: auto; }
         .disclaimer-bar { display: flex; align-items: center; background: transparent !important; padding: 0px 15px; border: none !important; gap: 4px; }
         
-        /* ⚙️ 頂部圖示共通樣式 (包含系統與工具箱) */
+        /* ⚙️ 頂部圖示共通樣式 */
         .system-menu { position: relative; padding: 6px 8px; cursor: pointer; background: transparent !important; display: flex; align-items: center; justify-content: center; }
         .system-icon { width: 22px; height: 22px; object-fit: contain; filter: drop-shadow(1px 1px 2px rgba(0,0,0,0.8)); transition: all 0.3s cubic-bezier(0.175, 0.885, 0.32, 1.275); }
         .system-menu:hover .system-icon { filter: drop-shadow(0px 0px 8px rgba(0, 210, 255, 0.9)); transform: scale(1.15); }
         
-        /* 🌟 專屬特效：定時反光/高光提示 */
+        /* 🌟 定時反光特效 */
         @keyframes periodicGlow {
             0%, 82% { filter: brightness(1) drop-shadow(1px 1px 2px rgba(0,0,0,0.8)); transform: scale(1); }
             88% { filter: brightness(1.7) drop-shadow(0 0 12px rgba(56, 189, 248, 1)); transform: scale(1.2); }
@@ -43,6 +43,21 @@ def inject_custom_header(is_logged_in=False):
         
         #custom-sidebar-toggle .system-icon { animation: periodicGlow 5s infinite ease-in-out; }
         #custom-sidebar-toggle:hover .system-icon { animation-play-state: paused; filter: brightness(1.2) drop-shadow(0px 0px 8px rgba(0, 210, 255, 0.9)); transform: scale(1.15); }
+
+        /* 🎁 贊助按鈕特別特效 (微微上下浮動) */
+        @keyframes floatDonate {
+            0%, 100% { transform: translateY(0); filter: drop-shadow(0 0 5px rgba(255, 215, 0, 0.4)); }
+            50% { transform: translateY(-2px); filter: drop-shadow(0 0 10px rgba(255, 215, 0, 0.8)); }
+        }
+        #donate-btn .system-icon { animation: floatDonate 3s infinite ease-in-out; }
+        #donate-btn:hover .system-icon { animation-play-state: paused; transform: scale(1.2); }
+
+        /* 綠色補血特效動畫 */
+        @keyframes healFlash {
+            0% { opacity: 0; }
+            50% { opacity: 1; transform: scale(1.2); }
+            100% { opacity: 0; transform: scale(1.5); }
+        }
 
         /* 下拉選單 */
         .system-dropdown { position: absolute; top: 100%; left: 10px; width: 280px; background-color: rgba(17, 22, 34, 0.95); border: 1px solid rgba(255,255,255,0.1); border-top: none; border-radius: 0 0 8px 8px; padding: 0; max-height: 0; opacity: 0; overflow: hidden; transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1); box-shadow: 0px 8px 20px rgba(0,0,0,0.8); z-index: 1000010; backdrop-filter: blur(10px); }
@@ -60,12 +75,15 @@ def inject_custom_header(is_logged_in=False):
         
         .vip-login-btn { color: #FFD700 !important; font-size: 14px; justify-content: center; margin-top: 2px; }
         .vip-login-btn:hover { text-shadow: 0 0 10px rgba(255, 215, 0, 0.8); }
+        
+        /* 登出狀態按鈕樣式 (紅色警示) */
+        .vip-logout-btn { color: #FF4C4C !important; font-size: 14px; justify-content: center; margin-top: 2px;}
+        .vip-logout-btn:hover { text-shadow: 0 0 10px rgba(255, 76, 76, 0.8); }
 
-        /* 未解鎖/開發中 道具效果 */
         .locked-item { opacity: 0.5; filter: grayscale(50%); cursor: not-allowed; }
         .locked-item:hover { background-color: transparent; opacity: 0.8; filter: grayscale(0%); }
 
-        /* 💎 懸浮式導覽列 (純粹的籌碼動向儀表板) */
+        /* 💎 導覽列 */
         .nav-btn-container { 
             display: flex; flex-wrap: wrap; justify-content: flex-end; align-items: center; 
             padding: 8px 15px; gap: 6px; 
@@ -106,7 +124,6 @@ def inject_custom_header(is_logged_in=False):
         .nav-icon { width: 20px; height: 20px; margin-right: 6px; object-fit: contain; transition: all 0.3s ease-in-out; }
         .nav-text-link:hover .nav-icon { filter: drop-shadow(0px 0px 6px rgba(255, 215, 0, 0.9)) brightness(1.2); }
         
-        /* 🌟 雷達按鈕靈動浮動特效 */
         @keyframes floatAndPulse {
             0% { transform: translateY(0px) scale(1); filter: drop-shadow(0 0 5px rgba(56, 189, 248, 0.4)); }
             50% { transform: translateY(-3px) scale(1.05); filter: drop-shadow(0 0 12px rgba(56, 189, 248, 0.9)); }
@@ -123,7 +140,6 @@ def inject_custom_header(is_logged_in=False):
 
         .force-hide { display: none !important; }
 
-        /* 📱 手機版專屬：派蒙網格菜單 */
         @media (max-width: 768px) { 
             .nav-btn-container { 
                 width: 96%; margin: 10px auto; 
@@ -150,6 +166,11 @@ def inject_custom_header(is_logged_in=False):
     const headerDiv = parentDoc.createElement('div');
     headerDiv.id = 'custom-sticky-header';
     
+    // 動態生成類別與圖示
+    const login_class = is_logged_in ? "vip-logout-btn" : "vip-login-btn";
+    const login_icon = is_logged_in ? "app/static/icon-logout.png" : "app/static/icon-login.png";
+    const login_action = is_logged_in ? "登出" : "登入";
+
     headerDiv.innerHTML = `
         <div class="disclaimer-bar">
             
@@ -161,8 +182,9 @@ def inject_custom_header(is_logged_in=False):
                 
                 <div class="system-dropdown">
                     <div class="dropdown-item actionable" style="text-align: center;">
-                        <a href="#" data-target="登入" class="dropdown-title internal-nav vip-login-btn">
-                            <img src="app/static/icon-login.png" class="menu-icon" alt="login"> __LOGIN_TEXT__
+                        <!-- 💡 登入/登出按鈕 -->
+                        <a href="#" data-target="${login_action}" class="dropdown-title internal-nav ${login_class}">
+                            <img src="${login_icon}" class="menu-icon" alt="login"> ${login_action}
                         </a>
                     </div>
                     <div class="dropdown-item actionable">
@@ -182,13 +204,21 @@ def inject_custom_header(is_logged_in=False):
                 </div>
             </div>
 
-            <!-- 🎒 工具箱 / 擴充功能 (取代原本零散的按鈕) -->
+            <!-- 🎒 工具箱 -->
             <div class="system-menu">
                 <div class="system-menu-title" title="工具與擴充模組">
                     <img src="app/static/icon-toolbox.png" class="system-icon" alt="工具箱">
                 </div>
                 
                 <div class="system-dropdown">
+                    <!-- 🧪 精神回復藥水 -->
+                    <div class="dropdown-item actionable" style="border-bottom: 2px solid rgba(74, 222, 128, 0.3);">
+                        <a href="#" id="potion-trigger" class="dropdown-title internal-nav" style="color: #4ADE80;">
+                            <img src="app/static/icon-potion.png" class="menu-icon" alt="potion"> 精神回復藥水
+                        </a>
+                        <p class="dropdown-text">清除思緒雜訊，重置儀表板並恢復冷靜視角。</p>
+                    </div>
+
                     <div class="dropdown-item actionable">
                         <a href="#" data-target="NavToNews" class="dropdown-title internal-nav">
                             <img src="app/static/magicbook2.png" class="menu-icon" alt="news"> 市場消息
@@ -202,7 +232,6 @@ def inject_custom_header(is_logged_in=False):
                         <p class="dropdown-text">自訂與管理您的專屬觀察清單。</p>
                     </div>
                     
-                    <!-- 🔓 預告未來功能，增加遊戲期待感 -->
                     <div class="dropdown-item locked-item">
                         <span class="dropdown-title">
                             <img src="app/static/icon-podiumaward.png" class="menu-icon" alt="lock"> 權重與回測 (未解鎖)
@@ -213,13 +242,20 @@ def inject_custom_header(is_logged_in=False):
                         <span class="dropdown-title">
                             <img src="app/static/icon-chessknightalt.png" class="menu-icon" alt="game"> 命運酒館 (開發中)
                         </span>
-                        <p class="dropdown-text">休息一下別殺進殺出占個卜、主力追蹤等更多互動功能。</p>
+                        <p class="dropdown-text">休息一下別殺進殺出，占個卜或追蹤主力。</p>
                     </div>
                 </div>
             </div>
 
             <div id="custom-sidebar-toggle" class="system-menu" title="搜尋與側欄功能">
                 <img src="app/static/icon-search.png" class="system-icon" alt="搜尋">
+            </div>
+
+            <!-- 🎁 贊助開發按鈕 -->
+            <div id="donate-btn" class="system-menu" title="贊助開發">
+                <a href="#" data-target="NavToDonate" class="internal-nav" style="display:flex;">
+                    <img src="app/static/icon-donatebox.png" class="system-icon" alt="贊助">
+                </a>
             </div>
 
             <div style="flex-grow: 1;"></div>
@@ -231,7 +267,6 @@ def inject_custom_header(is_logged_in=False):
             <div class="disclaimer-item" id="mobile-nav-toggle" title="收起選單" style="cursor: pointer; padding-right: 5px;"><span id="nav-toggle-icon" style="font-size: 18px; color: #38BDF8;">📜</span></div>
         </div>
         
-        <!-- 💡 核心導覽列：觀察名單回歸主戰場 -->
         <div class="nav-btn-container" id="nav-btn-container">
             <a href="#" data-target="NavToPool" class="nav-text-link internal-nav"><img src="app/static/magicbookfire2.png" class="nav-icon" alt="icon">觀察名單</a><span class="nav-divider">|</span>
             <a href="#" data-target="NavToB1" class="nav-text-link internal-nav"><img src="app/static/magicbookleaf.png" class="nav-icon" alt="icon">法人動向</a><span class="nav-divider">|</span>
@@ -246,16 +281,57 @@ def inject_custom_header(is_logged_in=False):
     parentDoc.body.insertBefore(headerDiv, parentDoc.body.firstChild);
 
     setTimeout(() => {
+        // 綁定所有帶有 data-target 的內部導航
         const navLinks = parentDoc.querySelectorAll('.internal-nav');
         navLinks.forEach(link => {
             link.onclick = (e) => {
                 e.preventDefault(); 
                 const targetName = link.getAttribute('data-target');
+                if (!targetName) return;
+
+                // 找尋 Streamlit 產生的真實 button
                 const btns = Array.from(parentDoc.querySelectorAll('button'));
-                const targetBtn = btns.find(b => b.textContent.includes(targetName));
-                if (targetBtn) targetBtn.click();
+                let targetBtn = btns.find(b => b.textContent.includes(targetName));
+                
+                // 如果是贊助，暫時導向 Contact
+                if(targetName === 'NavToDonate' && !targetBtn) {
+                    targetBtn = btns.find(b => b.textContent.includes('NavToContact'));
+                }
+
+                if (targetBtn) {
+                    targetBtn.click();
+                    
+                    // 💡 如果是登出動作，我們幫它手動重整畫面，清除暫存感
+                    if (targetName === "登出") {
+                        setTimeout(() => {
+                            window.location.reload();
+                        }, 500);
+                    }
+                }
             };
         });
+
+        // 🧪 藥水特效邏輯
+        const potionTrigger = parentDoc.getElementById('potion-trigger');
+        if (potionTrigger) {
+            potionTrigger.onclick = (e) => {
+                e.preventDefault();
+                const overlay = parentDoc.createElement('div');
+                overlay.style.position = 'fixed';
+                overlay.style.top = '0'; overlay.style.left = '0';
+                overlay.style.width = '100%'; overlay.style.height = '100%';
+                overlay.style.background = 'radial-gradient(circle, rgba(74, 222, 128, 0.3) 0%, transparent 70%)';
+                overlay.style.pointerEvents = 'none';
+                overlay.style.zIndex = '9999999';
+                overlay.style.animation = 'healFlash 0.8s ease-out';
+                parentDoc.body.appendChild(overlay);
+                
+                setTimeout(() => { 
+                    overlay.remove(); 
+                    window.location.reload();
+                }, 800);
+            };
+        }
 
         const menuToggle = parentDoc.getElementById('mobile-nav-toggle');
         const navContainer = parentDoc.getElementById('nav-btn-container');
@@ -324,10 +400,11 @@ def inject_custom_header(is_logged_in=False):
             };
         }
 
+        // 隱藏原始的 Streamlit Buttons
         setInterval(() => {
             const allBtns = Array.from(parentDoc.querySelectorAll('button'));
             allBtns.forEach(b => {
-                if(b.textContent.includes('NavTo') || b.textContent.includes('登入')) { 
+                if(b.textContent.includes('NavTo') || b.textContent === '登入' || b.textContent === '登出') { 
                     const wrapper = b.closest('div[data-testid="stElementContainer"]');
                     if (wrapper) wrapper.style.display = 'none';
                 }
@@ -337,7 +414,6 @@ def inject_custom_header(is_logged_in=False):
     </script>
     """
     
-    inject_js = inject_js.replace("__LOGIN_TEXT__", login_btn_text)
     inject_js = inject_js.replace("__B6_TEXT__", b6_text)
     components.html(inject_js, height=0, width=0)
 
@@ -346,6 +422,11 @@ import streamlit as st
 def render_proxy_buttons():
     def change_page(page_name):
         st.query_params["page"] = page_name 
+
+    # 處理登出：清空狀態並導回首頁 (前端 JS 會自動重整畫面)
+    def handle_logout():
+        st.session_state.clear()
+        st.query_params["page"] = "home"
 
     with st.container():
         st.button("NavToContact", on_click=change_page, args=("contact",))
@@ -359,4 +440,7 @@ def render_proxy_buttons():
         st.button("NavToB5", on_click=change_page, args=("b5",))
         st.button("NavToB6", on_click=change_page, args=("b6",))
         st.button("NavToB7", on_click=change_page, args=("b7",))
+        
+        # 登入與登出 Proxy Buttons
         st.button("登入", on_click=change_page, args=("login",))
+        st.button("登出", on_click=handle_logout)
