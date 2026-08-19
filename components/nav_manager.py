@@ -23,7 +23,6 @@ def inject_custom_header(is_logged_in=False):
         [data-testid="stToolbar"] { display: none !important; }
         [data-testid="collapsedControl"] { top: 70px !important; z-index: 1000000 !important; background-color: rgba(10, 13, 20, 0.8) !important; border-radius: 50%; }
 
-        /* 💡 修正3：大幅提升 Header 層級，防止被 B3 卡片覆蓋 */
         #custom-sticky-header { position: fixed; top: 0; left: 0; width: 100%; z-index: 1000005; background: transparent !important; pointer-events: none; }
         
         .disclaimer-bar, .nav-btn-container { pointer-events: auto; }
@@ -34,6 +33,26 @@ def inject_custom_header(is_logged_in=False):
         .system-icon { width: 22px; height: 22px; object-fit: contain; filter: drop-shadow(1px 1px 2px rgba(0,0,0,0.8)); transition: all 0.3s cubic-bezier(0.175, 0.885, 0.32, 1.275); }
         .system-menu:hover .system-icon { filter: drop-shadow(0px 0px 8px rgba(0, 210, 255, 0.9)); transform: scale(1.15); }
         
+        /* 🌟 專屬特效：搜尋與側欄按鈕的「定時反光/高光提示」 */
+        @keyframes periodicGlow {
+            0%, 82% { filter: brightness(1) drop-shadow(1px 1px 2px rgba(0,0,0,0.8)); transform: scale(1); }
+            88% { filter: brightness(1.7) drop-shadow(0 0 12px rgba(56, 189, 248, 1)); transform: scale(1.2); }
+            94% { filter: brightness(1) drop-shadow(1px 1px 2px rgba(0,0,0,0.8)); transform: scale(1); }
+            100% { filter: brightness(1) drop-shadow(1px 1px 2px rgba(0,0,0,0.8)); }
+        }
+        
+        /* 綁定動畫到側欄按鈕的圖示上 */
+        #custom-sidebar-toggle .system-icon {
+            animation: periodicGlow 5s infinite ease-in-out; 
+        }
+        /* 滑鼠停在上面時暫停閃爍，維持發亮 */
+        #custom-sidebar-toggle:hover .system-icon {
+            animation-play-state: paused;
+            filter: brightness(1.2) drop-shadow(0px 0px 8px rgba(0, 210, 255, 0.9));
+            transform: scale(1.15);
+        }
+
+        /* 下拉選單 */
         .system-dropdown { position: absolute; top: 100%; left: 10px; width: 280px; background-color: rgba(17, 22, 34, 0.95); border: 1px solid rgba(255,255,255,0.1); border-top: none; border-radius: 0 0 8px 8px; padding: 0; max-height: 0; opacity: 0; overflow: hidden; transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1); box-shadow: 0px 8px 20px rgba(0,0,0,0.8); z-index: 1000010; backdrop-filter: blur(10px); }
         .system-menu:hover .system-dropdown { max-height: 500px; opacity: 1; padding: 8px 0; }
         
@@ -50,20 +69,20 @@ def inject_custom_header(is_logged_in=False):
         .vip-login-btn { color: #FFD700 !important; font-size: 14px; justify-content: center; margin-top: 2px; }
         .vip-login-btn:hover { text-shadow: 0 0 10px rgba(255, 215, 0, 0.8); }
 
-        /* 💎 修正4：懸浮式導覽列，不覆蓋全螢幕的毛玻璃 */
+        /* 💎 懸浮式導覽列 */
         .nav-btn-container { 
             display: flex; flex-wrap: wrap; justify-content: flex-end; align-items: center; 
             padding: 8px 15px; gap: 6px; 
             background: rgba(255, 255, 255, 0.06) !important; 
             backdrop-filter: blur(8px); -webkit-backdrop-filter: blur(8px);
             border: 1px solid rgba(255, 255, 255, 0.1) !important; border-top: none !important; border-right: none !important;
-            border-radius: 0 0 0 16px; /* 左下角圓角，使其像一個懸浮面板 */
+            border-radius: 0 0 0 16px;
             box-shadow: -4px 4px 15px rgba(0,0,0,0.3);
             transition: all 0.3s ease-in-out; 
-            width: fit-content; margin-left: auto; /* 靠右對齊且不撐滿全版 */
+            width: fit-content; margin-left: auto;
         }
         
-        /* ✨ 流光特效按鈕 */
+        /* ✨ 導覽列按鈕與流光特效 */
         .nav-text-link { 
             position: relative; overflow: hidden;
             text-decoration: none !important; color: #CBD5E1 !important; font-size: 15px; font-weight: 600; 
@@ -92,7 +111,7 @@ def inject_custom_header(is_logged_in=False):
         .nav-icon { width: 20px; height: 20px; margin-right: 6px; object-fit: contain; transition: all 0.3s ease-in-out; }
         .nav-text-link:hover .nav-icon { filter: drop-shadow(0px 0px 6px rgba(255, 215, 0, 0.9)) brightness(1.2); }
         
-        /* 🌟 靈動特效動畫：雷達按鈕 */
+        /* 🌟 雷達按鈕靈動浮動特效 */
         @keyframes floatAndPulse {
             0% { transform: translateY(0px) scale(1); filter: drop-shadow(0 0 5px rgba(56, 189, 248, 0.4)); }
             50% { transform: translateY(-3px) scale(1.05); filter: drop-shadow(0 0 12px rgba(56, 189, 248, 0.9)); }
@@ -110,13 +129,12 @@ def inject_custom_header(is_logged_in=False):
         .global-radar-toggle:hover img { transform: scale(1.15); filter: drop-shadow(0 0 15px rgba(255, 215, 0, 1)); animation-play-state: paused; }
         .global-radar-toggle img.is-hidden { animation: none; opacity: 0.3; filter: grayscale(100%); transform: scale(0.9); }
 
-        /* 💡 修正2：可靠的強制隱藏 Class，解決收闔Bug */
         .force-hide { display: none !important; }
 
-        /* 📱 手機版專屬：派蒙網格菜單 (Genshin Style 2xN) */
+        /* 📱 手機版專屬：派蒙網格菜單 */
         @media (max-width: 768px) { 
             .nav-btn-container { 
-                width: 96%; margin: 10px auto; /* 手機置中並帶有邊距 */
+                width: 96%; margin: 10px auto; 
                 display: grid !important; grid-template-columns: repeat(2, 1fr); gap: 12px;
                 padding: 20px 15px; background: rgba(15, 20, 30, 0.92) !important;
                 border-radius: 12px; border: 1px solid rgba(255,255,255,0.1) !important;
@@ -143,7 +161,6 @@ def inject_custom_header(is_logged_in=False):
     headerDiv.innerHTML = `
         <div class="disclaimer-bar">
             
-            <!-- 💡 修正1：系統按鈕放在左邊，搜尋/側欄在右邊 -->
             <div class="system-menu">
                 <div class="system-menu-title" title="系統與聲明">
                     <img src="app/static/icon-system.png" class="system-icon" alt="系統">
@@ -172,7 +189,6 @@ def inject_custom_header(is_logged_in=False):
                 </div>
             </div>
 
-            <!-- 側欄/搜尋按鈕 (已移動到系統按鈕右側) -->
             <div id="custom-sidebar-toggle" class="system-menu" title="搜尋與側欄功能">
                 <img src="app/static/icon-search.png" class="system-icon" alt="搜尋">
             </div>
@@ -213,13 +229,11 @@ def inject_custom_header(is_logged_in=False):
             };
         });
 
-        // 💡 修正2：更強健的選單收闔邏輯 (解決點擊無反應問題)
         const menuToggle = parentDoc.getElementById('mobile-nav-toggle');
         const navContainer = parentDoc.getElementById('nav-btn-container');
         const iconSpan = parentDoc.getElementById('nav-toggle-icon');
-        let isNavOpen = true; // 預設狀態
+        let isNavOpen = true; 
         
-        // 如果是手機版，預設自動隱藏選單，節省畫面空間！
         if (window.innerWidth <= 768 && navContainer && iconSpan) {
             isNavOpen = false;
             navContainer.classList.add('force-hide');
@@ -230,15 +244,15 @@ def inject_custom_header(is_logged_in=False):
         if (menuToggle && navContainer && iconSpan) {
             menuToggle.onclick = (e) => {
                 e.preventDefault();
-                isNavOpen = !isNavOpen; // 切換狀態
+                isNavOpen = !isNavOpen; 
                 
                 if (isNavOpen) {
-                    navContainer.classList.remove('force-hide'); // 移除隱藏 Class
+                    navContainer.classList.remove('force-hide'); 
                     menuToggle.title = "收起選單";
                     iconSpan.innerText = '📜';
                     iconSpan.style.color = '#38BDF8';
                 } else {
-                    navContainer.classList.add('force-hide'); // 加入隱藏 Class
+                    navContainer.classList.add('force-hide'); 
                     menuToggle.title = "展開選單";
                     iconSpan.innerText = '📙';
                     iconSpan.style.color = '#FFD700';
