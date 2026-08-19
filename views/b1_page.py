@@ -404,7 +404,9 @@ def show_b1_page(DATA_DIR, STOCK_DICT):
                 
             admin_pw = st.text_input("解鎖功能", type="password", key="admin_pw_input")
             
-            if admin_pw == "DDong888": 
+            expected_pw = st.secrets["passwords"]["b1_admin"]# 從 secrets 中讀取密碼
+            
+            if admin_pw == expected_pw: 
                 st.success("🔓 驗證成功！請執行快照封存。")
                 
                 if st.button("🔄 重新整理 GitHub 最新數據", use_container_width=True):
