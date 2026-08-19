@@ -1,4 +1,165 @@
-# 📋 完美等比 8 欄位設計 (調整比例：縮小名稱與產業的間距，放大筆記空間)
+# views/watchlist_page.py
+import streamlit as st
+import os
+import json
+import re
+import time
+import pandas as pd
+
+# 定義儲存使用者資料的路徑
+USER_DATA_DIR = "./data/users"
+if not os.path.exists(USER_DATA_DIR):
+    os.makedirs(USER_DATA_DIR)
+
+# ==========================================
+# 🚀 高效能批次報價引擎 (快取 5 分鐘)
+# ==========================================
+@st.cache_data(ttl=300)
+def get_watchlist_quotes(stock_codes):
+    """批次向 Yahoo Finance 請求報價，避免迴圈卡死網頁"""
+    import yfinance as yf
+    
+    if not stock_codes: return {}
+    
+    # 將代號分別加上上市 (.TW) 與上櫃 (.TWO) 後綴，交給系統一次抓取
+    tickers = [f"{c}.TW" for c in stock_codes] + [f"{c}.TWO" for c in stock_codes]
+    
+    # 靜默批次下載最近 5 個交易日資料
+    df = yf.download(tickers, period="5d", progress=False)
+    
+    quotes = {}
+    # 相容不同版本的 yfinance 回傳格式
+    if isinstance(df.columns, pd.MultiIndex):
+        close_df = df['Close'] if 'Close' in df else pd.DataFrame()
+        vol_df = df['Volume'] if 'Volume' in df else pd.DataFrame()
+    else:
+        close_df = pd.DataFrame({tickers[0]: df['Close']}) if 'Close' in df else pd.DataFrame()
+        vol_df = pd.DataFrame({tickers[0]: df['Volume']}) if 'Volume' in df else pd.DataFrame()
+
+    for c in stock_codes:
+        tw = f"{c}.TW"
+        two = f"{c}.TWO"
+        
+        # 智慧判斷是上市還上櫃
+        target = tw if tw in close_df.columns and not pd.isna(close_df[tw].iloc[-1]) else (two if two in close_df.columns else None)
+        
+        if target:
+            closes = close_df[target].dropna()
+            vols = vol_df[target].dropna()
+            
+            if len(closes) >= 2 and len(vols) >= 2:
+                c_today, c_yest = float(closes.iloc[-1]), float(closes.iloc[-2])
+                v_today, v_yest = float(vols.iloc[-1]), float(vols.iloc[-2])
+                
+                # 計算漲跌幅 (台股邏輯)
+                p_pct = (c_today - c_yest) / c_yest * 100 if c_yest > 0 else 0
+                v_pct = (v_today - v_yest) / v_yest * 100 if v_yest > 0 else 0
+                
+                quotes[c] = {
+                    "price": c_today,
+                    "price_pct": p_pct,
+                    "vol": int(v_today / 1000), # 轉換為「張」
+                    "vol_pct": v_pct,
+                    "date": closes.index[-1].strftime("%m/%d")
+                }
+    return quotes
+
+# ==========================================
+# 💾 資料庫存取
+# ==========================================
+def get_user_watchlist(username):
+    path = os.path.join(USER_DATA_DIR, f"{username}_watchlist.json")
+    if os.path.exists(path):
+        with open(path, "r", encoding="utf-8") as f:
+            data = json.load(f)
+            if isinstance(data, list): return {stock: "" for stock in data}
+            return data
+    return {}
+
+def save_user_watchlist(username, watchlist):
+    path = os.path.join(USER_DATA_DIR, f"{username}_watchlist.json")
+    with open(path, "w", encoding="utf-8") as f:
+        json.dump(watchlist, f, ensure_ascii=False)
+
+# ==========================================
+# 🎨 畫面渲染主程式
+# ==========================================
+def show_watchlist_page(STOCK_DICT=None):
+    st.title("冒險者專屬追蹤名單")
+
+    if not st.session_state.get("logged_in", False):
+        st.warning("⚠️ 守衛：「這區是 VIP 專屬！請先前往『登入頁面』出示邀請函。」")
+        if st.button("前往登入", key="go_login_from_watchlist"):
+            st.query_params["page"] = "login"
+            st.rerun()
+        return
+
+    username = st.session_state.get("username", "guest")
+    watchlist = get_user_watchlist(username)
+    MAX_STOCKS = 60 
+
+    st.subheader(f"新增追蹤標的 (目前 {len(watchlist)}/{MAX_STOCKS} 檔)")
+    col1, col2 = st.columns([3, 1])
+    with col1:
+        new_stock = st.text_input("請輸入股票代號或名稱", key="new_stock_input")
+    with col2:
+        st.markdown("<br>", unsafe_allow_html=True)
+        if st.button("加入追蹤", use_container_width=True):
+            if new_stock:
+                if len(watchlist) >= MAX_STOCKS:
+                    st.error(f"⚠️ 追蹤名單已達 {MAX_STOCKS} 檔上限！")
+                else:
+                    query_clean = new_stock.strip()
+                    final_stock_name = query_clean
+                    
+                    if STOCK_DICT:
+                        if query_clean in STOCK_DICT:
+                            final_stock_name = f"{STOCK_DICT[query_clean]['id']} {STOCK_DICT[query_clean]['name']}"
+                        else:
+                            for k, v in STOCK_DICT.items():
+                                if query_clean in k or query_clean == v["id"] or query_clean == v["name"]:
+                                    final_stock_name = f"{v['id']} {v['name']}"
+                                    break
+
+                    if final_stock_name not in watchlist:
+                        watchlist[final_stock_name] = "" 
+                        save_user_watchlist(username, watchlist)
+                        st.success(f"已加入「{final_stock_name}」！")
+                        time.sleep(1)
+                        st.rerun()
+                    else:
+                        st.info(f"「{final_stock_name}」已在名單中囉！")
+
+    st.markdown("<hr style='border-color: #334155; margin: 10px 0;'>", unsafe_allow_html=True)
+    
+    if not watchlist:
+        st.info("目前還沒有追蹤任何標的，趕快新增一個吧！")
+    else:
+        # 1. 萃取目前所有追蹤的代號，準備抓報價
+        stock_codes = []
+        for stock in watchlist.keys():
+            m = re.search(r'\d+', stock)
+            if m: stock_codes.append(m.group())
+
+        # 2. 啟動批次抓價引擎
+        with st.spinner("📡 正在同步即時報價與成交量..."):
+            market_data = get_watchlist_quotes(stock_codes)
+
+        # 🗑️ 批次刪除功能
+        col_space, col_batch_del = st.columns([8.5, 1.5])
+        with col_batch_del:
+            if st.button("🗑️ 刪除勾選", use_container_width=True, type="primary"):
+                to_delete = [s for s in watchlist.keys() if st.session_state.get(f"chk_{s}", False)]
+                if to_delete:
+                    for s in to_delete: del watchlist[s]
+                    save_user_watchlist(username, watchlist)
+                    st.success(f"已移除 {len(to_delete)} 檔！")
+                    time.sleep(1)
+                    st.rerun()
+                else:
+                    st.warning("請先勾選後方選取框。")
+
+        # 📋 完美等比 8 欄位設計 (調整比例：縮小名稱與產業的間距，放大筆記空間)
         # 舊版: [1.2, 0.8, 1.2, 1.3, 2.5, 0.8, 0.7, 0.5]
         # 新版: [0.9, 0.7, 1.2, 1.2, 3.2, 0.7, 0.6, 0.5]
         col_ratios = [0.9, 0.7, 1.2, 1.2, 3.2, 0.7, 0.6, 0.5]
