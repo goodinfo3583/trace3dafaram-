@@ -202,7 +202,7 @@ def render_b2_top10_glass_card():
         df_23, df_24 = get_top10(raw_df_23, c23), get_top10(raw_df_24, c24)
 
         def make_list_html(df, val_col):
-            if df.empty or val_col is None: return "<p style='font-size:13px; text-align:center; color:#94A3B8; margin-top:40px;'>無資料</p>"
+            if df.empty or val_col is None: return "<p style='font-size:13.5px; text-align:center; color:#94A3B8; margin-top:40px;'>無資料</p>"
             html = "<ul style='padding-left: 0; margin: 0; list-style-type: none;'>"
             for i, row in enumerate(df.to_dict('records')):
                 val = row.get(val_col, 0)
@@ -218,8 +218,9 @@ def render_b2_top10_glass_card():
                 elif "趨緩" in cs: short_status = "⚠️趨緩"
                 else: short_status = cs[:3]
 
+                # 💡 修改點：行距放大 margin-bottom: 9px; line-height: 1.5; font-size: 13.5px;
                 html += (
-                    f"<li style='display: flex; align-items: center; justify-content: space-between; margin-bottom: 4px; font-size: 13px; line-height: 1.4;'>"
+                    f"<li style='display: flex; align-items: center; justify-content: space-between; margin-bottom: 9px; font-size: 13.5px; line-height: 1.5;'>"
                     f"  <div style='display: flex; align-items: center; width: 50%; overflow: hidden;'>"
                     f"      <b style='color:#FFF; width:22px; flex-shrink: 0;'>{i+1}.</b>"
                     f"      <span style='white-space:nowrap; overflow:hidden; text-overflow:ellipsis;'>{row['股票代號']}{row['股票名稱']}</span>"
@@ -247,7 +248,6 @@ def render_b2_top10_glass_card():
 #pause-b2-card:checked ~ #b2-top10-card .carousel-item-b2 {{ animation-play-state: paused !important; }}
 #pause-b2-card:checked ~ #b2-top10-card .pause-icon-b2::after {{ content: '▶'; font-size: 11px; color: #FFD700; }}
 #pause-b2-card:not(:checked) ~ #b2-top10-card .pause-icon-b2::after {{ content: '⏸'; font-size: 11px; }}
-
 @keyframes slideInDownB2 {{ from {{ transform: translateY(-50%); opacity: 0; }} to {{ transform: translateY(0); opacity: 1; }} }}
 .glass-panel-b2 {{ position: fixed; top: 75px; left: 83.5%; width: 15.5vw; min-width: 220px; background: rgba(30, 20, 20, 0.88); backdrop-filter: blur(12px); -webkit-backdrop-filter: blur(12px); border: 1px solid rgba(255, 76, 76, 0.35); border-radius: 12px; padding: 10px 12px; z-index: 999998; color: #E2E8F0; box-shadow: 0 4px 15px rgba(0, 0, 0, 0.6); animation: slideInDownB2 0.9s cubic-bezier(0.25, 0.8, 0.25, 1); transition: all 0.3s ease; box-sizing: border-box; }}
 .header-bar-b2 {{ display: flex; justify-content: space-between; align-items: center; border-bottom: 1px solid rgba(255,255,255,0.1); padding-bottom: 6px; margin-bottom: 8px; cursor: default; }}
@@ -257,17 +257,16 @@ def render_b2_top10_glass_card():
 .action-btn-b2:hover {{ color: #FF4C4C; }}
 .panel-title-b2 {{ margin: 0 0 8px 0; font-size: 12.5px; font-weight: bold; color: #FF4C4C; display: flex; justify-content: space-between; align-items: flex-end; }}
 .date-badge-b2 {{ font-size: 10px; color: #94A3B8; font-weight: normal; }}
-.carousel-wrapper-b2 {{ position: relative; max-height: 295px; height: 295px; overflow: hidden; transition: all 0.3s ease; opacity: 1; }}
+/* 💡 修改點：高度放大到 370px 以容納 10 檔與加寬的行距 */
+.carousel-wrapper-b2 {{ position: relative; max-height: 370px; height: 370px; overflow: hidden; transition: all 0.3s ease; opacity: 1; }}
 .carousel-item-b2 {{ position: absolute; top: 0; left: 0; width: 100%; opacity: 0; animation: fadeSwitchB2 20s infinite; }}
 .carousel-item-b2:nth-child(1) {{ animation-delay: 0s; }}
 .carousel-item-b2:nth-child(2) {{ animation-delay: 5s; }}
 .carousel-item-b2:nth-child(3) {{ animation-delay: 10s; }}
 .carousel-item-b2:nth-child(4) {{ animation-delay: 15s; }}
 @keyframes fadeSwitchB2 {{ 0%, 22% {{ opacity: 1; z-index: 2; }} 25%, 97% {{ opacity: 0; z-index: 1; }} 100% {{ opacity: 1; z-index: 2; }} }}
-
-@media (max-width: 1200px) {{
-    .glass-panel-b2 {{ position: relative; top: auto; left: auto; width: 90%; max-width: 350px; margin: 10px auto; display: block; }}
-}}
+/* 💡 修改點：移除了 @media 之前的空白斷行 */
+@media (max-width: 1200px) {{ .glass-panel-b2 {{ position: relative; top: auto; left: auto; width: 90%; max-width: 350px; margin: 10px auto; display: block; }} }}
 </style>
 <div class="glass-panel-b2" id="b2-top10-card">
 <div class="header-bar-b2"><span class="header-title-b2">🚀 法人掃貨</span>
@@ -309,12 +308,13 @@ def render_top10_glass_card():
         d_fo_day, d_it_day, d_fo_wk, d_it_wk = fmt_d(date_fo_day), fmt_d(date_it_day), fmt_d(date_fo_wk), fmt_d(date_it_wk)
 
         def make_list_html(df, col_days, unit):
-            if df is None or df.empty: return "<p style='font-size:13px; text-align:center; color:#94A3B8; margin-top:40px;'>無資料</p>"
-            html = "<ul style='padding-left: 0px; margin: 0; font-size: 13px; line-height: 1.4; list-style-type: none;'>"
+            if df is None or df.empty: return "<p style='font-size:13.5px; text-align:center; color:#94A3B8; margin-top:40px;'>無資料</p>"
+            html = "<ul style='padding-left: 0px; margin: 0; list-style-type: none;'>"
             for i, row in enumerate(df.to_dict('records')):
                 val, status = row.get(col_days, 0), row.get('狀態動態', '')
+                # 💡 修改點：行距放大 margin-bottom: 9px; line-height: 1.5; font-size: 13.5px;
                 html += (
-                    f"<li style='display:flex; justify-content:space-between; margin-bottom:4px;'>"
+                    f"<li style='display:flex; justify-content:space-between; margin-bottom:9px; font-size: 13.5px; line-height: 1.5;'>"
                     f"<div style='display:flex; width:65%; overflow:hidden;'>"
                     f"<b style='color:#FFF; display:inline-block; width:22px; flex-shrink:0;'>{i+1}.</b>"
                     f"<span style='white-space:nowrap; overflow:hidden; text-overflow:ellipsis;'>{row['股票代號']}{row['股票名稱']}</span>"
@@ -343,7 +343,6 @@ def render_top10_glass_card():
 #pause-card:checked ~ #b3-top10-card .carousel-item {{ animation-play-state: paused !important; }}
 #pause-card:checked ~ #b3-top10-card .pause-icon::after {{ content: '▶'; font-size: 11px; color: #FFD700; }}
 #pause-card:not(:checked) ~ #b3-top10-card .pause-icon::after {{ content: '⏸'; font-size: 11px; }}
-
 @keyframes slideInDownB3 {{ from {{ transform: translateY(-50%); opacity: 0; }} to {{ transform: translateY(0); opacity: 1; }} }}
 .glass-panel {{ position: fixed; top: 75px; left: 67%; width: 15.5vw; min-width: 220px; background: rgba(15, 23, 42, 0.88); backdrop-filter: blur(12px); -webkit-backdrop-filter: blur(12px); border: 1px solid rgba(0, 210, 255, 0.35); border-radius: 12px; padding: 10px 12px; z-index: 999999; color: #E2E8F0; box-shadow: 0 4px 15px rgba(0, 0, 0, 0.6); animation: slideInDownB3 0.8s cubic-bezier(0.25, 0.8, 0.25, 1); transition: all 0.3s ease; box-sizing: border-box; }}
 .header-bar {{ display: flex; justify-content: space-between; align-items: center; border-bottom: 1px solid rgba(255,255,255,0.1); padding-bottom: 6px; margin-bottom: 8px; cursor: default; }}
@@ -354,17 +353,16 @@ def render_top10_glass_card():
 .close-btn:hover {{ color: #FF4C4C; }}
 .panel-title {{ margin: 0 0 8px 0; font-size: 12.5px; font-weight: bold; color: #00D2FF; display: flex; justify-content: space-between; align-items: flex-end; }}
 .date-badge {{ font-size: 10px; color: #94A3B8; font-weight: normal; }}
-.carousel-wrapper {{ position: relative; max-height: 295px; height: 295px; overflow: hidden; transition: all 0.3s ease; opacity: 1; }}
+/* 💡 修改點：高度放大到 370px */
+.carousel-wrapper {{ position: relative; max-height: 370px; height: 370px; overflow: hidden; transition: all 0.3s ease; opacity: 1; }}
 .carousel-item {{ position: absolute; top: 0; left: 0; width: 100%; opacity: 0; animation: fadeSwitch 20s infinite; }}
 .carousel-item:nth-child(1) {{ animation-delay: 0s; }}
 .carousel-item:nth-child(2) {{ animation-delay: 5s; }}
 .carousel-item:nth-child(3) {{ animation-delay: 10s; }}
 .carousel-item:nth-child(4) {{ animation-delay: 15s; }}
 @keyframes fadeSwitch {{ 0%, 22% {{ opacity: 1; z-index: 2; }} 25%, 97% {{ opacity: 0; z-index: 1; }} 100% {{ opacity: 1; z-index: 2; }} }}
-
-@media (max-width: 1200px) {{
-    .glass-panel {{ position: relative; top: auto; left: auto; width: 90%; max-width: 350px; margin: 10px auto; display: block; }}
-}}
+/* 💡 修改點：移除了 @media 之前的空白斷行 */
+@media (max-width: 1200px) {{ .glass-panel {{ position: relative; top: auto; left: auto; width: 90%; max-width: 350px; margin: 10px auto; display: block; }} }}
 </style>
 <div class="glass-panel" id="b3-top10-card">
 <div class="header-bar"><span class="header-title">📊 法人連買</span>
@@ -403,15 +401,16 @@ def render_b4_top10_glass_card():
 
         def make_radar_html(df, start_idx, theme):
             sub_df = df.iloc[start_idx : start_idx+10]
-            if sub_df.empty: return "<p style='font-size:13px; text-align:center; color:#94A3B8; margin-top:40px;'>尚無目標</p>"
+            if sub_df.empty: return "<p style='font-size:13.5px; text-align:center; color:#94A3B8; margin-top:40px;'>尚無目標</p>"
             html = "<ul style='padding-left: 0; margin: 0; list-style-type: none;'>"
             for i, row in enumerate(sub_df.to_dict('records')):
                 status = row.get('軋空評估', '') if theme == 'sq' else row.get('套牢評估', '')
                 pct = row.get('漲跌幅', 0.0)
                 short_status = status[:4] if len(status) > 4 else status
                 pct_color = "#FF4C4C" if theme == 'sq' else "#00e676"
+                # 💡 修改點：行距放大 margin-bottom: 9px; line-height: 1.5; font-size: 13.5px;
                 html += (
-                    f"<li style='display: flex; align-items: center; justify-content: space-between; margin-bottom: 4px; font-size: 13px; line-height: 1.4;'>"
+                    f"<li style='display: flex; align-items: center; justify-content: space-between; margin-bottom: 9px; font-size: 13.5px; line-height: 1.5;'>"
                     f"  <div style='display: flex; align-items: center; width: 55%; overflow: hidden;'>"
                     f"      <b style='color:#FFF; width:22px; flex-shrink: 0;'>{start_idx + i + 1}.</b>"
                     f"      <span style='white-space:nowrap; overflow:hidden; text-overflow:ellipsis;'>{row['代號']}{row['名稱']}</span>"
@@ -439,7 +438,6 @@ def render_b4_top10_glass_card():
 #pause-b4-card:checked ~ #b4-top10-card .carousel-item-b4 {{ animation-play-state: paused !important; }}
 #pause-b4-card:checked ~ #b4-top10-card .pause-icon-b4::after {{ content: '▶'; font-size: 11px; color: #FFD700; }}
 #pause-b4-card:not(:checked) ~ #b4-top10-card .pause-icon-b4::after {{ content: '⏸'; font-size: 11px; }}
-
 @keyframes slideInDownB4 {{ from {{ transform: translateY(-50%); opacity: 0; }} to {{ transform: translateY(0); opacity: 1; }} }}
 @keyframes radarBreath {{ 0%, 49.9% {{ border-color: rgba(188, 19, 254, 0.4); box-shadow: 0 4px 15px rgba(188, 19, 254, 0.15); }} 50%, 100% {{ border-color: rgba(0, 230, 118, 0.4); box-shadow: 0 4px 15px rgba(0, 230, 118, 0.1); }} }}
 .glass-panel-b4 {{ position: fixed; top: 75px; left: 34%; width: 15.5vw; min-width: 220px; background: rgba(20, 22, 35, 0.88); backdrop-filter: blur(12px); -webkit-backdrop-filter: blur(12px); border: 1px solid rgba(188, 19, 254, 0.35); border-radius: 12px; padding: 10px 12px; z-index: 999997; color: #E2E8F0; animation: slideInDownB4 0.6s cubic-bezier(0.25, 0.8, 0.25, 1), radarBreath 20s infinite; transition: all 0.3s ease; box-sizing: border-box; }}
@@ -451,17 +449,16 @@ def render_b4_top10_glass_card():
 .panel-title-b4 {{ margin: 0 0 8px 0; font-size: 12.5px; font-weight: bold; color: #bc13fe; display: flex; justify-content: space-between; align-items: flex-end; }}
 .panel-title-b4.risk {{ color: #00e676; }}
 .date-badge-b4 {{ font-size: 10px; color: #94A3B8; font-weight: normal; }}
-.carousel-wrapper-b4 {{ position: relative; max-height: 295px; height: 295px; overflow: hidden; transition: all 0.3s ease; opacity: 1; }}
+/* 💡 修改點：高度放大到 370px */
+.carousel-wrapper-b4 {{ position: relative; max-height: 370px; height: 370px; overflow: hidden; transition: all 0.3s ease; opacity: 1; }}
 .carousel-item-b4 {{ position: absolute; top: 0; left: 0; width: 100%; opacity: 0; animation: fadeSwitchB4 20s infinite; }}
 .carousel-item-b4:nth-child(1) {{ animation-delay: 0s; }}
 .carousel-item-b4:nth-child(2) {{ animation-delay: 5s; }}
 .carousel-item-b4:nth-child(3) {{ animation-delay: 10s; }}
 .carousel-item-b4:nth-child(4) {{ animation-delay: 15s; }}
 @keyframes fadeSwitchB4 {{ 0%, 22% {{ opacity: 1; z-index: 2; }} 25%, 97% {{ opacity: 0; z-index: 1; }} 100% {{ opacity: 1; z-index: 2; }} }}
-
-@media (max-width: 1200px) {{
-    .glass-panel-b4 {{ position: relative; top: auto; left: auto; width: 90%; max-width: 350px; margin: 10px auto; display: block; }}
-}}
+/* 💡 修改點：移除了 @media 之前的空白斷行 */
+@media (max-width: 1200px) {{ .glass-panel-b4 {{ position: relative; top: auto; left: auto; width: 90%; max-width: 350px; margin: 10px auto; display: block; }} }}
 </style>
 <div class="glass-panel-b4" id="b4-top10-card">
 <div class="header-bar-b4"><span class="header-title-b4">📡 資券雷達</span>
@@ -525,7 +522,7 @@ def render_b5_top10_glass_card():
             return "⚪無字"
 
         def make_resonance_html(df, is_6w):
-            if df.empty: return "<p style='font-size:13px; text-align:center; color:#94A3B8; margin-top:40px;'>尚無共振標的</p>"
+            if df.empty: return "<p style='font-size:13.5px; text-align:center; color:#94A3B8; margin-top:40px;'>尚無共振標的</p>"
             html = "<ul style='padding-left: 0; margin: 0; list-style-type: none;'>"
             for i, row in enumerate(df.to_dict('records')):
                 if is_6w:
@@ -534,8 +531,10 @@ def render_b5_top10_glass_card():
                 else:
                     s1, s2 = unify_status_text(row.get('狀態(千)', '')), unify_status_text(row.get('狀態(四)', ''))
                     info_html = f"<div style='display:flex; width:45%; justify-content:flex-end; color:#F59E0B; font-size:10px;'><span style='width:40px; text-align:right;'>{s1}</span><span style='color:#94A3B8; font-size:9px; margin:0 2px;'>/</span><span style='width:40px; text-align:right;'>{s2}</span></div>"
+                
+                # 💡 修改點：行距放大 margin-bottom: 9px; line-height: 1.5; font-size: 13.5px;
                 html += (
-                    f"<li style='display:flex; align-items:center; justify-content:space-between; margin-bottom:4px; font-size:13px; line-height:1.4;'>"
+                    f"<li style='display:flex; align-items:center; justify-content:space-between; margin-bottom:9px; font-size:13.5px; line-height:1.5;'>"
                     f"  <div style='display:flex; align-items:center; width:55%; overflow:hidden;'>"
                     f"      <b style='color:#FFF; width:22px; flex-shrink:0;'>{i+1}.</b>"
                     f"      <span style='white-space:nowrap; overflow:hidden; text-overflow:ellipsis;'>{row['股票代號']}{row['股票名稱']}</span>"
@@ -559,7 +558,6 @@ def render_b5_top10_glass_card():
 #pause-b5-card:checked ~ #b5-top10-card .carousel-item-b5 {{ animation-play-state: paused !important; }}
 #pause-b5-card:checked ~ #b5-top10-card .pause-icon-b5::after {{ content: '▶'; font-size: 11px; color: #FFD700; }}
 #pause-b5-card:not(:checked) ~ #b5-top10-card .pause-icon-b5::after {{ content: '⏸'; font-size: 11px; }}
-
 @keyframes slideInDownB5 {{ from {{ transform: translateY(-50%); opacity: 0; }} to {{ transform: translateY(0); opacity: 1; }} }}
 .glass-panel-b5 {{ position: fixed; top: 75px; left: 50.5%; width: 15.5vw; min-width: 220px; background: rgba(30, 25, 10, 0.88); backdrop-filter: blur(12px); -webkit-backdrop-filter: blur(12px); border: 1px solid rgba(245, 158, 11, 0.4); border-radius: 12px; padding: 10px 12px; z-index: 999996; color: #E2E8F0; box-shadow: 0 4px 15px rgba(245, 158, 11, 0.2); animation: slideInDownB5 0.7s cubic-bezier(0.25, 0.8, 0.25, 1); transition: all 0.3s ease; box-sizing: border-box; }}
 .header-bar-b5 {{ display: flex; justify-content: space-between; align-items: center; border-bottom: 1px solid rgba(255,255,255,0.1); padding-bottom: 6px; margin-bottom: 8px; cursor: default; }}
@@ -569,15 +567,14 @@ def render_b5_top10_glass_card():
 .action-btn-b5:hover {{ color: #F59E0B; }}
 .panel-title-b5 {{ margin: 0 0 8px 0; font-size: 12.5px; font-weight: bold; color: #F59E0B; display: flex; justify-content: space-between; align-items: flex-end; }}
 .date-badge-b5 {{ font-size: 10px; color: #94A3B8; font-weight: normal; }}
-.carousel-wrapper-b5 {{ position: relative; max-height: 295px; height: 295px; overflow: hidden; transition: all 0.3s ease; opacity: 1; }}
+/* 💡 修改點：高度放大到 370px */
+.carousel-wrapper-b5 {{ position: relative; max-height: 370px; height: 370px; overflow: hidden; transition: all 0.3s ease; opacity: 1; }}
 .carousel-item-b5 {{ position: absolute; top: 0; left: 0; width: 100%; opacity: 0; animation: fadeSwitchB5 10s infinite; }}
 .carousel-item-b5:nth-child(1) {{ animation-delay: 0s; }}
 .carousel-item-b5:nth-child(2) {{ animation-delay: 5s; }}
 @keyframes fadeSwitchB5 {{ 0%, 45% {{ opacity: 1; z-index: 2; }} 50%, 95% {{ opacity: 0; z-index: 1; }} 100% {{ opacity: 1; z-index: 2; }} }}
-
-@media (max-width: 1200px) {{
-    .glass-panel-b5 {{ position: relative; top: auto; left: auto; width: 90%; max-width: 350px; margin: 10px auto; display: block; }}
-}}
+/* 💡 修改點：移除了 @media 之前的空白斷行 */
+@media (max-width: 1200px) {{ .glass-panel-b5 {{ position: relative; top: auto; left: auto; width: 90%; max-width: 350px; margin: 10px auto; display: block; }} }}
 </style>
 <div class="glass-panel-b5" id="b5-top10-card">
 <div class="header-bar-b5"><span class="header-title-b5">🔥 大腿共振</span>
