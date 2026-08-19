@@ -4,34 +4,89 @@ import os
 import json
 import re
 import time
+import pandas as pd
 
 # 定義儲存使用者資料的路徑
 USER_DATA_DIR = "./data/users"
 if not os.path.exists(USER_DATA_DIR):
     os.makedirs(USER_DATA_DIR)
 
+# ==========================================
+# 🚀 高效能批次報價引擎 (快取 5 分鐘)
+# ==========================================
+@st.cache_data(ttl=300)
+def get_watchlist_quotes(stock_codes):
+    """批次向 Yahoo Finance 請求報價，避免迴圈卡死網頁"""
+    import yfinance as yf
+    
+    if not stock_codes: return {}
+    
+    # 將代號分別加上上市 (.TW) 與上櫃 (.TWO) 後綴，交給系統一次抓取
+    tickers = [f"{c}.TW" for c in stock_codes] + [f"{c}.TWO" for c in stock_codes]
+    
+    # 靜默批次下載最近 5 個交易日資料
+    df = yf.download(tickers, period="5d", progress=False)
+    
+    quotes = {}
+    # 相容不同版本的 yfinance 回傳格式
+    if isinstance(df.columns, pd.MultiIndex):
+        close_df = df['Close'] if 'Close' in df else pd.DataFrame()
+        vol_df = df['Volume'] if 'Volume' in df else pd.DataFrame()
+    else:
+        close_df = pd.DataFrame({tickers[0]: df['Close']}) if 'Close' in df else pd.DataFrame()
+        vol_df = pd.DataFrame({tickers[0]: df['Volume']}) if 'Volume' in df else pd.DataFrame()
+
+    for c in stock_codes:
+        tw = f"{c}.TW"
+        two = f"{c}.TWO"
+        
+        # 智慧判斷是上市還上櫃
+        target = tw if tw in close_df.columns and not pd.isna(close_df[tw].iloc[-1]) else (two if two in close_df.columns else None)
+        
+        if target:
+            closes = close_df[target].dropna()
+            vols = vol_df[target].dropna()
+            
+            if len(closes) >= 2 and len(vols) >= 2:
+                c_today, c_yest = float(closes.iloc[-1]), float(closes.iloc[-2])
+                v_today, v_yest = float(vols.iloc[-1]), float(vols.iloc[-2])
+                
+                # 計算漲跌幅 (台股邏輯)
+                p_pct = (c_today - c_yest) / c_yest * 100 if c_yest > 0 else 0
+                v_pct = (v_today - v_yest) / v_yest * 100 if v_yest > 0 else 0
+                
+                quotes[c] = {
+                    "price": c_today,
+                    "price_pct": p_pct,
+                    "vol": int(v_today / 1000), # 轉換為「張」
+                    "vol_pct": v_pct,
+                    "date": closes.index[-1].strftime("%m/%d")
+                }
+    return quotes
+
+# ==========================================
+# 💾 資料庫存取
+# ==========================================
 def get_user_watchlist(username):
-    """讀取使用者的追蹤名單與筆記"""
     path = os.path.join(USER_DATA_DIR, f"{username}_watchlist.json")
     if os.path.exists(path):
         with open(path, "r", encoding="utf-8") as f:
             data = json.load(f)
-            # 🔄 舊版相容機制：如果讀到舊的 List 格式，自動轉換成含有筆記空字串的 Dict
-            if isinstance(data, list):
-                return {stock: "" for stock in data}
+            if isinstance(data, list): return {stock: "" for stock in data}
             return data
-    return {} # 現在回傳 Dict 格式
+    return {}
 
 def save_user_watchlist(username, watchlist):
-    """儲存使用者的追蹤名單與筆記"""
     path = os.path.join(USER_DATA_DIR, f"{username}_watchlist.json")
     with open(path, "w", encoding="utf-8") as f:
         json.dump(watchlist, f, ensure_ascii=False)
 
+# ==========================================
+# 🎨 畫面渲染主程式
+# ==========================================
 def show_watchlist_page(STOCK_DICT=None):
     st.title("冒險者專屬追蹤名單")
 
-    # 1. 權限檢查：必須登入才能使用
     if not st.session_state.get("logged_in", False):
         st.warning("⚠️ 守衛：「這區是 VIP 專屬！請先前往『登入頁面』出示邀請函。」")
         if st.button("前往登入", key="go_login_from_watchlist"):
@@ -41,24 +96,22 @@ def show_watchlist_page(STOCK_DICT=None):
 
     username = st.session_state.get("username", "guest")
     watchlist = get_user_watchlist(username)
-    MAX_STOCKS = 60 # 🛡️ 設定最大追蹤數量
+    MAX_STOCKS = 60 
 
-    # 2. 新增標的區塊
     st.subheader(f"新增追蹤標的 (目前 {len(watchlist)}/{MAX_STOCKS} 檔)")
     col1, col2 = st.columns([3, 1])
     with col1:
-        new_stock = st.text_input("請輸入股票代號或名稱 (例如: 2330 或 台積電)", key="new_stock_input")
+        new_stock = st.text_input("請輸入股票代號或名稱", key="new_stock_input")
     with col2:
         st.markdown("<br>", unsafe_allow_html=True)
         if st.button("加入追蹤", use_container_width=True):
             if new_stock:
                 if len(watchlist) >= MAX_STOCKS:
-                    st.error(f"⚠️ 追蹤名單已達 {MAX_STOCKS} 檔上限！為確保系統效能，請先移除部分標的。")
+                    st.error(f"⚠️ 追蹤名單已達 {MAX_STOCKS} 檔上限！")
                 else:
                     query_clean = new_stock.strip()
                     final_stock_name = query_clean
                     
-                    # 透過 STOCK_DICT 尋找完整名稱
                     if STOCK_DICT:
                         if query_clean in STOCK_DICT:
                             final_stock_name = f"{STOCK_DICT[query_clean]['id']} {STOCK_DICT[query_clean]['name']}"
@@ -68,95 +121,120 @@ def show_watchlist_page(STOCK_DICT=None):
                                     final_stock_name = f"{v['id']} {v['name']}"
                                     break
 
-                    # 檢查是否已經在追蹤名單內
                     if final_stock_name not in watchlist:
-                        watchlist[final_stock_name] = "" # 預設筆記為空字串
+                        watchlist[final_stock_name] = "" 
                         save_user_watchlist(username, watchlist)
-                        st.success(f"已將「{final_stock_name}」加入追蹤名單！")
+                        st.success(f"已加入「{final_stock_name}」！")
                         time.sleep(1)
                         st.rerun()
                     else:
-                        st.info(f"「{final_stock_name}」已經在你的追蹤名單中囉！")
+                        st.info(f"「{final_stock_name}」已在名單中囉！")
 
-    # 3. 顯示追蹤名單與操作按鈕
     st.markdown("<hr style='border-color: #334155; margin: 10px 0;'>", unsafe_allow_html=True)
     
     if not watchlist:
         st.info("目前還沒有追蹤任何標的，趕快新增一個吧！")
     else:
-        # 🗑️ 批次刪除按鈕
-        col_space, col_batch_del = st.columns([8, 2])
+        # 1. 萃取目前所有追蹤的代號，準備抓報價
+        stock_codes = []
+        for stock in watchlist.keys():
+            m = re.search(r'\d+', stock)
+            if m: stock_codes.append(m.group())
+
+        # 2. 啟動批次抓價引擎
+        with st.spinner("📡 正在同步即時報價與成交量..."):
+            market_data = get_watchlist_quotes(stock_codes)
+
+        # 🗑️ 批次刪除功能
+        col_space, col_batch_del = st.columns([8.5, 1.5])
         with col_batch_del:
-            if st.button("🗑️ 刪除已勾選標的", use_container_width=True, type="primary"):
-                # 收集被勾選的標的
+            if st.button("🗑️ 刪除勾選", use_container_width=True, type="primary"):
                 to_delete = [s for s in watchlist.keys() if st.session_state.get(f"chk_{s}", False)]
                 if to_delete:
-                    for s in to_delete:
-                        del watchlist[s]
+                    for s in to_delete: del watchlist[s]
                     save_user_watchlist(username, watchlist)
-                    st.success(f"已成功移除 {len(to_delete)} 檔標的！")
+                    st.success(f"已移除 {len(to_delete)} 檔！")
                     time.sleep(1)
                     st.rerun()
                 else:
-                    st.warning("請先勾選後方的選取框。")
+                    st.warning("請先勾選後方選取框。")
 
-        # 📋 標題列 (調整比例來填補空白)
-        h1, h2, h3, h4, h5 = st.columns([1.5, 4, 1.2, 1, 0.8])
-        h1.markdown("<span style='color:#94a3b8;'>標的名稱</span>", unsafe_allow_html=True)
-        h2.markdown("<span style='color:#94a3b8;'>專屬筆記</span>", unsafe_allow_html=True)
-        h3.markdown("")
-        h4.markdown("")
-        h5.markdown("<span style='color:#94a3b8; font-size:14px;'>批次選取</span>", unsafe_allow_html=True)
+        # 📋 完美等比 8 欄位設計
+        h1, h2, h3, h4, h5, h6, h7, h8 = st.columns([1.2, 0.8, 1.2, 1.3, 2.5, 0.8, 0.7, 0.5])
+        h1.markdown("<span style='color:#94a3b8; font-size:14px;'>標的名稱</span>", unsafe_allow_html=True)
+        h2.markdown("<span style='color:#94a3b8; font-size:14px;'>產業別</span>", unsafe_allow_html=True)
+        h3.markdown("<span style='color:#94a3b8; font-size:14px;'>最新價</span>", unsafe_allow_html=True)
+        h4.markdown("<span style='color:#94a3b8; font-size:14px;'>成交量 (張)</span>", unsafe_allow_html=True)
+        h5.markdown("<span style='color:#94a3b8; font-size:14px;'>專屬筆記</span>", unsafe_allow_html=True)
+        h8.markdown("<span style='color:#94a3b8; font-size:13px;'>批次</span>", unsafe_allow_html=True)
 
-        # 定義儲存筆記的 Callback 函數 (打字按 Enter 即自動存檔)
         def save_note_callback(stock_key):
             watchlist[stock_key] = st.session_state[f"note_{stock_key}"]
             save_user_watchlist(username, watchlist)
 
-        # 🔄 迴圈渲染清單
+        # 🎨 台股專屬紅綠顏色渲染器 (漲紅、跌綠)
+        def fmt_color(val, is_pct=False, is_vol=False):
+            color = "#FF4B4B" if val > 0 else ("#00E272" if val < 0 else "#94A3B8")
+            sign = "+" if val > 0 else ""
+            tail = "%" if is_pct else ""
+            if is_vol: return f"<span style='color:{color}; font-size:12px;'>({sign}{val:.1f}%)</span>"
+            return f"<span style='color:{color}; font-weight:bold;'>{sign}{val:.2f}{tail}</span>"
+
         for stock, note in list(watchlist.items()):
-            # 調整比例：標的(1.5) | 筆記(4) | 顯示資料(1.2) | 單一移除(1) | 勾選框(0.8)
-            c1, c2, c3, c4, c5 = st.columns([1.5, 4, 1.2, 1, 0.8])
+            
+            # 取出代號
+            pure_code = None
+            stock_code_match = re.search(r'\d+', stock)
+            if stock_code_match: pure_code = stock_code_match.group()
+
+            # 動態尋找產業別
+            industry_label = "未知"
+            if pure_code and STOCK_DICT and pure_code in STOCK_DICT:
+                industry_label = STOCK_DICT[pure_code].get("industry", "未知")
+
+            # 抓取報價資料
+            p_str, v_str = "<span style='color:#555;'>-</span>", "<span style='color:#555;'>-</span>"
+            if pure_code and pure_code in market_data:
+                d = market_data[pure_code]
+                p_str = f"<span style='font-size:16px;'>{d['price']:.2f}</span><br>{fmt_color(d['price_pct'], True)}"
+                v_str = f"<span style='font-size:15px;'>{d['vol']:,}</span><br>{fmt_color(d['vol_pct'], False, True)}"
+
+            # 渲染各欄位
+            c1, c2, c3, c4, c5, c6, c7, c8 = st.columns([1.2, 0.8, 1.2, 1.3, 2.5, 0.8, 0.7, 0.5])
             
             with c1:
-                st.markdown(f"<div style='padding-top:6px; font-weight:bold; font-size:16px;'>{stock}</div>", unsafe_allow_html=True)
-            
+                st.markdown(f"<div style='padding-top:8px; font-weight:bold; font-size:15px;'>{stock}</div>", unsafe_allow_html=True)
             with c2:
-                # 📝 自訂筆記輸入框
-                st.text_input(
-                    "筆記", 
-                    value=note, 
-                    key=f"note_{stock}", 
-                    label_visibility="collapsed", 
-                    placeholder="點此輸入筆記...",
-                    on_change=save_note_callback,
-                    args=(stock,) # 傳遞當前標的名稱給 Callback
-                )
-                
+                st.markdown(f"<div style='padding-top:10px; font-size:12px; color:#38BDF8;'><span style='background-color:#1E293B; padding:2px 5px; border-radius:4px; border: 1px solid #0369a1;'>{industry_label}</span></div>", unsafe_allow_html=True)
             with c3:
-                # 🔍 顯示資料 (結合先前實作的側邊欄連動)
+                st.markdown(f"<div style='padding-top:4px;'>{p_str}</div>", unsafe_allow_html=True)
+            with c4:
+                st.markdown(f"<div style='padding-top:4px;'>{v_str}</div>", unsafe_allow_html=True)
+            with c5:
+                # 使用者如果打字，會把整個高度撐開，保持排版穩定
+                st.markdown("<div style='padding-top:8px;'>", unsafe_allow_html=True)
+                st.text_input("筆記", value=note, key=f"note_{stock}", label_visibility="collapsed", placeholder="點此輸入筆記...", on_change=save_note_callback, args=(stock,))
+                st.markdown("</div>", unsafe_allow_html=True)
+            with c6:
+                st.markdown("<div style='padding-top:8px;'>", unsafe_allow_html=True)
                 if st.button(f"🔍 顯示", key=f"view_{stock}", use_container_width=True):
                     st.session_state["selected_watch_stock"] = stock
-                    stock_code_match = re.search(r'\d+', stock)
-                    if stock_code_match:
-                        st.session_state["global_search_final"] = stock_code_match.group()
-                    else:
-                        st.session_state["global_search_final"] = stock
+                    st.session_state["global_search_final"] = pure_code if pure_code else stock
                     st.rerun()
-                    
-            with c4:
-                # 🗑️ 單一移除
+                st.markdown("</div>", unsafe_allow_html=True)
+            with c7:
+                st.markdown("<div style='padding-top:8px;'>", unsafe_allow_html=True)
                 if st.button(f"移除", key=f"remove_{stock}", use_container_width=True):
                     del watchlist[stock]
                     save_user_watchlist(username, watchlist)
-                    # 如果刪除的剛好是正在查看的，清空狀態
                     if st.session_state.get("selected_watch_stock") == stock:
                         st.session_state["selected_watch_stock"] = None
                         st.session_state["global_search_final"] = ""
                     st.rerun()
-                    
-            with c5:
-                # ☑️ 批次選取勾選框
-                st.markdown("<div style='padding-top:6px; padding-left:15px;'>", unsafe_allow_html=True)
+                st.markdown("</div>", unsafe_allow_html=True)
+            with c8:
+                st.markdown("<div style='padding-top:15px; padding-left:5px;'>", unsafe_allow_html=True)
                 st.checkbox("選取", key=f"chk_{stock}", label_visibility="collapsed")
                 st.markdown("</div>", unsafe_allow_html=True)
+            
+            st.markdown("<hr style='border-color: #1E293B; margin: 5px 0;'>", unsafe_allow_html=True)
