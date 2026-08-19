@@ -24,7 +24,7 @@ def save_user_watchlist(username, watchlist):
         json.dump(watchlist, f, ensure_ascii=False)
 
 def show_watchlist_page(STOCK_DICT=None):
-    st.title("🌟 冒險者專屬追蹤名單")
+    st.title("冒險者專屬追蹤名單")
 
     # 1. 權限檢查：必須登入才能使用
     if not st.session_state.get("logged_in", False):
@@ -38,7 +38,7 @@ def show_watchlist_page(STOCK_DICT=None):
     watchlist = get_user_watchlist(username)
 
     # 2. 新增標的區塊
-    st.subheader("➕ 新增追蹤標的")
+    st.subheader("新增追蹤標的")
     col1, col2 = st.columns([3, 1])
     with col1:
         new_stock = st.text_input("請輸入股票代號或名稱 (例如: 2330 或 台積電)", key="new_stock_input")
@@ -71,7 +71,7 @@ def show_watchlist_page(STOCK_DICT=None):
                     st.info(f"「{final_stock_name}」已經在你的追蹤名單中囉！")
 
     # 3. 顯示追蹤名單與操作按鈕
-    st.subheader("📋 目前追蹤名單")
+    st.subheader("目前追蹤名單")
     if not watchlist:
         st.info("目前還沒有追蹤任何標的，趕快新增一個吧！")
     else:
