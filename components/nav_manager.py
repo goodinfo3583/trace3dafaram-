@@ -129,7 +129,7 @@ def inject_custom_header(is_logged_in=False):
             
             <!-- 💡 雷達總控按鈕 (純圓形圖示) -->
             <div id="global-radar-btn" class="global-radar-toggle" title="開關排行卡片">
-                <img src="app/static/17.png" alt="雷達總控" id="global-radar-img">
+                <img src="app/static/icon-card.png" alt="雷達總控" id="global-radar-img">
             </div>
 
             <div class="disclaimer-item" id="mobile-nav-toggle" title="收起選單" style="cursor: pointer; padding-right: 5px;"><span id="nav-toggle-icon" style="font-size: 18px; color: #38BDF8;">📜</span></div>
