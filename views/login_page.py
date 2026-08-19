@@ -149,9 +149,9 @@ def show_login_page(conn=None, SHEET_URL=None):
                                 user_df = conn.read(spreadsheet=SHEET_URL, worksheet="會員名冊", ttl=0)
                                 if not user_df.empty and '帳號' in user_df.columns and '密碼' in user_df.columns:
                                     
-                                    # 🛑 強制轉字串並清除首尾空白，再將帳號轉小寫
-                                    user_df['帳號'] = user_df['帳號'].astype(str).str.strip().str.lower()
-                                    user_df['密碼'] = user_df['密碼'].astype(str).str.strip()
+                                    # 🛑 強制轉字串，剃除莫名其妙產生的小數點(.0)，清除首尾空白，再將帳號轉小寫
+                                    user_df['帳號'] = user_df['帳號'].astype(str).str.replace(r'\.0$', '', regex=True).str.strip().str.lower()
+                                    user_df['密碼'] = user_df['密碼'].astype(str).str.replace(r'\.0$', '', regex=True).str.strip()
                                     
                                     match = user_df[(user_df['帳號'] == login_user_target) & 
                                                     (user_df['密碼'] == clean_pass)]
