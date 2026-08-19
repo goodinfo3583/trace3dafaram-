@@ -580,8 +580,8 @@ def render_b5_top10_glass_card():
 <label for="close-b5-card" class="action-btn-b5" title="關閉">✕</label>
 </div></div>
 <div class="carousel-wrapper-b5">
-<div class="carousel-item-b5"><div class="panel-title-b5"><span>📊 6周累積(千/400)</span><span class="date-badge-b5">{date_str}</span></div>{h_6w}</div>
-<div class="carousel-item-b5"><div class="panel-title-b5"><span>⚡ 週動能(千/400)</span><span class="date-badge-b5">{date_str}</span></div>{h_latest}</div>
+<div class="carousel-item-b5"><div class="panel-title-b5"><span>📊 6周累積(1000/400)</span><span class="date-badge-b5">{date_str}</span></div>{h_6w}</div>
+<div class="carousel-item-b5"><div class="panel-title-b5"><span>⚡ 週動能(1000/400)</span><span class="date-badge-b5">{date_str}</span></div>{h_latest}</div>
 </div></div>
 """
         st.markdown(card_html, unsafe_allow_html=True)
