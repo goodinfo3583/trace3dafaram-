@@ -127,7 +127,8 @@ if current_page == "all":
 if current_page == "news":
     show_news_page()
 elif current_page == "login":
-    show_login_page()
+    from views.login_page import show_login_page # 將您在 test_web.py 開頭宣告的 conn 和 SHEET_URL 傳進去     
+    show_login_page(conn, SHEET_URL)
 elif current_page == "contact":
     show_contact_page(conn, SHEET_URL)
 elif current_page == "pool":
