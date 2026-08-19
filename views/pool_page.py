@@ -667,7 +667,10 @@ def show_pool_page(conn, SHEET_URL, DATA_DIR, STOCK_DICT):
                                     with st.expander("🔐 站長用寫入追蹤名單", expanded=True):
                                         track_pw = st.text_input("密碼", type="password", key="track_pw")
                                         
-                                        if track_pw == "DDong888":
+                                        # 從 secrets 中讀取預期密碼
+                                        expected_pw = st.secrets["passwords"]["pool_admin"]
+                                        
+                                        if track_pw == expected_pw:
                                             st.markdown("""
                                             <style>
                                             div[data-testid="stButton"] > button { padding: 0.25rem 0.5rem; font-size: 14px; }
