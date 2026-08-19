@@ -26,16 +26,28 @@ def inject_custom_header(is_logged_in=False):
         #custom-sticky-header { position: fixed; top: 0; left: 0; width: 100%; z-index: 999999; background: transparent !important; pointer-events: none; }
         .disclaimer-bar, .nav-btn-container { pointer-events: auto; }
         .disclaimer-bar { display: flex; align-items: center; background: transparent !important; padding: 0px 15px; border: none !important; }
-        .disclaimer-item { position: relative; padding: 6px 15px; cursor: help; background: transparent !important; }
-        .disclaimer-title { color: #64748B; font-size: 13px; font-weight: 500; text-decoration: none; text-shadow: 1px 1px 4px rgba(0,0,0,1), -1px -1px 4px rgba(0,0,0,1); }
-        .disclaimer-item:hover .disclaimer-title { color: #FFD700; text-shadow: 0 0 8px rgba(255, 215, 0, 0.8); }
         
-        .vip-login-btn { color: #FFD700 !important; font-weight: bold; text-shadow: 0 0 5px rgba(255, 215, 0, 0.5); transition: all 0.3s; }
-        .vip-login-btn:hover { text-shadow: 0 0 12px rgba(255, 215, 0, 1); transform: scale(1.05); }
+        /* ⚙️ 系統下拉選單樣式 */
+        .system-menu { position: relative; padding: 6px 15px; cursor: pointer; background: transparent !important; }
+        .system-menu-title { color: #64748B; font-size: 14px; font-weight: bold; display: flex; align-items: center; gap: 5px; transition: color 0.3s; text-shadow: 1px 1px 4px rgba(0,0,0,1); }
+        .system-menu:hover .system-menu-title { color: #00D2FF; text-shadow: 0 0 8px rgba(0, 210, 255, 0.8); }
+        
+        .system-dropdown { position: absolute; top: 100%; left: 10px; width: 280px; background-color: rgba(17, 22, 34, 0.95); border: 1px solid #1E293B; border-top: none; border-radius: 0 0 8px 8px; padding: 0; max-height: 0; opacity: 0; overflow: hidden; transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1); box-shadow: 0px 8px 20px rgba(0,0,0,0.8); z-index: 1000; }
+        .system-menu:hover .system-dropdown { max-height: 500px; opacity: 1; padding: 8px 0; }
+        
+        .dropdown-item { padding: 10px 15px; border-bottom: 1px solid rgba(255,255,255,0.05); }
+        .dropdown-item:last-child { border-bottom: none; }
+        
+        .dropdown-title { color: #E2E8F0; font-size: 13px; font-weight: bold; margin-bottom: 4px; display: block; text-decoration: none; transition: color 0.2s; cursor: pointer; }
+        .dropdown-text { font-size: 11px; color: #94A3B8; line-height: 1.5; margin: 0; }
+        
+        /* 懸停效果與按鈕特化 */
+        .dropdown-item:hover { background-color: rgba(255,255,255,0.03); }
+        .dropdown-item.actionable:hover .dropdown-title { color: #FFD700; }
+        
+        .vip-login-btn { color: #FFD700 !important; font-size: 14px; display: flex; align-items: center; justify-content: center; gap: 8px; margin-top: 5px;}
+        .vip-login-btn:hover { text-shadow: 0 0 10px rgba(255, 215, 0, 0.8); }
 
-        .disclaimer-content { position: absolute; top: 100%; left: 0; width: 350px; max-width: 90vw; background-color: rgba(17, 22, 34, 0.95); border: 1px solid #1E293B; border-top: none; border-radius: 0 0 8px 8px; padding: 0px 15px; max-height: 0; opacity: 0; overflow: hidden; transition: all 0.3s; font-size: 12px; color: #94A3B8; line-height: 1.6; box-shadow: 0px 8px 20px rgba(0,0,0,0.8); }
-        .disclaimer-item:hover .disclaimer-content { max-height: 400px; opacity: 1; padding: 12px 15px; }
-        
         .nav-btn-container { display: flex; flex-wrap: wrap; justify-content: flex-end; align-items: center; padding: 8px 15px; background: transparent !important; gap: 6px; border: none !important; transition: all 0.3s ease-in-out; }
         .nav-text-link { text-decoration: none !important; color: #94A3B8 !important; font-size: 16px; font-weight: 600; padding: 4px 6px; transition: all 0.2s ease-in-out; text-shadow: 1px 1px 4px rgba(0,0,0,1), -1px -1px 4px rgba(0,0,0,1); cursor: pointer; display: flex; align-items: center; }
         .nav-text-link:hover { color: #FFD700 !important; text-shadow: 0 0 12px rgba(255, 215, 0, 0.8); transform: scale(1.08); }
@@ -67,19 +79,38 @@ def inject_custom_header(is_logged_in=False):
     
     headerDiv.innerHTML = `
         <div class="disclaimer-bar">
-            <div class="disclaimer-item"><span class="disclaimer-title">聲明</span><div class="disclaimer-content">本平台僅供教育研究與籌碼觀察，絕不構成任何實質投資建議、勸誘或要約。所有資料源自公開數據，受限於網路技術，可能有延遲或錯誤。</div></div>
-            <div class="disclaimer-item"><span class="disclaimer-title">隱私</span><div class="disclaimer-content"><b>1. 蒐集目的與範圍：</b><br>本平台依個資法蒐集您的識別資料僅供維持系統安全與優化服務使用。<br><b>2. 資料利用：</b><br>您的資料絕不向第三方洩露。<br><b>3. 資料刪除：</b><br>您可透過「聯絡我們」請求刪除資料。<br><b>4. 政策修訂：</b><br>本站保留修改政策之權利，繼續使用即視為同意。</b></div></div>
-            <div class="disclaimer-item"><a href="#" data-target="NavToContact" class="disclaimer-title internal-nav" style="cursor: pointer;">📧訊息</a></div>
-            <div class="disclaimer-item"><a href="#" data-target="登入" class="disclaimer-title internal-nav vip-login-btn" style="cursor: pointer; display: flex; align-items: center;">__LOGIN_TEXT__</a></div>
+            <!-- 💡 新增：系統下拉選單 -->
+            <div class="system-menu">
+                <div class="system-menu-title">⚙️ 系統</div>
+                <div class="system-dropdown">
+                    <div class="dropdown-item">
+                        <span class="dropdown-title">📜 聲明</span>
+                        <p class="dropdown-text">本平台僅供教育研究與籌碼觀察，絕不構成實質投資建議。資料源自公開數據，可能有延遲或錯誤。</p>
+                    </div>
+                    <div class="dropdown-item">
+                        <span class="dropdown-title">🛡️ 隱私</span>
+                        <p class="dropdown-text">依個資法蒐集識別資料僅供優化服務，絕不外流。可透過聯絡我們請求刪除資料。</p>
+                    </div>
+                    <div class="dropdown-item actionable">
+                        <a href="#" data-target="NavToContact" class="dropdown-title internal-nav">📧 聯絡訊息</a>
+                    </div>
+                    <div class="dropdown-item actionable" style="text-align: center; border-bottom: none;">
+                        <a href="#" data-target="登入" class="dropdown-title internal-nav vip-login-btn">🔐 __LOGIN_TEXT__</a>
+                    </div>
+                </div>
+            </div>
+
             <div style="flex-grow: 1;"></div>
             
-            <div id="global-radar-btn" class="global-radar-toggle" title="開關所有雷達卡片">
+            <!-- 💡 修改：排行按鈕文字固定為「排行」 -->
+            <div id="global-radar-btn" class="global-radar-toggle" title="開關排行卡片">
                 <img src="app/static/17.png" alt="雷達總控">
                 <span id="global-radar-text">排行</span>
             </div>
 
             <div class="disclaimer-item" id="mobile-nav-toggle" title="收起選單" style="cursor: pointer; padding-right: 5px;"><span id="nav-toggle-icon" style="font-size: 18px; color: #38BDF8;">📜</span></div>
         </div>
+        
         <div class="nav-btn-container" id="nav-btn-container">
             <a href="#" id="custom-sidebar-toggle" class="nav-text-link"><img src="app/static/iconarrow1.png" class="nav-icon" alt="icon">側欄功能</a><span class="nav-divider">|</span>
             <a href="#" data-target="NavToNews" class="nav-text-link internal-nav"><img src="app/static/magicbook2.png" class="nav-icon" alt="icon">市場消息</a><span class="nav-divider">|</span>
@@ -144,18 +175,13 @@ def inject_custom_header(is_logged_in=False):
             };
         }
 
-        // 🎯 核心改動：改為控制完全隱藏 (close-xxx-card)
         const globalRadarBtn = parentDoc.getElementById('global-radar-btn');
         const globalRadarText = parentDoc.getElementById('global-radar-text');
-        // 預設為 true，代表一開始進畫面就是「已隱藏」狀態
         let isAllHidden = false; 
 
         if (globalRadarBtn) {
-            // 執行一次初始化（讓畫面載入時自動先關閉卡片，如果你希望預設開啟，就把 isAllHidden 設為 false，並把下一行註解掉）
-            
             globalRadarBtn.onclick = (e) => {
                 e.preventDefault();
-                // 注意這裡的 id 變成 close-xxx-card 了
                 const targetIds = ['close-b2-card', 'close-card', 'close-b4-card', 'close-b5-card'];
                 isAllHidden = !isAllHidden;
                 
@@ -166,12 +192,13 @@ def inject_custom_header(is_logged_in=False):
                     }
                 });
                 
+                // 💡 修改：文字永遠維持「排行」，只透過顏色變化來暗示狀態
                 if (isAllHidden) {
-                    globalRadarText.innerText = '顯示排行';
-                    globalRadarText.style.color = '#FFD700'; 
+                    globalRadarText.style.color = '#64748B';  // 隱藏時變灰
+                    globalRadarBtn.style.borderColor = '#64748B';
                 } else {
-                    globalRadarText.innerText = '關閉排行';
-                    globalRadarText.style.color = '#38BDF8'; 
+                    globalRadarText.style.color = '#38BDF8';  // 開啟時恢復亮藍色
+                    globalRadarBtn.style.borderColor = '#38BDF8';
                 }
             };
         }
