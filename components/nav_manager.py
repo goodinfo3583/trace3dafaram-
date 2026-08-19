@@ -110,7 +110,7 @@ def inject_custom_header(is_logged_in=False):
                     <!-- 3. 聲明 -->
                     <div class="dropdown-item">
                         <span class="dropdown-title">
-                            <img src="app/static/icon-disclaimer.png" class="menu-icon" alt="disclaimer"> 平台聲明
+                            <img src="app/static/icon-agree.png" class="menu-icon" alt="disclaimer"> 平台聲明
                         </span>
                         <p class="dropdown-text">本平台僅供教育研究與籌碼觀察，絕不構成實質投資建議。資料源自公開數據，可能有延遲或錯誤。</p>
                     </div>
@@ -118,7 +118,7 @@ def inject_custom_header(is_logged_in=False):
                     <!-- 4. 隱私 -->
                     <div class="dropdown-item" style="border-bottom: none;">
                         <span class="dropdown-title">
-                            <img src="app/static/icon-privacy.png" class="menu-icon" alt="privacy"> 隱私政策
+                            <img src="app/static/icon-agree.png" class="menu-icon" alt="privacy"> 隱私政策
                         </span>
                         <p class="dropdown-text">依個資法蒐集識別資料僅供優化服務，絕不外流。可透過聯絡我們請求刪除資料。</p>
                     </div>
