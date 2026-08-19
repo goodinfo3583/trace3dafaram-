@@ -11,6 +11,37 @@ USER_DATA_DIR = "./data/users"
 if not os.path.exists(USER_DATA_DIR):
     os.makedirs(USER_DATA_DIR)
 
+import json
+
+# ==========================================
+# 💾 資料庫存取 (改接 Google Sheets 版本概念)
+# ==========================================
+def get_user_watchlist(username):
+    """從 GS 讀取使用者的追蹤名單與筆記"""
+    # 1. 透過你的 GS 套件 (例如 gspread 或 st.connection) 搜尋該 username 所在的資料列
+    # 2. 取得該列中 'Watchlist' 欄位的值 (這會是一串文字)
+    gs_watchlist_str = "" # 替換成你從 GS 抓到的值
+    
+    if gs_watchlist_str:
+        try:
+            data = json.loads(gs_watchlist_str)
+            # 相容舊版陣列轉換
+            if isinstance(data, list): 
+                return {stock: "" for stock in data}
+            return data
+        except:
+            return {}
+    return {}
+
+def save_user_watchlist(username, watchlist):
+    """將使用者的追蹤名單與筆記存回 GS"""
+    # 1. 將 Python 字典轉換成 JSON 格式的純文字字串
+    watchlist_str = json.dumps(watchlist, ensure_ascii=False)
+    
+    # 2. 透過你的 GS 套件，找到該 username 所在的資料列
+    # 3. 將 watchlist_str 寫入或更新到 'Watchlist' 這個欄位中
+    # 這樣只要打完筆記，就會瞬間同步到 Google Sheets 上！
+
 # ==========================================
 # 🚀 高效能批次報價引擎 (快取 5 分鐘)
 # ==========================================
