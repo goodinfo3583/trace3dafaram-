@@ -83,6 +83,12 @@ def show_watchlist_page(STOCK_DICT=None):
                 # 點擊後，將選中的標的寫入 session_state 給側邊欄讀取
                 if st.button(f"🔍 顯示資料", key=f"view_{stock}"):
                     st.session_state["selected_watch_stock"] = stock
+                    # 🚀 新增這裡：自動萃取代號，並寫入側邊欄搜尋框的 key (global_search_final)
+                    stock_code_match = re.search(r'\d+', stock)
+                    if stock_code_match:
+                        st.session_state["global_search_final"] = stock_code_match.group()
+                    else:
+                        st.session_state["global_search_final"] = stock # 若無數字則整串帶入
                     st.rerun()
             with c3:
                 # 刪除功能

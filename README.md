@@ -60,6 +60,8 @@
 
 │   ├── 📄 sidebar.py            # 側邊視窗欄位
 
+│   ├── 📄 watchlist\_page.py     # 使用者自訂追蹤清單
+
 │   ├── 📄 pool\_page.py          # 觀察名單 (大數據計分、樹狀圖、歷史回測)
 
 │   ├── 📄 b1\_page.py            # 區塊 1 法人動向

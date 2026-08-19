@@ -821,6 +821,10 @@ def render_sidebar_war_room(STOCK_DICT, DATA_DIR="data"):
             st.write("") # 空一行
             if st.button("❌ 關閉焦點", use_container_width=True, key="close_focus_btn"):
                 st.session_state["selected_watch_stock"] = None
+
+                # 關閉焦點時，同步清空下方的搜尋框(watchlist自訂義用)
+                st.session_state["global_search_final"] = ""
+
                 st.rerun()
                 
             st.markdown("<hr style='border-color: #38BDF8; margin: 15px 0px;'>", unsafe_allow_html=True)
