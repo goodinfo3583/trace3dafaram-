@@ -1,3 +1,4 @@
+#newdaily1820_scraper ,20260820
 import time
 import random
 import pandas as pd
