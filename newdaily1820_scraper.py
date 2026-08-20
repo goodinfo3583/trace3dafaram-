@@ -7,7 +7,7 @@ from io import StringIO
 from datetime import datetime
 from selenium.webdriver.common.by import By
 from selenium.webdriver.common.action_chains import ActionChains
-from selenium.webdriver.common.keys import Keys # 🌟 新增：鍵盤按鍵模擬
+from selenium.webdriver.common.keys import Keys 
 # 🌟 匯入終極突破武器 🌟
 import undetected_chromedriver as uc 
 import subprocess
@@ -206,7 +206,7 @@ except Exception as e:
     print(f"    ⚠️ 失敗: {e}")
 
 # ==========================================
-# 🐢 階段三：Goodinfo 模擬點擊瀏覽器 (人類行為模擬升級版)
+# 🐢 階段三：Goodinfo 模擬點擊瀏覽器 (CDP 深度偽裝 + 盲劍客鍵盤版)
 # ==========================================
 GOODINFO_TARGETS = {
     "外資賣出佔成交比(3日累計排名)": "https://goodinfo.tw/tw/StockList.asp?RPT_TIME=&MARKET_CAT=%E7%86%B1%E9%96%80%E6%8E%92%E8%A1%8C&INDUSTRY_CAT=%E5%A4%96%E8%B3%87%E8%B3%A3%E5%87%BA%E4%BD%94%E6%88%90%E4%BA%A4%E6%AF%94+%E2%80%93+3%E6%97%A5%40%40%E5%A4%96%E8%B3%87%E8%B3%A3%E5%87%BA%E4%BD%94%E6%88%90%E4%BA%A4%E6%AF%94%40%40%E5%A4%96%E8%B3%87+%E2%80%93+3%E6%97%A5",
@@ -242,29 +242,37 @@ GOODINFO_TARGETS = {
 
 print("\n>> [階段三] 啟動 Google Chrome 瀏覽器 (針對 Goodinfo, 破甲版)...")
 options = uc.ChromeOptions()
-
 options.add_argument('--no-sandbox')               
 options.add_argument('--disable-dev-shm-usage')    
 options.add_argument('--disable-gpu')              
 options.add_argument('--window-size=1920,1080')
-# 🌟 語系偽裝：讓 CF 以為我們是來自台灣的一般瀏覽器，降低警戒心
-options.add_argument('--lang=zh-TW,zh,en-US')
 
 version_main = None
 try:
     out = subprocess.check_output(['google-chrome', '--version']).decode('utf-8')
     match = re.search(r'(\d+)\.', out)
-    if match:
-        version_main = int(match.group(1))
-        print(f" └─ 🔍 自動偵測到伺服器 Chrome 主版本為: {version_main}")
-except Exception as e:
-    print(f" └─ ⚠️ 無法自動偵測 Chrome 版本，將使用預設設定。")
+    if match: version_main = int(match.group(1))
+    print(f" └─ 🔍 自動偵測到伺服器 Chrome 主版本為: {version_main}")
+except Exception: pass
+
+# 🌟 CDP 深度偽裝：強制宣告為真實的 Windows 電腦，而非 Linux 伺服器
+if version_main:
+    ua = f"Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/{version_main}.0.0.0 Safari/537.36"
+else:
+    ua = "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/126.0.0.0 Safari/537.36"
+options.add_argument(f'--user-agent={ua}')
 
 try:
-    if version_main:
-        driver = uc.Chrome(options=options, version_main=version_main)
-    else:
-        driver = uc.Chrome(options=options)
+    driver = uc.Chrome(options=options, version_main=version_main)
+    # 🌟 CDP 深度偽裝：竄改瀏覽器時區與經緯度 (偽裝成位於台北)
+    driver.execute_cdp_cmd('Emulation.setTimezoneOverride', {'timezoneId': 'Asia/Taipei'})
+    driver.execute_cdp_cmd('Emulation.setGeolocationOverride', {'latitude': 25.0330, 'longitude': 121.5654, 'accuracy': 100})
+    driver.execute_cdp_cmd('Emulation.setUserAgentOverride', {
+        "userAgent": ua,
+        "acceptLanguage": "zh-TW,zh;q=0.9,en-US;q=0.8,en;q=0.7",
+        "platform": "Win32" # 🌟 極重要：覆蓋 navigator.platform 避免洩漏 Linux 身份
+    })
+    print(" └─ 🎭 CDP 深度偽裝完成：已切換為台灣時區、GPS 座落地點，並偽裝為 Windows 系統！")
 except Exception as e:
     print(f"啟動 Chrome 失敗！錯誤細節: {e}")
     exit()
@@ -274,51 +282,47 @@ print(f"開始執行 Goodinfo 下載任務，共計 {len(GOODINFO_TARGETS)} 個�
 for index, (name_suffix, url) in enumerate(GOODINFO_TARGETS.items()):
     file_name = f"{today}{name_suffix}.csv"
     file_path = os.path.join(SAVE_DIR, file_name)
-    
     print(f"[{index+1}/{len(GOODINFO_TARGETS)}] 正在擷取: {file_name}")
     
     try:
         driver.get(url)
         
         # ==========================================================
-        # 🌟 終極破盾核心 v2：人類行為模擬器 + 無差別盲點擊
+        # 🌟 終極破盾核心 v3：影子 DOM 穿透 + 盲劍客鍵盤法
         # ==========================================================
         if "Just a moment" in driver.title or "Cloudflare" in driver.title:
-            print(" └─ 🛡️ 遇到 Cloudflare 驗證畫面，啟動【人類行為模擬】通關機制...")
+            print(" └─ 🛡️ 遇到 Cloudflare 驗證畫面，啟動【盲劍客鍵盤破盾法】與【影子 DOM 穿透】...")
             
-            for cf_attempt in range(6): 
-                # 1. 模擬滑鼠在畫面上隨機亂晃 (干擾 CF 的機器人判定)
+            for cf_attempt in range(5): 
+                # 策略 1：使用 JavaScript 刺探隱形的 Turnstile 驗證框並取得絕對座標
                 try:
-                    body = driver.find_element(By.TAG_NAME, "body")
+                    js_click = """
+                    let wrappers = document.querySelectorAll('div');
+                    for (let w of wrappers) {
+                        if (w.className.includes('cf-turnstile') || w.id.includes('turnstile')) {
+                            let rect = w.getBoundingClientRect();
+                            return [rect.x + rect.width/2, rect.y + rect.height/2];
+                        }
+                    }
+                    return null;
+                    """
+                    coords = driver.execute_script(js_click)
+                    if coords:
+                        print(f" └─ 🎯 [嘗試 {cf_attempt+1}/5] 成功穿透 Shadow DOM 找到驗證框！發射精準座標點擊...")
+                        ActionChains(driver).move_by_offset(coords[0], coords[1]).click().perform()
+                        ActionChains(driver).move_by_offset(-coords[0], -coords[1]).perform() # 滑鼠歸位
+                except Exception: pass
+                
+                time.sleep(2)
+                
+                # 策略 2：鍵盤盲按 (不管畫面上看不看得到，Tab 兩次後強按空白鍵)
+                try:
+                    print(f" └─ 🎹 [嘗試 {cf_attempt+1}/5] 執行鍵盤 Tab + Space 盲按...")
                     ac = ActionChains(driver)
-                    for _ in range(3):
-                        x_offset = random.randint(-100, 100)
-                        y_offset = random.randint(-100, 100)
-                        ac.move_to_element_with_offset(body, x_offset, y_offset).pause(0.3)
-                    ac.perform()
-                    print(f" └─ 🖱️ [嘗試 {cf_attempt+1}/6] 已送出隨機滑鼠軌跡 (Mouse Entropy)...")
-                except:
-                    pass
+                    ac.send_keys(Keys.TAB).pause(0.5).send_keys(Keys.TAB).pause(0.5).send_keys(Keys.SPACE).perform()
+                except Exception: pass
                 
-                # 2. 尋找畫面上的任何 iframe 並強制盲點擊
-                try:
-                    iframes = driver.find_elements(By.TAG_NAME, "iframe")
-                    if iframes:
-                        for iframe in iframes:
-                            try:
-                                # 移到該 iframe 並點擊
-                                ActionChains(driver).move_to_element(iframe).click().perform()
-                                # 補上一發空白鍵 (對付需要鍵盤觸發的勾選框)
-                                iframe.send_keys(Keys.SPACE)
-                            except: pass
-                        print(f" └─ 🎯 [嘗試 {cf_attempt+1}/6] 發現 iframe！已執行無差別盲點擊與空白鍵連擊。")
-                    else:
-                        print(f" └─ ⏳ [嘗試 {cf_attempt+1}/6] 畫面上尚未吐出 iframe，靠滑鼠軌跡拖延中...")
-                except Exception as e:
-                    pass
-                
-                # 點擊後給予 5 秒鐘讓網頁跳轉
-                time.sleep(5)
+                time.sleep(6)
                 if "Just a moment" not in driver.title and "Cloudflare" not in driver.title:
                     print(" └─ 🔓 Cloudflare 盾牌已成功擊破！網頁通行許可取得。")
                     time.sleep(3) 
@@ -360,7 +364,6 @@ for index, (name_suffix, url) in enumerate(GOODINFO_TARGETS.items()):
                     continue
                     
                 tables = pd.read_html(StringIO(html))
-                
                 for df in tables:
                     if isinstance(df.columns, pd.MultiIndex):
                         df.columns = df.columns.get_level_values(-1)
@@ -373,8 +376,7 @@ for index, (name_suffix, url) in enumerate(GOODINFO_TARGETS.items()):
                 if target_df is not None:
                     print(f" └─ ⚡ 成功解析表格！(耗時約 {i+1} 秒)")
                     break 
-            except Exception:
-                pass
+            except Exception: pass
             time.sleep(1) 
             
         if target_df is not None:
@@ -384,17 +386,7 @@ for index, (name_suffix, url) in enumerate(GOODINFO_TARGETS.items()):
             target_df.to_csv(file_path, index=False, encoding='utf-8-sig')
             print(f" └─ ✅ 成功存檔！")
         else:
-            current_title = driver.title
-            print(f" └─ ❌ 失敗！等了 60 秒還是沒有看到股票資料。")
-            print(f" └─ 🔍 盲測診斷：當前網頁標題是【{current_title}】")
-            
-            if "Just a moment" in current_title or "Cloudflare" in current_title or "Attention" in current_title:
-                print(" └─ 🚨 確診：爬蟲被 Cloudflare 防機器人盾牌擋住。")
-            elif "goodinfo.tw" in current_title.lower() or current_title.strip() == "":
-                print(" └─ 🚨 確診：網頁白畫面或網路連線異常。")
-            else:
-                print(" └─ 🚨 確診：可能該排行榜今日【無符合條件之股票】(資料庫為空)。")
-            
+            print(f" └─ ❌ 失敗！盲測診斷標題：【{driver.title}】")
             driver.save_screenshot(f"error_shot_{index+1}.png")
             
     except Exception as e:
@@ -405,5 +397,5 @@ for index, (name_suffix, url) in enumerate(GOODINFO_TARGETS.items()):
         print(f" └─ [防封鎖] 隨機休息 {sleep_time:.2f} 秒...\n")
         time.sleep(sleep_time)
 
-print("-" * 40 + "\n🎉 爬蟲任務全數完成！趕快去資料夾檢查熱騰騰的 CSV 吧！")
+print("-" * 40 + "\n🎉 爬蟲任務全數完成！")
 driver.quit()
