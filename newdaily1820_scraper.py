@@ -206,7 +206,7 @@ except Exception as e:
     print(f"    ⚠️ 失敗: {e}")
 
 # ==========================================
-# 🐢 階段三：Goodinfo 模擬點擊瀏覽器 (CDP 深度偽裝 + 盲劍客鍵盤版)
+# 🐢 階段三：Goodinfo 模擬點擊瀏覽器 (多國語言雷達修正版)
 # ==========================================
 GOODINFO_TARGETS = {
     "外資賣出佔成交比(3日累計排名)": "https://goodinfo.tw/tw/StockList.asp?RPT_TIME=&MARKET_CAT=%E7%86%B1%E9%96%80%E6%8E%92%E8%A1%8C&INDUSTRY_CAT=%E5%A4%96%E8%B3%87%E8%B3%A3%E5%87%BA%E4%BD%94%E6%88%90%E4%BA%A4%E6%AF%94+%E2%80%93+3%E6%97%A5%40%40%E5%A4%96%E8%B3%87%E8%B3%A3%E5%87%BA%E4%BD%94%E6%88%90%E4%BA%A4%E6%AF%94%40%40%E5%A4%96%E8%B3%87+%E2%80%93+3%E6%97%A5",
@@ -255,7 +255,7 @@ try:
     print(f" └─ 🔍 自動偵測到伺服器 Chrome 主版本為: {version_main}")
 except Exception: pass
 
-# 🌟 CDP 深度偽裝：強制宣告為真實的 Windows 電腦，而非 Linux 伺服器
+# 🌟 CDP 深度偽裝：強制宣告為真實的 Windows 電腦
 if version_main:
     ua = f"Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/{version_main}.0.0.0 Safari/537.36"
 else:
@@ -279,6 +279,9 @@ except Exception as e:
 
 print(f"開始執行 Goodinfo 下載任務，共計 {len(GOODINFO_TARGETS)} 個檔案。\n" + "-"*40)
 
+# 🌟 定義 CF 觸發的關鍵字清單，涵蓋中英文版本
+CF_KEYWORDS = ["Just a moment", "Cloudflare", "請稍候", "Attention", "驗證"]
+
 for index, (name_suffix, url) in enumerate(GOODINFO_TARGETS.items()):
     file_name = f"{today}{name_suffix}.csv"
     file_path = os.path.join(SAVE_DIR, file_name)
@@ -286,12 +289,24 @@ for index, (name_suffix, url) in enumerate(GOODINFO_TARGETS.items()):
     
     try:
         driver.get(url)
+        time.sleep(3) # 讓網頁稍微讀取一下標題
         
         # ==========================================================
-        # 🌟 終極破盾核心 v3：影子 DOM 穿透 + 盲劍客鍵盤法
+        # 🌟 終極破盾核心 v4：多國語言雷達 + 影子 DOM 穿透 + 盲劍客
         # ==========================================================
-        if "Just a moment" in driver.title or "Cloudflare" in driver.title:
-            print(" └─ 🛡️ 遇到 Cloudflare 驗證畫面，啟動【盲劍客鍵盤破盾法】與【影子 DOM 穿透】...")
+        
+        # 判斷是否被 CF 擋住 (檢查標題或網頁原始碼)
+        is_cf_blocked = False
+        current_title = driver.title
+        page_src = driver.page_source
+        
+        if any(kw in current_title for kw in CF_KEYWORDS):
+            is_cf_blocked = True
+        elif "cf-turnstile" in page_src or "cf-browser-verification" in page_src:
+            is_cf_blocked = True
+
+        if is_cf_blocked:
+            print(f" └─ 🛡️ 遇到 Cloudflare 驗證畫面 (標題: {current_title})，啟動【盲劍客鍵盤破盾法】與【影子 DOM 穿透】...")
             
             for cf_attempt in range(5): 
                 # 策略 1：使用 JavaScript 刺探隱形的 Turnstile 驗證框並取得絕對座標
@@ -323,7 +338,9 @@ for index, (name_suffix, url) in enumerate(GOODINFO_TARGETS.items()):
                 except Exception: pass
                 
                 time.sleep(6)
-                if "Just a moment" not in driver.title and "Cloudflare" not in driver.title:
+                
+                # 檢查是否通關成功
+                if not any(kw in driver.title for kw in CF_KEYWORDS):
                     print(" └─ 🔓 Cloudflare 盾牌已成功擊破！網頁通行許可取得。")
                     time.sleep(3) 
                     break
