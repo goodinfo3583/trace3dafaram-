@@ -210,18 +210,11 @@ def inject_custom_header(is_logged_in=False):
                         </span>
                         <p class="dropdown-text">自訂計分籌碼權重與未來勝率回測模擬。</p>
                     </div>
-                    
                     <div class="dropdown-item locked-item" style="border-bottom: none;">
                         <span class="dropdown-title">
                             <img src="app/static/icon-chessknightalt.png" class="menu-icon" alt="game"> 命運酒館 (開發中)
                         </span>
                         <p class="dropdown-text">休息一下別殺進殺出占個卜、主力追蹤等更多互動功能。</p>
-                        
-                    <div class="dropdown-item locked-item" style="border-bottom: none;">
-                        <span class="dropdown-title">
-                            <img src="app/static/icon-openbookapple.png" class="menu-icon" alt="game"> 課程 (開發中)
-                        </span>
-                        <p class="dropdown-text">學習與增加你的最大知識，缺乏基礎智識，停下來有時反而能增加你的勝率。</p>
                     </div>
                 </div>
             </div>
