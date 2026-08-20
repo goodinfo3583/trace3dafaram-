@@ -144,7 +144,9 @@ def inject_custom_header(is_logged_in=False):
             .nav-icon { margin: 0 0 8px 0; width: 28px; height: 28px; }
             .global-radar-toggle { display: flex; } 
         }
-        .stApp { margin-top: 50px !important; }
+        
+        /* 💡 將原本的 50px 改為 65px，讓所有內容往下推 15px，解決遮擋問題 */
+        .stApp { margin-top: 65px !important; }
     `;
     parentDoc.head.appendChild(style);
 
