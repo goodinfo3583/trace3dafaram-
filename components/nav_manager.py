@@ -6,7 +6,7 @@ def inject_custom_header(is_logged_in=False):
     login_btn_text = "登出" if is_logged_in else "登入"
     b6_text = "鉅額交易"
     
-    inject_js = '''
+    inject_js = """
     <script>
     const parentDoc = window.parent.document;
 
@@ -31,11 +31,7 @@ def inject_custom_header(is_logged_in=False):
         /* ⚙️ 頂部圖示共通樣式 (包含系統與工具箱) */
         .system-menu { position: relative; padding: 6px 8px; cursor: pointer; background: transparent !important; display: flex; align-items: center; justify-content: center; }
         .system-icon { width: 22px; height: 22px; object-fit: contain; filter: drop-shadow(1px 1px 2px rgba(0,0,0,0.8)); transition: all 0.3s cubic-bezier(0.175, 0.885, 0.32, 1.275); }
-        
-        /* 💡 統一：滑鼠滑過時上浮並放大發光 */
-        .system-menu:hover .system-icon { filter: drop-shadow(0px 0px 8px rgba(0, 210, 255, 0.9)); transform: scale(1.15) translateY(-2px); }
-        /* 💡 新增：點擊時下壓特效 (與右側按鈕統一) */
-        .system-menu:active .system-icon { transform: scale(0.9) translateY(2px); filter: drop-shadow(0px 0px 3px rgba(0, 210, 255, 0.5)); transition: all 0.1s ease; }
+        .system-menu:hover .system-icon { filter: drop-shadow(0px 0px 8px rgba(0, 210, 255, 0.9)); transform: scale(1.15); }
         
         /* 🌟 專屬特效：定時反光/高光提示 */
         @keyframes periodicGlow {
@@ -46,10 +42,10 @@ def inject_custom_header(is_logged_in=False):
         }
         
         #custom-sidebar-toggle .system-icon { animation: periodicGlow 5s infinite ease-in-out; }
-        #custom-sidebar-toggle:hover .system-icon { animation-play-state: paused; filter: brightness(1.2) drop-shadow(0px 0px 8px rgba(0, 210, 255, 0.9)); transform: scale(1.15) translateY(-2px); }
+        #custom-sidebar-toggle:hover .system-icon { animation-play-state: paused; filter: brightness(1.2) drop-shadow(0px 0px 8px rgba(0, 210, 255, 0.9)); transform: scale(1.15); }
 
         /* 下拉選單 */
-        .system-dropdown { position: absolute; top: 100%; left: 10px; width: 280px; background-color: rgba(17, 22, 34, 0.95); border: 1px solid rgba(255,255,255,0.1); border-top: none; border-radius: 0 0 8px 8px; padding: 0; max-height: 0; opacity: 0; overflow: hidden; transition: all 0.4s cubic-bezier(0.4, 0, 0.2, 1); box-shadow: 0px 8px 20px rgba(0,0,0,0.8); z-index: 1000010; backdrop-filter: blur(10px); }
+        .system-dropdown { position: absolute; top: 100%; left: 10px; width: 280px; background-color: rgba(17, 22, 34, 0.95); border: 1px solid rgba(255,255,255,0.1); border-top: none; border-radius: 0 0 8px 8px; padding: 0; max-height: 0; opacity: 0; overflow: hidden; transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1); box-shadow: 0px 8px 20px rgba(0,0,0,0.8); z-index: 1000010; backdrop-filter: blur(10px); }
         .system-menu:hover .system-dropdown { max-height: 600px; opacity: 1; padding: 8px 0; }
         
         .dropdown-item { padding: 10px 15px; border-bottom: 1px solid rgba(255,255,255,0.05); }
@@ -62,9 +58,11 @@ def inject_custom_header(is_logged_in=False):
         .dropdown-item:hover { background-color: rgba(255,255,255,0.05); }
         .dropdown-item.actionable:hover .dropdown-title { color: #FFD700; }
         
+        /* 根據登入狀態調整文字顏色 */
         .vip-login-btn { color: #FFD700 !important; font-size: 14px; justify-content: center; margin-top: 2px; }
         .vip-login-btn:hover { text-shadow: 0 0 10px rgba(255, 215, 0, 0.8); }
 
+        /* 未解鎖/開發中 道具效果 */
         .locked-item { opacity: 0.5; filter: grayscale(50%); cursor: not-allowed; }
         .locked-item:hover { background-color: transparent; opacity: 0.8; filter: grayscale(0%); }
 
@@ -77,17 +75,14 @@ def inject_custom_header(is_logged_in=False):
             border: 1px solid rgba(255, 255, 255, 0.1) !important; border-top: none !important; border-right: none !important;
             border-radius: 0 0 0 16px;
             box-shadow: -4px 4px 15px rgba(0,0,0,0.3);
-            transition: all 0.4s cubic-bezier(0.4, 0, 0.2, 1); 
+            transition: all 0.3s ease-in-out; 
             width: fit-content; margin-left: auto;
-            transform-origin: top;
         }
         
         .nav-text-link { 
             position: relative; overflow: hidden;
             text-decoration: none !important; color: #CBD5E1 !important; font-size: 15px; font-weight: 600; 
-            padding: 6px 12px; border-radius: 6px; 
-            /* 💡 加入彈性動畫曲線 */
-            transition: all 0.3s cubic-bezier(0.175, 0.885, 0.32, 1.275); 
+            padding: 6px 12px; border-radius: 6px; transition: all 0.3s ease-in-out; 
             text-shadow: 1px 1px 3px rgba(0,0,0,0.8); cursor: pointer; display: flex; align-items: center; 
             border: 1px solid transparent;
         }
@@ -98,20 +93,10 @@ def inject_custom_header(is_logged_in=False):
             transform: skewX(-20deg); transition: none;
         }
         
-        /* 💡 統一：滑過時整體稍微放大、向上浮起，並加上發光特效 */
         .nav-text-link:hover { 
             color: #FFD700 !important; text-shadow: 0 0 10px rgba(255, 215, 0, 0.8); 
             background: rgba(255, 255, 255, 0.1); border: 1px solid rgba(255, 215, 0, 0.3);
-            transform: scale(1.05) translateY(-2px); box-shadow: 0 6px 12px rgba(0,0,0,0.3);
-        }
-        
-        /* 💡 新增：點擊時的物理下壓特效，鬆開彈起 */
-        .nav-text-link:active {
-            transform: scale(0.95) translateY(2px) !important; 
-            box-shadow: inset 0 2px 8px rgba(0,0,0,0.6) !important;
-            background: rgba(255, 215, 0, 0.15) !important;
-            border-color: rgba(255, 215, 0, 0.5) !important;
-            transition: all 0.1s ease; 
+            transform: translateY(-2px); box-shadow: 0 4px 10px rgba(0,0,0,0.3);
         }
         
         .nav-text-link:hover::before { animation: sweepLight 0.6s ease-out; }
@@ -119,11 +104,8 @@ def inject_custom_header(is_logged_in=False):
         
         .nav-divider { color: rgba(255, 255, 255, 0.15); font-size: 14px; user-select: none; margin: 0 2px; }
 
-        .nav-icon { width: 20px; height: 20px; margin-right: 6px; object-fit: contain; transition: all 0.3s cubic-bezier(0.175, 0.885, 0.32, 1.275); }
-        
-        /* 💡 統一：內部圖示也會同步放大 */
-        .nav-text-link:hover .nav-icon { filter: drop-shadow(0px 0px 6px rgba(255, 215, 0, 0.9)) brightness(1.2); transform: scale(1.15); }
-        .nav-text-link:active .nav-icon { transform: scale(0.9); transition: all 0.1s ease; }
+        .nav-icon { width: 20px; height: 20px; margin-right: 6px; object-fit: contain; transition: all 0.3s ease-in-out; }
+        .nav-text-link:hover .nav-icon { filter: drop-shadow(0px 0px 6px rgba(255, 215, 0, 0.9)) brightness(1.2); }
         
         /* 🌟 雷達按鈕靈動浮動特效 */
         @keyframes floatAndPulse {
@@ -136,32 +118,21 @@ def inject_custom_header(is_logged_in=False):
             display: flex; align-items: center; justify-content: center; cursor: pointer; 
             margin-right: 15px; background: transparent; border: none; padding: 6px 10px;
         }
-        .global-radar-toggle img { width: 22px; height: 22px; object-fit: contain; transition: all 0.3s cubic-bezier(0.175, 0.885, 0.32, 1.275); animation: floatAndPulse 3s infinite ease-in-out; }
-        
-        /* 💡 統一雷達圖示互動 */
-        .global-radar-toggle:hover img { transform: scale(1.15) translateY(-2px); filter: drop-shadow(0 0 15px rgba(255, 215, 0, 1)); animation-play-state: paused; }
-        .global-radar-toggle:active img { transform: scale(0.9) translateY(2px); filter: drop-shadow(0 0 5px rgba(255, 215, 0, 0.5)); transition: all 0.1s ease; }
+        .global-radar-toggle img { width: 22px; height: 22px; object-fit: contain; transition: all 0.4s ease; animation: floatAndPulse 3s infinite ease-in-out; }
+        .global-radar-toggle:hover img { transform: scale(1.15); filter: drop-shadow(0 0 15px rgba(255, 215, 0, 1)); animation-play-state: paused; }
         .global-radar-toggle img.is-hidden { animation: none; opacity: 0.3; filter: grayscale(100%); transform: scale(0.9); }
 
-        /* 📱 手機版專屬：派蒙網格菜單 (加入收闔/展開平滑滑動動畫) */
+        .force-hide { display: none !important; }
+
+        /* 📱 手機版專屬：派蒙網格菜單 */
         @media (max-width: 768px) { 
             .nav-btn-container { 
                 width: 96%; margin: 10px auto; 
                 display: grid !important; grid-template-columns: repeat(2, 1fr); gap: 12px;
                 padding: 20px 15px; background: rgba(15, 20, 30, 0.92) !important;
                 border-radius: 12px; border: 1px solid rgba(255,255,255,0.1) !important;
-                /* 💡 使手機版具有上下收展動畫 */
-                max-height: 600px; opacity: 1; overflow: hidden;
-                transition: max-height 0.4s ease, opacity 0.4s ease, padding 0.4s ease, margin 0.4s ease;
             } 
-            .nav-btn-container.force-hide { 
-                /* 💡 不再使用 display: none，改用 max-height 創造下拉/收闔動畫 */
-                display: grid !important;
-                max-height: 0 !important; opacity: 0 !important; 
-                padding-top: 0 !important; padding-bottom: 0 !important;
-                margin-top: 0 !important; margin-bottom: 0 !important;
-                border: none !important;
-            }
+            .nav-btn-container.force-hide { display: none !important; }
             .nav-divider { display: none; } 
             .nav-text-link { 
                 flex-direction: column; justify-content: center; padding: 16px 10px; margin: 0;
@@ -191,6 +162,7 @@ def inject_custom_header(is_logged_in=False):
                 
                 <div class="system-dropdown">
                     <div class="dropdown-item actionable" style="text-align: center;">
+                        <!-- 💡 讓 data-target 和顯示文字一樣，這樣 JS 就會去找對應的 Python 按鈕 -->
                         <a href="#" data-target="__LOGIN_TEXT__" class="dropdown-title internal-nav vip-login-btn">
                             <img src="app/static/icon-login.png" class="menu-icon" alt="login"> __LOGIN_TEXT__
                         </a>
@@ -211,8 +183,7 @@ def inject_custom_header(is_logged_in=False):
                     </div>
                 </div>
             </div>
-
-            <!-- 🎒 工具箱 / 擴充功能 -->
+                        <!-- 🎒 工具箱 / 擴充功能 (取代原本零散的按鈕) -->
             <div class="system-menu">
                 <div class="system-menu-title" title="工具與擴充模組">
                     <img src="app/static/icon-toolbox.png" class="system-icon" alt="工具箱">
@@ -232,6 +203,7 @@ def inject_custom_header(is_logged_in=False):
                         <p class="dropdown-text">自訂與管理您的專屬觀察清單。</p>
                     </div>
                     
+                    <!-- 🔓 預告未來功能，增加遊戲期待感 -->
                     <div class="dropdown-item locked-item">
                         <span class="dropdown-title">
                             <img src="app/static/icon-podiumaward.png" class="menu-icon" alt="lock"> 權重與回測 (未解鎖)
@@ -282,6 +254,7 @@ def inject_custom_header(is_logged_in=False):
                 const targetName = link.getAttribute('data-target');
                 const btns = Array.from(parentDoc.querySelectorAll('button'));
                 
+                // 找到文字完全等於 targetName 的按鈕 (避免誤判)
                 const targetBtn = btns.find(b => b.textContent.trim() === targetName || b.textContent.includes(targetName));
                 if (targetBtn) {
                     targetBtn.click();
@@ -356,6 +329,7 @@ def inject_custom_header(is_logged_in=False):
             };
         }
 
+        // 💡 確保包含 "登入" 和 "登出" 的原生按鈕都會被隱藏
         setInterval(() => {
             const allBtns = Array.from(parentDoc.querySelectorAll('button'));
             allBtns.forEach(b => {
@@ -368,7 +342,7 @@ def inject_custom_header(is_logged_in=False):
         }, 100);
     }, 500);
     </script>
-    '''
+    """
     
     inject_js = inject_js.replace("__LOGIN_TEXT__", login_btn_text)
     inject_js = inject_js.replace("__B6_TEXT__", b6_text)
@@ -381,6 +355,7 @@ def render_proxy_buttons():
     def change_page(page_name):
         st.query_params["page"] = page_name 
 
+    # 💡 處理登出：清除狀態並跳轉首頁 (不依賴 JS reload)
     def handle_logout():
         st.session_state.clear()
         st.query_params["page"] = "home"
@@ -398,5 +373,6 @@ def render_proxy_buttons():
         st.button("NavToB6", on_click=change_page, args=("b6",))
         st.button("NavToB7", on_click=change_page, args=("b7",))
         
+        # 💡 同時準備兩顆隱藏按鈕，交由前端文字對應點擊
         st.button("登入", on_click=change_page, args=("login",))
         st.button("登出", on_click=handle_logout)
