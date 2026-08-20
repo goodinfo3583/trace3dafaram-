@@ -32,7 +32,8 @@ jobs:
         sudo apt-get update
         sudo apt-get install -y xvfb
         python -m pip install --upgrade pip
-        pip install pandas selenium lxml html5lib requests beautifulsoup4 undetected-chromedriver
+        # ↓↓↓ 讓系統自動讀取 requirements.txt 裡面的清單 ↓↓↓
+        pip install -r requirements.txt
 
     # 🌟 升級點 2：使用 xvfb-run 啟動 Python，欺騙 Cloudflare 這是一台有螢幕的電腦
     - name: 執行 18:20 Python 爬蟲程式
