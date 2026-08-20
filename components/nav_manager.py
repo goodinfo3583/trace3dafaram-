@@ -25,12 +25,11 @@ def inject_custom_header(is_logged_in=False):
 
         #custom-sticky-header { position: fixed; top: 0; left: 0; width: 100%; z-index: 1000005; background: transparent !important; pointer-events: none; }
         
-        /* 💡 微調 disclaimer-bar，確保它緊貼頂部 */
         .disclaimer-bar, .nav-btn-container { pointer-events: auto; }
-        .disclaimer-bar { display: flex; align-items: flex-start; background: transparent !important; padding: 0px 15px; border: none !important; gap: 4px; height: 45px;}
+        .disclaimer-bar { display: flex; align-items: center; background: transparent !important; padding: 0px 15px; border: none !important; gap: 4px; }
         
         /* ⚙️ 頂部圖示共通樣式 (包含系統與工具箱) */
-        .system-menu { position: relative; padding: 6px 8px; cursor: pointer; background: transparent !important; display: flex; align-items: center; justify-content: center; height: 100%;}
+        .system-menu { position: relative; padding: 6px 8px; cursor: pointer; background: transparent !important; display: flex; align-items: center; justify-content: center; }
         .system-icon { width: 22px; height: 22px; object-fit: contain; filter: drop-shadow(1px 1px 2px rgba(0,0,0,0.8)); transition: all 0.3s cubic-bezier(0.175, 0.885, 0.32, 1.275); }
         .system-menu:hover .system-icon { filter: drop-shadow(0px 0px 8px rgba(0, 210, 255, 0.9)); transform: scale(1.15); }
         
@@ -68,26 +67,22 @@ def inject_custom_header(is_logged_in=False):
         .locked-item:hover { background-color: transparent; opacity: 0.8; filter: grayscale(0%); }
 
         /* 💎 懸浮式導覽列 (純粹的籌碼動向儀表板) */
-        /* 💡 修正這裡：讓按鈕容器緊貼頂部，減少 padding，往上提 */
         .nav-btn-container { 
             display: flex; flex-wrap: wrap; justify-content: flex-end; align-items: center; 
-            padding: 4px 15px; gap: 6px; /* 減小上下 padding */
+            padding: 8px 15px; gap: 6px; 
             background: rgba(255, 255, 255, 0.06) !important; 
             backdrop-filter: blur(8px); -webkit-backdrop-filter: blur(8px);
             border: 1px solid rgba(255, 255, 255, 0.1) !important; border-top: none !important; border-right: none !important;
-            border-radius: 0 0 0 12px; /* 圓角稍微縮小一點 */
+            border-radius: 0 0 0 16px;
             box-shadow: -4px 4px 15px rgba(0,0,0,0.3);
             transition: all 0.3s ease-in-out; 
             width: fit-content; margin-left: auto;
-            /* 💡 關鍵：將整個區塊往上移動，使其緊貼螢幕頂端 */
-            margin-top: -5px; 
-            height: 38px; /* 設定一個固定的較小高度 */
         }
         
         .nav-text-link { 
             position: relative; overflow: hidden;
-            text-decoration: none !important; color: #CBD5E1 !important; font-size: 14px; font-weight: 600; /* 字體稍微縮小 1px */
-            padding: 4px 8px; border-radius: 6px; transition: all 0.3s ease-in-out; /* 減小按鈕 padding */
+            text-decoration: none !important; color: #CBD5E1 !important; font-size: 15px; font-weight: 600; 
+            padding: 6px 12px; border-radius: 6px; transition: all 0.3s ease-in-out; 
             text-shadow: 1px 1px 3px rgba(0,0,0,0.8); cursor: pointer; display: flex; align-items: center; 
             border: 1px solid transparent;
         }
@@ -101,15 +96,15 @@ def inject_custom_header(is_logged_in=False):
         .nav-text-link:hover { 
             color: #FFD700 !important; text-shadow: 0 0 10px rgba(255, 215, 0, 0.8); 
             background: rgba(255, 255, 255, 0.1); border: 1px solid rgba(255, 215, 0, 0.3);
-            transform: translateY(-1px); box-shadow: 0 4px 10px rgba(0,0,0,0.3);
+            transform: translateY(-2px); box-shadow: 0 4px 10px rgba(0,0,0,0.3);
         }
         
         .nav-text-link:hover::before { animation: sweepLight 0.6s ease-out; }
         @keyframes sweepLight { 0% { left: -100%; } 100% { left: 200%; } }
         
-        .nav-divider { color: rgba(255, 255, 255, 0.15); font-size: 12px; user-select: none; margin: 0 2px; }
+        .nav-divider { color: rgba(255, 255, 255, 0.15); font-size: 14px; user-select: none; margin: 0 2px; }
 
-        .nav-icon { width: 18px; height: 18px; margin-right: 4px; object-fit: contain; transition: all 0.3s ease-in-out; } /* 圖示微調 */
+        .nav-icon { width: 20px; height: 20px; margin-right: 6px; object-fit: contain; transition: all 0.3s ease-in-out; }
         .nav-text-link:hover .nav-icon { filter: drop-shadow(0px 0px 6px rgba(255, 215, 0, 0.9)) brightness(1.2); }
         
         /* 🌟 雷達按鈕靈動浮動特效 */
@@ -121,13 +116,11 @@ def inject_custom_header(is_logged_in=False):
 
         .global-radar-toggle {
             display: flex; align-items: center; justify-content: center; cursor: pointer; 
-            margin-right: 15px; background: transparent; border: none; padding: 6px 10px; height: 100%;
+            margin-right: 15px; background: transparent; border: none; padding: 6px 10px;
         }
         .global-radar-toggle img { width: 22px; height: 22px; object-fit: contain; transition: all 0.4s ease; animation: floatAndPulse 3s infinite ease-in-out; }
         .global-radar-toggle:hover img { transform: scale(1.15); filter: drop-shadow(0 0 15px rgba(255, 215, 0, 1)); animation-play-state: paused; }
         .global-radar-toggle img.is-hidden { animation: none; opacity: 0.3; filter: grayscale(100%); transform: scale(0.9); }
-
-        .disclaimer-item { display: flex; align-items: center; height: 100%; }
 
         .force-hide { display: none !important; }
 
@@ -138,7 +131,6 @@ def inject_custom_header(is_logged_in=False):
                 display: grid !important; grid-template-columns: repeat(2, 1fr); gap: 12px;
                 padding: 20px 15px; background: rgba(15, 20, 30, 0.92) !important;
                 border-radius: 12px; border: 1px solid rgba(255,255,255,0.1) !important;
-                height: auto; /* 手機版解除高度限制 */
             } 
             .nav-btn-container.force-hide { display: none !important; }
             .nav-divider { display: none; } 
@@ -152,8 +144,6 @@ def inject_custom_header(is_logged_in=False):
             .nav-icon { margin: 0 0 8px 0; width: 28px; height: 28px; }
             .global-radar-toggle { display: flex; } 
         }
-        
-        /* 💡 恢復原狀，既然推不動卡片，就不用硬推 .stApp 了，維持 50px 即可 */
         .stApp { margin-top: 50px !important; }
     `;
     parentDoc.head.appendChild(style);
