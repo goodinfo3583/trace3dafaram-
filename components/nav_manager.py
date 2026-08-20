@@ -1,4 +1,3 @@
-#0820
 # components/nav_manager.py
 import streamlit.components.v1 as components
 
@@ -59,6 +58,7 @@ def inject_custom_header(is_logged_in=False):
         .dropdown-item:hover { background-color: rgba(255,255,255,0.05); }
         .dropdown-item.actionable:hover .dropdown-title { color: #FFD700; }
         
+        /* 根據登入狀態調整文字顏色 */
         .vip-login-btn { color: #FFD700 !important; font-size: 14px; justify-content: center; margin-top: 2px; }
         .vip-login-btn:hover { text-shadow: 0 0 10px rgba(255, 215, 0, 0.8); }
 
@@ -162,7 +162,8 @@ def inject_custom_header(is_logged_in=False):
                 
                 <div class="system-dropdown">
                     <div class="dropdown-item actionable" style="text-align: center;">
-                        <a href="#" data-target="登入" class="dropdown-title internal-nav vip-login-btn">
+                        <!-- 💡 讓 data-target 和顯示文字一樣，這樣 JS 就會去找對應的 Python 按鈕 -->
+                        <a href="#" data-target="__LOGIN_TEXT__" class="dropdown-title internal-nav vip-login-btn">
                             <img src="app/static/icon-login.png" class="menu-icon" alt="login"> __LOGIN_TEXT__
                         </a>
                     </div>
@@ -179,42 +180,6 @@ def inject_custom_header(is_logged_in=False):
                     <div class="dropdown-item" style="border-bottom: none;">
                         <span class="dropdown-title"><img src="app/static/icon-agree.png" class="menu-icon" alt="privacy"> 隱私政策</span>
                         <p class="dropdown-text">依個資法蒐集識別資料僅供優化服務，絕不外流。</p>
-                    </div>
-                </div>
-            </div>
-
-            <!-- 🎒 工具箱 / 擴充功能 (取代原本零散的按鈕) -->
-            <div class="system-menu">
-                <div class="system-menu-title" title="工具與擴充模組">
-                    <img src="app/static/icon-toolbox.png" class="system-icon" alt="工具箱">
-                </div>
-                
-                <div class="system-dropdown">
-                    <div class="dropdown-item actionable">
-                        <a href="#" data-target="NavToNews" class="dropdown-title internal-nav">
-                            <img src="app/static/magicbook2.png" class="menu-icon" alt="news"> 市場消息
-                        </a>
-                        <p class="dropdown-text">掌握最新市場動態與總經快訊。</p>
-                    </div>
-                    <div class="dropdown-item actionable">
-                        <a href="#" data-target="NavToWatchlist" class="dropdown-title internal-nav">
-                            <img src="app/static/icon-watchlist.png" class="menu-icon" alt="create"> 建立名單
-                        </a>
-                        <p class="dropdown-text">自訂與管理您的專屬觀察清單。</p>
-                    </div>
-                    
-                    <!-- 🔓 預告未來功能，增加遊戲期待感 -->
-                    <div class="dropdown-item locked-item">
-                        <span class="dropdown-title">
-                            <img src="app/static/icon-podiumaward.png" class="menu-icon" alt="lock"> 權重與回測 (未解鎖)
-                        </span>
-                        <p class="dropdown-text">自訂計分籌碼權重與未來勝率回測模擬。</p>
-                    </div>
-                    <div class="dropdown-item locked-item" style="border-bottom: none;">
-                        <span class="dropdown-title">
-                            <img src="app/static/icon-chessknightalt.png" class="menu-icon" alt="game"> 命運酒館 (開發中)
-                        </span>
-                        <p class="dropdown-text">休息一下別殺進殺出占個卜、主力追蹤等更多互動功能。</p>
                     </div>
                 </div>
             </div>
@@ -253,8 +218,12 @@ def inject_custom_header(is_logged_in=False):
                 e.preventDefault(); 
                 const targetName = link.getAttribute('data-target');
                 const btns = Array.from(parentDoc.querySelectorAll('button'));
-                const targetBtn = btns.find(b => b.textContent.includes(targetName));
-                if (targetBtn) targetBtn.click();
+                
+                // 找到文字完全等於 targetName 的按鈕 (避免誤判)
+                const targetBtn = btns.find(b => b.textContent.trim() === targetName || b.textContent.includes(targetName));
+                if (targetBtn) {
+                    targetBtn.click();
+                }
             };
         });
 
@@ -325,10 +294,12 @@ def inject_custom_header(is_logged_in=False):
             };
         }
 
+        // 💡 確保包含 "登入" 和 "登出" 的原生按鈕都會被隱藏
         setInterval(() => {
             const allBtns = Array.from(parentDoc.querySelectorAll('button'));
             allBtns.forEach(b => {
-                if(b.textContent.includes('NavTo') || b.textContent.includes('登入')) { 
+                const text = b.textContent.trim();
+                if(text.includes('NavTo') || text === '登入' || text === '登出') { 
                     const wrapper = b.closest('div[data-testid="stElementContainer"]');
                     if (wrapper) wrapper.style.display = 'none';
                 }
@@ -344,9 +315,15 @@ def inject_custom_header(is_logged_in=False):
 
 # ==========================================
 import streamlit as st
+
 def render_proxy_buttons():
     def change_page(page_name):
         st.query_params["page"] = page_name 
+
+    # 💡 處理登出：清除狀態並跳轉首頁 (不依賴 JS reload)
+    def handle_logout():
+        st.session_state.clear()
+        st.query_params["page"] = "home"
 
     with st.container():
         st.button("NavToContact", on_click=change_page, args=("contact",))
@@ -360,4 +337,7 @@ def render_proxy_buttons():
         st.button("NavToB5", on_click=change_page, args=("b5",))
         st.button("NavToB6", on_click=change_page, args=("b6",))
         st.button("NavToB7", on_click=change_page, args=("b7",))
+        
+        # 💡 同時準備兩顆隱藏按鈕，交由前端文字對應點擊
         st.button("登入", on_click=change_page, args=("login",))
+        st.button("登出", on_click=handle_logout)
