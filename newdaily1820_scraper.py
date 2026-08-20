@@ -309,34 +309,39 @@ for index, (name_suffix, url) in enumerate(GOODINFO_TARGETS.items()):
             print(f" └─ 🛡️ 遇到 Cloudflare 驗證畫面 (標題: {current_title})，啟動【盲劍客鍵盤破盾法】與【影子 DOM 穿透】...")
             
             for cf_attempt in range(5): 
-                # 策略 1：使用 JavaScript 刺探隱形的 Turnstile 驗證框並取得絕對座標
                 try:
-                    js_click = """
-                    let wrappers = document.querySelectorAll('div');
-                    for (let w of wrappers) {
-                        if (w.className.includes('cf-turnstile') || w.id.includes('turnstile')) {
-                            let rect = w.getBoundingClientRect();
-                            return [rect.x + rect.width/2, rect.y + rect.height/2];
-                        }
-                    }
-                    return null;
-                    """
-                    coords = driver.execute_script(js_click)
-                    if coords:
-                        print(f" └─ 🎯 [嘗試 {cf_attempt+1}/5] 成功穿透 Shadow DOM 找到驗證框！發射精準座標點擊...")
-                        ActionChains(driver).move_by_offset(coords[0], coords[1]).click().perform()
-                        ActionChains(driver).move_by_offset(-coords[0], -coords[1]).perform() # 滑鼠歸位
-                except Exception: pass
+                    # 關鍵修正 1：尋找並切入 Cloudflare 的 iframe
+                    cf_iframe = driver.find_element(By.XPATH, "//iframe[contains(@title, 'Cloudflare') or contains(@src, 'turnstile') or contains(@src, 'cloudflare')]")
+                    
+                    # 將游標移至 iframe 區域，模擬人類軌跡
+                    ActionChains(driver).move_to_element(cf_iframe).perform()
+                    time.sleep(1)
+                    
+                    # 切換焦點進入 iframe 內部
+                    driver.switch_to.frame(cf_iframe)
+                    time.sleep(1)
+                    
+                    # 尋找內部的驗證框並點擊 (通常 iframe 的 body 就是整個可點擊區)
+                    cf_body = driver.find_element(By.TAG_NAME, "body")
+                    cf_body.click()
+                    print(f" └─ 🎯 [嘗試 {cf_attempt+1}/5] 成功切入 Iframe 並點選驗證區塊！")
+                    
+                except Exception as e:
+                    # 關鍵修正 2：如果找不到 iframe，改用焦點鎖定版的盲劍客
+                    print(f" └─ 🎹 [嘗試 {cf_attempt+1}/5] 執行焦點鎖定版 Tab + Space...")
+                    try:
+                        # 先點擊網頁背景確保視窗有取得焦點
+                        driver.find_element(By.TAG_NAME, "body").click()
+                        time.sleep(0.5)
+                        # 單次 Tab 配合 Space，避免多次 Tab 跳過頭
+                        ActionChains(driver).send_keys(Keys.TAB).pause(0.5).send_keys(Keys.SPACE).perform()
+                    except:
+                        pass
                 
-                time.sleep(2)
-                
-                # 策略 2：鍵盤盲按 (不管畫面上看不看得到，Tab 兩次後強按空白鍵)
-                try:
-                    print(f" └─ 🎹 [嘗試 {cf_attempt+1}/5] 執行鍵盤 Tab + Space 盲按...")
-                    ac = ActionChains(driver)
-                    ac.send_keys(Keys.TAB).pause(0.5).send_keys(Keys.TAB).pause(0.5).send_keys(Keys.SPACE).perform()
-                except Exception: pass
-                
+                finally:
+                    # 關鍵修正 3：無論成功或失敗，都必須切回主畫面，否則後續爬蟲抓不到表格
+                    driver.switch_to.default_content()
+
                 time.sleep(6)
                 
                 # 檢查是否通關成功
