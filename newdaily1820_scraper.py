@@ -1,4 +1,3 @@
-#newdaily1820_scraper ,20260820
 import time
 import random
 import pandas as pd
@@ -20,12 +19,12 @@ if not os.path.exists(SAVE_DIR):
     os.makedirs(SAVE_DIR)
 
 today = datetime.now().strftime("%Y%m%d")
-taifex_date = datetime.now().strftime("%Y/%m/%d") # 期交所需要的日期格式
+taifex_date = datetime.now().strftime("%Y/%m/%d")
 
 print(f"啟動爬蟲系統，目標日期：{today}\n" + "="*40)
 
 # ==========================================
-# 🚀 階段一：TWSE 證交所 & TPEx 櫃買中心 API (全新改版解析對策)
+# 🚀 階段一：TWSE 證交所 & TPEx 櫃買中心 API (保持原樣)
 # ==========================================
 print(">> [階段一] 執行證交所與櫃買中心 API 擷取...")
 
@@ -40,7 +39,6 @@ headers = {
     'X-Requested-With': 'XMLHttpRequest'
 }
 
-# 🎯 步驟 1：先透過上市大盤，找出「真正的最後交易日」
 print(f" └─ 🔍 正在向證交所校準「最新交易日」...")
 url_cal = f"https://www.twse.com.tw/rwd/zh/afterTrading/FMTQIK?date={today}&response=json"
 real_date_str = today 
@@ -55,7 +53,6 @@ try:
         latest_roc_date = res_cal["data"][-1][0]
         parts = latest_roc_date.split('/')
         real_year = int(parts[0]) + 1911
-        
         real_date_str = f"{real_year}{parts[1].zfill(2)}{parts[2].zfill(2)}"
         roc_full_date = latest_roc_date 
         roc_month = f"{parts[0]}/{parts[1].zfill(2)}" 
@@ -63,14 +60,12 @@ try:
 except Exception as e:
     print(f"    ⚠️ 校準失敗，將使用系統今日日期: {e}")
 
-# 🎯 步驟 2：拿著確認有交易的日期，準備精準抓取
 TWSE_APIS = {
     "大盤上市成交量": url_cal,
     "三大法人買賣超金額": f"https://www.twse.com.tw/rwd/zh/fund/BFI82U?date={real_date_str}&response=json",
     "鉅額交易": f"https://www.twse.com.tw/rwd/zh/block/BFIAUU?date={real_date_str}&selectType=S&response=json",
 }
 
-# --- 處理 TWSE (上市) ---
 for name, url in TWSE_APIS.items():
     file_path = os.path.join(SAVE_DIR, f"{real_date_str}-{name}.csv")
     print(f" └─ 📡 正在直連抓取: {name}...")
@@ -90,7 +85,6 @@ for name, url in TWSE_APIS.items():
     except Exception as e:
         print(f"    ⚠️ 發生錯誤: {e}")
 
-# --- 處理 TPEX (上櫃) ---
 name = "大盤上櫃成交量"
 file_path = os.path.join(SAVE_DIR, f"{real_date_str}-{name}.csv")
 print(f" └─ 📡 正在直連抓取: {name}...")
@@ -129,12 +123,11 @@ if not tpex_success:
     print(f"    ❌ 伺服器回傳無資料 (可能是非交易日或伺服器異常)。")
 
 # ==========================================
-# 🚀 階段二：TAIFEX 期交所 HTML 扒表術
+# 🚀 階段二：TAIFEX 期交所 HTML 扒表術 (保持原樣)
 # ==========================================
 print("\n>> [階段二] 執行期交所網頁解析 (TAIFEX)...")
 headers = {'User-Agent': 'Mozilla/5.0'}
 
-# 1. 臺指選擇權PC比
 print(" └─ 📡 正在抓取: 臺指選擇權PC比...")
 try:
     res = requests.post("https://www.taifex.com.tw/cht/3/pcRatio", data={"queryStartDate": taifex_date, "queryEndDate": taifex_date}, headers=headers)
@@ -148,7 +141,6 @@ try:
             break
 except Exception as e: print(f"    ⚠️ 失敗: {e}")
 
-# 2. 三大法人期貨多空 (TX)
 print(" └─ 📡 正在抓取: 三大法人期貨多空單...")
 try:
     res = requests.post("https://www.taifex.com.tw/cht/3/futContractsDate", data={"queryDate": taifex_date}, headers=headers)
@@ -163,7 +155,6 @@ try:
             break
 except Exception as e: print(f"    ⚠️ 失敗: {e}")
 
-# 3. 臺指選擇權行情簡表
 print(" └─ 📡 正在抓取: 臺指選擇權行情簡表...")
 try:
     payload = {
@@ -213,7 +204,7 @@ except Exception as e:
     print(f"    ⚠️ 失敗: {e}")
 
 # ==========================================
-# 🐢 階段三：Goodinfo 模擬點擊瀏覽器 (終極破甲版)
+# 🐢 階段三：Goodinfo 模擬點擊瀏覽器 (終極破甲升級版)
 # ==========================================
 GOODINFO_TARGETS = {
     "外資賣出佔成交比(3日累計排名)": "https://goodinfo.tw/tw/StockList.asp?RPT_TIME=&MARKET_CAT=%E7%86%B1%E9%96%80%E6%8E%92%E8%A1%8C&INDUSTRY_CAT=%E5%A4%96%E8%B3%87%E8%B3%A3%E5%87%BA%E4%BD%94%E6%88%90%E4%BA%A4%E6%AF%94+%E2%80%93+3%E6%97%A5%40%40%E5%A4%96%E8%B3%87%E8%B3%A3%E5%87%BA%E4%BD%94%E6%88%90%E4%BA%A4%E6%AF%94%40%40%E5%A4%96%E8%B3%87+%E2%80%93+3%E6%97%A5",
@@ -250,17 +241,16 @@ GOODINFO_TARGETS = {
 print("\n>> [階段三] 啟動 Google Chrome 瀏覽器 (針對 Goodinfo, 破甲版)...")
 options = uc.ChromeOptions()
 
-# 🌟 我們現在有 Xvfb 虛擬螢幕，所以不需要 --headless
 options.add_argument('--no-sandbox')               
 options.add_argument('--disable-dev-shm-usage')    
 options.add_argument('--disable-gpu')              
-options.add_argument('--user-agent=Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/126.0.0.0 Safari/537.36')
 options.add_argument('--window-size=1920,1080')
+# 🌟 致命修正 1：移除原本寫死的 User-Agent，讓瀏覽器原生呈現！
+# 🌟 致命修正 2：加入這行關鍵語法，隱藏 WebDriver 被自動化軟體控制的痕跡！
+options.add_argument('--disable-blink-features=AutomationControlled')
 
-# 🌟 關鍵修復：自動偵測 GitHub 虛擬機的 Chrome 版本，防止 ChromeDriver 版本暴衝不匹配
 version_main = None
 try:
-    # 透過指令查詢系統內的 Chrome 版本 (例如輸出 "Google Chrome 150.0.7871.0")
     out = subprocess.check_output(['google-chrome', '--version']).decode('utf-8')
     match = re.search(r'(\d+)\.', out)
     if match:
@@ -270,7 +260,6 @@ except Exception as e:
     print(f" └─ ⚠️ 無法自動偵測 Chrome 版本，將使用預設設定。")
 
 try:
-    # 🎯 這裡加上 version_main 參數，強迫驅動程式與瀏覽器版本同步！
     if version_main:
         driver = uc.Chrome(options=options, version_main=version_main)
     else:
@@ -289,16 +278,19 @@ for index, (name_suffix, url) in enumerate(GOODINFO_TARGETS.items()):
     
     try:
         driver.get(url)
+
+        # 🌟 診斷升級：主動等待 Cloudflare 盾牌通關 
+        if "Just a moment" in driver.title or "Cloudflare" in driver.title:
+            print(" └─ 🛡️ 遇到 Cloudflare 驗證畫面，啟動等待與自動通關機制...")
+            for _ in range(25): # 給 CF 25秒的時間跑驗證
+                if "Just a moment" not in driver.title and "Cloudflare" not in driver.title:
+                    print(" └─ 🔓 Cloudflare 驗證通過！")
+                    time.sleep(2) # 通關後稍微喘息一下
+                    break
+                time.sleep(1)
         
-        # ==========================================
-        # 💡 終極修正版：使用正則表達式自動抓取起始名次
-        # ==========================================
         target_start = None
-        
-        # 尋找檔名中是否有 "數字-數字名" 的結構，例如 "301-600名"
         match = re.search(r'(\d+)-\d+名', name_suffix)
-        
-        # 但要排除 "1-300名"，因為這是預設的第一頁，不需要切換
         if match and match.group(1) != "1": 
             target_start = match.group(1)
             
@@ -308,7 +300,6 @@ for index, (name_suffix, url) in enumerate(GOODINFO_TARGETS.items()):
             try:
                 options_elements = driver.find_elements(By.TAG_NAME, "option")
                 for opt in options_elements:
-                    # 只要下拉選單的文字包含我們的「起始數字」，就點下去
                     if target_start in opt.text:
                         opt.click()
                         parent_select = opt.find_element(By.XPATH, "..")
@@ -325,8 +316,6 @@ for index, (name_suffix, url) in enumerate(GOODINFO_TARGETS.items()):
         for i in range(60): 
             try:
                 html = driver.page_source
-                
-                # 💡 改善 1：防卡死機制。如果等了 30 秒還是白畫面，強制重新整理 (Refresh)！
                 if i == 30:
                     print(" └─ 🔄 網頁似乎載入卡住，嘗試強制重新整理...")
                     driver.refresh()
@@ -341,7 +330,6 @@ for index, (name_suffix, url) in enumerate(GOODINFO_TARGETS.items()):
                     df.columns = [str(col).strip() for col in df.columns]
                     
                     if '代號' in df.columns or '名稱' in df.columns:
-                        # 💡 改善 2：放寬限制！有時候投信賣出只有 1~2 檔，從 >5 改成 >=1 即可。
                         if len(df) >= 1: 
                             target_df = df
                             break 
@@ -365,6 +353,12 @@ for index, (name_suffix, url) in enumerate(GOODINFO_TARGETS.items()):
             
             if "Just a moment" in current_title or "Cloudflare" in current_title or "Attention" in current_title:
                 print(" └─ 🚨 確診：你的爬蟲被 Cloudflare 的防機器人驗證機制擋在外面了！")
+                # 🌟 X光機升級：滿足球員 (你) 的要求，直接將 CF 頁面原始碼印出！
+                print(" └─ 🖥️ 【網頁原始碼 X 光機啟動】印出前 1000 個字元幫助判讀：")
+                try:
+                    print(driver.page_source[:1000])
+                except:
+                    print("    (無法取得網頁原始碼)")
             elif "goodinfo.tw" in current_title.lower() or current_title.strip() == "":
                 print(" └─ 🚨 確診：網頁白畫面或網路連線異常。")
             else:
