@@ -1,3 +1,4 @@
+#0820
 # components/nav_manager.py
 import streamlit.components.v1 as components
 
@@ -150,9 +151,6 @@ def inject_custom_header(is_logged_in=False):
     const headerDiv = parentDoc.createElement('div');
     headerDiv.id = 'custom-sticky-header';
     
-    // 💡 修正登入狀態按鈕：根據 is_logged_in 決定 target 是 "登入" 還是 "登出"
-    const login_action = is_logged_in ? "登出" : "登入";
-
     headerDiv.innerHTML = `
         <div class="disclaimer-bar">
             
@@ -164,8 +162,7 @@ def inject_custom_header(is_logged_in=False):
                 
                 <div class="system-dropdown">
                     <div class="dropdown-item actionable" style="text-align: center;">
-                        <!-- 這裡的 data-target 會動態變成 登入 或 登出 -->
-                        <a href="#" data-target="${login_action}" class="dropdown-title internal-nav vip-login-btn">
+                        <a href="#" data-target="登入" class="dropdown-title internal-nav vip-login-btn">
                             <img src="app/static/icon-login.png" class="menu-icon" alt="login"> __LOGIN_TEXT__
                         </a>
                     </div>
@@ -256,12 +253,8 @@ def inject_custom_header(is_logged_in=False):
                 e.preventDefault(); 
                 const targetName = link.getAttribute('data-target');
                 const btns = Array.from(parentDoc.querySelectorAll('button'));
-                
-                // 💡 尋找對應的 Streamlit 原生按鈕並點擊
                 const targetBtn = btns.find(b => b.textContent.includes(targetName));
-                if (targetBtn) {
-                    targetBtn.click();
-                }
+                if (targetBtn) targetBtn.click();
             };
         });
 
@@ -332,11 +325,10 @@ def inject_custom_header(is_logged_in=False):
             };
         }
 
-        // 💡 修正 setInterval：隱藏所有包含 "NavTo"、"登入" 以及 "登出" 的 Streamlit 原始按鈕
         setInterval(() => {
             const allBtns = Array.from(parentDoc.querySelectorAll('button'));
             allBtns.forEach(b => {
-                if(b.textContent.includes('NavTo') || b.textContent.includes('登入') || b.textContent.includes('登出')) { 
+                if(b.textContent.includes('NavTo') || b.textContent.includes('登入')) { 
                     const wrapper = b.closest('div[data-testid="stElementContainer"]');
                     if (wrapper) wrapper.style.display = 'none';
                 }
@@ -352,15 +344,9 @@ def inject_custom_header(is_logged_in=False):
 
 # ==========================================
 import streamlit as st
-
 def render_proxy_buttons():
     def change_page(page_name):
         st.query_params["page"] = page_name 
-
-    # 💡 處理直接登出的邏輯：清除 Session State 並導向首頁
-    def handle_logout():
-        st.session_state.clear()
-        st.query_params["page"] = "home"
 
     with st.container():
         st.button("NavToContact", on_click=change_page, args=("contact",))
@@ -374,9 +360,4 @@ def render_proxy_buttons():
         st.button("NavToB5", on_click=change_page, args=("b5",))
         st.button("NavToB6", on_click=change_page, args=("b6",))
         st.button("NavToB7", on_click=change_page, args=("b7",))
-        
-        # 保留登入按鈕
         st.button("登入", on_click=change_page, args=("login",))
-        
-        # 💡 新增：隱藏的登出按鈕，專門用來接收前端 JS 傳來的點擊事件
-        st.button("登出", on_click=handle_logout)
