@@ -6,7 +6,8 @@ import requests
 from io import StringIO
 from datetime import datetime
 from selenium.webdriver.common.by import By
-from selenium.webdriver.common.action_chains import ActionChains # 🌟 新增：用來模擬真實滑鼠點擊的神器
+from selenium.webdriver.common.action_chains import ActionChains
+from selenium.webdriver.common.keys import Keys # 🌟 新增：鍵盤按鍵模擬
 # 🌟 匯入終極突破武器 🌟
 import undetected_chromedriver as uc 
 import subprocess
@@ -205,7 +206,7 @@ except Exception as e:
     print(f"    ⚠️ 失敗: {e}")
 
 # ==========================================
-# 🐢 階段三：Goodinfo 模擬點擊瀏覽器 (終極破甲點擊版)
+# 🐢 階段三：Goodinfo 模擬點擊瀏覽器 (人類行為模擬升級版)
 # ==========================================
 GOODINFO_TARGETS = {
     "外資賣出佔成交比(3日累計排名)": "https://goodinfo.tw/tw/StockList.asp?RPT_TIME=&MARKET_CAT=%E7%86%B1%E9%96%80%E6%8E%92%E8%A1%8C&INDUSTRY_CAT=%E5%A4%96%E8%B3%87%E8%B3%A3%E5%87%BA%E4%BD%94%E6%88%90%E4%BA%A4%E6%AF%94+%E2%80%93+3%E6%97%A5%40%40%E5%A4%96%E8%B3%87%E8%B3%A3%E5%87%BA%E4%BD%94%E6%88%90%E4%BA%A4%E6%AF%94%40%40%E5%A4%96%E8%B3%87+%E2%80%93+3%E6%97%A5",
@@ -246,7 +247,8 @@ options.add_argument('--no-sandbox')
 options.add_argument('--disable-dev-shm-usage')    
 options.add_argument('--disable-gpu')              
 options.add_argument('--window-size=1920,1080')
-# 🌟 移除會引發 CF 警報的 AutomationControlled 參數，讓 uc 自動發揮隱身效果！
+# 🌟 語系偽裝：讓 CF 以為我們是來自台灣的一般瀏覽器，降低警戒心
+options.add_argument('--lang=zh-TW,zh,en-US')
 
 version_main = None
 try:
@@ -279,35 +281,47 @@ for index, (name_suffix, url) in enumerate(GOODINFO_TARGETS.items()):
         driver.get(url)
         
         # ==========================================================
-        # 🌟 終極破盾核心：Phantom Clicker (實體滑鼠模擬點擊 CF 盾牌)
+        # 🌟 終極破盾核心 v2：人類行為模擬器 + 無差別盲點擊
         # ==========================================================
         if "Just a moment" in driver.title or "Cloudflare" in driver.title:
-            print(" └─ 🛡️ 遇到 Cloudflare 驗證畫面，啟動【實體游標點擊】通關機制...")
-            time.sleep(5) # 給 CF 載入判斷機制的時間
+            print(" └─ 🛡️ 遇到 Cloudflare 驗證畫面，啟動【人類行為模擬】通關機制...")
             
-            for cf_attempt in range(5): 
+            for cf_attempt in range(6): 
+                # 1. 模擬滑鼠在畫面上隨機亂晃 (干擾 CF 的機器人判定)
                 try:
-                    # 尋找頁面內由 Cloudflare 生成的驗證用 iframe
+                    body = driver.find_element(By.TAG_NAME, "body")
+                    ac = ActionChains(driver)
+                    for _ in range(3):
+                        x_offset = random.randint(-100, 100)
+                        y_offset = random.randint(-100, 100)
+                        ac.move_to_element_with_offset(body, x_offset, y_offset).pause(0.3)
+                    ac.perform()
+                    print(f" └─ 🖱️ [嘗試 {cf_attempt+1}/6] 已送出隨機滑鼠軌跡 (Mouse Entropy)...")
+                except:
+                    pass
+                
+                # 2. 尋找畫面上的任何 iframe 並強制盲點擊
+                try:
                     iframes = driver.find_elements(By.TAG_NAME, "iframe")
-                    clicked = False
-                    for iframe in iframes:
-                        src = iframe.get_attribute("src")
-                        if src and "challenges.cloudflare.com" in src:
-                            # 🎯 使用 ActionChains 模擬真實人類將滑鼠移動到該元素並點下去！
-                            ActionChains(driver).move_to_element(iframe).click().perform()
-                            print(f" └─ 🖱️ [嘗試 {cf_attempt+1}/5] 已對 CF 驗證框發射實體點擊訊號！")
-                            clicked = True
-                            break
-                    if not clicked:
-                        print(f" └─ ⏳ [嘗試 {cf_attempt+1}/5] 畫面上尚未出現 CF 驗證框，等待載入...")
+                    if iframes:
+                        for iframe in iframes:
+                            try:
+                                # 移到該 iframe 並點擊
+                                ActionChains(driver).move_to_element(iframe).click().perform()
+                                # 補上一發空白鍵 (對付需要鍵盤觸發的勾選框)
+                                iframe.send_keys(Keys.SPACE)
+                            except: pass
+                        print(f" └─ 🎯 [嘗試 {cf_attempt+1}/6] 發現 iframe！已執行無差別盲點擊與空白鍵連擊。")
+                    else:
+                        print(f" └─ ⏳ [嘗試 {cf_attempt+1}/6] 畫面上尚未吐出 iframe，靠滑鼠軌跡拖延中...")
                 except Exception as e:
                     pass
                 
-                # 點擊後等待 5 秒讓 CF 進行雲端驗算並切換網頁
+                # 點擊後給予 5 秒鐘讓網頁跳轉
                 time.sleep(5)
                 if "Just a moment" not in driver.title and "Cloudflare" not in driver.title:
                     print(" └─ 🔓 Cloudflare 盾牌已成功擊破！網頁通行許可取得。")
-                    time.sleep(3) # 通關後給予 Goodinfo 網頁載入時間
+                    time.sleep(3) 
                     break
 
         # ==========================================================
@@ -376,11 +390,6 @@ for index, (name_suffix, url) in enumerate(GOODINFO_TARGETS.items()):
             
             if "Just a moment" in current_title or "Cloudflare" in current_title or "Attention" in current_title:
                 print(" └─ 🚨 確診：爬蟲被 Cloudflare 防機器人盾牌擋住。")
-                print(" └─ 🖥️ 【網頁原始碼 X 光機】前 800 字元：")
-                try:
-                    print(driver.page_source[:800])
-                except:
-                    print("    (無法取得網頁原始碼)")
             elif "goodinfo.tw" in current_title.lower() or current_title.strip() == "":
                 print(" └─ 🚨 確診：網頁白畫面或網路連線異常。")
             else:
