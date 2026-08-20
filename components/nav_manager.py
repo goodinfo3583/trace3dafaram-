@@ -146,7 +146,7 @@ def inject_custom_header(is_logged_in=False):
         }
         
         /* 💡 將原本的 50px 改為 65px，讓所有內容往下推 15px，解決遮擋問題 */
-        .stApp { margin-top: 65px !important; }
+        .stApp { margin-top: 100px !important; }
     `;
     parentDoc.head.appendChild(style);
 
