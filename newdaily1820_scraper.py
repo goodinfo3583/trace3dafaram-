@@ -9,7 +9,7 @@ from selenium.webdriver.common.by import By
 from selenium.webdriver.common.action_chains import ActionChains
 from selenium.webdriver.common.keys import Keys 
 # 🌟 匯入終極突破武器 🌟
-import undetected_chromedriver as uc 
+from seleniumbase import Driver
 import subprocess
 import re
 
@@ -239,13 +239,10 @@ GOODINFO_TARGETS = {
     "外資持股比例2101-2315名":"https://goodinfo.tw/tw/StockList.asp?MARKET_CAT=%E7%86%B1%E9%96%80%E6%8E%92%E8%A1%8C&INDUSTRY_CAT=%E5%A4%96%E8%B3%87%E6%8C%81%E8%82%A1%E6%AF%94%E4%BE%8B",
     "三大法人買超佔成交比(5日累計排名)":"https://goodinfo.tw/tw/StockList.asp?RPT_TIME=&MARKET_CAT=%E7%86%B1%E9%96%80%E6%8E%92%E8%A1%8C&INDUSTRY_CAT=%E4%B8%89%E5%A4%A7%E6%B3%95%E4%BA%BA%E8%B2%B7%E8%B6%85%E4%BD%94%E6%88%90%E4%BA%A4%E6%AF%94+%E2%80%93+5%E6%97%A5%40%40%E4%B8%89%E5%A4%A7%E6%B3%95%E4%BA%BA%E8%B2%B7%E8%B6%85%E4%BD%94%E6%88%90%E4%BA%A4%E6%AF%94%40%40%E4%B8%89%E5%A4%A7%E6%B3%95%E4%BA%BA+%E2%80%93+5%E6%97%A5",
 }
-
-print("\n>> [階段三] 啟動 Google Chrome 瀏覽器 (針對 Goodinfo, 破甲版)...")
-options = uc.ChromeOptions()
-options.add_argument('--no-sandbox')               
-options.add_argument('--disable-dev-shm-usage')    
-options.add_argument('--disable-gpu')              
-options.add_argument('--window-size=1920,1080')
+# ==========================================
+# 🐢 階段三：Goodinfo 模擬點擊瀏覽器 (SeleniumBase 破甲版)
+# ==========================================
+print("\n>> [階段三] 啟動 SeleniumBase (UC 模式) 瀏覽器...")
 
 version_main = None
 try:
@@ -255,31 +252,38 @@ try:
     print(f" └─ 🔍 自動偵測到伺服器 Chrome 主版本為: {version_main}")
 except Exception: pass
 
-# 🌟 CDP 深度偽裝：強制宣告為真實的 Windows 電腦
 if version_main:
     ua = f"Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/{version_main}.0.0.0 Safari/537.36"
 else:
     ua = "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/126.0.0.0 Safari/537.36"
-options.add_argument(f'--user-agent={ua}')
 
 try:
-    driver = uc.Chrome(options=options, version_main=version_main)
-    # 🌟 CDP 深度偽裝：竄改瀏覽器時區與經緯度 (偽裝成位於台北)
+    # 🌟 啟動 SeleniumBase UC 模式
+    # 因為你的環境有掛 xvfb-run (虛擬顯示器)，所以 headless 必須設為 False
+    driver = Driver(
+        uc=True,               # 啟動反偵測模式
+        headless=False,        # 交由 xvfb 處理畫面，不使用瀏覽器原生 headless
+        agent=ua,              # 套用 Windows User-Agent
+        no_sandbox=True,
+        disable_gpu=True,
+        window_size="1920,1080"
+    )
+    
+    # CDP 深度偽裝依然完美相容
     driver.execute_cdp_cmd('Emulation.setTimezoneOverride', {'timezoneId': 'Asia/Taipei'})
     driver.execute_cdp_cmd('Emulation.setGeolocationOverride', {'latitude': 25.0330, 'longitude': 121.5654, 'accuracy': 100})
     driver.execute_cdp_cmd('Emulation.setUserAgentOverride', {
         "userAgent": ua,
         "acceptLanguage": "zh-TW,zh;q=0.9,en-US;q=0.8,en;q=0.7",
-        "platform": "Win32" # 🌟 極重要：覆蓋 navigator.platform 避免洩漏 Linux 身份
+        "platform": "Win32" 
     })
-    print(" └─ 🎭 CDP 深度偽裝完成：已切換為台灣時區、GPS 座落地點，並偽裝為 Windows 系統！")
+    print(" └─ 🎭 CDP 深度偽裝完成：已切換為台灣時區與 Windows 平台！")
 except Exception as e:
     print(f"啟動 Chrome 失敗！錯誤細節: {e}")
     exit()
 
 print(f"開始執行 Goodinfo 下載任務，共計 {len(GOODINFO_TARGETS)} 個檔案。\n" + "-"*40)
 
-# 🌟 定義 CF 觸發的關鍵字清單，涵蓋中英文版本
 CF_KEYWORDS = ["Just a moment", "Cloudflare", "請稍候", "Attention", "驗證"]
 
 for index, (name_suffix, url) in enumerate(GOODINFO_TARGETS.items()):
@@ -288,68 +292,28 @@ for index, (name_suffix, url) in enumerate(GOODINFO_TARGETS.items()):
     print(f"[{index+1}/{len(GOODINFO_TARGETS)}] 正在擷取: {file_name}")
     
     try:
-        driver.get(url)
-        time.sleep(3) # 讓網頁稍微讀取一下標題
+        # 🌟 SeleniumBase 專屬破盾絕招 1：帶有繞過機制的開啟方式
+        driver.uc_open_with_reconnect(url, reconnect_time=4)
+        time.sleep(3) 
         
-        # ==========================================================
-        # 🌟 終極破盾核心 v4：多國語言雷達 + 影子 DOM 穿透 + 盲劍客
-        # ==========================================================
-        
-        # 判斷是否被 CF 擋住 (檢查標題或網頁原始碼)
         is_cf_blocked = False
-        current_title = driver.title
-        page_src = driver.page_source
-        
-        if any(kw in current_title for kw in CF_KEYWORDS):
-            is_cf_blocked = True
-        elif "cf-turnstile" in page_src or "cf-browser-verification" in page_src:
+        if any(kw in driver.title for kw in CF_KEYWORDS) or "cf-turnstile" in driver.page_source:
             is_cf_blocked = True
 
         if is_cf_blocked:
-            print(f" └─ 🛡️ 遇到 Cloudflare 驗證畫面 (標題: {current_title})，啟動【盲劍客鍵盤破盾法】與【影子 DOM 穿透】...")
+            print(f" └─ 🛡️ 遇到 Cloudflare 驗證畫面 (標題: {driver.title})，啟動 SeleniumBase 自動破盾機制...")
+            try:
+                # 🌟 SeleniumBase 專屬破盾絕招 2：自動尋找 iframe 並點擊核取方塊
+                # 這行直接取代了原本所有複雜的 Tab、空白鍵與座標計算！
+                driver.uc_gui_click_captcha()
+                print(" └─ 🎯 成功執行自動點擊指令！")
+                time.sleep(5)
+            except Exception as e:
+                print(f" └─ ⚠️ 自動點擊遇障礙，等待跳轉: {e}")
             
-            for cf_attempt in range(5): 
-                try:
-                    # 關鍵修正 1：尋找並切入 Cloudflare 的 iframe
-                    cf_iframe = driver.find_element(By.XPATH, "//iframe[contains(@title, 'Cloudflare') or contains(@src, 'turnstile') or contains(@src, 'cloudflare')]")
-                    
-                    # 將游標移至 iframe 區域，模擬人類軌跡
-                    ActionChains(driver).move_to_element(cf_iframe).perform()
-                    time.sleep(1)
-                    
-                    # 切換焦點進入 iframe 內部
-                    driver.switch_to.frame(cf_iframe)
-                    time.sleep(1)
-                    
-                    # 尋找內部的驗證框並點擊 (通常 iframe 的 body 就是整個可點擊區)
-                    cf_body = driver.find_element(By.TAG_NAME, "body")
-                    cf_body.click()
-                    print(f" └─ 🎯 [嘗試 {cf_attempt+1}/5] 成功切入 Iframe 並點選驗證區塊！")
-                    
-                except Exception as e:
-                    # 關鍵修正 2：如果找不到 iframe，改用焦點鎖定版的盲劍客
-                    print(f" └─ 🎹 [嘗試 {cf_attempt+1}/5] 執行焦點鎖定版 Tab + Space...")
-                    try:
-                        # 先點擊網頁背景確保視窗有取得焦點
-                        driver.find_element(By.TAG_NAME, "body").click()
-                        time.sleep(0.5)
-                        # 單次 Tab 配合 Space，避免多次 Tab 跳過頭
-                        ActionChains(driver).send_keys(Keys.TAB).pause(0.5).send_keys(Keys.SPACE).perform()
-                    except:
-                        pass
-                
-                finally:
-                    # 關鍵修正 3：無論成功或失敗，都必須切回主畫面，否則後續爬蟲抓不到表格
-                    driver.switch_to.default_content()
-
-                time.sleep(6)
-                
-                # 檢查是否通關成功
-                if not any(kw in driver.title for kw in CF_KEYWORDS):
-                    print(" └─ 🔓 Cloudflare 盾牌已成功擊破！網頁通行許可取得。")
-                    time.sleep(3) 
-                    break
-
+            # 檢查是否通關
+            if not any(kw in driver.title for kw in CF_KEYWORDS):
+                print(" └─ 🔓 Cloudflare 盾牌已成功擊破！")
         # ==========================================================
         
         target_start = None

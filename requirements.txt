@@ -7,3 +7,4 @@ st-gsheets-connection
 lxml
 requests
 streamlit-authenticator
+seleniumbase
