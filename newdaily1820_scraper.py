@@ -6,6 +6,7 @@ import requests
 from io import StringIO
 from datetime import datetime
 from selenium.webdriver.common.by import By
+from selenium.webdriver.common.action_chains import ActionChains # 🌟 新增：用來模擬真實滑鼠點擊的神器
 # 🌟 匯入終極突破武器 🌟
 import undetected_chromedriver as uc 
 import subprocess
@@ -24,7 +25,7 @@ taifex_date = datetime.now().strftime("%Y/%m/%d")
 print(f"啟動爬蟲系統，目標日期：{today}\n" + "="*40)
 
 # ==========================================
-# 🚀 階段一：TWSE 證交所 & TPEx 櫃買中心 API (保持原樣)
+# 🚀 階段一：TWSE 證交所 & TPEx 櫃買中心 API 
 # ==========================================
 print(">> [階段一] 執行證交所與櫃買中心 API 擷取...")
 
@@ -123,7 +124,7 @@ if not tpex_success:
     print(f"    ❌ 伺服器回傳無資料 (可能是非交易日或伺服器異常)。")
 
 # ==========================================
-# 🚀 階段二：TAIFEX 期交所 HTML 扒表術 (保持原樣)
+# 🚀 階段二：TAIFEX 期交所 HTML 扒表術
 # ==========================================
 print("\n>> [階段二] 執行期交所網頁解析 (TAIFEX)...")
 headers = {'User-Agent': 'Mozilla/5.0'}
@@ -204,7 +205,7 @@ except Exception as e:
     print(f"    ⚠️ 失敗: {e}")
 
 # ==========================================
-# 🐢 階段三：Goodinfo 模擬點擊瀏覽器 (終極破甲升級版)
+# 🐢 階段三：Goodinfo 模擬點擊瀏覽器 (終極破甲點擊版)
 # ==========================================
 GOODINFO_TARGETS = {
     "外資賣出佔成交比(3日累計排名)": "https://goodinfo.tw/tw/StockList.asp?RPT_TIME=&MARKET_CAT=%E7%86%B1%E9%96%80%E6%8E%92%E8%A1%8C&INDUSTRY_CAT=%E5%A4%96%E8%B3%87%E8%B3%A3%E5%87%BA%E4%BD%94%E6%88%90%E4%BA%A4%E6%AF%94+%E2%80%93+3%E6%97%A5%40%40%E5%A4%96%E8%B3%87%E8%B3%A3%E5%87%BA%E4%BD%94%E6%88%90%E4%BA%A4%E6%AF%94%40%40%E5%A4%96%E8%B3%87+%E2%80%93+3%E6%97%A5",
@@ -245,9 +246,7 @@ options.add_argument('--no-sandbox')
 options.add_argument('--disable-dev-shm-usage')    
 options.add_argument('--disable-gpu')              
 options.add_argument('--window-size=1920,1080')
-# 🌟 致命修正 1：移除原本寫死的 User-Agent，讓瀏覽器原生呈現！
-# 🌟 致命修正 2：加入這行關鍵語法，隱藏 WebDriver 被自動化軟體控制的痕跡！
-options.add_argument('--disable-blink-features=AutomationControlled')
+# 🌟 移除會引發 CF 警報的 AutomationControlled 參數，讓 uc 自動發揮隱身效果！
 
 version_main = None
 try:
@@ -278,16 +277,40 @@ for index, (name_suffix, url) in enumerate(GOODINFO_TARGETS.items()):
     
     try:
         driver.get(url)
-
-        # 🌟 診斷升級：主動等待 Cloudflare 盾牌通關 
+        
+        # ==========================================================
+        # 🌟 終極破盾核心：Phantom Clicker (實體滑鼠模擬點擊 CF 盾牌)
+        # ==========================================================
         if "Just a moment" in driver.title or "Cloudflare" in driver.title:
-            print(" └─ 🛡️ 遇到 Cloudflare 驗證畫面，啟動等待與自動通關機制...")
-            for _ in range(25): # 給 CF 25秒的時間跑驗證
+            print(" └─ 🛡️ 遇到 Cloudflare 驗證畫面，啟動【實體游標點擊】通關機制...")
+            time.sleep(5) # 給 CF 載入判斷機制的時間
+            
+            for cf_attempt in range(5): 
+                try:
+                    # 尋找頁面內由 Cloudflare 生成的驗證用 iframe
+                    iframes = driver.find_elements(By.TAG_NAME, "iframe")
+                    clicked = False
+                    for iframe in iframes:
+                        src = iframe.get_attribute("src")
+                        if src and "challenges.cloudflare.com" in src:
+                            # 🎯 使用 ActionChains 模擬真實人類將滑鼠移動到該元素並點下去！
+                            ActionChains(driver).move_to_element(iframe).click().perform()
+                            print(f" └─ 🖱️ [嘗試 {cf_attempt+1}/5] 已對 CF 驗證框發射實體點擊訊號！")
+                            clicked = True
+                            break
+                    if not clicked:
+                        print(f" └─ ⏳ [嘗試 {cf_attempt+1}/5] 畫面上尚未出現 CF 驗證框，等待載入...")
+                except Exception as e:
+                    pass
+                
+                # 點擊後等待 5 秒讓 CF 進行雲端驗算並切換網頁
+                time.sleep(5)
                 if "Just a moment" not in driver.title and "Cloudflare" not in driver.title:
-                    print(" └─ 🔓 Cloudflare 驗證通過！")
-                    time.sleep(2) # 通關後稍微喘息一下
+                    print(" └─ 🔓 Cloudflare 盾牌已成功擊破！網頁通行許可取得。")
+                    time.sleep(3) # 通關後給予 Goodinfo 網頁載入時間
                     break
-                time.sleep(1)
+
+        # ==========================================================
         
         target_start = None
         match = re.search(r'(\d+)-\d+名', name_suffix)
@@ -352,11 +375,10 @@ for index, (name_suffix, url) in enumerate(GOODINFO_TARGETS.items()):
             print(f" └─ 🔍 盲測診斷：當前網頁標題是【{current_title}】")
             
             if "Just a moment" in current_title or "Cloudflare" in current_title or "Attention" in current_title:
-                print(" └─ 🚨 確診：你的爬蟲被 Cloudflare 的防機器人驗證機制擋在外面了！")
-                # 🌟 X光機升級：滿足球員 (你) 的要求，直接將 CF 頁面原始碼印出！
-                print(" └─ 🖥️ 【網頁原始碼 X 光機啟動】印出前 1000 個字元幫助判讀：")
+                print(" └─ 🚨 確診：爬蟲被 Cloudflare 防機器人盾牌擋住。")
+                print(" └─ 🖥️ 【網頁原始碼 X 光機】前 800 字元：")
                 try:
-                    print(driver.page_source[:1000])
+                    print(driver.page_source[:800])
                 except:
                     print("    (無法取得網頁原始碼)")
             elif "goodinfo.tw" in current_title.lower() or current_title.strip() == "":
