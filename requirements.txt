@@ -8,3 +8,5 @@ lxml
 requests
 streamlit-authenticator
 seleniumbase
+html5lib
+beautifulsoup4
