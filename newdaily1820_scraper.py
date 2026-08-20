@@ -6,10 +6,8 @@ import requests
 from io import StringIO
 from datetime import datetime
 from selenium.webdriver.common.by import By
-from selenium.webdriver.common.action_chains import ActionChains
-from selenium.webdriver.common.keys import Keys 
 # 🌟 匯入終極突破武器 🌟
-from seleniumbase import Driver
+import undetected_chromedriver as uc 
 import subprocess
 import re
 
@@ -21,12 +19,12 @@ if not os.path.exists(SAVE_DIR):
     os.makedirs(SAVE_DIR)
 
 today = datetime.now().strftime("%Y%m%d")
-taifex_date = datetime.now().strftime("%Y/%m/%d")
+taifex_date = datetime.now().strftime("%Y/%m/%d") # 期交所需要的日期格式
 
 print(f"啟動爬蟲系統，目標日期：{today}\n" + "="*40)
 
 # ==========================================
-# 🚀 階段一：TWSE 證交所 & TPEx 櫃買中心 API 
+# 🚀 階段一：TWSE 證交所 & TPEx 櫃買中心 API (全新改版解析對策)
 # ==========================================
 print(">> [階段一] 執行證交所與櫃買中心 API 擷取...")
 
@@ -41,6 +39,7 @@ headers = {
     'X-Requested-With': 'XMLHttpRequest'
 }
 
+# 🎯 步驟 1：先透過上市大盤，找出「真正的最後交易日」
 print(f" └─ 🔍 正在向證交所校準「最新交易日」...")
 url_cal = f"https://www.twse.com.tw/rwd/zh/afterTrading/FMTQIK?date={today}&response=json"
 real_date_str = today 
@@ -55,6 +54,7 @@ try:
         latest_roc_date = res_cal["data"][-1][0]
         parts = latest_roc_date.split('/')
         real_year = int(parts[0]) + 1911
+        
         real_date_str = f"{real_year}{parts[1].zfill(2)}{parts[2].zfill(2)}"
         roc_full_date = latest_roc_date 
         roc_month = f"{parts[0]}/{parts[1].zfill(2)}" 
@@ -62,12 +62,14 @@ try:
 except Exception as e:
     print(f"    ⚠️ 校準失敗，將使用系統今日日期: {e}")
 
+# 🎯 步驟 2：拿著確認有交易的日期，準備精準抓取
 TWSE_APIS = {
     "大盤上市成交量": url_cal,
     "三大法人買賣超金額": f"https://www.twse.com.tw/rwd/zh/fund/BFI82U?date={real_date_str}&response=json",
     "鉅額交易": f"https://www.twse.com.tw/rwd/zh/block/BFIAUU?date={real_date_str}&selectType=S&response=json",
 }
 
+# --- 處理 TWSE (上市) ---
 for name, url in TWSE_APIS.items():
     file_path = os.path.join(SAVE_DIR, f"{real_date_str}-{name}.csv")
     print(f" └─ 📡 正在直連抓取: {name}...")
@@ -87,6 +89,7 @@ for name, url in TWSE_APIS.items():
     except Exception as e:
         print(f"    ⚠️ 發生錯誤: {e}")
 
+# --- 處理 TPEX (上櫃) ---
 name = "大盤上櫃成交量"
 file_path = os.path.join(SAVE_DIR, f"{real_date_str}-{name}.csv")
 print(f" └─ 📡 正在直連抓取: {name}...")
@@ -130,6 +133,7 @@ if not tpex_success:
 print("\n>> [階段二] 執行期交所網頁解析 (TAIFEX)...")
 headers = {'User-Agent': 'Mozilla/5.0'}
 
+# 1. 臺指選擇權PC比
 print(" └─ 📡 正在抓取: 臺指選擇權PC比...")
 try:
     res = requests.post("https://www.taifex.com.tw/cht/3/pcRatio", data={"queryStartDate": taifex_date, "queryEndDate": taifex_date}, headers=headers)
@@ -143,6 +147,7 @@ try:
             break
 except Exception as e: print(f"    ⚠️ 失敗: {e}")
 
+# 2. 三大法人期貨多空 (TX)
 print(" └─ 📡 正在抓取: 三大法人期貨多空單...")
 try:
     res = requests.post("https://www.taifex.com.tw/cht/3/futContractsDate", data={"queryDate": taifex_date}, headers=headers)
@@ -157,6 +162,7 @@ try:
             break
 except Exception as e: print(f"    ⚠️ 失敗: {e}")
 
+# 3. 臺指選擇權行情簡表
 print(" └─ 📡 正在抓取: 臺指選擇權行情簡表...")
 try:
     payload = {
@@ -206,7 +212,7 @@ except Exception as e:
     print(f"    ⚠️ 失敗: {e}")
 
 # ==========================================
-# 🐢 階段三：Goodinfo 模擬點擊瀏覽器 (多國語言雷達修正版)
+# 🐢 階段三：Goodinfo 模擬點擊瀏覽器 (終極破甲版)
 # ==========================================
 GOODINFO_TARGETS = {
     "外資賣出佔成交比(3日累計排名)": "https://goodinfo.tw/tw/StockList.asp?RPT_TIME=&MARKET_CAT=%E7%86%B1%E9%96%80%E6%8E%92%E8%A1%8C&INDUSTRY_CAT=%E5%A4%96%E8%B3%87%E8%B3%A3%E5%87%BA%E4%BD%94%E6%88%90%E4%BA%A4%E6%AF%94+%E2%80%93+3%E6%97%A5%40%40%E5%A4%96%E8%B3%87%E8%B3%A3%E5%87%BA%E4%BD%94%E6%88%90%E4%BA%A4%E6%AF%94%40%40%E5%A4%96%E8%B3%87+%E2%80%93+3%E6%97%A5",
@@ -239,85 +245,59 @@ GOODINFO_TARGETS = {
     "外資持股比例2101-2315名":"https://goodinfo.tw/tw/StockList.asp?MARKET_CAT=%E7%86%B1%E9%96%80%E6%8E%92%E8%A1%8C&INDUSTRY_CAT=%E5%A4%96%E8%B3%87%E6%8C%81%E8%82%A1%E6%AF%94%E4%BE%8B",
     "三大法人買超佔成交比(5日累計排名)":"https://goodinfo.tw/tw/StockList.asp?RPT_TIME=&MARKET_CAT=%E7%86%B1%E9%96%80%E6%8E%92%E8%A1%8C&INDUSTRY_CAT=%E4%B8%89%E5%A4%A7%E6%B3%95%E4%BA%BA%E8%B2%B7%E8%B6%85%E4%BD%94%E6%88%90%E4%BA%A4%E6%AF%94+%E2%80%93+5%E6%97%A5%40%40%E4%B8%89%E5%A4%A7%E6%B3%95%E4%BA%BA%E8%B2%B7%E8%B6%85%E4%BD%94%E6%88%90%E4%BA%A4%E6%AF%94%40%40%E4%B8%89%E5%A4%A7%E6%B3%95%E4%BA%BA+%E2%80%93+5%E6%97%A5",
 }
-# ==========================================
-# 🐢 階段三：Goodinfo 模擬點擊瀏覽器 (SeleniumBase 破甲版)
-# ==========================================
-print("\n>> [階段三] 啟動 SeleniumBase (UC 模式) 瀏覽器...")
 
+print("\n>> [階段三] 啟動 Google Chrome 瀏覽器 (針對 Goodinfo, 破甲版)...")
+options = uc.ChromeOptions()
+
+# 🌟 我們現在有 Xvfb 虛擬螢幕，所以不需要 --headless
+options.add_argument('--no-sandbox')               
+options.add_argument('--disable-dev-shm-usage')    
+options.add_argument('--disable-gpu')              
+options.add_argument('--user-agent=Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/126.0.0.0 Safari/537.36')
+options.add_argument('--window-size=1920,1080')
+
+# 🌟 關鍵修復：自動偵測 GitHub 虛擬機的 Chrome 版本，防止 ChromeDriver 版本暴衝不匹配
 version_main = None
 try:
+    # 透過指令查詢系統內的 Chrome 版本 (例如輸出 "Google Chrome 150.0.7871.0")
     out = subprocess.check_output(['google-chrome', '--version']).decode('utf-8')
     match = re.search(r'(\d+)\.', out)
-    if match: version_main = int(match.group(1))
-    print(f" └─ 🔍 自動偵測到伺服器 Chrome 主版本為: {version_main}")
-except Exception: pass
-
-if version_main:
-    ua = f"Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/{version_main}.0.0.0 Safari/537.36"
-else:
-    ua = "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/126.0.0.0 Safari/537.36"
+    if match:
+        version_main = int(match.group(1))
+        print(f" └─ 🔍 自動偵測到伺服器 Chrome 主版本為: {version_main}")
+except Exception as e:
+    print(f" └─ ⚠️ 無法自動偵測 Chrome 版本，將使用預設設定。")
 
 try:
-    # 🌟 啟動 SeleniumBase UC 模式
-    # 因為你的環境有掛 xvfb-run (虛擬顯示器)，所以 headless 必須設為 False
-    driver = Driver(
-        uc=True,               # 啟動反偵測模式
-        headless=False,        # 交由 xvfb 處理畫面，不使用瀏覽器原生 headless
-        agent=ua,              # 套用 Windows User-Agent
-        no_sandbox=True,
-        disable_gpu=True,
-        window_size="1920,1080"
-    )
-    
-    # CDP 深度偽裝依然完美相容
-    driver.execute_cdp_cmd('Emulation.setTimezoneOverride', {'timezoneId': 'Asia/Taipei'})
-    driver.execute_cdp_cmd('Emulation.setGeolocationOverride', {'latitude': 25.0330, 'longitude': 121.5654, 'accuracy': 100})
-    driver.execute_cdp_cmd('Emulation.setUserAgentOverride', {
-        "userAgent": ua,
-        "acceptLanguage": "zh-TW,zh;q=0.9,en-US;q=0.8,en;q=0.7",
-        "platform": "Win32" 
-    })
-    print(" └─ 🎭 CDP 深度偽裝完成：已切換為台灣時區與 Windows 平台！")
+    # 🎯 這裡加上 version_main 參數，強迫驅動程式與瀏覽器版本同步！
+    if version_main:
+        driver = uc.Chrome(options=options, version_main=version_main)
+    else:
+        driver = uc.Chrome(options=options)
 except Exception as e:
     print(f"啟動 Chrome 失敗！錯誤細節: {e}")
     exit()
 
 print(f"開始執行 Goodinfo 下載任務，共計 {len(GOODINFO_TARGETS)} 個檔案。\n" + "-"*40)
 
-CF_KEYWORDS = ["Just a moment", "Cloudflare", "請稍候", "Attention", "驗證"]
-
 for index, (name_suffix, url) in enumerate(GOODINFO_TARGETS.items()):
     file_name = f"{today}{name_suffix}.csv"
     file_path = os.path.join(SAVE_DIR, file_name)
+    
     print(f"[{index+1}/{len(GOODINFO_TARGETS)}] 正在擷取: {file_name}")
     
     try:
-        # 🌟 SeleniumBase 專屬破盾絕招 1：帶有繞過機制的開啟方式
-        driver.uc_open_with_reconnect(url, reconnect_time=4)
-        time.sleep(3) 
+        driver.get(url)
         
-        is_cf_blocked = False
-        if any(kw in driver.title for kw in CF_KEYWORDS) or "cf-turnstile" in driver.page_source:
-            is_cf_blocked = True
-
-        if is_cf_blocked:
-            print(f" └─ 🛡️ 遇到 Cloudflare 驗證畫面 (標題: {driver.title})，啟動 SeleniumBase 自動破盾機制...")
-            try:
-                # 🌟 SeleniumBase 專屬破盾絕招 2：自動尋找 iframe 並點擊核取方塊
-                # 這行直接取代了原本所有複雜的 Tab、空白鍵與座標計算！
-                driver.uc_gui_click_captcha()
-                print(" └─ 🎯 成功執行自動點擊指令！")
-                time.sleep(5)
-            except Exception as e:
-                print(f" └─ ⚠️ 自動點擊遇障礙，等待跳轉: {e}")
-            
-            # 檢查是否通關
-            if not any(kw in driver.title for kw in CF_KEYWORDS):
-                print(" └─ 🔓 Cloudflare 盾牌已成功擊破！")
-        # ==========================================================
-        
+        # ==========================================
+        # 💡 終極修正版：使用正則表達式自動抓取起始名次
+        # ==========================================
         target_start = None
+        
+        # 尋找檔名中是否有 "數字-數字名" 的結構，例如 "301-600名"
         match = re.search(r'(\d+)-\d+名', name_suffix)
+        
+        # 但要排除 "1-300名"，因為這是預設的第一頁，不需要切換
         if match and match.group(1) != "1": 
             target_start = match.group(1)
             
@@ -327,6 +307,7 @@ for index, (name_suffix, url) in enumerate(GOODINFO_TARGETS.items()):
             try:
                 options_elements = driver.find_elements(By.TAG_NAME, "option")
                 for opt in options_elements:
+                    # 只要下拉選單的文字包含我們的「起始數字」，就點下去
                     if target_start in opt.text:
                         opt.click()
                         parent_select = opt.find_element(By.XPATH, "..")
@@ -343,6 +324,8 @@ for index, (name_suffix, url) in enumerate(GOODINFO_TARGETS.items()):
         for i in range(60): 
             try:
                 html = driver.page_source
+                
+                # 💡 改善 1：防卡死機制。如果等了 30 秒還是白畫面，強制重新整理 (Refresh)！
                 if i == 30:
                     print(" └─ 🔄 網頁似乎載入卡住，嘗試強制重新整理...")
                     driver.refresh()
@@ -350,19 +333,22 @@ for index, (name_suffix, url) in enumerate(GOODINFO_TARGETS.items()):
                     continue
                     
                 tables = pd.read_html(StringIO(html))
+                
                 for df in tables:
                     if isinstance(df.columns, pd.MultiIndex):
                         df.columns = df.columns.get_level_values(-1)
                     df.columns = [str(col).strip() for col in df.columns]
                     
                     if '代號' in df.columns or '名稱' in df.columns:
+                        # 💡 改善 2：放寬限制！有時候投信賣出只有 1~2 檔，從 >5 改成 >=1 即可。
                         if len(df) >= 1: 
                             target_df = df
                             break 
                 if target_df is not None:
                     print(f" └─ ⚡ 成功解析表格！(耗時約 {i+1} 秒)")
                     break 
-            except Exception: pass
+            except Exception:
+                pass
             time.sleep(1) 
             
         if target_df is not None:
@@ -372,7 +358,17 @@ for index, (name_suffix, url) in enumerate(GOODINFO_TARGETS.items()):
             target_df.to_csv(file_path, index=False, encoding='utf-8-sig')
             print(f" └─ ✅ 成功存檔！")
         else:
-            print(f" └─ ❌ 失敗！盲測診斷標題：【{driver.title}】")
+            current_title = driver.title
+            print(f" └─ ❌ 失敗！等了 60 秒還是沒有看到股票資料。")
+            print(f" └─ 🔍 盲測診斷：當前網頁標題是【{current_title}】")
+            
+            if "Just a moment" in current_title or "Cloudflare" in current_title or "Attention" in current_title:
+                print(" └─ 🚨 確診：你的爬蟲被 Cloudflare 的防機器人驗證機制擋在外面了！")
+            elif "goodinfo.tw" in current_title.lower() or current_title.strip() == "":
+                print(" └─ 🚨 確診：網頁白畫面或網路連線異常。")
+            else:
+                print(" └─ 🚨 確診：可能該排行榜今日【無符合條件之股票】(資料庫為空)。")
+            
             driver.save_screenshot(f"error_shot_{index+1}.png")
             
     except Exception as e:
@@ -383,5 +379,5 @@ for index, (name_suffix, url) in enumerate(GOODINFO_TARGETS.items()):
         print(f" └─ [防封鎖] 隨機休息 {sleep_time:.2f} 秒...\n")
         time.sleep(sleep_time)
 
-print("-" * 40 + "\n🎉 爬蟲任務全數完成！")
+print("-" * 40 + "\n🎉 爬蟲任務全數完成！趕快去資料夾檢查熱騰騰的 CSV 吧！")
 driver.quit()
