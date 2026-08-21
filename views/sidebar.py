@@ -873,10 +873,11 @@ def render_sidebar_war_room(STOCK_DICT, DATA_DIR="data"):
         
         c_search, c_btn_go, c_btn_clear = st.columns([6, 1.5, 1.5])
         
-        # 🚀 升級：自動產生下拉選單，並過濾掉超過 4 碼的權證！
+        # 🚀 升級：利用 set (集合 {}) 自動剃除雙胞胎，並使用 sorted 排序
         stock_options = []
         if STOCK_DICT:
-            stock_options = [f"{v['id']} {v['name']}" for v in STOCK_DICT.values() if len(str(v['id'])) <= 4]
+            unique_options = {f"{v['id']} {v['name']}" for v in STOCK_DICT.values() if len(str(v['id'])) <= 4}
+            stock_options = sorted(list(unique_options))
 
         with c_search:
             search_query = st.selectbox(
