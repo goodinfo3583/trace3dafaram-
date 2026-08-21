@@ -4,82 +4,49 @@ import json
 import re
 import time
 import pandas as pd
-import os
-# 定義儲存使用者資料的路徑
-USER_DATA_DIR = "./data/users"
-os.makedirs(USER_DATA_DIR, exist_ok=True)
+
 # ==========================================
 # 💾 資料庫存取 (Google Sheets 正式連線版)
 # ==========================================
 def get_user_watchlist(username, conn, SHEET_URL):
-    """從 GS 讀取使用者的追蹤名單與筆記"""
-    if not conn or not SHEET_URL:
-        return {}
-        
+    if not conn or not SHEET_URL: return {}
     try:
-        # 1. 讀取整張「會員名冊」
         df = conn.read(spreadsheet=SHEET_URL, worksheet="會員名冊", ttl=0)
-        
         if df.empty or '帳號' not in df.columns or 'Watchlist' not in df.columns:
             return {}
             
-        # 2. 清理帳號格式 (轉字串、去小數點、去空白、轉小寫) 確保能精準比對
         clean_accounts = df['帳號'].astype(str).str.replace(r'\.0$', '', regex=True).str.strip().str.lower()
         target_user = str(username).strip().lower()
-        
-        # 3. 找出該名冒險者的資料列
         match = df[clean_accounts == target_user]
         
         if not match.empty:
             gs_watchlist_str = match.iloc[0]['Watchlist']
-            # 如果欄位有內容且不是空值 (NaN)
             if pd.notna(gs_watchlist_str) and str(gs_watchlist_str).strip() != "":
                 data = json.loads(str(gs_watchlist_str))
-                # 相容舊版陣列轉換
-                if isinstance(data, list): 
-                    return {stock: "" for stock in data}
+                if isinstance(data, list): return {stock: "" for stock in data}
                 return data
-                
-    except Exception as e:
-        pass
-        
+    except Exception as e: pass
     return {}
 
 def save_user_watchlist(username, watchlist, conn, SHEET_URL):
-    """將使用者的追蹤名單與筆記存回 GS"""
     if not conn or not SHEET_URL:
         st.error("⚠️ 無法連線至資料庫，無法存檔。")
         return
-        
     try:
-        # 1. 將字典轉為純文字 JSON 字串
         watchlist_str = json.dumps(watchlist, ensure_ascii=False)
-        
-        # 2. 讀取目前的「會員名冊」
         df = conn.read(spreadsheet=SHEET_URL, worksheet="會員名冊", ttl=0)
-        
-        if df.empty or '帳號' not in df.columns:
-            return
+        if df.empty or '帳號' not in df.columns: return
             
-        # 確保有 Watchlist 欄位 (防呆機制)
-        if 'Watchlist' not in df.columns:
-            df['Watchlist'] = ""
-            
-        # 🌟 關鍵修復：強制將欄位轉為 object 型態，這樣就能允許寫入字串！
+        if 'Watchlist' not in df.columns: df['Watchlist'] = ""
         df['Watchlist'] = df['Watchlist'].astype(object)
             
-        # 3. 尋找對應的帳號列
         clean_accounts = df['帳號'].astype(str).str.replace(r'\.0$', '', regex=True).str.strip().str.lower()
         target_user = str(username).strip().lower()
-        
         idx = df[clean_accounts == target_user].index
         
         if len(idx) > 0:
-            # 4. 覆寫該列的 Watchlist 欄位
             df.at[idx[0], 'Watchlist'] = watchlist_str
-            # 5. 上傳更新回 Google Sheets
             conn.update(spreadsheet=SHEET_URL, worksheet="會員名冊", data=df)
-            
     except Exception as e:
         st.error(f"❌ 同步至雲端失敗: {e}")
 
@@ -88,15 +55,12 @@ def save_user_watchlist(username, watchlist, conn, SHEET_URL):
 # ==========================================
 @st.cache_data(ttl=300)
 def get_watchlist_quotes(stock_codes):
-    """批次向 Yahoo Finance 請求報價，並濾除盤中空值雜訊"""
     import yfinance as yf
     if not stock_codes: return {}
     
     tickers = [f"{c}.TW" for c in stock_codes] + [f"{c}.TWO" for c in stock_codes]
-    try:
-        df = yf.download(tickers, period="5d", progress=False)
-    except:
-        return {}
+    try: df = yf.download(tickers, period="5d", progress=False)
+    except: return {}
         
     quotes = {}
     if df.empty: return quotes
@@ -109,9 +73,7 @@ def get_watchlist_quotes(stock_codes):
         vol_df = pd.DataFrame({tickers[0]: df['Volume']}) if 'Volume' in df.columns else pd.DataFrame()
 
     for c in stock_codes:
-        tw = f"{c}.TW"
-        two = f"{c}.TWO"
-        
+        tw, two = f"{c}.TW", f"{c}.TWO"
         closes = close_df[tw].dropna() if tw in close_df.columns else pd.Series(dtype=float)
         vols = vol_df[tw].dropna() if tw in vol_df.columns else pd.Series(dtype=float)
         
@@ -125,12 +87,7 @@ def get_watchlist_quotes(stock_codes):
             
             p_pct = (c_today - c_yest) / c_yest * 100 if c_yest > 0 else 0
             v_pct = (v_today - v_yest) / v_yest * 100 if v_yest > 0 else 0
-            
-            quotes[c] = {
-                "price": c_today, "price_pct": p_pct,
-                "vol": int(v_today / 1000), "vol_pct": v_pct,
-                "date": closes.index[-1].strftime("%m/%d")
-            }
+            quotes[c] = {"price": c_today, "price_pct": p_pct, "vol": int(v_today / 1000), "vol_pct": v_pct}
     return quotes
 
 # ==========================================
@@ -147,9 +104,14 @@ def show_watchlist_page(STOCK_DICT=None, conn=None, SHEET_URL=None):
         return
 
     username = st.session_state.get("username", "guest")
-    # 🌟 傳入連線物件
     watchlist = get_user_watchlist(username, conn, SHEET_URL)
     MAX_STOCKS = 60 
+
+    # 🌟 關鍵修復：從 session_state 捕捉還沒存檔的筆記，防止畫面刷新時遺失
+    for stock in watchlist.keys():
+        nk = f"note_{stock}"
+        if nk in st.session_state:
+            watchlist[stock] = st.session_state[nk]
 
     st.subheader(f"新增追蹤標的 (目前 {len(watchlist)}/{MAX_STOCKS} 檔)")
     col1, col2 = st.columns([3, 1])
@@ -176,7 +138,6 @@ def show_watchlist_page(STOCK_DICT=None, conn=None, SHEET_URL=None):
 
                     if final_stock_name not in watchlist:
                         watchlist[final_stock_name] = "" 
-                        # 🌟 寫入時傳入連線物件
                         save_user_watchlist(username, watchlist, conn, SHEET_URL)
                         st.success(f"已加入「{final_stock_name}」！")
                         time.sleep(1)
@@ -197,32 +158,26 @@ def show_watchlist_page(STOCK_DICT=None, conn=None, SHEET_URL=None):
         with st.spinner("📡 正在同步即時報價與成交量..."):
             market_data = get_watchlist_quotes(stock_codes)
 
-        col_space, col_batch_del = st.columns([8.5, 1.5])
-        with col_batch_del:
-            if st.button("🗑️ 刪除勾選", use_container_width=True, type="primary"):
-                to_delete = [s for s in watchlist.keys() if st.session_state.get(f"chk_{s}", False)]
-                if to_delete:
-                    for s in to_delete: del watchlist[s]
-                    save_user_watchlist(username, watchlist, conn, SHEET_URL)
-                    st.success(f"已移除 {len(to_delete)} 檔！")
-                    time.sleep(1)
-                    st.rerun()
-                else:
-                    st.warning("請先勾選後方選取框。")
+        # 🚀 移除批次功能，改為一鍵同步雲端按鈕
+        col_space, col_save = st.columns([8.2, 1.8])
+        with col_save:
+            if st.button("💾 同步筆記至雲端", use_container_width=True, type="primary"):
+                save_user_watchlist(username, watchlist, conn, SHEET_URL)
+                st.success("✅ 筆記已安全存檔！")
+                time.sleep(1)
+                st.rerun()
 
-        col_ratios = [0.9, 0.7, 1.2, 1.2, 3.2, 0.7, 0.6, 0.5]
+        # 📋 調整為 7 欄位，釋放更多空間給筆記
+        col_ratios = [1.0, 0.8, 1.2, 1.2, 4.2, 0.8, 0.8]
         
-        h1, h2, h3, h4, h5, h6, h7, h8 = st.columns(col_ratios)
+        h1, h2, h3, h4, h5, h6, h7 = st.columns(col_ratios)
         h1.markdown("<span style='color:#94a3b8; font-size:14px;'>標的名稱</span>", unsafe_allow_html=True)
         h2.markdown("<span style='color:#94a3b8; font-size:14px;'>產業別</span>", unsafe_allow_html=True)
         h3.markdown("<span style='color:#94a3b8; font-size:14px;'>最新價</span>", unsafe_allow_html=True)
         h4.markdown("<span style='color:#94a3b8; font-size:14px;'>成交量 (張)</span>", unsafe_allow_html=True)
-        h5.markdown("<span style='color:#94a3b8; font-size:14px;'>專屬筆記 (Enter換行/點擊空白處存檔)</span>", unsafe_allow_html=True)
-        h8.markdown("<span style='color:#94a3b8; font-size:13px;'>批次</span>", unsafe_allow_html=True)
-
-        def save_note_callback(stock_key):
-            watchlist[stock_key] = st.session_state[f"note_{stock_key}"]
-            save_user_watchlist(username, watchlist, conn, SHEET_URL)
+        h5.markdown("<span style='color:#94a3b8; font-size:14px;'>專屬筆記 (編輯後點擊右上角同步)</span>", unsafe_allow_html=True)
+        h6.markdown("")
+        h7.markdown("")
 
         def fmt_color(val, is_pct=False, is_vol=False):
             color = "#FF4B4B" if val > 0 else ("#00E272" if val < 0 else "#94A3B8")
@@ -246,7 +201,7 @@ def show_watchlist_page(STOCK_DICT=None, conn=None, SHEET_URL=None):
                 p_str = f"<span style='font-size:16px;'>{d['price']:.2f}</span><br>{fmt_color(d['price_pct'], True)}"
                 v_str = f"<span style='font-size:15px;'>{d['vol']:,}</span><br>{fmt_color(d['vol_pct'], False, True)}"
 
-            c1, c2, c3, c4, c5, c6, c7, c8 = st.columns(col_ratios)
+            c1, c2, c3, c4, c5, c6, c7 = st.columns(col_ratios)
             
             with c1:
                 st.markdown(f"<div style='padding-top:8px; font-weight:bold; font-size:15px;'>{stock}</div>", unsafe_allow_html=True)
@@ -257,6 +212,7 @@ def show_watchlist_page(STOCK_DICT=None, conn=None, SHEET_URL=None):
             with c4:
                 st.markdown(f"<div style='padding-top:4px;'>{v_str}</div>", unsafe_allow_html=True)
             with c5:
+                # 🚀 移除 on_change 事件，避免每次打字完點擊旁邊就卡住
                 st.markdown("<div style='padding-top:2px;'>", unsafe_allow_html=True)
                 st.text_area(
                     "筆記", 
@@ -264,8 +220,6 @@ def show_watchlist_page(STOCK_DICT=None, conn=None, SHEET_URL=None):
                     key=f"note_{stock}", 
                     label_visibility="collapsed", 
                     placeholder="點此輸入筆記...", 
-                    on_change=save_note_callback, 
-                    args=(stock,),
                     height=68 
                 )
                 st.markdown("</div>", unsafe_allow_html=True)
@@ -285,10 +239,6 @@ def show_watchlist_page(STOCK_DICT=None, conn=None, SHEET_URL=None):
                         st.session_state["selected_watch_stock"] = None
                         st.session_state["global_search_final"] = ""
                     st.rerun()
-                st.markdown("</div>", unsafe_allow_html=True)
-            with c8:
-                st.markdown("<div style='padding-top:22px; padding-left:5px;'>", unsafe_allow_html=True)
-                st.checkbox("選取", key=f"chk_{stock}", label_visibility="collapsed")
                 st.markdown("</div>", unsafe_allow_html=True)
             
             st.markdown("<hr style='border-color: #1E293B; margin: 5px 0;'>", unsafe_allow_html=True)
