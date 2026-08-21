@@ -1156,31 +1156,26 @@ def render_sidebar_war_room(STOCK_DICT, DATA_DIR="data"):
 
 
     # ==========================================
-    # 🚀 快速回到頂部按鈕 (自訂圖片 Base64 鑲嵌版)
+    # 🚀 快速回到頂部按鈕 (Google Material Icons 版)
     # ==========================================
-    import base64
-    import os
-    
-    # 1. 讀取你在 static 資料夾中的自訂 icon (請換成你真實的檔名)
-    icon_path = "./static/icon-up.png" 
-    icon_tag = "⬆️" # 預設圖案
-    
-    # 2. 如果圖片存在，將它轉化為網頁看得懂的 Base64 格式
-    if os.path.exists(icon_path):
-        with open(icon_path, "rb") as f:
-            icon_b64 = base64.b64encode(f.read()).decode("utf-8")
-        # 將圖片寫成 HTML 標籤，並設定大小 (width: 20px) 與對齊方式
-        icon_tag = f'<img src="data:image/png;base64,{icon_b64}" style="width: 20px; vertical-align: middle; margin-right: 8px;">'
-
-    # 3. 渲染按鈕
+    # 1. 載入 Google Material Icons 的字型庫
     st.markdown(
-        f"""
+        '<link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined" rel="stylesheet" />',
+        unsafe_allow_html=True
+    )
+
+    # 2. 渲染回到頂部按鈕
+    # 注意 gap: 6px 是用來讓圖案跟文字中間有點空隙
+    # <span class="material-symbols-outlined"> 裡面包的就是你在 Google 網頁上看到的 Icon 名稱
+    st.markdown(
+        """
         <a href="#section-search" target="_self" 
            style="display: flex; justify-content: center; align-items: center; background-color: rgba(14, 165, 233, 0.1); 
                   color: #38bdf8; font-size: 14px; font-weight: bold; padding: 12px; 
                   border-radius: 8px; text-decoration: none; margin-top: 40px; margin-bottom: 20px; 
-                  border: 1px solid rgba(56, 189, 248, 0.3); box-shadow: 0px 4px 6px rgba(0,0,0,0.3);">
-            {icon_tag} 點擊回到頂部搜尋區
+                  border: 1px solid rgba(56, 189, 248, 0.3); box-shadow: 0px 4px 6px rgba(0,0,0,0.3); gap: 6px;">
+            <span class="material-symbols-outlined" style="font-size: 20px;">move_up</span> 
+            點擊回到頂部搜尋區
         </a>
         """, 
         unsafe_allow_html=True
