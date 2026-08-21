@@ -62,6 +62,9 @@ def save_user_watchlist(username, watchlist, conn, SHEET_URL):
         if 'Watchlist' not in df.columns:
             df['Watchlist'] = ""
             
+        # 🌟 關鍵修復：強制將欄位轉為 object 型態，這樣就能允許寫入字串！
+        df['Watchlist'] = df['Watchlist'].astype(object)
+            
         # 3. 尋找對應的帳號列
         clean_accounts = df['帳號'].astype(str).str.replace(r'\.0$', '', regex=True).str.strip().str.lower()
         target_user = str(username).strip().lower()
