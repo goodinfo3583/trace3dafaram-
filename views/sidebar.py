@@ -104,25 +104,52 @@ def ensure_b1_to_b5_loaded(DATA_DIR):
 # 🌟 快搜各頁面與顯示工具函數區 
 # ==========================================
 def robust_search_engine(df, query):
+    """
+    強化版搜尋引擎：先精準比對 (Exact Match)，找不到才模糊比對 (Partial Match)
+    解決權證 (如 054430) 攔截真實代號 (5443) 的問題
+    """
     if df is None or df.empty: return pd.DataFrame()
     df = df.loc[:, ~df.columns.duplicated()].copy()
-    query = str(query).strip()
-    mask = pd.Series(False, index=df.index)
     
-    # 🟢 兼容 "股票代號" 或 "代號" (因 b7 的質押表欄位名為 "代號")
+    query = str(query).strip()
+    if not query: return pd.DataFrame()
+
+    # 1. 找出正確的欄位名稱
     col_id = '股票代號' if '股票代號' in df.columns else ('代號' if '代號' in df.columns else None)
-    if col_id:
-        df[col_id] = df[col_id].astype(str).str.strip()
-        mask = mask | (df[col_id] == query)
-        
-    # 🟢 兼容 "股票名稱" 或 "名稱"
     col_name = '股票名稱' if '股票名稱' in df.columns else ('名稱' if '名稱' in df.columns else None)
+
+    # 確保欄位都是乾淨的字串，並強制剃除 Pandas 產生的 .0
+    if col_id:
+        df[col_id] = df[col_id].astype(str).str.replace(r'\.0$', '', regex=True).str.strip()
     if col_name:
         df[col_name] = df[col_name].astype(str).str.strip()
-        mask = mask | df[col_name].str.contains(query, na=False, case=False)
-        
-    return df[mask]
 
+    # ==========================================
+    # 🌟 第一階段：【嚴格精準比對】
+    # ==========================================
+    exact_mask = pd.Series(False, index=df.index)
+    if col_id:
+        exact_mask = exact_mask | (df[col_id] == query)
+    if col_name:
+        exact_mask = exact_mask | (df[col_name].str.lower() == query.lower())
+
+    # 如果有找到「完全一模一樣」的，就直接回傳，不再往下找！
+    exact_result = df[exact_mask]
+    if not exact_result.empty:
+        return exact_result
+
+    # ==========================================
+    # 🌟 第二階段：【模糊包含比對】 (只有精準找不到時才啟動)
+    # ==========================================
+    partial_mask = pd.Series(False, index=df.index)
+    if col_id:
+        partial_mask = partial_mask | df[col_id].str.contains(query, na=False)
+    if col_name:
+        partial_mask = partial_mask | df[col_name].str.contains(query, na=False, case=False)
+
+    return df[partial_mask]
+
+# ==========================================
 def scan_and_display(title, session_key, query):
     st.markdown(f"<h6 style='color: #E2E8F0; margin-bottom: 5px;'>{title}</h6>", unsafe_allow_html=True)
     df = get_sidebar_df(session_key)
