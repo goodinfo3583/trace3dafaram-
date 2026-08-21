@@ -43,11 +43,11 @@ MARKET_HISTORY_DIR = os.path.join(DATA_DIR, "MarketHistory")
 BLOCK_HISTORY_DIR = os.path.join(DATA_DIR, "BlockHistory")
 
 # 隱形急救引擎 (置於程式最頂端，不要刪除)
-# 即使不顯示區塊 0 面板，這段程式碼也必須存在，否則側邊欄導航會因為讀不到歷史檔案而顯示「查無資料」。
-if not os.path.exists(DATA_DIR): os.makedirs(DATA_DIR)
-if not os.path.exists(SCORE_HISTORY_DIR): os.makedirs(SCORE_HISTORY_DIR)
-if not os.path.exists(MARKET_HISTORY_DIR): os.makedirs(MARKET_HISTORY_DIR)
-if not os.path.exists(BLOCK_HISTORY_DIR): os.makedirs(BLOCK_HISTORY_DIR)
+# 加上 exist_ok=True，徹底消滅 FileExistsError
+os.makedirs(DATA_DIR, exist_ok=True)
+os.makedirs(SCORE_HISTORY_DIR, exist_ok=True)
+os.makedirs(MARKET_HISTORY_DIR, exist_ok=True)
+os.makedirs(BLOCK_HISTORY_DIR, exist_ok=True)
 
 # ✨ 修改 ：在載入畫面之前，確保 B3 數據已經存在記憶體中供卡片/跑馬燈使用
 if 'df_blk2_1' not in st.session_state:
