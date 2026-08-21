@@ -861,7 +861,7 @@ def render_sidebar_war_room(STOCK_DICT, DATA_DIR="data"):
         <h2 style="color: #e0f2fe; margin: 0; letter-spacing: 2px; text-shadow: 0 0 15px rgba(56, 189, 248, 0.8);">
             🔍 個股籌碼快搜
         </h2>
-        <p style="color: #94a3b8; margin-top: 8px; font-size: 14px; margin-bottom: 0;">一起看看K線吧</p>
+        <p style="color: #94a3b8; margin-top: 8px; font-size: 14px; margin-bottom: 0;">一起看看K線吧(興櫃標的僅有線圖無籌碼資訊)</p>
     </div>
     """, unsafe_allow_html=True)
 
