@@ -120,41 +120,34 @@ def show_watchlist_page(STOCK_DICT=None, conn=None, SHEET_URL=None):
 
     st.subheader(f"新增追蹤標的 (目前 {len(watchlist)}/{MAX_STOCKS} 檔)")
     col1, col2 = st.columns([3, 1])
+# 🚀 升級：自動產生下拉選單，並過濾掉超過 4 碼的權證！
+    stock_options = []
+    if STOCK_DICT:
+        stock_options = [f"{v['id']} {v['name']}" for v in STOCK_DICT.values() if len(str(v['id'])) <= 4]
+
     with col1:
-        new_stock = st.text_input("請輸入股票代號或名稱", key="new_stock_input")
+        new_stock = st.selectbox(
+            "請選擇股票", 
+            options=[""] + stock_options,
+            key="new_stock_input",
+            label_visibility="collapsed"
+        )
+        
     with col2:
-        st.markdown("<br>", unsafe_allow_html=True)
         if st.button("加入追蹤", use_container_width=True):
             if new_stock:
                 if len(watchlist) >= MAX_STOCKS:
                     st.error(f"⚠️ 追蹤名單已達 {MAX_STOCKS} 檔上限！")
                 else:
-                    query_clean = new_stock.strip()
-                    final_stock_name = query_clean
-                    if STOCK_DICT:
-                        exact_match = False
-                        for k, v in STOCK_DICT.items():
-                            stock_id = str(v.get("id", ""))
-                            stock_name = str(v.get("name", ""))
-                            if query_clean == stock_id or query_clean == stock_name:
-                                final_stock_name = f"{stock_id} {stock_name}"
-                                exact_match = True
-                                break
-                        
-                        if not exact_match:
-                            for k, v in STOCK_DICT.items():
-                                if query_clean in k or query_clean in str(v.get("name", "")):
-                                    final_stock_name = f"{v['id']} {v['name']}"
-                                    break
-
-                    if final_stock_name not in watchlist:
-                        watchlist[final_stock_name] = "" 
-                        st.session_state[f"note_{final_stock_name}"] = ""
-                        st.success(f"已暫存「{final_stock_name}」，請記得點擊左上方「💾 存檔」！")
+                    # 💡 因為選單出來的值已經是完美的 "2330 台積電" 格式，我們不需要再做任何文字處理！
+                    if new_stock not in watchlist:
+                        watchlist[new_stock] = "" 
+                        st.session_state[f"note_{new_stock}"] = ""
+                        st.success(f"已暫存「{new_stock}」，請記得點擊左上方「存檔」！")
                         time.sleep(1)
                         st.rerun()
                     else:
-                        st.info(f"「{final_stock_name}」已在名單中囉！")
+                        st.info(f"「{new_stock}」已在名單中囉！")
 
     st.markdown("<hr style='border-color: #334155; margin: 10px 0;'>", unsafe_allow_html=True)
     

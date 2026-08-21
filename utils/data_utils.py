@@ -89,7 +89,7 @@ def get_diff_ui(today_val, prev_val):
 #台股代號與名稱產業類別 萬用字典引擎 (後台靜默運作)
 @st.cache_data(ttl=3600)
 def get_stock_dictionary():
-    """讀取證交所 ISIN 檔案，在後台安靜地建立雙向對照表"""
+    """讀取證交所 ISIN 檔案，支援同時讀取上市、上櫃、興櫃多個檔案"""
     mapping = {}
     search_patterns = [
         "./data/*辨識號碼*.txt",
@@ -101,31 +101,36 @@ def get_stock_dictionary():
         
     if not dict_files: return mapping
         
-    target_file = dict_files[0]
-    raw_lines = []
-    
-    for encoding in ['utf-8-sig', 'utf-8', 'cp950', 'utf-16', 'big5']:
-        try:
-            with open(target_file, 'r', encoding=encoding) as f:
-                raw_lines = f.readlines()
-            if len(raw_lines) > 10: break
-        except: continue
-            
-    for line in raw_lines:
-        parts = line.split('\t') if '\t' in line else line.split(',')
-        if len(parts) >= 5:
-            name_part = parts[0].strip()
-            industry = parts[4].strip()
-            
-            clean_name = re.sub(r'[\s ]+', ' ', name_part).strip()
-            tokens = clean_name.split(' ')
-            
-            if len(tokens) >= 2:
-                sid = tokens[0].strip()
-                sname = tokens[1].strip()
-                if sid.isalnum(): 
-                    mapping[sname] = {"id": sid, "name": sname, "industry": industry}
-                    mapping[sid] = {"id": sid, "name": sname, "industry": industry}
+    # 🚀 修復：使用迴圈處理「所有」找到的檔案，而不只是第一個
+    for target_file in dict_files:
+        raw_lines = []
+        
+        for encoding in ['utf-8-sig', 'utf-8', 'cp950', 'utf-16', 'big5']:
+            try:
+                with open(target_file, 'r', encoding=encoding) as f:
+                    raw_lines = f.readlines()
+                if len(raw_lines) > 10: 
+                    break # 成功讀取就跳出編碼嘗試
+            except: 
+                continue
+                
+        for line in raw_lines:
+            parts = line.split('\t') if '\t' in line else line.split(',')
+            if len(parts) >= 5:
+                name_part = parts[0].strip()
+                industry = parts[4].strip()
+                
+                clean_name = re.sub(r'[\s ]+', ' ', name_part).strip()
+                tokens = clean_name.split(' ')
+                
+                if len(tokens) >= 2:
+                    sid = tokens[0].strip()
+                    sname = tokens[1].strip()
+                    
+                    # 🛡️ 權證過濾機制：只把「代號長度小於等於 4」且是純數字/英數混合的標的加入字典
+                    if sid.isalnum() and len(sid) <= 4: 
+                        mapping[sname] = {"id": sid, "name": sname, "industry": industry}
+                        mapping[sid] = {"id": sid, "name": sname, "industry": industry}
                     
     return mapping
 
