@@ -285,7 +285,7 @@ def show_watchlist_page(STOCK_DICT=None, conn=None, SHEET_URL=None):
                 st.markdown("</div>", unsafe_allow_html=True)
             with c7:
                 st.markdown("<div style='padding-top:15px;'>", unsafe_allow_html=True)
-                if st.button("籌碼", icon=":material/monitoring:", key=f"view_{stock}", use_container_width=True, help="顯示籌碼診斷"):
+                if st.button(icon=":material/monitoring:", key=f"view_{stock}", use_container_width=True, help="顯示籌碼診斷"):
                     st.session_state["selected_watch_stock"] = stock
                     st.session_state["global_search_final"] = pure_code if pure_code else stock
                     st.rerun()
