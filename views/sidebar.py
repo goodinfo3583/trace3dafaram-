@@ -1048,17 +1048,15 @@ def render_sidebar_war_room(STOCK_DICT, DATA_DIR="data"):
             df_b3 = get_sidebar_df('b3_main')
             if not df_b3.empty:
                 res_b3 = robust_search_engine(df_b3, target_query)
-                display_id = res_b3.iloc[0]['股票代號'] if not res_b3.empty else pure_stock_id
-                display_b3_name = res_b3.iloc[0]['股票名稱'] if not res_b3.empty else "-"
                 
-                base_types = ['🌐 外資日連買', '🌐 外資週連買', '🏦 投信日連買', '🏦 投信週連買']
-                display_list = []
-                for b_type in base_types:
-                    match = res_b3[res_b3['連買類型'] == b_type] if not res_b3.empty else pd.DataFrame()
-                    if not match.empty: display_list.append(match.iloc[0].to_dict())
-                    else: display_list.append({'連買類型': b_type, '股票代號': display_id, '股票名稱': display_b3_name, '狀態動態': '⚪ 未進榜', '連買週期數': '-'})
-                st.dataframe(pd.DataFrame(display_list), use_container_width=True, hide_index=True)
-            else: st.info("⚪ 區塊 3：尚未載入資料表")
+                # 🚀 智能收納：如果 4 個連買榜單都沒進，直接給一句乾淨的未進榜！
+                if res_b3.empty:
+                    st.write("⚪ 未進榜")
+                else:
+                    # 如果有進榜，原生 DataFrame 就只會包含「真正有進榜」的那幾列，完全不用手動補空殼！
+                    st.dataframe(res_b3, use_container_width=True, hide_index=True)
+            else: 
+                st.info("⚪ 區塊 3：尚未載入資料表")
 
             st.markdown("<hr style='border-color: #334155;'>", unsafe_allow_html=True)
             st.markdown("<h4 style='color: #FCD34D;'>🔄 區塊 4：券資有利排名</h4>", unsafe_allow_html=True)
