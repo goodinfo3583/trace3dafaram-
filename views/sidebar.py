@@ -1105,7 +1105,7 @@ def render_sidebar_war_room(STOCK_DICT, DATA_DIR="data"):
             st.markdown("<hr style='border-color: #334155;'>", unsafe_allow_html=True)
             
             # 👔 區塊 7
-            icon_b7 = get_img_html("35.png") # 替換為你的圖片名稱
+            icon_b7 = get_img_html("magicbookboss.png") # 替換為你的圖片名稱
             st.markdown(f"<h4 style='color: #FCD34D;'>{icon_b7}董監動向</h4>", unsafe_allow_html=True)
             scan_and_display("🔹 董監最新質押比", 'b7_pledge', target_query)
             scan_and_display("🔹 董監質押歷史趨勢", 'b7_pledge_history', target_query)
