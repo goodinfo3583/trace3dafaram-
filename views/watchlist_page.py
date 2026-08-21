@@ -275,7 +275,7 @@ def show_watchlist_page(STOCK_DICT=None, conn=None, SHEET_URL=None):
                 st.markdown("<div style='padding-top:15px;'>", unsafe_allow_html=True)
                 # 🚀 修復：使用 on_click 觸發 Callback，不再產生狀態修改衝突！
                 st.button(
-                    f"📥 帶入", 
+                    "帶入", icon=":material/download:", 
                     key=f"import_{stock}", 
                     use_container_width=True, 
                     help="將今日行情寫入筆記 (不覆蓋)",
@@ -285,14 +285,14 @@ def show_watchlist_page(STOCK_DICT=None, conn=None, SHEET_URL=None):
                 st.markdown("</div>", unsafe_allow_html=True)
             with c7:
                 st.markdown("<div style='padding-top:15px;'>", unsafe_allow_html=True)
-                if st.button(f"🔍", key=f"view_{stock}", use_container_width=True, help="顯示籌碼診斷"):
+                if st.button("籌碼", icon=":material/monitoring:", key=f"view_{stock}", use_container_width=True, help="顯示籌碼診斷"):
                     st.session_state["selected_watch_stock"] = stock
                     st.session_state["global_search_final"] = pure_code if pure_code else stock
                     st.rerun()
                 st.markdown("</div>", unsafe_allow_html=True)
             with c8:
                 st.markdown("<div style='padding-top:15px;'>", unsafe_allow_html=True)
-                if st.button(f"🗑️", key=f"remove_{stock}", use_container_width=True, help="移除此標的"):
+                if st.button("移除", icon=":material/delete:", key=f"remove_{stock}", use_container_width=True, help="移除此標的"):
                     del watchlist[stock]
                     if nk in st.session_state:
                         del st.session_state[nk]
