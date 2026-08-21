@@ -848,10 +848,7 @@ def render_sidebar_war_room(STOCK_DICT, DATA_DIR="data"):
             st.write("") # 空一行
             if st.button("❌ 關閉焦點", use_container_width=True, key="close_focus_btn"):
                 st.session_state["selected_watch_stock"] = None
-
-                # 關閉焦點時，同步清空下方的搜尋框(watchlist自訂義用)
                 st.session_state["global_search_final"] = ""
-
                 st.rerun()
                 
             st.markdown("<hr style='border-color: #38BDF8; margin: 15px 0px;'>", unsafe_allow_html=True)
@@ -872,11 +869,11 @@ def render_sidebar_war_room(STOCK_DICT, DATA_DIR="data"):
         def clear_search():
             st.session_state['global_search_final'] = ""
 
-        st.markdown("<div style='font-size: 14px; color: #E2E8F0; margin-bottom: 5px; font-weight: bold;'>輸入 代號 或 名稱 或 代號+名稱 ：</div>", unsafe_allow_html=True)
+        st.markdown("<div style='font-size: 14px; color: #E2E8F0; margin-bottom: 5px; font-weight: bold;'>輸入 或 選擇標的 ：</div>", unsafe_allow_html=True)
         
         c_search, c_btn_go, c_btn_clear = st.columns([6, 1.5, 1.5])
         
-# 🚀 升級：自動產生下拉選單，並過濾掉超過 4 碼的權證！
+        # 🚀 升級：自動產生下拉選單，並過濾掉超過 4 碼的權證！
         stock_options = []
         if STOCK_DICT:
             stock_options = [f"{v['id']} {v['name']}" for v in STOCK_DICT.values() if len(str(v['id'])) <= 4]
@@ -900,49 +897,34 @@ def render_sidebar_war_room(STOCK_DICT, DATA_DIR="data"):
         industry_label = "未分類"
         
         if search_query:
+            # 🚀 智慧拆解：將下拉選單的 "5443 均豪" 拆解為純數字 "5443"
             query_clean = search_query.strip()
-            
-            # 搜尋當下即時觸發 B1~B5 背景補載機制
-            ensure_b1_to_b5_loaded(DATA_DIR)
-            
-            industry_label = "未分類"
-
-            if search_query:
-            # 🚀 智慧拆解：如果使用者選了下拉選單的 "5443 均豪"，我們只取前面數字部分來搜尋
-            query_clean = search_query.strip()
-            match_code = re.search(r'^[A-Za-z0-9]{2,4}', query_clean) # 抓出開頭的代號
+            match_code = re.search(r'^[A-Za-z0-9]{2,4}', query_clean)
             
             if match_code:
                 pure_stock_id = match_code.group(0)
             else:
-                # 預防萬一：如果使用者手殘只打中文，就直接拿中文去字典查代號
                 pure_stock_id = query_clean
             
-            # 搜尋當下即時觸發 B1~B5 背景補載機制
             ensure_b1_to_b5_loaded(DATA_DIR)
 
-            # ==========================================
-            # 🚀 修復：使用純代號去字典查詢，保證找到正確資訊
-            # ==========================================
             if STOCK_DICT:
                 if pure_stock_id in STOCK_DICT:
                     v = STOCK_DICT[pure_stock_id]
-                    pure_stock_id = v["id"]
+                    pure_stock_id = str(v["id"])
                     display_name = f"{v['id']} {v['name']}"
                     industry_label = v.get("industry", "未分類")
                 else:
-                    # 如果連純代號都查不到 (可能是打錯字)，就保留使用者輸入的字串去瞎子摸象
                     display_name = search_query
 
             # 將純粹的代號 (例如 5443) 指派給 target_query，交給 B1~B7 的引擎去跑！
             target_query = pure_stock_id if pure_stock_id else search_query
 
             st.markdown(f"### 🎯 綜合診斷標的：<span style='color: #00D2FF;'>{display_name}</span> <span style='font-size:16px; background-color:#1E293B; padding:4px 10px; border-radius:6px; color:#38BDF8; border: 1px solid #38BDF8; margin-left:10px;'>🏷️ {industry_label}</span>", unsafe_allow_html=True)
-            
-            #==============================
+
+            # ==========================================
             # 🚀 融合 AI 訊號區
             # ==========================================
-            target_query = pure_stock_id if pure_stock_id else search_query
             old_ai_msg = generate_stock_commentary(target_query)
 
             new_ai_msgs = []
@@ -986,7 +968,7 @@ def render_sidebar_war_room(STOCK_DICT, DATA_DIR="data"):
             st.session_state.show_kline = show_kline
 
             if show_kline:
-                if 'pure_stock_id' in locals() and pure_stock_id != "":          
+                if pure_stock_id != "":          
                     st.markdown("##### 技術線圖與指標配置面板")
                     
                     kline_period = st.radio("選擇週期", ["日線", "週線", "月線"], horizontal=True, label_visibility="collapsed", key="kline_radio_period")
@@ -1004,14 +986,15 @@ def render_sidebar_war_room(STOCK_DICT, DATA_DIR="data"):
                     st.warning("⚠️ 技術 K 線圖目前僅支援代號查詢。")
 
             # ==========================================
-            # 👑 區塊 1 ~ 5：數據庫展演 (對接萬能變數雷達)
+            # 👑 區塊 1 ~ 7：數據庫展演 (對接萬能變數雷達)
+            # 🚀 修復：全面將 search_query 替換為純數字的 target_query！
             # ==========================================
             st.markdown("<hr style='border-color: #334155;'>", unsafe_allow_html=True)
             st.markdown("<h4 style='color: #FCD34D;'>👑 區塊 1：短中長線三大法人持股變化</h4>", unsafe_allow_html=True)
             
             df_b1 = get_sidebar_df('b1_final_df')
             if not df_b1.empty:
-                res_b1 = robust_search_engine(df_b1, search_query)
+                res_b1 = robust_search_engine(df_b1, target_query)
                 if not res_b1.empty:
                     date_cols = [c for c in res_b1.columns if '持股%' in c or c.isdigit()]
                     is_all_unranked = True
@@ -1029,7 +1012,7 @@ def render_sidebar_war_room(STOCK_DICT, DATA_DIR="data"):
                         st.dataframe(res_b1[clean_cols], use_container_width=True, hide_index=True)
                         
                         row = res_b1.iloc[0]
-                        stock_name = row.get('股票名稱', search_query)
+                        stock_name = row.get('股票名稱', display_name)
                         raw_x_vals = date_cols[::-1]
                         clean_x_labels = [c.replace('持股%', '')[-4:] for c in raw_x_vals]
                         
@@ -1060,50 +1043,48 @@ def render_sidebar_war_room(STOCK_DICT, DATA_DIR="data"):
             st.markdown("<hr style='border-color: #334155;'>", unsafe_allow_html=True)
             st.markdown("<h4 style='color: #FCD34D;'>🎯 區塊 2：法人買超診斷</h4>", unsafe_allow_html=True)
             c1, c2 = st.columns(2)
-            with c1: scan_and_display("🌐 外資 5 日淨買佔成交量", 'b2_1', search_query)
-            with c2: scan_and_display("🏦 投信 5 日淨買佔成交量", 'b2_2', search_query)
+            with c1: scan_and_display("🌐 外資 5 日淨買佔成交量", 'b2_1', target_query)
+            with c2: scan_and_display("🏦 投信 5 日淨買佔成交量", 'b2_2', target_query)
             c3, c4 = st.columns(2)
-            with c3: scan_and_display("🌐 外資 5 日淨買佔發行量", 'b2_3', search_query)
-            with c4: scan_and_display("🏦 投信 5 日淨買佔發行量", 'b2_4', search_query)
+            with c3: scan_and_display("🌐 外資 5 日淨買佔發行量", 'b2_3', target_query)
+            with c4: scan_and_display("🏦 投信 5 日淨買佔發行量", 'b2_4', target_query)
 
             st.markdown("<hr style='border-color: #334155;'>", unsafe_allow_html=True)
             st.markdown("<h4 style='color: #FCD34D;'>📅 區塊 3：法人連買診斷 (日/週)</h4>", unsafe_allow_html=True)
             df_b3 = get_sidebar_df('b3_main')
             if not df_b3.empty:
-                res_b3 = robust_search_engine(df_b3, search_query)
-                display_id = res_b3.iloc[0]['股票代號'] if not res_b3.empty else search_query
-                display_name = res_b3.iloc[0]['股票名稱'] if not res_b3.empty else "-"
+                res_b3 = robust_search_engine(df_b3, target_query)
+                display_id = res_b3.iloc[0]['股票代號'] if not res_b3.empty else pure_stock_id
+                display_b3_name = res_b3.iloc[0]['股票名稱'] if not res_b3.empty else "-"
                 
                 base_types = ['🌐 外資日連買', '🌐 外資週連買', '🏦 投信日連買', '🏦 投信週連買']
                 display_list = []
                 for b_type in base_types:
                     match = res_b3[res_b3['連買類型'] == b_type] if not res_b3.empty else pd.DataFrame()
                     if not match.empty: display_list.append(match.iloc[0].to_dict())
-                    else: display_list.append({'連買類型': b_type, '股票代號': display_id, '股票名稱': display_name, '狀態動態': '⚪ 未進榜', '連買週期數': '-'})
+                    else: display_list.append({'連買類型': b_type, '股票代號': display_id, '股票名稱': display_b3_name, '狀態動態': '⚪ 未進榜', '連買週期數': '-'})
                 st.dataframe(pd.DataFrame(display_list), use_container_width=True, hide_index=True)
             else: st.info("⚪ 區塊 3：尚未載入資料表")
 
             st.markdown("<hr style='border-color: #334155;'>", unsafe_allow_html=True)
             st.markdown("<h4 style='color: #FCD34D;'>🔄 區塊 4：券資有利排名</h4>", unsafe_allow_html=True)
             
-            render_b4_panorama("5日幅度變動排名", [('📉 融資減少', 'b4_margin_pct'), ('📉 借券減少', 'b4_short_pct'), ('📈 融券增加', 'b4_margin_plus_pct')], search_query)
+            render_b4_panorama("5日幅度變動排名", [('📉 融資減少', 'b4_margin_pct'), ('📉 借券減少', 'b4_short_pct'), ('📈 融券增加', 'b4_margin_plus_pct')], target_query)
             st.write("") 
-            render_b4_panorama("5日張數變動排名", [('📉 融資減少', 'b4_margin_vol'), ('📉 借券減少', 'b4_short_vol'), ('📈 融券增加', 'b4_margin_plus_vol')], search_query)
+            render_b4_panorama("5日張數變動排名", [('📉 融資減少', 'b4_margin_vol'), ('📉 借券減少', 'b4_short_vol'), ('📈 融券增加', 'b4_margin_plus_vol')], target_query)
 
             st.markdown("<hr style='border-color: #334155;'>", unsafe_allow_html=True)
             st.markdown("<h4 style='color: #FCD34D;'>💰 區塊 5：大腿動向</h4>", unsafe_allow_html=True)
             
             col_400, col_1000 = st.columns(2)
-            with col_400: scan_and_display("💎 400張以上大戶動向", 'b5_400', search_query)
-            with col_1000: scan_and_display("🐳 1000張以上超級大戶動向", 'b5_1000', search_query)
-            # 👇 
-            #區塊 7 新增--步驟4
+            with col_400: scan_and_display("💎 400張以上大戶動向", 'b5_400', target_query)
+            with col_1000: scan_and_display("🐳 1000張以上超級大戶動向", 'b5_1000', target_query)
+
             st.markdown("<hr style='border-color: #334155;'>", unsafe_allow_html=True)
             st.markdown("<h4 style='color: #FCD34D;'>👔 區塊 7：董監動向</h4>", unsafe_allow_html=True)
-            # 🟢 依序將三個表單渲染至側邊搜尋視窗中
-            scan_and_display("🔹 董監最新質押比", 'b7_pledge', search_query)
-            scan_and_display("🔹 董監質押歷史趨勢", 'b7_pledge_history', search_query)
-            scan_and_display("🔹 董監持股比增減", 'b7_main', search_query)
+            scan_and_display("🔹 董監最新質押比", 'b7_pledge', target_query)
+            scan_and_display("🔹 董監質押歷史趨勢", 'b7_pledge_history', target_query)
+            scan_and_display("🔹 董監持股比增減", 'b7_main', target_query)
             
     # 💡 當搜尋列「沒有內容」時，顯示大盤總經
     if not search_query:
