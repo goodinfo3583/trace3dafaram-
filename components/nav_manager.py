@@ -1,45 +1,151 @@
 # components/nav_manager.py
 import streamlit.components.v1 as components
 import streamlit as st
-import json
 
 def inject_custom_header(is_logged_in=False):
-    """注入客製化懸浮頂部導航與隱藏側邊欄邏輯 (支援動態快捷鍵與黑白主題)"""
+    """注入客製化懸浮頂部導航與隱藏側邊欄邏輯 (遊戲化UI版 + 快捷鍵支援)"""
     login_btn_text = "登出" if is_logged_in else "登入"
     b6_text = "鉅額交易"
     
-    # 預設快捷鍵字典 (全部轉小寫以利 JS 判斷)
-    default_hotkeys = {
-        "f1": "NavToB1", "f2": "NavToB2", "f3": "NavToB3", 
-        "f4": "NavToB4", "f5": "NavToB5", "f6": "NavToB6", "f7": "NavToB7",
-        "alt+l": "NavToWatchlist", "escape": "NavToSystem"
-    }
-    # 若 Session 中有自訂快捷鍵則覆蓋，否則使用預設
-    user_hotkeys = st.session_state.get('custom_hotkeys', default_hotkeys)
-    hotkeys_json = json.dumps(user_hotkeys)
-    
     inject_js = """
     <script>
-    const parentWin = window.parent;
-    const parentDoc = parentWin.document;
+    const parentDoc = window.parent.document;
 
-    // 清除舊的 Header 與 Style
     const oldHeader = parentDoc.getElementById('custom-sticky-header');
     if (oldHeader) oldHeader.remove();
     
     const oldStyle = parentDoc.getElementById('custom-nav-style');
     if (oldStyle) oldStyle.remove();
 
-    /* ...(這裡保留你原本的 CSS style 樣式設定，請將原本 style.innerHTML = `...` 內的 CSS 貼回這裡) ... */
-    
-    // 【修改點1】這裡為了節省版面，假設你已經貼上原本的完整 CSS
     const style = parentDoc.createElement('style');
     style.id = 'custom-nav-style'; 
     style.innerHTML = `
-        /* 💡 為了維持完整性，請將你原有的 nav CSS 全部貼回這裡 */
         [data-testid="stHeader"] { display: none !important; }
         [data-testid="stToolbar"] { display: none !important; }
-        /* ... 其他省略 ... */
+        [data-testid="collapsedControl"] { top: 70px !important; z-index: 1000000 !important; background-color: rgba(10, 13, 20, 0.8) !important; border-radius: 50%; }
+
+        #custom-sticky-header { position: fixed; top: 0; left: 0; width: 100%; z-index: 1000005; background: transparent !important; pointer-events: none; }
+        
+        .disclaimer-bar, .nav-btn-container { pointer-events: auto; }
+        .disclaimer-bar { display: flex; align-items: center; background: transparent !important; padding: 0px 15px; border: none !important; gap: 4px; }
+        
+        /* ⚙️ 頂部圖示共通樣式 (包含系統與工具箱) */
+        .system-menu { position: relative; padding: 6px 8px; cursor: pointer; background: transparent !important; display: flex; align-items: center; justify-content: center; }
+        .system-icon { width: 22px; height: 22px; object-fit: contain; filter: drop-shadow(1px 1px 2px rgba(0,0,0,0.8)); transition: all 0.3s cubic-bezier(0.175, 0.885, 0.32, 1.275); }
+        .system-menu:hover .system-icon { filter: drop-shadow(0px 0px 8px rgba(0, 210, 255, 0.9)); transform: scale(1.15); }
+        
+        /* 🌟 專屬特效：定時反光/高光提示 */
+        @keyframes periodicGlow {
+            0%, 82% { filter: brightness(1) drop-shadow(1px 1px 2px rgba(0,0,0,0.8)); transform: scale(1); }
+            88% { filter: brightness(1.7) drop-shadow(0 0 12px rgba(56, 189, 248, 1)); transform: scale(1.2); }
+            94% { filter: brightness(1) drop-shadow(1px 1px 2px rgba(0,0,0,0.8)); transform: scale(1); }
+            100% { filter: brightness(1) drop-shadow(1px 1px 2px rgba(0,0,0,0.8)); }
+        }
+        
+        #custom-sidebar-toggle .system-icon { animation: periodicGlow 5s infinite ease-in-out; }
+        #custom-sidebar-toggle:hover .system-icon { animation-play-state: paused; filter: brightness(1.2) drop-shadow(0px 0px 8px rgba(0, 210, 255, 0.9)); transform: scale(1.15); }
+
+        /* 下拉選單 */
+        .system-dropdown { position: absolute; top: 100%; left: 10px; width: 300px; background-color: rgba(17, 22, 34, 0.95); border: 1px solid rgba(255,255,255,0.1); border-top: none; border-radius: 0 0 8px 8px; padding: 0; max-height: 0; opacity: 0; overflow: hidden; transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1); box-shadow: 0px 8px 20px rgba(0,0,0,0.8); z-index: 1000010; backdrop-filter: blur(10px); }
+        .system-menu:hover .system-dropdown { max-height: 800px; opacity: 1; padding: 8px 0; }
+        
+        .dropdown-item { padding: 10px 15px; border-bottom: 1px solid rgba(255,255,255,0.05); }
+        .dropdown-item:last-child { border-bottom: none; }
+        
+        .dropdown-title { display: flex; align-items: center; gap: 8px; color: #E2E8F0; font-size: 13px; font-weight: bold; margin-bottom: 4px; text-decoration: none; transition: color 0.2s; cursor: pointer; }
+        .menu-icon { width: 18px; height: 18px; object-fit: contain; }
+        .dropdown-text { font-size: 11px; color: #94A3B8; line-height: 1.5; margin: 0; padding-left: 26px; }
+        
+        .dropdown-item:hover { background-color: rgba(255,255,255,0.05); }
+        .dropdown-item.actionable:hover .dropdown-title { color: #FFD700; }
+        
+        /* 根據登入狀態調整文字顏色 */
+        .vip-login-btn { color: #FFD700 !important; font-size: 14px; justify-content: center; margin-top: 2px; }
+        .vip-login-btn:hover { text-shadow: 0 0 10px rgba(255, 215, 0, 0.8); }
+
+        /* 未解鎖/開發中 道具效果 */
+        .locked-item { opacity: 0.5; filter: grayscale(50%); cursor: not-allowed; }
+        .locked-item:hover { background-color: transparent; opacity: 0.8; filter: grayscale(0%); }
+
+        /* 💎 懸浮式導覽列 (純粹的籌碼動向儀表板) */
+        .nav-btn-container { 
+            display: flex; flex-wrap: wrap; justify-content: flex-end; align-items: center; 
+            padding: 8px 15px; gap: 6px; 
+            background: rgba(255, 255, 255, 0.06) !important; 
+            backdrop-filter: blur(8px); -webkit-backdrop-filter: blur(8px);
+            border: 1px solid rgba(255, 255, 255, 0.1) !important; border-top: none !important; border-right: none !important;
+            border-radius: 0 0 0 16px;
+            box-shadow: -4px 4px 15px rgba(0,0,0,0.3);
+            transition: all 0.3s ease-in-out; 
+            width: fit-content; margin-left: auto;
+        }
+        
+        .nav-text-link { 
+            position: relative; overflow: hidden;
+            text-decoration: none !important; color: #CBD5E1 !important; font-size: 15px; font-weight: 600; 
+            padding: 6px 12px; border-radius: 6px; transition: all 0.3s ease-in-out; 
+            text-shadow: 1px 1px 3px rgba(0,0,0,0.8); cursor: pointer; display: flex; align-items: center; 
+            border: 1px solid transparent;
+        }
+        
+        .nav-text-link::before {
+            content: ''; position: absolute; top: 0; left: -100%; width: 50%; height: 100%;
+            background: linear-gradient(90deg, transparent, rgba(255, 255, 255, 0.4), transparent);
+            transform: skewX(-20deg); transition: none;
+        }
+        
+        .nav-text-link:hover { 
+            color: #FFD700 !important; text-shadow: 0 0 10px rgba(255, 215, 0, 0.8); 
+            background: rgba(255, 255, 255, 0.1); border: 1px solid rgba(255, 215, 0, 0.3);
+            transform: translateY(-2px); box-shadow: 0 4px 10px rgba(0,0,0,0.3);
+        }
+        
+        .nav-text-link:hover::before { animation: sweepLight 0.6s ease-out; }
+        @keyframes sweepLight { 0% { left: -100%; } 100% { left: 200%; } }
+        
+        .nav-divider { color: rgba(255, 255, 255, 0.15); font-size: 14px; user-select: none; margin: 0 2px; }
+
+        .nav-icon { width: 20px; height: 20px; margin-right: 6px; object-fit: contain; transition: all 0.3s ease-in-out; }
+        .nav-text-link:hover .nav-icon { filter: drop-shadow(0px 0px 6px rgba(255, 215, 0, 0.9)) brightness(1.2); }
+        
+        /* 🌟 雷達按鈕靈動浮動特效 */
+        @keyframes floatAndPulse {
+            0% { transform: translateY(0px) scale(1); filter: drop-shadow(0 0 5px rgba(56, 189, 248, 0.4)); }
+            50% { transform: translateY(-3px) scale(1.05); filter: drop-shadow(0 0 12px rgba(56, 189, 248, 0.9)); }
+            100% { transform: translateY(0px) scale(1); filter: drop-shadow(0 0 5px rgba(56, 189, 248, 0.4)); }
+        }
+
+        .global-radar-toggle {
+            display: flex; align-items: center; justify-content: center; cursor: pointer; 
+            margin-right: 15px; background: transparent; border: none; padding: 6px 10px;
+        }
+        .global-radar-toggle img { width: 22px; height: 22px; object-fit: contain; transition: all 0.4s ease; animation: floatAndPulse 3s infinite ease-in-out; }
+        .global-radar-toggle:hover img { transform: scale(1.15); filter: drop-shadow(0 0 15px rgba(255, 215, 0, 1)); animation-play-state: paused; }
+        .global-radar-toggle img.is-hidden { animation: none; opacity: 0.3; filter: grayscale(100%); transform: scale(0.9); }
+
+        .force-hide { display: none !important; }
+
+        /* 📱 手機版專屬：派蒙網格菜單 */
+        @media (max-width: 768px) { 
+            .nav-btn-container { 
+                width: 96%; margin: 10px auto; 
+                display: grid !important; grid-template-columns: repeat(2, 1fr); gap: 12px;
+                padding: 20px 15px; background: rgba(15, 20, 30, 0.92) !important;
+                border-radius: 12px; border: 1px solid rgba(255,255,255,0.1) !important;
+            } 
+            .nav-btn-container.force-hide { display: none !important; }
+            .nav-divider { display: none; } 
+            .nav-text-link { 
+                flex-direction: column; justify-content: center; padding: 16px 10px; margin: 0;
+                background: rgba(255,255,255,0.03); border: 1px solid rgba(255,255,255,0.08); 
+                border-radius: 12px; font-size: 14px !important; text-align: center;
+                box-shadow: inset 0 0 10px rgba(0,0,0,0.2);
+            } 
+            .nav-text-link:active { transform: scale(0.95); background: rgba(255,215,0,0.1); }
+            .nav-icon { margin: 0 0 8px 0; width: 28px; height: 28px; }
+            .global-radar-toggle { display: flex; } 
+        }
+        .stApp { margin-top: 50px !important; }
     `;
     parentDoc.head.appendChild(style);
 
@@ -47,12 +153,14 @@ def inject_custom_header(is_logged_in=False):
     headerDiv.id = 'custom-sticky-header';
     
     headerDiv.innerHTML = `
-        <!-- 【修改點2】在系統下拉選單中，加入"設定"按鈕 -->
         <div class="disclaimer-bar">
+            
+            <!-- ⚙️ 系統設定 -->
             <div class="system-menu">
                 <div class="system-menu-title" title="系統與聲明">
                     <img src="app/static/icon-system.png" class="system-icon" alt="系統">
                 </div>
+                
                 <div class="system-dropdown">
                     <div class="dropdown-item actionable" style="text-align: center;">
                         <a href="#" data-target="__LOGIN_TEXT__" class="dropdown-title internal-nav vip-login-btn">
@@ -61,27 +169,126 @@ def inject_custom_header(is_logged_in=False):
                     </div>
                     <div class="dropdown-item actionable">
                         <a href="#" data-target="NavToSystem" class="dropdown-title internal-nav">
-                            <img src="app/static/icon-system.png" class="menu-icon" alt="system"> 系統首頁 <span style="color:#64748b; font-size:10px;">(Esc)</span>
+                            <img src="app/static/icon-system.png" class="menu-icon" alt="system"> 系統頁面 <span style="color:#64748b; font-size:10px;">(Esc)</span>
                         </a>
+                        <p class="dropdown-text">返回系統主控台。</p>
                     </div>
-                    <!-- 新增的設定按鈕 -->
                     <div class="dropdown-item actionable">
-                        <a href="#" data-target="NavToSettings" class="dropdown-title internal-nav">
-                            <img src="app/static/icon-system.png" class="menu-icon" alt="settings"> ⚙️ 系統設定
+                        <a href="#" data-target="NavToContact" class="dropdown-title internal-nav">
+                            <img src="app/static/icon-contact.png" class="menu-icon" alt="contact"> 聯絡我們
                         </a>
-                        <p class="dropdown-text">自訂介面風格與專屬鍵盤快捷鍵。</p>
+                        <p class="dropdown-text">有任何問題或合作提案，歡迎發送訊息與我們聯繫。</p>
                     </div>
-                    <!-- 聯絡我們與其他按鈕保留... -->
+                    <div class="dropdown-item">
+                        <span class="dropdown-title"><img src="app/static/icon-agree.png" class="menu-icon" alt="disclaimer"> 平台聲明</span>
+                        <p class="dropdown-text">本平台僅供教育研究與籌碼觀察，絕不構成實質投資建議。</p>
+                    </div>
+                    <div class="dropdown-item" style="border-bottom: none;">
+                        <span class="dropdown-title"><img src="app/static/icon-agree.png" class="menu-icon" alt="privacy"> 隱私政策</span>
+                        <p class="dropdown-text">依個資法蒐集識別資料僅供優化服務，絕不外流。</p>
+                    </div>
                 </div>
             </div>
-            <!-- 工具箱按鈕與其他介面保留... -->
+            
+            <!-- 🎒 工具箱 / 擴充功能 -->
+            <div class="system-menu">
+                <div class="system-menu-title" title="韭菜盒子">
+                    <img src="app/static/icon-toolbag.png" class="system-icon" alt="工具箱">
+                </div>
+                
+                <div class="system-dropdown">
+                    <!-- 1. 建立名單移至最上方 -->
+                    <div class="dropdown-item actionable">
+                        <a href="#" data-target="NavToWatchlist" class="dropdown-title internal-nav">
+                            <img src="app/static/icon-watchlist.png" class="menu-icon" alt="create"> 建立名單 <span style="color:#64748b; font-size:10px;">(Alt+L)</span>
+                        </a>
+                        <p class="dropdown-text">自訂與管理您的專屬觀察清單。</p>
+                    </div>
+                    
+                    <!-- 2. 市場消息 -->
+                    <div class="dropdown-item actionable">
+                        <a href="#" data-target="NavToNews" class="dropdown-title internal-nav">
+                            <img src="app/static/magicbook2.png" class="menu-icon" alt="news"> 市場消息
+                        </a>
+                        <p class="dropdown-text">掌握最新市場動態與總經快訊。</p>
+                    </div>
+                    
+                    <!-- 3. 新增外部連結：靠北投顧 3.0 -->
+                    <div class="dropdown-item actionable">
+                        <a href="https://www.facebook.com/DOUBLEE04/?locale=zh_TW" target="_blank" class="dropdown-title" style="text-decoration: none;">
+                            <img src="app/static/magicbook2.png" class="menu-icon" alt="fb-group"> 靠北投顧 3.0 
+                        </a>
+                        <p class="dropdown-text">分享分析師真實績效，避免受話術白白繳學費。</p>
+                    </div>
+                    
+                    <!-- 4. 新增基礎課程 -->
+                    <div class="dropdown-item actionable">
+                        <a href="#" data-target="NavToCourses" class="dropdown-title internal-nav">
+                            <img src="app/static/magicbookleaf.png" class="menu-icon" alt="courses"> 基礎課程
+                        </a>
+                        <p class="dropdown-text">量價關係、籌碼結構等10堂基礎課，強化自身能力不求人。</p>
+                    </div>
+                    
+                    <!-- 5. 鎖定功能區 -->
+                    <div class="dropdown-item locked-item">
+                        <span class="dropdown-title">
+                            <img src="app/static/icon-podiumaward.png" class="menu-icon" alt="lock"> 券商分點 (先不開放)
+                        </span>
+                        <p class="dropdown-text">追蹤特定券商分點進出動向。</p>
+                    </div>
+                    
+                    <div class="dropdown-item locked-item">
+                        <span class="dropdown-title">
+                            <img src="app/static/icon-podiumaward.png" class="menu-icon" alt="lock"> 主力追蹤 (先不開放)
+                        </span>
+                        <p class="dropdown-text">深度解析主力籌碼囤積路徑。</p>
+                    </div>
+                    
+                    <div class="dropdown-item locked-item">
+                        <span class="dropdown-title">
+                            <img src="app/static/icon-podiumaward.png" class="menu-icon" alt="lock"> 權重與回測 (未解鎖)
+                        </span>
+                        <p class="dropdown-text">自訂計分籌碼權重與未來勝率回測模擬。</p>
+                    </div>
+                    
+                    <div class="dropdown-item locked-item" style="border-bottom: none;">
+                        <span class="dropdown-title">
+                            <img src="app/static/icon-chessknightalt.png" class="menu-icon" alt="game"> 命運酒館 (開發中)
+                        </span>
+                        <p class="dropdown-text">休息一下別殺進殺出占個卜，更多互動功能。</p>
+                    </div>
+                </div>
+            </div>
+            
+            <div id="custom-sidebar-toggle" class="system-menu" title="搜尋與側欄功能">
+                <img src="app/static/icon-search.png" class="system-icon" alt="搜尋">
+            </div>
+
+            <div style="flex-grow: 1;"></div>
+            
+            <div id="global-radar-btn" class="global-radar-toggle" title="開關排行卡片">
+                <img src="app/static/icon-card.png" alt="雷達總控" id="global-radar-img">
+            </div>
+
+            <div class="disclaimer-item" id="mobile-nav-toggle" title="收起選單" style="cursor: pointer; padding-right: 5px;"><span id="nav-toggle-icon" style="font-size: 18px; color: #38BDF8;">📜</span></div>
+        </div>
+        
+        <!-- 💡 核心導覽列：觀察名單回歸主戰場 -->
+        <div class="nav-btn-container" id="nav-btn-container">
+            <a href="#" data-target="NavToPool" class="nav-text-link internal-nav"><img src="app/static/magicbookfire2.png" class="nav-icon" alt="icon">觀察名單</a><span class="nav-divider">|</span>
+            <a href="#" data-target="NavToB1" class="nav-text-link internal-nav"><img src="app/static/magicbookleaf.png" class="nav-icon" alt="icon">法人動向</a><span class="nav-divider">|</span>
+            <a href="#" data-target="NavToB2" class="nav-text-link internal-nav"><img src="app/static/magicbookwind.png" class="nav-icon" alt="icon">法人掃貨</a><span class="nav-divider">|</span>
+            <a href="#" data-target="NavToB3" class="nav-text-link internal-nav"><img src="app/static/magicbookwater.png" class="nav-icon" alt="icon">法人連買</a><span class="nav-divider">|</span>
+            <a href="#" data-target="NavToB4" class="nav-text-link internal-nav"><img src="app/static/magicbookground.png" class="nav-icon" alt="icon">資券動向</a><span class="nav-divider">|</span>
+            <a href="#" data-target="NavToB5" class="nav-text-link internal-nav"><img src="app/static/wirtleg.png" class="nav-icon" alt="icon">大腿動向</a><span class="nav-divider">|</span>
+            <a href="#" data-target="NavToB6" class="nav-text-link internal-nav"><img src="app/static/magicbookfire.png" class="nav-icon" alt="icon">__B6_TEXT__</a><span class="nav-divider">|</span>
+            <a href="#" data-target="NavToB7" class="nav-text-link internal-nav"><img src="app/static/magicbookboss.png" class="nav-icon" alt="icon">董監動向</a>
         </div>
     `;
-    // 礙於字數，這裡省略你原本的 HTML，請記得把下拉選單更新進去
     parentDoc.body.insertBefore(headerDiv, parentDoc.body.firstChild);
 
     setTimeout(() => {
-        // 點擊綁定
+        // 1. 處理點擊導航綁定
         const navLinks = parentDoc.querySelectorAll('.internal-nav');
         navLinks.forEach(link => {
             link.onclick = (e) => {
@@ -89,60 +296,128 @@ def inject_custom_header(is_logged_in=False):
                 const targetName = link.getAttribute('data-target');
                 const btns = Array.from(parentDoc.querySelectorAll('button'));
                 const targetBtn = btns.find(b => b.textContent.trim() === targetName || b.textContent.includes(targetName));
-                if (targetBtn) targetBtn.click();
-            };
-        });
-
-        // ==========================================
-        // 【修改點3】全新強化的動態快捷鍵引擎
-        // ==========================================
-        const hotkeysMap = JSON.parse(`__HOTKEYS_JSON__`);
-
-        // 避免重複綁定：先移除舊的監聽器
-        if (parentWin.customHotkeyHandler) {
-            parentDoc.removeEventListener('keydown', parentWin.customHotkeyHandler);
-        }
-
-        // 建立新的監聽器
-        parentWin.customHotkeyHandler = function(e) {
-            // 焦點在輸入框時不觸發
-            const activeTag = parentDoc.activeElement ? parentDoc.activeElement.tagName.toLowerCase() : '';
-            if (activeTag === 'input' || activeTag === 'textarea') return;
-
-            // 組合使用者按下的按鍵字串 (例如: alt+l, f1, escape)
-            let combo = [];
-            if (e.ctrlKey) combo.push('ctrl');
-            if (e.altKey) combo.push('alt');
-            if (e.shiftKey) combo.push('shift');
-            combo.push(e.key.toLowerCase());
-            let keyStr = combo.join('+');
-
-            // 如果字典裡有這個快捷鍵
-            if (hotkeysMap[keyStr]) {
-                e.preventDefault(); // 🔥 攔截瀏覽器預設行為 (例如 F1不會跳出說明, F3不會跳出搜尋)
-                const targetName = hotkeysMap[keyStr];
-                const btns = Array.from(parentDoc.querySelectorAll('button'));
-                const targetBtn = btns.find(b => b.textContent.trim() === targetName);
                 if (targetBtn) {
                     targetBtn.click();
                 }
-            }
-        };
-        
-        parentDoc.addEventListener('keydown', parentWin.customHotkeyHandler);
+            };
+        });
 
-        // ... 保留隱藏原生按鈕等邏輯 ...
+        // 2. 處理快捷鍵綁定 (加上防止重複綁定的防呆機制)
+        if (!parentDoc.body.dataset.hotkeysBound) {
+            parentDoc.addEventListener('keydown', (e) => {
+                // 如果焦點在輸入框 (例如 st.text_input)，不觸發快捷鍵，避免打字衝突
+                const activeTag = parentDoc.activeElement ? parentDoc.activeElement.tagName.toLowerCase() : '';
+                if (activeTag === 'input' || activeTag === 'textarea') return;
+
+                // 按下 Esc -> 系統頁面
+                if (e.key === "Escape") {
+                    e.preventDefault();
+                    const btns = Array.from(parentDoc.querySelectorAll('button'));
+                    const targetBtn = btns.find(b => b.textContent.trim() === "NavToSystem");
+                    if (targetBtn) targetBtn.click();
+                }
+
+                // 按下 Alt + L -> 建立名單
+                if (e.altKey && e.key.toLowerCase() === 'l') {
+                    e.preventDefault();
+                    const btns = Array.from(parentDoc.querySelectorAll('button'));
+                    const targetBtn = btns.find(b => b.textContent.trim() === "NavToWatchlist");
+                    if (targetBtn) targetBtn.click();
+                }
+            });
+            parentDoc.body.dataset.hotkeysBound = "true";
+        }
+
+        // 其餘 UI 互動腳本保持不變
+        const menuToggle = parentDoc.getElementById('mobile-nav-toggle');
+        const navContainer = parentDoc.getElementById('nav-btn-container');
+        const iconSpan = parentDoc.getElementById('nav-toggle-icon');
+        let isNavOpen = true; 
+        
+        if (window.innerWidth <= 768 && navContainer && iconSpan) {
+            isNavOpen = false;
+            navContainer.classList.add('force-hide');
+            iconSpan.innerText = '📙';
+            iconSpan.style.color = '#FFD700';
+        }
+
+        if (menuToggle && navContainer && iconSpan) {
+            menuToggle.onclick = (e) => {
+                e.preventDefault();
+                isNavOpen = !isNavOpen; 
+                
+                if (isNavOpen) {
+                    navContainer.classList.remove('force-hide'); 
+                    menuToggle.title = "收起選單";
+                    iconSpan.innerText = '📜';
+                    iconSpan.style.color = '#38BDF8';
+                } else {
+                    navContainer.classList.add('force-hide'); 
+                    menuToggle.title = "展開選單";
+                    iconSpan.innerText = '📙';
+                    iconSpan.style.color = '#FFD700';
+                }
+            };
+        }
+
+        const toggleBtn = parentDoc.getElementById('custom-sidebar-toggle');
+        if (toggleBtn) {
+            toggleBtn.onclick = (e) => {
+                e.preventDefault();
+                const expandBtn = parentDoc.querySelector('[data-testid="collapsedControl"]');
+                if (expandBtn) expandBtn.click();
+                else {
+                    const sidebar = parentDoc.querySelector('[data-testid="stSidebar"]');
+                    if (sidebar) {
+                        const closeBtn = sidebar.querySelector('button');
+                        if (closeBtn) closeBtn.click();
+                    }
+                }
+            };
+        }
+
+        const globalRadarBtn = parentDoc.getElementById('global-radar-btn');
+        const globalRadarImg = parentDoc.getElementById('global-radar-img');
+        let isAllHidden = false; 
+
+        if (globalRadarBtn) {
+            globalRadarBtn.onclick = (e) => {
+                e.preventDefault();
+                const targetIds = ['close-b2-card', 'close-card', 'close-b4-card', 'close-b5-card'];
+                isAllHidden = !isAllHidden;
+                
+                targetIds.forEach(id => {
+                    const checkbox = parentDoc.getElementById(id);
+                    if (checkbox) { checkbox.checked = isAllHidden; }
+                });
+                
+                if (isAllHidden) { globalRadarImg.classList.add('is-hidden'); } 
+                else { globalRadarImg.classList.remove('is-hidden'); }
+            };
+        }
+
+        // 💡 確保包含所有 Proxy 按鈕都會被隱藏
+        setInterval(() => {
+            const allBtns = Array.from(parentDoc.querySelectorAll('button'));
+            allBtns.forEach(b => {
+                const text = b.textContent.trim();
+                if(text.includes('NavTo') || text === '登入' || text === '登出') { 
+                    const wrapper = b.closest('div[data-testid="stElementContainer"]');
+                    if (wrapper) wrapper.style.display = 'none';
+                }
+            });
+        }, 100);
     }, 500);
     </script>
     """
     
     inject_js = inject_js.replace("__LOGIN_TEXT__", login_btn_text)
     inject_js = inject_js.replace("__B6_TEXT__", b6_text)
-    inject_js = inject_js.replace("__HOTKEYS_JSON__", hotkeys_json)
-    
     components.html(inject_js, height=0, width=0)
 
-# Python 隱藏按鈕對應區
+# ==========================================
+# python 後端需對應的 proxy 按鈕
+# ==========================================
 def render_proxy_buttons():
     def change_page(page_name):
         st.query_params["page"] = page_name 
@@ -152,7 +427,19 @@ def render_proxy_buttons():
         st.query_params["page"] = "home"
 
     with st.container():
-        st.button("NavToSettings", on_click=change_page, args=("settings",)) # 🔥新增設定頁面路由
-        # ... 保留其他 NavTo按鈕 ...
+        st.button("NavToContact", on_click=change_page, args=("contact",))
+        st.button("NavToNews", on_click=change_page, args=("news",))
+        st.button("NavToPool", on_click=change_page, args=("pool",))
+        st.button("NavToWatchlist", on_click=change_page, args=("watchlist",)) 
+        st.button("NavToCourses", on_click=change_page, args=("courses",)) # 新增課程按鈕
+        st.button("NavToSystem", on_click=change_page, args=("system",))   # 新增系統按鈕 (對應Esc)
+        st.button("NavToB1", on_click=change_page, args=("b1",))
+        st.button("NavToB2", on_click=change_page, args=("b2",))
+        st.button("NavToB3", on_click=change_page, args=("b3",))
+        st.button("NavToB4", on_click=change_page, args=("b4",))
+        st.button("NavToB5", on_click=change_page, args=("b5",))
+        st.button("NavToB6", on_click=change_page, args=("b6",))
+        st.button("NavToB7", on_click=change_page, args=("b7",))
+        
         st.button("登入", on_click=change_page, args=("login",))
         st.button("登出", on_click=handle_logout)
