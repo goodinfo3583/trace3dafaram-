@@ -1153,3 +1153,20 @@ def render_sidebar_war_room(STOCK_DICT, DATA_DIR="data"):
                     <div style="font-size: 14px; font-weight: 600; color: {fng_color};">{f_rating}</div>
                 </div>
                 """, unsafe_allow_html=True)
+
+
+    # ==========================================
+    # 🚀 快速回到頂部按鈕 (放在 render_sidebar_war_room 函數的最後面)
+    # ==========================================
+    st.markdown(
+        """
+        <a href="#section-search" target="_self" 
+           style="display: block; text-align: center; background-color: rgba(14, 165, 233, 0.1); 
+                  color: #38bdf8; font-size: 14px; font-weight: bold; padding: 12px; 
+                  border-radius: 8px; text-decoration: none; margin-top: 40px; margin-bottom: 20px; 
+                  border: 1px solid rgba(56, 189, 248, 0.3); box-shadow: 0px 4px 6px rgba(0,0,0,0.3);">
+            ⬆️ 點擊回到頂部搜尋區
+        </a>
+        """, 
+        unsafe_allow_html=True
+    )
