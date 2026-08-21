@@ -278,44 +278,30 @@ def generate_technical_signals(df_sig):
 
 #=========
 def render_b4_panorama(view_title, keys_and_labels, query, stock_name="-"):
-    display_list = []
-    display_id = query
-    has_any_data = False # 🚀 新增：用來紀錄「這三個榜單中，是否至少有一個進榜？」
+    st.markdown(f"<h5 style='color: #E2E8F0; margin-bottom: 5px;'>{view_title}</h5>", unsafe_allow_html=True)
     
     for label, key in keys_and_labels:
         df = get_sidebar_df(key)
         if not df.empty:
             res = robust_search_engine(df, query)
             if not res.empty:
-                has_any_data = True # 只要有一個榜單有抓到資料，就標記為 True
-                row_data = res.iloc[0].to_dict()
-                if '股票名稱' not in row_data: row_data['股票名稱'] = stock_name
-                if '股票代號' not in row_data: row_data['股票代號'] = query
+                # 🚀 命中訊號：顯示專屬標題，並畫出單行小表格
+                st.markdown(f"<div style='font-size:14px; font-weight:bold; color:#38BDF8; margin-top:8px; margin-bottom:4px;'>{label}</div>", unsafe_allow_html=True)
                 
-                new_row = {'榜單類型': label}
-                new_row.update(row_data)
-                display_list.append(new_row)
-            else: 
-                display_list.append({'榜單類型': label, '股票代號': query, '股票名稱': stock_name, '進榜狀態': '⚪ 未進榜'})
-        else: 
-            display_list.append({'榜單類型': label, '股票代號': query, '股票名稱': stock_name, '進榜狀態': '⚠️ 尚未載入'})
-            
-    st.markdown(f"<h5 style='color: #E2E8F0;'>{view_title}</h5>", unsafe_allow_html=True)
-    
-    # 🚀 智能收納魔法：如果全部都沒進榜，就不要畫表格了，直接顯示未進榜！
-    if not has_any_data:
-        st.write("⚪ 未進榜")
-        return
-
-    df_panorama = pd.DataFrame(display_list).fillna('-')
-    front_cols = ['榜單類型', '股票代號', '股票名稱', '進榜狀態']
-    data_cols = [c for c in df_panorama.columns if c not in front_cols]
-    final_cols = [c for c in front_cols if c in df_panorama.columns] + data_cols
-    for c in final_cols: df_panorama[c] = df_panorama[c].apply(lambda x: str(x)[:-2] if str(x).endswith('.0') else x)
-    
-    st.dataframe(df_panorama[final_cols], use_container_width=True, hide_index=True)
-
-    # ==========================================
+                row_data = res.iloc[[0]].copy()
+                if '股票代號' not in row_data.columns: row_data.insert(0, '股票代號', query)
+                if '股票名稱' not in row_data.columns: row_data.insert(1, '股票名稱', stock_name)
+                
+                for c in row_data.columns: 
+                    row_data[c] = row_data[c].apply(lambda x: str(x)[:-2] if str(x).endswith('.0') else x)
+                    
+                st.dataframe(row_data, use_container_width=True, hide_index=True)
+            else:
+                # 🚀 沒進榜：拒絕畫空表格，僅用一行乾淨文字帶過
+                st.markdown(f"<div style='font-size:13px; color:#94a3b8; margin-top:4px; margin-bottom:4px;'>{label}： <span style='color:#E2E8F0;'>⚪ 未進榜</span></div>", unsafe_allow_html=True)
+        else:
+            st.markdown(f"<div style='font-size:13px; color:#94a3b8; margin-top:4px; margin-bottom:4px;'>{label}： <span style='color:#f59e0b;'>⚠️ 尚未載入</span></div>", unsafe_allow_html=True)
+# ==========================================
 # 📈 側邊雙視窗 K 線圖與技術分析引擎
 # ==========================================
 @st.cache_data(ttl=900)
