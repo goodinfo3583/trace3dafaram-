@@ -1,46 +1,92 @@
 # views/watchlist_page.py
 import streamlit as st
-import os
 import json
 import re
 import time
 import pandas as pd
 
-# 定義儲存使用者資料的路徑 (恢復本機秒存檔模式)
-USER_DATA_DIR = "./data/users"
-if not os.path.exists(USER_DATA_DIR):
-    os.makedirs(USER_DATA_DIR)
-
 # ==========================================
-# 💾 資料庫存取 (穩定版 JSON 存取)
+# 💾 資料庫存取 (Google Sheets 正式連線版)
 # ==========================================
-def get_user_watchlist(username):
-    path = os.path.join(USER_DATA_DIR, f"{username}_watchlist.json")
-    if os.path.exists(path):
-        with open(path, "r", encoding="utf-8") as f:
-            data = json.load(f)
-            if isinstance(data, list): return {stock: "" for stock in data}
-            return data
+def get_user_watchlist(username, conn, SHEET_URL):
+    """從 GS 讀取使用者的追蹤名單與筆記"""
+    if not conn or not SHEET_URL:
+        return {}
+        
+    try:
+        # 1. 讀取整張「會員名冊」
+        df = conn.read(spreadsheet=SHEET_URL, worksheet="會員名冊", ttl=0)
+        
+        if df.empty or '帳號' not in df.columns or 'Watchlist' not in df.columns:
+            return {}
+            
+        # 2. 清理帳號格式 (轉字串、去小數點、去空白、轉小寫) 確保能精準比對
+        clean_accounts = df['帳號'].astype(str).str.replace(r'\.0$', '', regex=True).str.strip().str.lower()
+        target_user = str(username).strip().lower()
+        
+        # 3. 找出該名冒險者的資料列
+        match = df[clean_accounts == target_user]
+        
+        if not match.empty:
+            gs_watchlist_str = match.iloc[0]['Watchlist']
+            # 如果欄位有內容且不是空值 (NaN)
+            if pd.notna(gs_watchlist_str) and str(gs_watchlist_str).strip() != "":
+                data = json.loads(str(gs_watchlist_str))
+                # 相容舊版陣列轉換
+                if isinstance(data, list): 
+                    return {stock: "" for stock in data}
+                return data
+                
+    except Exception as e:
+        pass
+        
     return {}
 
-def save_user_watchlist(username, watchlist):
-    path = os.path.join(USER_DATA_DIR, f"{username}_watchlist.json")
-    with open(path, "w", encoding="utf-8") as f:
-        json.dump(watchlist, f, ensure_ascii=False)
+def save_user_watchlist(username, watchlist, conn, SHEET_URL):
+    """將使用者的追蹤名單與筆記存回 GS"""
+    if not conn or not SHEET_URL:
+        st.error("⚠️ 無法連線至資料庫，無法存檔。")
+        return
+        
+    try:
+        # 1. 將字典轉為純文字 JSON 字串
+        watchlist_str = json.dumps(watchlist, ensure_ascii=False)
+        
+        # 2. 讀取目前的「會員名冊」
+        df = conn.read(spreadsheet=SHEET_URL, worksheet="會員名冊", ttl=0)
+        
+        if df.empty or '帳號' not in df.columns:
+            return
+            
+        # 確保有 Watchlist 欄位 (防呆機制)
+        if 'Watchlist' not in df.columns:
+            df['Watchlist'] = ""
+            
+        # 3. 尋找對應的帳號列
+        clean_accounts = df['帳號'].astype(str).str.replace(r'\.0$', '', regex=True).str.strip().str.lower()
+        target_user = str(username).strip().lower()
+        
+        idx = df[clean_accounts == target_user].index
+        
+        if len(idx) > 0:
+            # 4. 覆寫該列的 Watchlist 欄位
+            df.at[idx[0], 'Watchlist'] = watchlist_str
+            # 5. 上傳更新回 Google Sheets
+            conn.update(spreadsheet=SHEET_URL, worksheet="會員名冊", data=df)
+            
+    except Exception as e:
+        st.error(f"❌ 同步至雲端失敗: {e}")
 
 # ==========================================
-# 🚀 高效能批次報價引擎 (修復空值雜訊問題)
+# 🚀 高效能批次報價引擎
 # ==========================================
 @st.cache_data(ttl=300)
 def get_watchlist_quotes(stock_codes):
     """批次向 Yahoo Finance 請求報價，並濾除盤中空值雜訊"""
     import yfinance as yf
-    
     if not stock_codes: return {}
     
-    # 將代號分別加上上市 (.TW) 與上櫃 (.TWO) 後綴
     tickers = [f"{c}.TW" for c in stock_codes] + [f"{c}.TWO" for c in stock_codes]
-    
     try:
         df = yf.download(tickers, period="5d", progress=False)
     except:
@@ -49,7 +95,6 @@ def get_watchlist_quotes(stock_codes):
     quotes = {}
     if df.empty: return quotes
     
-    # 相容不同版本的 yfinance 回傳格式
     if isinstance(df.columns, pd.MultiIndex):
         close_df = df['Close'] if 'Close' in df.columns else pd.DataFrame()
         vol_df = df['Volume'] if 'Volume' in df.columns else pd.DataFrame()
@@ -61,11 +106,9 @@ def get_watchlist_quotes(stock_codes):
         tw = f"{c}.TW"
         two = f"{c}.TWO"
         
-        # 🛡️ 核心修復：使用 dropna() 濾除盤中尚未產生的 NaN 雜訊，確保抓到真實收盤價
         closes = close_df[tw].dropna() if tw in close_df.columns else pd.Series(dtype=float)
         vols = vol_df[tw].dropna() if tw in vol_df.columns else pd.Series(dtype=float)
         
-        # 如果上市找不到，改找上櫃
         if closes.empty:
             closes = close_df[two].dropna() if two in close_df.columns else pd.Series(dtype=float)
             vols = vol_df[two].dropna() if two in vol_df.columns else pd.Series(dtype=float)
@@ -78,10 +121,8 @@ def get_watchlist_quotes(stock_codes):
             v_pct = (v_today - v_yest) / v_yest * 100 if v_yest > 0 else 0
             
             quotes[c] = {
-                "price": c_today,
-                "price_pct": p_pct,
-                "vol": int(v_today / 1000), 
-                "vol_pct": v_pct,
+                "price": c_today, "price_pct": p_pct,
+                "vol": int(v_today / 1000), "vol_pct": v_pct,
                 "date": closes.index[-1].strftime("%m/%d")
             }
     return quotes
@@ -89,7 +130,7 @@ def get_watchlist_quotes(stock_codes):
 # ==========================================
 # 🎨 畫面渲染主程式
 # ==========================================
-def show_watchlist_page(STOCK_DICT=None):
+def show_watchlist_page(STOCK_DICT=None, conn=None, SHEET_URL=None):
     st.title("冒險者專屬追蹤名單")
 
     if not st.session_state.get("logged_in", False):
@@ -100,7 +141,8 @@ def show_watchlist_page(STOCK_DICT=None):
         return
 
     username = st.session_state.get("username", "guest")
-    watchlist = get_user_watchlist(username)
+    # 🌟 傳入連線物件
+    watchlist = get_user_watchlist(username, conn, SHEET_URL)
     MAX_STOCKS = 60 
 
     st.subheader(f"新增追蹤標的 (目前 {len(watchlist)}/{MAX_STOCKS} 檔)")
@@ -128,7 +170,8 @@ def show_watchlist_page(STOCK_DICT=None):
 
                     if final_stock_name not in watchlist:
                         watchlist[final_stock_name] = "" 
-                        save_user_watchlist(username, watchlist)
+                        # 🌟 寫入時傳入連線物件
+                        save_user_watchlist(username, watchlist, conn, SHEET_URL)
                         st.success(f"已加入「{final_stock_name}」！")
                         time.sleep(1)
                         st.rerun()
@@ -154,7 +197,7 @@ def show_watchlist_page(STOCK_DICT=None):
                 to_delete = [s for s in watchlist.keys() if st.session_state.get(f"chk_{s}", False)]
                 if to_delete:
                     for s in to_delete: del watchlist[s]
-                    save_user_watchlist(username, watchlist)
+                    save_user_watchlist(username, watchlist, conn, SHEET_URL)
                     st.success(f"已移除 {len(to_delete)} 檔！")
                     time.sleep(1)
                     st.rerun()
@@ -173,7 +216,7 @@ def show_watchlist_page(STOCK_DICT=None):
 
         def save_note_callback(stock_key):
             watchlist[stock_key] = st.session_state[f"note_{stock_key}"]
-            save_user_watchlist(username, watchlist)
+            save_user_watchlist(username, watchlist, conn, SHEET_URL)
 
         def fmt_color(val, is_pct=False, is_vol=False):
             color = "#FF4B4B" if val > 0 else ("#00E272" if val < 0 else "#94A3B8")
@@ -231,7 +274,7 @@ def show_watchlist_page(STOCK_DICT=None):
                 st.markdown("<div style='padding-top:15px;'>", unsafe_allow_html=True)
                 if st.button(f"移除", key=f"remove_{stock}", use_container_width=True):
                     del watchlist[stock]
-                    save_user_watchlist(username, watchlist)
+                    save_user_watchlist(username, watchlist, conn, SHEET_URL)
                     if st.session_state.get("selected_watch_stock") == stock:
                         st.session_state["selected_watch_stock"] = None
                         st.session_state["global_search_final"] = ""

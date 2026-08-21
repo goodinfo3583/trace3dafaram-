@@ -147,8 +147,8 @@ elif current_page == "b6":
     show_b6_page(DATA_DIR)
 elif current_page == "b7":
     show_b7_page(DATA_DIR, STOCK_DICT)
-elif current_page == "watchlist":                # 👈 新增這一行
-    show_watchlist_page(STOCK_DICT)              # 👈 新增這一行
+elif current_page == "watchlist":                    # 👈 新增
+    show_watchlist_page(STOCK_DICT, conn, SHEET_URL) # 👈 新增
 # 渲染側邊欄
 with st.sidebar:
     render_sidebar_war_room(STOCK_DICT, DATA_DIR)
