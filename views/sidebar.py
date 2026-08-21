@@ -1000,7 +1000,7 @@ def render_sidebar_war_room(STOCK_DICT, DATA_DIR="data"):
             
             # 👑 區塊 1
             icon_b1 = get_img_html("magicbookleaf.png") # 替換為你的圖片名稱
-            st.markdown(f"<h4 style='color: #FCD34D;'>{icon_b1}區塊 1：短中長線三大法人持股變化</h4>", unsafe_allow_html=True)
+            st.markdown(f"<h4 style='color: #FCD34D;'>{icon_b1}法人動向</h4>", unsafe_allow_html=True)
             
             df_b1 = get_sidebar_df('b1_final_df')
             if not df_b1.empty:
@@ -1054,7 +1054,7 @@ def render_sidebar_war_room(STOCK_DICT, DATA_DIR="data"):
             
             # 🎯 區塊 2
             icon_b2 = get_img_html("magicbookwind.png") # 替換為你的圖片名稱
-            st.markdown(f"<h4 style='color: #FCD34D;'>{icon_b2}區塊 2：法人買超診斷</h4>", unsafe_allow_html=True)
+            st.markdown(f"<h4 style='color: #FCD34D;'>{icon_b2}法人掃貨</h4>", unsafe_allow_html=True)
             c1, c2 = st.columns(2)
             with c1: scan_and_display("🌐 外資 5 日淨買佔成交量", 'b2_1', target_query)
             with c2: scan_and_display("🏦 投信 5 日淨買佔成交量", 'b2_2', target_query)
@@ -1066,7 +1066,7 @@ def render_sidebar_war_room(STOCK_DICT, DATA_DIR="data"):
             
             # 📅 區塊 3
             icon_b3 = get_img_html("magicbookwater.png") # 替換為你的圖片名稱
-            st.markdown(f"<h4 style='color: #FCD34D;'>{icon_b3}區塊 3：法人連買診斷 (日/週)</h4>", unsafe_allow_html=True)
+            st.markdown(f"<h4 style='color: #FCD34D;'>{icon_b3}法人連買</h4>", unsafe_allow_html=True)
             df_b3 = get_sidebar_df('b3_main')
             if not df_b3.empty:
                 res_b3 = robust_search_engine(df_b3, target_query)
@@ -1084,7 +1084,7 @@ def render_sidebar_war_room(STOCK_DICT, DATA_DIR="data"):
             
             # 🔄 區塊 4
             icon_b4 = get_img_html("magicbookground.png") # 替換為你的圖片名稱
-            st.markdown(f"<h4 style='color: #FCD34D;'>{icon_b4}區塊 4：券資有利排名</h4>", unsafe_allow_html=True)
+            st.markdown(f"<h4 style='color: #FCD34D;'>{icon_b4}資券動向</h4>", unsafe_allow_html=True)
             # 🚀 萃取出純名稱 (例如把 "5443 均豪" 變成 "均豪") 傳給 B4
             just_name = display_name.replace(pure_stock_id, "").strip() if pure_stock_id else display_name
             
@@ -1096,7 +1096,7 @@ def render_sidebar_war_room(STOCK_DICT, DATA_DIR="data"):
             
             # 💰 區塊 5
             icon_b5 = get_img_html("wirtleg.png") # 這是你的大腿圖片！
-            st.markdown(f"<h4 style='color: #FCD34D;'>{icon_b5}區塊 5：大腿動向</h4>", unsafe_allow_html=True)
+            st.markdown(f"<h4 style='color: #FCD34D;'>{icon_b5}大腿動向</h4>", unsafe_allow_html=True)
             
             col_400, col_1000 = st.columns(2)
             with col_400: scan_and_display("💎 400張以上大戶動向", 'b5_400', target_query)
@@ -1106,7 +1106,7 @@ def render_sidebar_war_room(STOCK_DICT, DATA_DIR="data"):
             
             # 👔 區塊 7
             icon_b7 = get_img_html("35.png") # 替換為你的圖片名稱
-            st.markdown(f"<h4 style='color: #FCD34D;'>{icon_b7}區塊 7：董監動向</h4>", unsafe_allow_html=True)
+            st.markdown(f"<h4 style='color: #FCD34D;'>{icon_b7}董監動向</h4>", unsafe_allow_html=True)
             scan_and_display("🔹 董監最新質押比", 'b7_pledge', target_query)
             scan_and_display("🔹 董監質押歷史趨勢", 'b7_pledge_history', target_query)
             scan_and_display("🔹 董監持股比增減", 'b7_main', target_query)
