@@ -48,7 +48,7 @@ def save_user_watchlist(username, watchlist, conn, SHEET_URL):
             df.at[idx[0], 'Watchlist'] = watchlist_str
             conn.update(spreadsheet=SHEET_URL, worksheet="會員名冊", data=df)
     except Exception as e:
-        st.error(f"❌ 同步至雲端失敗: {e}")
+        st.error(f"❌ 存檔失敗: {e}")
 
 # ==========================================
 # 🚀 高效能批次報價引擎
@@ -104,11 +104,18 @@ def show_watchlist_page(STOCK_DICT=None, conn=None, SHEET_URL=None):
         return
 
     username = st.session_state.get("username", "guest")
-    watchlist = get_user_watchlist(username, conn, SHEET_URL)
+    wl_cache_key = f"wl_cache_{username}"
+
+    # 🚀 記憶體快取機制：只在第一次進入頁面時讀取 Google Sheets，之後都在本地運作
+    if wl_cache_key not in st.session_state:
+        with st.spinner("載入您的專屬名單中..."):
+            st.session_state[wl_cache_key] = get_user_watchlist(username, conn, SHEET_URL)
+            
+    watchlist = st.session_state[wl_cache_key]
     MAX_STOCKS = 60 
 
-    # 🌟 關鍵修復：從 session_state 捕捉還沒存檔的筆記，防止畫面刷新時遺失
-    for stock in watchlist.keys():
+    # 確保筆記隨時同步到記憶體的字典中，防止換頁遺失
+    for stock in list(watchlist.keys()):
         nk = f"note_{stock}"
         if nk in st.session_state:
             watchlist[stock] = st.session_state[nk]
@@ -126,7 +133,6 @@ def show_watchlist_page(STOCK_DICT=None, conn=None, SHEET_URL=None):
                 else:
                     query_clean = new_stock.strip()
                     final_stock_name = query_clean
-                    
                     if STOCK_DICT:
                         if query_clean in STOCK_DICT:
                             final_stock_name = f"{STOCK_DICT[query_clean]['id']} {STOCK_DICT[query_clean]['name']}"
@@ -138,14 +144,34 @@ def show_watchlist_page(STOCK_DICT=None, conn=None, SHEET_URL=None):
 
                     if final_stock_name not in watchlist:
                         watchlist[final_stock_name] = "" 
-                        save_user_watchlist(username, watchlist, conn, SHEET_URL)
-                        st.success(f"已加入「{final_stock_name}」！")
+                        # 🚀 加入後不直接上傳 GS，而是提示使用者記得存檔
+                        st.success(f"已暫存「{final_stock_name}」，請記得點擊左上方「💾 存檔」！")
                         time.sleep(1)
                         st.rerun()
                     else:
                         st.info(f"「{final_stock_name}」已在名單中囉！")
 
     st.markdown("<hr style='border-color: #334155; margin: 10px 0;'>", unsafe_allow_html=True)
+    
+    # ==========================================
+    # 💾 左上角存檔按鈕區塊 (Word 體驗)
+    # ==========================================
+    col_save, col_space = st.columns([1.5, 8.5])
+    with col_save:
+        if st.button("💾 存檔", use_container_width=True, type="primary", help="將目前的變更同步至雲端"):
+            with st.spinner("正在上傳至雲端..."):
+                # 將最新筆記內容收集齊全
+                for stock in list(watchlist.keys()):
+                    nk = f"note_{stock}"
+                    if nk in st.session_state:
+                        watchlist[stock] = st.session_state[nk]
+                # 執行寫入
+                save_user_watchlist(username, watchlist, conn, SHEET_URL)
+            st.success("✅ 存檔成功！")
+            time.sleep(1)
+            st.rerun()
+
+    st.write("") # 增加一點呼吸空間
     
     if not watchlist:
         st.info("目前還沒有追蹤任何標的，趕快新增一個吧！")
@@ -158,24 +184,15 @@ def show_watchlist_page(STOCK_DICT=None, conn=None, SHEET_URL=None):
         with st.spinner("📡 正在同步即時報價與成交量..."):
             market_data = get_watchlist_quotes(stock_codes)
 
-        # 🚀 移除批次功能，改為一鍵同步雲端按鈕
-        col_space, col_save = st.columns([8.2, 1.8])
-        with col_save:
-            if st.button("💾 同步筆記至雲端", use_container_width=True, type="primary"):
-                save_user_watchlist(username, watchlist, conn, SHEET_URL)
-                st.success("✅ 筆記已安全存檔！")
-                time.sleep(1)
-                st.rerun()
-
-        # 📋 調整為 7 欄位，釋放更多空間給筆記
-        col_ratios = [1.0, 0.8, 1.2, 1.2, 4.2, 0.8, 0.8]
+        # 📋 精簡為 6 欄位版型 (移除了批次勾選欄)
+        col_ratios = [1.1, 0.9, 1.2, 1.2, 4.2, 0.7, 0.7]
         
         h1, h2, h3, h4, h5, h6, h7 = st.columns(col_ratios)
         h1.markdown("<span style='color:#94a3b8; font-size:14px;'>標的名稱</span>", unsafe_allow_html=True)
         h2.markdown("<span style='color:#94a3b8; font-size:14px;'>產業別</span>", unsafe_allow_html=True)
         h3.markdown("<span style='color:#94a3b8; font-size:14px;'>最新價</span>", unsafe_allow_html=True)
         h4.markdown("<span style='color:#94a3b8; font-size:14px;'>成交量 (張)</span>", unsafe_allow_html=True)
-        h5.markdown("<span style='color:#94a3b8; font-size:14px;'>專屬筆記 (編輯後點擊右上角同步)</span>", unsafe_allow_html=True)
+        h5.markdown("<span style='color:#94a3b8; font-size:14px;'>專屬筆記 (編輯後點擊左上方存檔)</span>", unsafe_allow_html=True)
         h6.markdown("")
         h7.markdown("")
 
@@ -212,7 +229,7 @@ def show_watchlist_page(STOCK_DICT=None, conn=None, SHEET_URL=None):
             with c4:
                 st.markdown(f"<div style='padding-top:4px;'>{v_str}</div>", unsafe_allow_html=True)
             with c5:
-                # 🚀 移除 on_change 事件，避免每次打字完點擊旁邊就卡住
+                # 📝 純粹在本地記憶體運作的便利貼，拔除自動連線
                 st.markdown("<div style='padding-top:2px;'>", unsafe_allow_html=True)
                 st.text_area(
                     "筆記", 
@@ -233,8 +250,8 @@ def show_watchlist_page(STOCK_DICT=None, conn=None, SHEET_URL=None):
             with c7:
                 st.markdown("<div style='padding-top:15px;'>", unsafe_allow_html=True)
                 if st.button(f"移除", key=f"remove_{stock}", use_container_width=True):
+                    # 🚀 移除等待連線，直接從快取中刪除，實現瞬間消失！
                     del watchlist[stock]
-                    save_user_watchlist(username, watchlist, conn, SHEET_URL)
                     if st.session_state.get("selected_watch_stock") == stock:
                         st.session_state["selected_watch_stock"] = None
                         st.session_state["global_search_final"] = ""
