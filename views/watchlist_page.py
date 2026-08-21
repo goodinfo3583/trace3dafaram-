@@ -191,7 +191,6 @@ def show_watchlist_page(STOCK_DICT=None, conn=None, SHEET_URL=None):
     if not watchlist:
         st.info("目前還沒有追蹤任何標的，趕快新增一個吧！")
     else:
-        # 📋 分割為 8 個區域 (騰出一個專屬給「帶入」按鈕)
         col_ratios = [1.1, 0.9, 1.1, 1.1, 3.8, 0.8, 0.6, 0.6]
         
         h1, h2, h3, h4, h5, h6, h7, h8 = st.columns(col_ratios)
@@ -210,6 +209,21 @@ def show_watchlist_page(STOCK_DICT=None, conn=None, SHEET_URL=None):
             tail = "%" if is_pct else ""
             if is_vol: return f"<span style='color:{color}; font-size:12px;'>({sign}{val:.1f}%)</span>"
             return f"<span style='color:{color}; font-weight:bold;'>{sign}{val:.2f}{tail}</span>"
+
+        # 🚀 新增：專門處理「帶入行情」的 Callback 函數
+        def append_quote_to_note(stock_name, p_code):
+            if p_code and p_code in market_data:
+                d = market_data[p_code]
+                append_str = f"[{d['date'][5:]}] 收:{d['price']:.2f} 量:{d['vol']:,}張"
+                nk = f"note_{stock_name}"
+                current_text = st.session_state.get(nk, "").strip()
+                
+                if current_text:
+                    st.session_state[nk] = current_text + f"\n{append_str}"
+                else:
+                    st.session_state[nk] = append_str
+                # 同步回 watchlist 暫存區，確保不會遺失
+                watchlist[stock_name] = st.session_state[nk]
 
         for stock in list(watchlist.keys()):
             nk = f"note_{stock}"
@@ -239,7 +253,6 @@ def show_watchlist_page(STOCK_DICT=None, conn=None, SHEET_URL=None):
                 st.markdown(f"<div style='padding-top:4px;'>{v_str}</div>", unsafe_allow_html=True)
             with c5:
                 st.markdown("<div style='padding-top:2px;'>", unsafe_allow_html=True)
-                # 完全依賴 session_state 綁定，避免重複覆寫
                 st.text_area(
                     "筆記", 
                     key=nk, 
@@ -250,20 +263,15 @@ def show_watchlist_page(STOCK_DICT=None, conn=None, SHEET_URL=None):
                 st.markdown("</div>", unsafe_allow_html=True)
             with c6:
                 st.markdown("<div style='padding-top:15px;'>", unsafe_allow_html=True)
-                # 📥 智慧帶入按鈕
-                if st.button(f"📥 帶入", key=f"import_{stock}", use_container_width=True, help="將今日行情寫入筆記 (不覆蓋)"):
-                    if pure_code and pure_code in market_data:
-                        d = market_data[pure_code]
-                        # 準備要帶入的字串格式
-                        append_str = f"[{d['date'][5:]}] 收:{d['price']:.2f} 量:{d['vol']:,}張"
-                        
-                        # 如果原本有筆記，就自動換行加上去
-                        current_text = st.session_state[nk].strip()
-                        if current_text:
-                            st.session_state[nk] = current_text + f"\n{append_str}"
-                        else:
-                            st.session_state[nk] = append_str
-                        st.rerun()
+                # 🚀 修復：使用 on_click 觸發 Callback，不再產生狀態修改衝突！
+                st.button(
+                    f"📥 帶入", 
+                    key=f"import_{stock}", 
+                    use_container_width=True, 
+                    help="將今日行情寫入筆記 (不覆蓋)",
+                    on_click=append_quote_to_note,
+                    args=(stock, pure_code)
+                )
                 st.markdown("</div>", unsafe_allow_html=True)
             with c7:
                 st.markdown("<div style='padding-top:15px;'>", unsafe_allow_html=True)
