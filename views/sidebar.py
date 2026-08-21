@@ -900,18 +900,32 @@ def render_sidebar_war_room(STOCK_DICT, DATA_DIR="data"):
             ensure_b1_to_b5_loaded(DATA_DIR)
             
             industry_label = "未分類"
-            if STOCK_DICT:
-                if query_clean in STOCK_DICT:
-                    pure_stock_id = STOCK_DICT[query_clean]["id"]
-                    display_name = f"{STOCK_DICT[query_clean]['id']} {STOCK_DICT[query_clean]['name']}"
-                    industry_label = STOCK_DICT[query_clean]["industry"]
-                else:
+            
+                # ==========================================
+                # 🚀 修復：兩段式字典解析 (解決權證攔截問題)
+                # ==========================================
+                if STOCK_DICT:
+                    exact_match = False
+                    
+                    # 🌟 第一階段：優先精準比對 (代號完全相等 或 名稱完全相等)
                     for k, v in STOCK_DICT.items():
-                        if query_clean in k:
-                            pure_stock_id = v["id"]
-                            display_name = f"{v['id']} {v['name']}"
-                            industry_label = v["industry"]
+                        stock_id = str(v.get("id", ""))
+                        stock_name = str(v.get("name", ""))
+                        if query_clean == stock_id or query_clean == stock_name:
+                            pure_stock_id = stock_id
+                            display_name = f"{stock_id} {stock_name}"
+                            industry_label = v.get("industry", "未分類")
+                            exact_match = True
                             break
+                            
+                    # 🌟 第二階段：如果精準比對找不到，才啟動模糊包含比對
+                    if not exact_match:
+                        for k, v in STOCK_DICT.items():
+                            if query_clean in k or query_clean in str(v.get("name", "")):
+                                pure_stock_id = str(v.get("id", ""))
+                                display_name = f"{v.get('id', '')} {v.get('name', '')}"
+                                industry_label = v.get("industry", "未分類")
+                                break
                                     
             if pure_stock_id == "":
                 match_num = re.search(r'\d+', query_clean)
