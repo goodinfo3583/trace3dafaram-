@@ -3,6 +3,7 @@ import streamlit as st
 import pandas as pd
 import requests
 import re
+import base64
 import os
 import plotly.graph_objects as go
 from plotly.subplots import make_subplots
@@ -806,6 +807,19 @@ def fetch_macro_indicators():
 
     return data
 
+
+# =======================================================
+# 🎨 自訂圖片轉換引擎：讓標題輕鬆鑲嵌本地圖片
+# =======================================================
+def get_img_html(filename, height="28px"):
+    """將 static 資料夾內的圖片轉為可鑲嵌的 HTML 標籤"""
+    img_path = f"./static/{filename}"
+    if os.path.exists(img_path):
+        with open(img_path, "rb") as f:
+            img_b64 = base64.b64encode(f.read()).decode("utf-8")
+        return f'<img src="data:image/png;base64,{img_b64}" style="height: {height}; vertical-align: text-bottom; margin-right: 8px;">'
+    return "" # 找不到圖片就不顯示，避免破圖
+
 # =======================================================
 # 🚀 終極局部渲染魔法：將整個側邊視窗獨立為「不閃爍區塊」
 # =======================================================
@@ -981,10 +995,12 @@ def render_sidebar_war_room(STOCK_DICT, DATA_DIR="data"):
 
             # ==========================================
             # 👑 區塊 1 ~ 7：數據庫展演 (對接萬能變數雷達)
-            # 🚀 修復：全面將 search_query 替換為純數字的 target_query！
             # ==========================================
             st.markdown("<hr style='border-color: #334155;'>", unsafe_allow_html=True)
-            st.markdown("<h4 style='color: #FCD34D;'>👑 區塊 1：短中長線三大法人持股變化</h4>", unsafe_allow_html=True)
+            
+            # 👑 區塊 1
+            icon_b1 = get_img_html("magicbookleaf.png") # 替換為你的圖片名稱
+            st.markdown(f"<h4 style='color: #FCD34D;'>{icon_b1}區塊 1：短中長線三大法人持股變化</h4>", unsafe_allow_html=True)
             
             df_b1 = get_sidebar_df('b1_final_df')
             if not df_b1.empty:
@@ -1035,7 +1051,10 @@ def render_sidebar_war_room(STOCK_DICT, DATA_DIR="data"):
             else: st.info("⚪ 尚未載入資料表")
 
             st.markdown("<hr style='border-color: #334155;'>", unsafe_allow_html=True)
-            st.markdown("<h4 style='color: #FCD34D;'>🎯 區塊 2：法人買超診斷</h4>", unsafe_allow_html=True)
+            
+            # 🎯 區塊 2
+            icon_b2 = get_img_html("magicbookwind.png") # 替換為你的圖片名稱
+            st.markdown(f"<h4 style='color: #FCD34D;'>{icon_b2}區塊 2：法人買超診斷</h4>", unsafe_allow_html=True)
             c1, c2 = st.columns(2)
             with c1: scan_and_display("🌐 外資 5 日淨買佔成交量", 'b2_1', target_query)
             with c2: scan_and_display("🏦 投信 5 日淨買佔成交量", 'b2_2', target_query)
@@ -1044,7 +1063,10 @@ def render_sidebar_war_room(STOCK_DICT, DATA_DIR="data"):
             with c4: scan_and_display("🏦 投信 5 日淨買佔發行量", 'b2_4', target_query)
 
             st.markdown("<hr style='border-color: #334155;'>", unsafe_allow_html=True)
-            st.markdown("<h4 style='color: #FCD34D;'>📅 區塊 3：法人連買診斷 (日/週)</h4>", unsafe_allow_html=True)
+            
+            # 📅 區塊 3
+            icon_b3 = get_img_html("magicbookwater.png") # 替換為你的圖片名稱
+            st.markdown(f"<h4 style='color: #FCD34D;'>{icon_b3}區塊 3：法人連買診斷 (日/週)</h4>", unsafe_allow_html=True)
             df_b3 = get_sidebar_df('b3_main')
             if not df_b3.empty:
                 res_b3 = robust_search_engine(df_b3, target_query)
@@ -1059,7 +1081,10 @@ def render_sidebar_war_room(STOCK_DICT, DATA_DIR="data"):
                 st.info("⚪ 區塊 3：尚未載入資料表")
 
             st.markdown("<hr style='border-color: #334155;'>", unsafe_allow_html=True)
-            st.markdown("<h4 style='color: #FCD34D;'>🔄 區塊 4：券資有利排名</h4>", unsafe_allow_html=True)
+            
+            # 🔄 區塊 4
+            icon_b4 = get_img_html("magicbookground.png") # 替換為你的圖片名稱
+            st.markdown(f"<h4 style='color: #FCD34D;'>{icon_b4}區塊 4：券資有利排名</h4>", unsafe_allow_html=True)
             # 🚀 萃取出純名稱 (例如把 "5443 均豪" 變成 "均豪") 傳給 B4
             just_name = display_name.replace(pure_stock_id, "").strip() if pure_stock_id else display_name
             
@@ -1069,27 +1094,24 @@ def render_sidebar_war_room(STOCK_DICT, DATA_DIR="data"):
 
             st.markdown("<hr style='border-color: #334155;'>", unsafe_allow_html=True)
             
-            leg_icon_path = "./static/wirtleg.png"
-            if os.path.exists(leg_icon_path):
-                with open(leg_icon_path, "rb") as f:
-                    leg_b64 = base64.b64encode(f.read()).decode("utf-8")
-                # height 控制圖片大小，vertical-align 控制圖片跟文字的對齊，margin-right 是與文字的間距
-                leg_tag = f'<img src="data:image/png;base64,{leg_b64}" style="height: 28px; vertical-align: text-bottom; margin-right: 8px;">'
-                st.markdown(f"<h4 style='color: #FCD34D;'>{leg_tag}區塊 5：大腿動向</h4>", unsafe_allow_html=True)
-            else:
-                # 預防萬一：如果找不到圖片，就退回使用 Emoji
-                st.markdown("<h4 style='color: #FCD34D;'>💰 區塊 5：大腿動向</h4>", unsafe_allow_html=True)         
-
+            # 💰 區塊 5
+            icon_b5 = get_img_html("wirtleg.png") # 這是你的大腿圖片！
+            st.markdown(f"<h4 style='color: #FCD34D;'>{icon_b5}區塊 5：大腿動向</h4>", unsafe_allow_html=True)
+            
             col_400, col_1000 = st.columns(2)
             with col_400: scan_and_display("💎 400張以上大戶動向", 'b5_400', target_query)
             with col_1000: scan_and_display("🐳 1000張以上超級大戶動向", 'b5_1000', target_query)
 
             st.markdown("<hr style='border-color: #334155;'>", unsafe_allow_html=True)
-            st.markdown("<h4 style='color: #FCD34D;'>👔 區塊 7：董監動向</h4>", unsafe_allow_html=True)
+            
+            # 👔 區塊 7
+            icon_b7 = get_img_html("35.png") # 替換為你的圖片名稱
+            st.markdown(f"<h4 style='color: #FCD34D;'>{icon_b7}區塊 7：董監動向</h4>", unsafe_allow_html=True)
             scan_and_display("🔹 董監最新質押比", 'b7_pledge', target_query)
             scan_and_display("🔹 董監質押歷史趨勢", 'b7_pledge_history', target_query)
             scan_and_display("🔹 董監持股比增減", 'b7_main', target_query)
             
+    # ==========================================            
     # 💡 當搜尋列「沒有內容」時，顯示大盤總經
     if not search_query:
         st.write("---") 
