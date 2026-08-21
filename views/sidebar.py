@@ -1068,8 +1068,18 @@ def render_sidebar_war_room(STOCK_DICT, DATA_DIR="data"):
             render_b4_panorama("5日張數變動排名", [('📉 融資減少', 'b4_margin_vol'), ('📉 借券減少', 'b4_short_vol'), ('📈 融券增加', 'b4_margin_plus_vol')], target_query, just_name)
 
             st.markdown("<hr style='border-color: #334155;'>", unsafe_allow_html=True)
-            st.markdown("<h4 style='color: #FCD34D;'>💰 區塊 5：大腿動向</h4>", unsafe_allow_html=True)
             
+            leg_icon_path = "./static/wirtleg.png"
+            if os.path.exists(leg_icon_path):
+                with open(leg_icon_path, "rb") as f:
+                    leg_b64 = base64.b64encode(f.read()).decode("utf-8")
+                # height 控制圖片大小，vertical-align 控制圖片跟文字的對齊，margin-right 是與文字的間距
+                leg_tag = f'<img src="data:image/png;base64,{leg_b64}" style="height: 28px; vertical-align: text-bottom; margin-right: 8px;">'
+                st.markdown(f"<h4 style='color: #FCD34D;'>{leg_tag}區塊 5：大腿動向</h4>", unsafe_allow_html=True)
+            else:
+                # 預防萬一：如果找不到圖片，就退回使用 Emoji
+                st.markdown("<h4 style='color: #FCD34D;'>💰 區塊 5：大腿動向</h4>", unsafe_allow_html=True)         
+
             col_400, col_1000 = st.columns(2)
             with col_400: scan_and_display("💎 400張以上大戶動向", 'b5_400', target_query)
             with col_1000: scan_and_display("🐳 1000張以上超級大戶動向", 'b5_1000', target_query)
@@ -1175,7 +1185,7 @@ def render_sidebar_war_room(STOCK_DICT, DATA_DIR="data"):
                   border-radius: 8px; text-decoration: none; margin-top: 40px; margin-bottom: 20px; 
                   border: 1px solid rgba(56, 189, 248, 0.3); box-shadow: 0px 4px 6px rgba(0,0,0,0.3); gap: 6px;">
             <span class="material-symbols-outlined" style="font-size: 20px;">move_up</span> 
-            點擊回到頂部搜尋區
+            回到頂部
         </a>
         """, 
         unsafe_allow_html=True
