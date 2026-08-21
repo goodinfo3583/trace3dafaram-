@@ -901,35 +901,43 @@ def render_sidebar_war_room(STOCK_DICT, DATA_DIR="data"):
             
             industry_label = "未分類"
             
-            # ==========================================
-            # 🚀 修復：兩段式字典解析 (解決權證攔截問題)
-            # ==========================================
-            if STOCK_DICT:
-                exact_match = False
+            if search_query:
+                query_clean = search_query.strip()
+                
+                # 搜尋當下即時觸發 B1~B5 背景補載機制
+                ensure_b1_to_b5_loaded(DATA_DIR)
+                
+                industry_label = "未分類"
+                
+                # ==========================================
+                # 🚀 修復：兩段式字典解析 (解決權證攔截問題)
+                # ==========================================
+                if STOCK_DICT:
+                    exact_match = False
                     
-                # 🌟 第一階段：優先精準比對 (代號完全相等 或 名稱完全相等)
-                for k, v in STOCK_DICT.items():
-                    stock_id = str(v.get("id", ""))
-                    stock_name = str(v.get("name", ""))
-                    if query_clean == stock_id or query_clean == stock_name:
-                        pure_stock_id = stock_id
-                        display_name = f"{stock_id} {stock_name}"
-                        industry_label = v.get("industry", "未分類")
-                        exact_match = True
-                        break
-                        
-                # 🌟 第二階段：如果精準比對找不到，才啟動模糊包含比對
-                if not exact_match:
+                    # 🌟 第一階段：優先精準比對 (代號完全相等 或 名稱完全相等)
                     for k, v in STOCK_DICT.items():
-                        if query_clean in k or query_clean in str(v.get("name", "")):
-                            pure_stock_id = str(v.get("id", ""))
-                            display_name = f"{v.get('id', '')} {v.get('name', '')}"
+                        stock_id = str(v.get("id", ""))
+                        stock_name = str(v.get("name", ""))
+                        if query_clean == stock_id or query_clean == stock_name:
+                            pure_stock_id = stock_id
+                            display_name = f"{stock_id} {stock_name}"
                             industry_label = v.get("industry", "未分類")
+                            exact_match = True
                             break
+                            
+                    # 🌟 第二階段：如果精準比對找不到，才啟動模糊包含比對
+                    if not exact_match:
+                        for k, v in STOCK_DICT.items():
+                            if query_clean in k or query_clean in str(v.get("name", "")):
+                                pure_stock_id = str(v.get("id", ""))
+                                display_name = f"{v.get('id', '')} {v.get('name', '')}"
+                                industry_label = v.get("industry", "未分類")
+                                break
                                     
-        if pure_stock_id == "":
-            match_num = re.search(r'\d+', query_clean)
-            if match_num: pure_stock_id = match_num.group(0)
+            if pure_stock_id == "":
+                match_num = re.search(r'\d+', query_clean)
+                if match_num: pure_stock_id = match_num.group(0)
 
             st.markdown(f"### 🎯 綜合診斷標的：<span style='color: #00D2FF;'>{display_name}</span> <span style='font-size:16px; background-color:#1E293B; padding:4px 10px; border-radius:6px; color:#38BDF8; border: 1px solid #38BDF8; margin-left:10px;'>🏷️ {industry_label}</span>", unsafe_allow_html=True)
 
