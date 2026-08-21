@@ -113,7 +113,6 @@ def show_watchlist_page(STOCK_DICT=None, conn=None, SHEET_URL=None):
     watchlist = st.session_state[wl_cache_key]
     MAX_STOCKS = 60 
 
-    # 確保每個筆記欄位的值都在 session_state 中，避免元件衝突
     for stock in list(watchlist.keys()):
         nk = f"note_{stock}"
         if nk not in st.session_state:
@@ -132,9 +131,7 @@ def show_watchlist_page(STOCK_DICT=None, conn=None, SHEET_URL=None):
                 else:
                     query_clean = new_stock.strip()
                     final_stock_name = query_clean
-                    
                     if STOCK_DICT:
-                        # 🌟 1. 優先：進行「精準比對」(完全等於代號 或 完全等於名稱)
                         exact_match = False
                         for k, v in STOCK_DICT.items():
                             stock_id = str(v.get("id", ""))
@@ -144,7 +141,6 @@ def show_watchlist_page(STOCK_DICT=None, conn=None, SHEET_URL=None):
                                 exact_match = True
                                 break
                         
-                        # 🌟 2. 次要：如果精準比對沒找到，才使用「模糊包含比對」
                         if not exact_match:
                             for k, v in STOCK_DICT.items():
                                 if query_clean in k or query_clean in str(v.get("name", "")):
@@ -174,13 +170,12 @@ def show_watchlist_page(STOCK_DICT=None, conn=None, SHEET_URL=None):
         with st.spinner("📡 正在同步即時報價與成交量..."):
             market_data = get_watchlist_quotes(stock_codes)
             if market_data:
-                # 抓取第一筆資料的日期作為基準日
                 market_date = list(market_data.values())[0]["date"]
 
     # ==========================================
-    # 💾 左上角存檔與日期區塊 
+    # 💾 左上角存檔、匯出與日期區塊 
     # ==========================================
-    col_save, col_date, col_space = st.columns([1.5, 3.0, 5.5])
+    col_save, col_export, col_date, col_space = st.columns([1.5, 1.5, 3.0, 4.0])
     with col_save:
         if st.button("存檔", icon=":material/save:", use_container_width=True, type="primary", help="將目前的變更同步至雲端"):
             with st.spinner("正在上傳至雲端..."):
@@ -192,6 +187,41 @@ def show_watchlist_page(STOCK_DICT=None, conn=None, SHEET_URL=None):
             st.success("✅ 存檔成功！")
             time.sleep(1)
             st.rerun()
+            
+    with col_export:
+        # 製作匯出專用的 DataFrame
+        if watchlist:
+            export_data = []
+            for stock, note in watchlist.items():
+                current_note = st.session_state.get(f"note_{stock}", note)
+                pure_code = None
+                stock_code_match = re.search(r'\d+', stock)
+                if stock_code_match: pure_code = stock_code_match.group()
+                
+                # 若有抓到即時報價也一併附上
+                price, vol = "", ""
+                if pure_code and pure_code in market_data:
+                    price = market_data[pure_code]["price"]
+                    vol = market_data[pure_code]["vol"]
+                    
+                export_data.append({"標的名稱": stock, "最新價": price, "成交量(張)": vol, "專屬筆記": current_note})
+                
+            df_export = pd.DataFrame(export_data)
+            csv = df_export.to_csv(index=False, encoding='utf-8-sig').encode('utf-8-sig')
+            
+            # 使用 Streamlit 內建的下載按鈕
+            st.download_button(
+                label="匯出",
+                icon=":material/download:",
+                data=csv,
+                file_name=f"watchlist_{username}.csv",
+                mime="text/csv",
+                use_container_width=True,
+                help="下載為 CSV 檔"
+            )
+        else:
+            st.button("匯出", icon=":material/download:", use_container_width=True, disabled=True)
+
     with col_date:
         if watchlist and market_data:
             st.markdown(f"<div style='padding-top:8px; color:#38BDF8; font-size:15px; font-weight:bold;'>📅 行情基準日：{market_date}</div>", unsafe_allow_html=True)
@@ -201,7 +231,8 @@ def show_watchlist_page(STOCK_DICT=None, conn=None, SHEET_URL=None):
     if not watchlist:
         st.info("目前還沒有追蹤任何標的，趕快新增一個吧！")
     else:
-        col_ratios = [1.1, 0.9, 1.1, 1.1, 3.8, 0.8, 0.6, 0.6]
+        # 📋 分割為 8 個區域 (將按鈕欄位縮小，因為只剩 Icon)
+        col_ratios = [1.1, 0.9, 1.1, 1.1, 4.4, 0.5, 0.5, 0.5]
         
         h1, h2, h3, h4, h5, h6, h7, h8 = st.columns(col_ratios)
         h1.markdown("<span style='color:#94a3b8; font-size:14px;'>標的名稱</span>", unsafe_allow_html=True)
@@ -220,7 +251,6 @@ def show_watchlist_page(STOCK_DICT=None, conn=None, SHEET_URL=None):
             if is_vol: return f"<span style='color:{color}; font-size:12px;'>({sign}{val:.1f}%)</span>"
             return f"<span style='color:{color}; font-weight:bold;'>{sign}{val:.2f}{tail}</span>"
 
-        # 🚀 新增：專門處理「帶入行情」的 Callback 函數
         def append_quote_to_note(stock_name, p_code):
             if p_code and p_code in market_data:
                 d = market_data[p_code]
@@ -232,7 +262,6 @@ def show_watchlist_page(STOCK_DICT=None, conn=None, SHEET_URL=None):
                     st.session_state[nk] = current_text + f"\n{append_str}"
                 else:
                     st.session_state[nk] = append_str
-                # 同步回 watchlist 暫存區，確保不會遺失
                 watchlist[stock_name] = st.session_state[nk]
 
         for stock in list(watchlist.keys()):
@@ -273,9 +302,9 @@ def show_watchlist_page(STOCK_DICT=None, conn=None, SHEET_URL=None):
                 st.markdown("</div>", unsafe_allow_html=True)
             with c6:
                 st.markdown("<div style='padding-top:15px;'>", unsafe_allow_html=True)
-                # 🚀 修復：使用 on_click 觸發 Callback，不再產生狀態修改衝突！
                 st.button(
-                    "帶入", icon=":material/download:", 
+                    "", 
+                    icon=":material/input:", # 帶入
                     key=f"import_{stock}", 
                     use_container_width=True, 
                     help="將今日行情寫入筆記 (不覆蓋)",
@@ -285,14 +314,14 @@ def show_watchlist_page(STOCK_DICT=None, conn=None, SHEET_URL=None):
                 st.markdown("</div>", unsafe_allow_html=True)
             with c7:
                 st.markdown("<div style='padding-top:15px;'>", unsafe_allow_html=True)
-                if st.button(icon=":material/monitoring:", key=f"view_{stock}", use_container_width=True, help="顯示籌碼診斷"):
+                if st.button("", icon=":material/monitoring:", key=f"view_{stock}", use_container_width=True, help="顯示籌碼診斷"):
                     st.session_state["selected_watch_stock"] = stock
                     st.session_state["global_search_final"] = pure_code if pure_code else stock
                     st.rerun()
                 st.markdown("</div>", unsafe_allow_html=True)
             with c8:
                 st.markdown("<div style='padding-top:15px;'>", unsafe_allow_html=True)
-                if st.button("移除", icon=":material/delete:", key=f"remove_{stock}", use_container_width=True, help="移除此標的"):
+                if st.button("", icon=":material/delete:", key=f"remove_{stock}", use_container_width=True, help="移除此標的"):
                     del watchlist[stock]
                     if nk in st.session_state:
                         del st.session_state[nk]
