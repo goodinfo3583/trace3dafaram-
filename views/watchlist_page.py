@@ -308,6 +308,12 @@ def show_watchlist_page(STOCK_DICT=None, conn=None, SHEET_URL=None):
             with c7:
                 st.markdown("<div style='padding-top:15px;'>", unsafe_allow_html=True)
                 if st.button("", icon=":material/monitoring:", key=f"view_{stock}", use_container_width=True, help="顯示籌碼診斷"):
+                    # 🚀 修復：不管名稱被怎麼轉小寫或變形，都利用字典強制還原成最標準的 "代號 名稱" 格式
+                    standard_format = stock
+                    if pure_code and STOCK_DICT and pure_code in STOCK_DICT:
+                        v = STOCK_DICT[pure_code]
+                        standard_format = f"{v['id']} {v['name']}"
+
                     st.session_state["selected_watch_stock"] = stock
                     st.session_state["global_search_final"] = pure_code if pure_code else stock
                     st.rerun()
