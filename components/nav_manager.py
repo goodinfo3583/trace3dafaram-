@@ -4,25 +4,25 @@ import streamlit as st
 import json
 
 def inject_custom_header(is_logged_in=False):
-    """注入客製化懸浮頂部導航與隱藏側邊欄邏輯 (遊戲化UI版 + 快捷鍵支援)"""
+    """注入客製化懸浮頂部導航與隱藏側邊欄邏輯 (遊戲化UI版 + 動態快捷鍵 + 設定功能)"""
     login_btn_text = "登出" if is_logged_in else "登入"
-    b6_text = "鉅額交易"
-
+    
     # 預設快捷鍵字典 (全部轉小寫以利 JS 判斷)
     default_hotkeys = {
         "f1": "NavToB1", "f2": "NavToB2", "f3": "NavToB3", 
-        "f4": "NavToB4", "f5": "NavToB5", "f6": "NavToB6", "f7": "NavToB7",
+        "f4": "NavToB4", "f5": "NavToB5", "f7": "NavToB7",
         "alt+l": "NavToWatchlist", "escape": "NavToSystem"
     }
     # 若 Session 中有自訂快捷鍵則覆蓋，否則使用預設
     user_hotkeys = st.session_state.get('custom_hotkeys', default_hotkeys)
     hotkeys_json = json.dumps(user_hotkeys)
-
     
     inject_js = """
     <script>
-    const parentDoc = window.parent.document;
+    const parentWin = window.parent;
+    const parentDoc = parentWin.document;
 
+    // 清除舊的 Header 與 Style
     const oldHeader = parentDoc.getElementById('custom-sticky-header');
     if (oldHeader) oldHeader.remove();
     
@@ -41,7 +41,7 @@ def inject_custom_header(is_logged_in=False):
         .disclaimer-bar, .nav-btn-container { pointer-events: auto; }
         .disclaimer-bar { display: flex; align-items: center; background: transparent !important; padding: 0px 15px; border: none !important; gap: 4px; }
         
-        /* ⚙️ 頂部圖示共通樣式 (包含系統與工具箱) */
+        /* ⚙️ 頂部圖示共通樣式 */
         .system-menu { position: relative; padding: 6px 8px; cursor: pointer; background: transparent !important; display: flex; align-items: center; justify-content: center; }
         .system-icon { width: 22px; height: 22px; object-fit: contain; filter: drop-shadow(1px 1px 2px rgba(0,0,0,0.8)); transition: all 0.3s cubic-bezier(0.175, 0.885, 0.32, 1.275); }
         .system-menu:hover .system-icon { filter: drop-shadow(0px 0px 8px rgba(0, 210, 255, 0.9)); transform: scale(1.15); }
@@ -79,7 +79,7 @@ def inject_custom_header(is_logged_in=False):
         .locked-item { opacity: 0.5; filter: grayscale(50%); cursor: not-allowed; }
         .locked-item:hover { background-color: transparent; opacity: 0.8; filter: grayscale(0%); }
 
-        /* 💎 懸浮式導覽列 (純粹的籌碼動向儀表板) */
+        /* 💎 懸浮式導覽列 */
         .nav-btn-container { 
             display: flex; flex-wrap: wrap; justify-content: flex-end; align-items: center; 
             padding: 8px 15px; gap: 6px; 
@@ -185,6 +185,15 @@ def inject_custom_header(is_logged_in=False):
                         </a>
                         <p class="dropdown-text">返回系統主控台。</p>
                     </div>
+                    
+                    <!-- 💡 新增的設定按鈕 -->
+                    <div class="dropdown-item actionable">
+                        <a href="#" data-target="NavToSettings" class="dropdown-title internal-nav">
+                            <img src="app/static/icon-system.png" class="menu-icon" alt="settings"> ⚙️ 系統設定
+                        </a>
+                        <p class="dropdown-text">自訂介面底色風格與專屬鍵盤快捷鍵。</p>
+                    </div>
+
                     <div class="dropdown-item actionable">
                         <a href="#" data-target="NavToContact" class="dropdown-title internal-nav">
                             <img src="app/static/icon-contact.png" class="menu-icon" alt="contact"> 聯絡我們
@@ -209,7 +218,6 @@ def inject_custom_header(is_logged_in=False):
                 </div>
                 
                 <div class="system-dropdown">
-                    <!-- 1. 建立名單移至最上方 -->
                     <div class="dropdown-item actionable">
                         <a href="#" data-target="NavToWatchlist" class="dropdown-title internal-nav">
                             <img src="app/static/icon-watchlist.png" class="menu-icon" alt="create"> 建立名單 <span style="color:#64748b; font-size:10px;">(Alt+L)</span>
@@ -217,7 +225,6 @@ def inject_custom_header(is_logged_in=False):
                         <p class="dropdown-text">自訂與管理您的專屬觀察清單。</p>
                     </div>
                     
-                    <!-- 2. 市場消息 -->
                     <div class="dropdown-item actionable">
                         <a href="#" data-target="NavToNews" class="dropdown-title internal-nav">
                             <img src="app/static/magicbook2.png" class="menu-icon" alt="news"> 市場消息
@@ -225,7 +232,6 @@ def inject_custom_header(is_logged_in=False):
                         <p class="dropdown-text">掌握最新市場動態與總經快訊。</p>
                     </div>
                     
-                    <!-- 3. 新增外部連結：靠北投顧 3.0 -->
                     <div class="dropdown-item actionable">
                         <a href="https://www.facebook.com/DOUBLEE04/?locale=zh_TW" target="_blank" class="dropdown-title" style="text-decoration: none;">
                             <img src="app/static/magicbook2.png" class="menu-icon" alt="fb-group"> 靠北投顧 3.0 
@@ -233,7 +239,7 @@ def inject_custom_header(is_logged_in=False):
                         <p class="dropdown-text">分享分析師真實績效，避免受話術白白繳學費。</p>
                     </div>
                     
-                    <!-- 4. 新增基礎課程 -->
+                    <!-- 💡 未來課程 (將改成NPC卡片形式) -->
                     <div class="dropdown-item actionable">
                         <a href="#" data-target="NavToCourses" class="dropdown-title internal-nav">
                             <img src="app/static/magicbookleaf.png" class="menu-icon" alt="courses"> 基礎課程
@@ -241,7 +247,6 @@ def inject_custom_header(is_logged_in=False):
                         <p class="dropdown-text">量價關係、籌碼結構等10堂基礎課，強化自身能力不求人。</p>
                     </div>
                     
-                    <!-- 5. 鎖定功能區 -->
                     <div class="dropdown-item locked-item">
                         <span class="dropdown-title">
                             <img src="app/static/icon-podiumaward.png" class="menu-icon" alt="lock"> 券商分點 (先不開放)
@@ -285,7 +290,7 @@ def inject_custom_header(is_logged_in=False):
             <div class="disclaimer-item" id="mobile-nav-toggle" title="收起選單" style="cursor: pointer; padding-right: 5px;"><span id="nav-toggle-icon" style="font-size: 18px; color: #38BDF8;">📜</span></div>
         </div>
         
-        <!-- 💡 核心導覽列：觀察名單回歸主戰場 -->
+        <!-- 💡 核心導覽列：(已徹底移除 B6 鉅額交易) -->
         <div class="nav-btn-container" id="nav-btn-container">
             <a href="#" data-target="NavToPool" class="nav-text-link internal-nav"><img src="app/static/magicbookfire2.png" class="nav-icon" alt="icon">觀察名單</a><span class="nav-divider">|</span>
             <a href="#" data-target="NavToB1" class="nav-text-link internal-nav"><img src="app/static/magicbookleaf.png" class="nav-icon" alt="icon">法人動向</a><span class="nav-divider">|</span>
@@ -293,7 +298,6 @@ def inject_custom_header(is_logged_in=False):
             <a href="#" data-target="NavToB3" class="nav-text-link internal-nav"><img src="app/static/magicbookwater.png" class="nav-icon" alt="icon">法人連買</a><span class="nav-divider">|</span>
             <a href="#" data-target="NavToB4" class="nav-text-link internal-nav"><img src="app/static/magicbookground.png" class="nav-icon" alt="icon">資券動向</a><span class="nav-divider">|</span>
             <a href="#" data-target="NavToB5" class="nav-text-link internal-nav"><img src="app/static/wirtleg.png" class="nav-icon" alt="icon">大腿動向</a><span class="nav-divider">|</span>
-            <a href="#" data-target="NavToB6" class="nav-text-link internal-nav"><img src="app/static/magicbookfire.png" class="nav-icon" alt="icon">__B6_TEXT__</a><span class="nav-divider">|</span>
             <a href="#" data-target="NavToB7" class="nav-text-link internal-nav"><img src="app/static/magicbookboss.png" class="nav-icon" alt="icon">董監動向</a>
         </div>
     `;
@@ -314,33 +318,37 @@ def inject_custom_header(is_logged_in=False):
             };
         });
 
-        // 2. 處理快捷鍵綁定 (加上防止重複綁定的防呆機制)
-        if (!parentDoc.body.dataset.hotkeysBound) {
-            parentDoc.addEventListener('keydown', (e) => {
-                // 如果焦點在輸入框 (例如 st.text_input)，不觸發快捷鍵，避免打字衝突
-                const activeTag = parentDoc.activeElement ? parentDoc.activeElement.tagName.toLowerCase() : '';
-                if (activeTag === 'input' || activeTag === 'textarea') return;
+        // 2. 🔥 動態快捷鍵引擎 (避免重複綁定，並攔截預設事件)
+        const hotkeysMap = JSON.parse(`__HOTKEYS_JSON__`);
 
-                // 按下 Esc -> 系統頁面
-                if (e.key === "Escape") {
-                    e.preventDefault();
-                    const btns = Array.from(parentDoc.querySelectorAll('button'));
-                    const targetBtn = btns.find(b => b.textContent.trim() === "NavToSystem");
-                    if (targetBtn) targetBtn.click();
-                }
-
-                // 按下 Alt + L -> 建立名單
-                if (e.altKey && e.key.toLowerCase() === 'l') {
-                    e.preventDefault();
-                    const btns = Array.from(parentDoc.querySelectorAll('button'));
-                    const targetBtn = btns.find(b => b.textContent.trim() === "NavToWatchlist");
-                    if (targetBtn) targetBtn.click();
-                }
-            });
-            parentDoc.body.dataset.hotkeysBound = "true";
+        if (parentWin.customHotkeyHandler) {
+            parentDoc.removeEventListener('keydown', parentWin.customHotkeyHandler);
         }
 
-        // 其餘 UI 互動腳本保持不變
+        parentWin.customHotkeyHandler = function(e) {
+            // 焦點在輸入框時不觸發
+            const activeTag = parentDoc.activeElement ? parentDoc.activeElement.tagName.toLowerCase() : '';
+            if (activeTag === 'input' || activeTag === 'textarea') return;
+
+            let combo = [];
+            if (e.ctrlKey) combo.push('ctrl');
+            if (e.altKey) combo.push('alt');
+            if (e.shiftKey) combo.push('shift');
+            combo.push(e.key.toLowerCase());
+            let keyStr = combo.join('+');
+
+            if (hotkeysMap[keyStr]) {
+                e.preventDefault(); // 攔截 F1、F3 等預設事件
+                const targetName = hotkeysMap[keyStr];
+                const btns = Array.from(parentDoc.querySelectorAll('button'));
+                const targetBtn = btns.find(b => b.textContent.trim() === targetName);
+                if (targetBtn) targetBtn.click();
+            }
+        };
+        
+        parentDoc.addEventListener('keydown', parentWin.customHotkeyHandler);
+
+        // UI 互動腳本
         const menuToggle = parentDoc.getElementById('mobile-nav-toggle');
         const navContainer = parentDoc.getElementById('nav-btn-container');
         const iconSpan = parentDoc.getElementById('nav-toggle-icon');
@@ -408,7 +416,7 @@ def inject_custom_header(is_logged_in=False):
             };
         }
 
-        // 💡 確保包含所有 Proxy 按鈕都會被隱藏
+        // 確保包含所有 Proxy 按鈕都會被隱藏
         setInterval(() => {
             const allBtns = Array.from(parentDoc.querySelectorAll('button'));
             allBtns.forEach(b => {
@@ -424,33 +432,40 @@ def inject_custom_header(is_logged_in=False):
     """
     
     inject_js = inject_js.replace("__LOGIN_TEXT__", login_btn_text)
-    inject_js = inject_js.replace("__B6_TEXT__", b6_text)
+    inject_js = inject_js.replace("__HOTKEYS_JSON__", hotkeys_json)
     components.html(inject_js, height=0, width=0)
 
 # ==========================================
-# python 後端需對應的 proxy 按鈕
+# python 後端需對應的 proxy 按鈕 (已移除 NavToB6)
 # ==========================================
 def render_proxy_buttons():
     def change_page(page_name):
         st.query_params["page"] = page_name 
+        
+    # 💡 專給 NPC 課程對話框的切換功能
+    def toggle_course_npc():
+        st.session_state['show_course_npc'] = not st.session_state.get('show_course_npc', False)
 
     def handle_logout():
         st.session_state.clear()
         st.query_params["page"] = "home"
 
     with st.container():
+        st.button("NavToSettings", on_click=change_page, args=("settings",))
         st.button("NavToContact", on_click=change_page, args=("contact",))
         st.button("NavToNews", on_click=change_page, args=("news",))
         st.button("NavToPool", on_click=change_page, args=("pool",))
         st.button("NavToWatchlist", on_click=change_page, args=("watchlist",)) 
-        st.button("NavToCourses", on_click=change_page, args=("courses",)) # 新增課程按鈕
-        st.button("NavToSystem", on_click=change_page, args=("system",))   # 新增系統按鈕 (對應Esc)
+        
+        # 💡 將 NavToCourses 的行為改為切換 NPC 狀態，而不是跳轉頁面
+        st.button("NavToCourses", on_click=toggle_course_npc) 
+        
+        st.button("NavToSystem", on_click=change_page, args=("system",))   
         st.button("NavToB1", on_click=change_page, args=("b1",))
         st.button("NavToB2", on_click=change_page, args=("b2",))
         st.button("NavToB3", on_click=change_page, args=("b3",))
         st.button("NavToB4", on_click=change_page, args=("b4",))
         st.button("NavToB5", on_click=change_page, args=("b5",))
-        st.button("NavToB6", on_click=change_page, args=("b6",))
         st.button("NavToB7", on_click=change_page, args=("b7",))
         
         st.button("登入", on_click=change_page, args=("login",))
