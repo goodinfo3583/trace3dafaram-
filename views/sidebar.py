@@ -1163,7 +1163,7 @@ def render_sidebar_war_room(STOCK_DICT, DATA_DIR="data"):
     
     # 1. 讀取你在 static 資料夾中的自訂 icon (請換成你真實的檔名)
     icon_path = "./static/icon-up.png" 
-
+    icon_tag = "⬆️" # 預設圖案
     
     # 2. 如果圖片存在，將它轉化為網頁看得懂的 Base64 格式
     if os.path.exists(icon_path):
