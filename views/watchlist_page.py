@@ -132,12 +132,22 @@ def show_watchlist_page(STOCK_DICT=None, conn=None, SHEET_URL=None):
                 else:
                     query_clean = new_stock.strip()
                     final_stock_name = query_clean
+                    
                     if STOCK_DICT:
-                        if query_clean in STOCK_DICT:
-                            final_stock_name = f"{STOCK_DICT[query_clean]['id']} {STOCK_DICT[query_clean]['name']}"
-                        else:
+                        # 🌟 1. 優先：進行「精準比對」(完全等於代號 或 完全等於名稱)
+                        exact_match = False
+                        for k, v in STOCK_DICT.items():
+                            stock_id = str(v.get("id", ""))
+                            stock_name = str(v.get("name", ""))
+                            if query_clean == stock_id or query_clean == stock_name:
+                                final_stock_name = f"{stock_id} {stock_name}"
+                                exact_match = True
+                                break
+                        
+                        # 🌟 2. 次要：如果精準比對沒找到，才使用「模糊包含比對」
+                        if not exact_match:
                             for k, v in STOCK_DICT.items():
-                                if query_clean in k or query_clean == v["id"] or query_clean == v["name"]:
+                                if query_clean in k or query_clean in str(v.get("name", "")):
                                     final_stock_name = f"{v['id']} {v['name']}"
                                     break
 
@@ -172,7 +182,7 @@ def show_watchlist_page(STOCK_DICT=None, conn=None, SHEET_URL=None):
     # ==========================================
     col_save, col_date, col_space = st.columns([1.5, 3.0, 5.5])
     with col_save:
-        if st.button("💾 存檔", use_container_width=True, type="primary", help="將目前的變更同步至雲端"):
+        if st.button("存檔", icon=":material/save:", use_container_width=True, type="primary", help="將目前的變更同步至雲端"):
             with st.spinner("正在上傳至雲端..."):
                 for stock in list(watchlist.keys()):
                     nk = f"note_{stock}"
