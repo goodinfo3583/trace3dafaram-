@@ -897,6 +897,7 @@ def render_sidebar_war_room(STOCK_DICT, DATA_DIR="data"):
 
         pure_stock_id = ""
         display_name = search_query
+        industry_label = "未分類"
         
         if search_query:
             query_clean = search_query.strip()
