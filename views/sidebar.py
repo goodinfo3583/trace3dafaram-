@@ -277,16 +277,17 @@ def generate_technical_signals(df_sig):
     return signals
 
 #=========
-# 🚀 強制將名稱帶入的加強版 B4 渲染函數
 def render_b4_panorama(view_title, keys_and_labels, query, stock_name="-"):
     display_list = []
     display_id = query
+    has_any_data = False # 🚀 新增：用來紀錄「這三個榜單中，是否至少有一個進榜？」
     
     for label, key in keys_and_labels:
         df = get_sidebar_df(key)
         if not df.empty:
             res = robust_search_engine(df, query)
             if not res.empty:
+                has_any_data = True # 只要有一個榜單有抓到資料，就標記為 True
                 row_data = res.iloc[0].to_dict()
                 if '股票名稱' not in row_data: row_data['股票名稱'] = stock_name
                 if '股票代號' not in row_data: row_data['股票代號'] = query
@@ -299,16 +300,22 @@ def render_b4_panorama(view_title, keys_and_labels, query, stock_name="-"):
         else: 
             display_list.append({'榜單類型': label, '股票代號': query, '股票名稱': stock_name, '進榜狀態': '⚠️ 尚未載入'})
             
+    st.markdown(f"<h5 style='color: #E2E8F0;'>{view_title}</h5>", unsafe_allow_html=True)
+    
+    # 🚀 智能收納魔法：如果全部都沒進榜，就不要畫表格了，直接顯示未進榜！
+    if not has_any_data:
+        st.write("⚪ 未進榜")
+        return
+
     df_panorama = pd.DataFrame(display_list).fillna('-')
     front_cols = ['榜單類型', '股票代號', '股票名稱', '進榜狀態']
     data_cols = [c for c in df_panorama.columns if c not in front_cols]
     final_cols = [c for c in front_cols if c in df_panorama.columns] + data_cols
     for c in final_cols: df_panorama[c] = df_panorama[c].apply(lambda x: str(x)[:-2] if str(x).endswith('.0') else x)
     
-    st.markdown(f"<h5 style='color: #E2E8F0;'>{view_title}</h5>", unsafe_allow_html=True)
     st.dataframe(df_panorama[final_cols], use_container_width=True, hide_index=True)
 
-# ==========================================
+    # ==========================================
 # 📈 側邊雙視窗 K 線圖與技術分析引擎
 # ==========================================
 @st.cache_data(ttl=900)
