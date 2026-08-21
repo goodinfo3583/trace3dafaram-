@@ -905,48 +905,40 @@ def render_sidebar_war_room(STOCK_DICT, DATA_DIR="data"):
             ensure_b1_to_b5_loaded(DATA_DIR)
             
             industry_label = "未分類"
-            
-            if search_query:
-                query_clean = search_query.strip()
-                
-                # 搜尋當下即時觸發 B1~B5 背景補載機制
-                ensure_b1_to_b5_loaded(DATA_DIR)
-                
-                industry_label = "未分類"
-                
-                # ==========================================
-                # 🚀 修復：兩段式字典解析 (解決權證攔截問題)
-                # ==========================================
-                if STOCK_DICT:
-                    exact_match = False
-                    
-                    # 🌟 第一階段：優先精準比對 (代號完全相等 或 名稱完全相等)
-                    for k, v in STOCK_DICT.items():
-                        stock_id = str(v.get("id", ""))
-                        stock_name = str(v.get("name", ""))
-                        if query_clean == stock_id or query_clean == stock_name:
-                            pure_stock_id = stock_id
-                            display_name = f"{stock_id} {stock_name}"
-                            industry_label = v.get("industry", "未分類")
-                            exact_match = True
-                            break
-                            
-                    # 🌟 第二階段：如果精準比對找不到，才啟動模糊包含比對
-                    if not exact_match:
-                        for k, v in STOCK_DICT.items():
-                            if query_clean in k or query_clean in str(v.get("name", "")):
-                                pure_stock_id = str(v.get("id", ""))
-                                display_name = f"{v.get('id', '')} {v.get('name', '')}"
-                                industry_label = v.get("industry", "未分類")
-                                break
-                                    
-            if pure_stock_id == "":
-                match_num = re.search(r'\d+', query_clean)
-                if match_num: pure_stock_id = match_num.group(0)
 
-            st.markdown(f"### 🎯 綜合診斷標的：<span style='color: #00D2FF;'>{display_name}</span> <span style='font-size:16px; background-color:#1E293B; padding:4px 10px; border-radius:6px; color:#38BDF8; border: 1px solid #38BDF8; margin-left:10px;'>🏷️ {industry_label}</span>", unsafe_allow_html=True)
+            if search_query:
+            # 🚀 智慧拆解：如果使用者選了下拉選單的 "5443 均豪"，我們只取前面數字部分來搜尋
+            query_clean = search_query.strip()
+            match_code = re.search(r'^[A-Za-z0-9]{2,4}', query_clean) # 抓出開頭的代號
+            
+            if match_code:
+                pure_stock_id = match_code.group(0)
+            else:
+                # 預防萬一：如果使用者手殘只打中文，就直接拿中文去字典查代號
+                pure_stock_id = query_clean
+            
+            # 搜尋當下即時觸發 B1~B5 背景補載機制
+            ensure_b1_to_b5_loaded(DATA_DIR)
 
             # ==========================================
+            # 🚀 修復：使用純代號去字典查詢，保證找到正確資訊
+            # ==========================================
+            if STOCK_DICT:
+                if pure_stock_id in STOCK_DICT:
+                    v = STOCK_DICT[pure_stock_id]
+                    pure_stock_id = v["id"]
+                    display_name = f"{v['id']} {v['name']}"
+                    industry_label = v.get("industry", "未分類")
+                else:
+                    # 如果連純代號都查不到 (可能是打錯字)，就保留使用者輸入的字串去瞎子摸象
+                    display_name = search_query
+
+            # 將純粹的代號 (例如 5443) 指派給 target_query，交給 B1~B7 的引擎去跑！
+            target_query = pure_stock_id if pure_stock_id else search_query
+
+            st.markdown(f"### 🎯 綜合診斷標的：<span style='color: #00D2FF;'>{display_name}</span> <span style='font-size:16px; background-color:#1E293B; padding:4px 10px; border-radius:6px; color:#38BDF8; border: 1px solid #38BDF8; margin-left:10px;'>🏷️ {industry_label}</span>", unsafe_allow_html=True)
+            
+            #==============================
             # 🚀 融合 AI 訊號區
             # ==========================================
             target_query = pure_stock_id if pure_stock_id else search_query

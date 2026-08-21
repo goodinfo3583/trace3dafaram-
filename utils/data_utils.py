@@ -101,18 +101,14 @@ def get_stock_dictionary():
         
     if not dict_files: return mapping
         
-    # 🚀 修復：使用迴圈處理「所有」找到的檔案，而不只是第一個
     for target_file in dict_files:
         raw_lines = []
-        
         for encoding in ['utf-8-sig', 'utf-8', 'cp950', 'utf-16', 'big5']:
             try:
                 with open(target_file, 'r', encoding=encoding) as f:
                     raw_lines = f.readlines()
-                if len(raw_lines) > 10: 
-                    break # 成功讀取就跳出編碼嘗試
-            except: 
-                continue
+                if len(raw_lines) > 10: break
+            except: continue
                 
         for line in raw_lines:
             parts = line.split('\t') if '\t' in line else line.split(',')
@@ -127,10 +123,12 @@ def get_stock_dictionary():
                     sid = tokens[0].strip()
                     sname = tokens[1].strip()
                     
-                    # 🛡️ 權證過濾機制：只把「代號長度小於等於 4」且是純數字/英數混合的標的加入字典
+                    # 🛡️ 權證與重複過濾：只加入 4 碼純數字/英數，並且用 sid 作為主要防重鑰匙
                     if sid.isalnum() and len(sid) <= 4: 
-                        mapping[sname] = {"id": sid, "name": sname, "industry": industry}
-                        mapping[sid] = {"id": sid, "name": sname, "industry": industry}
+                        # 如果字典已經有這檔股票了，就不再重複寫入
+                        if sid not in mapping:
+                            mapping[sname] = {"id": sid, "name": sname, "industry": industry}
+                            mapping[sid] = {"id": sid, "name": sname, "industry": industry}
                     
     return mapping
 
