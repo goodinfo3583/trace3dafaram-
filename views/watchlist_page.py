@@ -4,7 +4,7 @@ import json
 import re
 import time
 import pandas as pd
-
+import os
 # 定義儲存使用者資料的路徑
 USER_DATA_DIR = "./data/users"
 os.makedirs(USER_DATA_DIR, exist_ok=True)
