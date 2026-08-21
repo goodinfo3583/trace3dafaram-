@@ -1,11 +1,23 @@
 # components/nav_manager.py
 import streamlit.components.v1 as components
 import streamlit as st
+import json
 
 def inject_custom_header(is_logged_in=False):
     """注入客製化懸浮頂部導航與隱藏側邊欄邏輯 (遊戲化UI版 + 快捷鍵支援)"""
     login_btn_text = "登出" if is_logged_in else "登入"
     b6_text = "鉅額交易"
+
+    # 預設快捷鍵字典 (全部轉小寫以利 JS 判斷)
+    default_hotkeys = {
+        "f1": "NavToB1", "f2": "NavToB2", "f3": "NavToB3", 
+        "f4": "NavToB4", "f5": "NavToB5", "f6": "NavToB6", "f7": "NavToB7",
+        "alt+l": "NavToWatchlist", "escape": "NavToSystem"
+    }
+    # 若 Session 中有自訂快捷鍵則覆蓋，否則使用預設
+    user_hotkeys = st.session_state.get('custom_hotkeys', default_hotkeys)
+    hotkeys_json = json.dumps(user_hotkeys)
+
     
     inject_js = """
     <script>
