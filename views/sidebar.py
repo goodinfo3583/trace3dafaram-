@@ -28,7 +28,7 @@ KEY_MAP = {
     'b5_400': ['b5_400', 'df_blk5'],
     'b5_1000': ['b5_1000', 'df_blk5_1000'],
     'b7_main': ['b7_main', 'df_blk7_main', 'df_b7_main'],
-    'b7_pledge': ['b7_pledge', 'df_pledge', 'df_b7_pledge'],   # 🟢 新增：董監最新質押比              
+    'b7_pledge': ['b7_pledge', 'df_pledge', 'df_b7_pledge'],# 🟢 新增：董監最新質押比                    
     'b7_pledge_history': ['b7_pledge_history', 'df_pledge_history', 'df_b7_pledge_history']  # 🟢 新增：董監質押歷史趨勢
     # 新增其他變數載入頁面，如'b7_main': ['b7_main'],--步驟2
 }
@@ -277,6 +277,7 @@ def generate_technical_signals(df_sig):
     return signals
 
 #=========
+# 🚀 強制將名稱帶入的加強版 B4 渲染函數
 def render_b4_panorama(view_title, keys_and_labels, query, stock_name="-"):
     display_list = []
     display_id = query
@@ -287,7 +288,6 @@ def render_b4_panorama(view_title, keys_and_labels, query, stock_name="-"):
             res = robust_search_engine(df, query)
             if not res.empty:
                 row_data = res.iloc[0].to_dict()
-                # 🚀 強制補上名稱，防止 B4 表格缺少名稱欄位顯示 "-"
                 if '股票名稱' not in row_data: row_data['股票名稱'] = stock_name
                 if '股票代號' not in row_data: row_data['股票代號'] = query
                 
@@ -303,8 +303,7 @@ def render_b4_panorama(view_title, keys_and_labels, query, stock_name="-"):
     front_cols = ['榜單類型', '股票代號', '股票名稱', '進榜狀態']
     data_cols = [c for c in df_panorama.columns if c not in front_cols]
     final_cols = [c for c in front_cols if c in df_panorama.columns] + data_cols
-    for c in final_cols: 
-        df_panorama[c] = df_panorama[c].apply(lambda x: str(x)[:-2] if str(x).endswith('.0') else x)
+    for c in final_cols: df_panorama[c] = df_panorama[c].apply(lambda x: str(x)[:-2] if str(x).endswith('.0') else x)
     
     st.markdown(f"<h5 style='color: #E2E8F0;'>{view_title}</h5>", unsafe_allow_html=True)
     st.dataframe(df_panorama[final_cols], use_container_width=True, hide_index=True)
@@ -1072,11 +1071,10 @@ def render_sidebar_war_room(STOCK_DICT, DATA_DIR="data"):
             st.markdown("<h4 style='color: #FCD34D;'>🔄 區塊 4：券資有利排名</h4>", unsafe_allow_html=True)
             # 🚀 萃取出純名稱 (例如把 "5443 均豪" 變成 "均豪") 傳給 B4
             just_name = display_name.replace(pure_stock_id, "").strip() if pure_stock_id else display_name
-
             
-            render_b4_panorama("5日幅度變動排名", [('📉 融資減少', 'b4_margin_pct'), ('📉 借券減少', 'b4_short_pct'), ('📈 融券增加', 'b4_margin_plus_pct')], target_query)
+            render_b4_panorama("5日幅度變動排名", [('📉 融資減少', 'b4_margin_pct'), ('📉 借券減少', 'b4_short_pct'), ('📈 融券增加', 'b4_margin_plus_pct')], target_query, just_name)
             st.write("") 
-            render_b4_panorama("5日張數變動排名", [('📉 融資減少', 'b4_margin_vol'), ('📉 借券減少', 'b4_short_vol'), ('📈 融券增加', 'b4_margin_plus_vol')], target_query)
+            render_b4_panorama("5日張數變動排名", [('📉 融資減少', 'b4_margin_vol'), ('📉 借券減少', 'b4_short_vol'), ('📈 融券增加', 'b4_margin_plus_vol')], target_query, just_name)
 
             st.markdown("<hr style='border-color: #334155;'>", unsafe_allow_html=True)
             st.markdown("<h4 style='color: #FCD34D;'>💰 區塊 5：大腿動向</h4>", unsafe_allow_html=True)

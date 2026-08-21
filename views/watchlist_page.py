@@ -120,10 +120,12 @@ def show_watchlist_page(STOCK_DICT=None, conn=None, SHEET_URL=None):
 
     st.subheader(f"新增追蹤標的 (目前 {len(watchlist)}/{MAX_STOCKS} 檔)")
     col1, col2 = st.columns([3, 1])
-# 🚀 升級：自動產生下拉選單，並過濾掉超過 4 碼的權證！
+    
+    # 🚀 升級：自動產生下拉選單，並使用 set {...} 剃除重複的雙胞胎！
     stock_options = []
     if STOCK_DICT:
-        stock_options = [f"{v['id']} {v['name']}" for v in STOCK_DICT.values() if len(str(v['id'])) <= 4]
+        unique_options = {f"{v['id']} {v['name']}" for v in STOCK_DICT.values() if len(str(v['id'])) <= 4}
+        stock_options = sorted(list(unique_options))
 
     with col1:
         new_stock = st.selectbox(
@@ -308,16 +310,17 @@ def show_watchlist_page(STOCK_DICT=None, conn=None, SHEET_URL=None):
             with c7:
                 st.markdown("<div style='padding-top:15px;'>", unsafe_allow_html=True)
                 if st.button("", icon=":material/monitoring:", key=f"view_{stock}", use_container_width=True, help="顯示籌碼診斷"):
-                    # 🚀 修復：不管名稱被怎麼轉小寫或變形，都利用字典強制還原成最標準的 "代號 名稱" 格式
+                    # 🚀 強制轉為標準格式，才能與下拉選單的選項完美吻合！
                     standard_format = stock
                     if pure_code and STOCK_DICT and pure_code in STOCK_DICT:
                         v = STOCK_DICT[pure_code]
                         standard_format = f"{v['id']} {v['name']}"
-
-                    st.session_state["selected_watch_stock"] = stock
-                    st.session_state["global_search_final"] = pure_code if pure_code else stock
+                        
+                    st.session_state["selected_watch_stock"] = standard_format
+                    st.session_state["global_search_final"] = standard_format
                     st.rerun()
                 st.markdown("</div>", unsafe_allow_html=True)
+
             with c8:
                 st.markdown("<div style='padding-top:15px;'>", unsafe_allow_html=True)
                 if st.button("", icon=":material/delete:", key=f"remove_{stock}", use_container_width=True, help="移除此標的"):
