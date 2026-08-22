@@ -751,9 +751,18 @@ def render_course_npc():
     import streamlit.components.v1 as components
     
     if st.session_state.get('show_course_npc', False):
-        # 💡 終極修正：將所有 HTML 標籤「完全貼齊最左邊」，刪除所有行首空格！
-        # 這樣 Streamlit 的 Markdown 引擎就不會再把 4 個空格誤判為程式碼區塊了。
-        npc_html = """<style>
+        
+        # 💡 初始化 NPC 視窗的路由狀態 (list: 列表, detail: 第4課詳情)
+        if 'course_view' not in st.session_state:
+            st.session_state['course_view'] = 'list'
+            
+        current_view = st.session_state['course_view']
+        
+        if current_view == 'list':
+            # =========================
+            # 📜 課程列表 (List View)
+            # =========================
+            html_code = """<style>
 .npc-overlay {
 position: fixed; bottom: 30px; right: 30px;
 width: 650px; height: 75vh; max-height: 800px;
@@ -761,7 +770,7 @@ background: rgba(15, 23, 42, 0.96);
 border: 2px solid #00D2FF; border-radius: 12px;
 z-index: 9999999; display: flex; flex-direction: column;
 padding: 25px; box-shadow: 0 8px 30px rgba(0, 210, 255, 0.3);
-color: white; animation: slideUpNPC 0.5s cubic-bezier(0.175, 0.885, 0.32, 1.275);
+color: white; animation: slideUpNPC 0.4s cubic-bezier(0.175, 0.885, 0.32, 1.275);
 }
 .npc-header { display: flex; align-items: flex-end; margin-bottom: 20px; border-bottom: 1px solid rgba(255,255,255,0.1); padding-bottom: 15px; }
 .npc-image {
@@ -776,11 +785,15 @@ margin-right: 20px; filter: drop-shadow(0 0 5px rgba(0,210,255,0.5));
 .course-list { flex: 1; overflow-y: auto; padding-right: 15px; }
 .course-list::-webkit-scrollbar { width: 8px; }
 .course-list::-webkit-scrollbar-thumb { background: rgba(0, 210, 255, 0.4); border-radius: 4px; }
-.course-item { margin-bottom: 18px; padding: 15px; background: rgba(255,255,255,0.03); border: 1px solid rgba(255,255,255,0.08); border-radius: 10px; transition: 0.2s; cursor: pointer; }
-.course-item:hover { background: rgba(0, 210, 255, 0.08); border-color: rgba(0, 210, 255, 0.4); transform: translateY(-2px); }
-.course-title { color: #FFD700; font-weight: bold; font-size: 16px; margin-bottom: 8px; display: flex; align-items: center; gap: 5px; }
+.course-item { margin-bottom: 18px; padding: 15px; background: rgba(255,255,255,0.03); border: 1px solid rgba(255,255,255,0.08); border-radius: 10px; transition: 0.2s; }
+.course-item.locked { cursor: not-allowed; opacity: 0.5; filter: grayscale(100%); }
+.course-item.active { cursor: pointer; border-color: rgba(0, 210, 255, 0.4); }
+.course-item.active:hover { background: rgba(0, 210, 255, 0.1); border-color: #00D2FF; transform: translateY(-2px); box-shadow: 0 4px 15px rgba(0,210,255,0.2); }
+.course-title { font-weight: bold; font-size: 16px; margin-bottom: 8px; display: flex; align-items: center; gap: 5px; }
+.course-item.locked .course-title { color: #94A3B8; }
+.course-item.active .course-title { color: #FFD700; }
 .course-desc { font-size: 14px; color: #CBD5E1; line-height: 1.6; }
-.close-btn { position: absolute; top: 15px; right: 20px; cursor: pointer; color: #94A3B8; font-size: 24px; transition: 0.2s; }
+.close-btn { position: absolute; top: 15px; right: 20px; cursor: pointer; color: #94A3B8; font-size: 24px; transition: 0.2s; z-index: 10; font-weight: bold; }
 .close-btn:hover { color: #FF4C4C; transform: scale(1.1); }
 @keyframes slideUpNPC { from { transform: translateY(100px) scale(0.8); opacity: 0; } to { transform: translateY(0) scale(1); opacity: 1; } }
 </style>
@@ -795,64 +808,171 @@ margin-right: 20px; filter: drop-shadow(0 0 5px rgba(0,210,255,0.5));
 </div>
 </div>
 <div class="course-list">
-<div class="course-item">
-<div class="course-title">📖 1. 宏觀經濟與景氣循環（總經介紹）</div>
+<div class="course-item locked">
+<div class="course-title">🔒 1. 宏觀經濟與景氣循環 (未開放)</div>
 <div class="course-desc">學習解讀 GDP、CPI、利率與匯率等基本總體經濟指標，判斷目前大盤處於景氣擴張或衰退的哪個階段。</div>
 </div>
-<div class="course-item">
-<div class="course-title">📖 2. 股市基本架構與名詞解析</div>
+<div class="course-item locked">
+<div class="course-title">🔒 2. 股市基本架構與名詞解析 (未開放)</div>
 <div class="course-desc">認識台股交易規則、漲跌幅限制、各類委託單與基本盤面術語，建立進場前的基礎常識。</div>
 </div>
-<div class="course-item">
-<div class="course-title">📖 3. 財報與基本面入門</div>
+<div class="course-item locked">
+<div class="course-title">🔒 3. 財報與基本面入門 (未開放)</div>
 <div class="course-desc">學習閱讀三大財務報表（綜合損益表、資產負債表、現金流量表），學會挑選具備長期競爭力的公司。</div>
 </div>
-<div class="course-item">
-<div class="course-title">📖 4. 量價關係與盤面解讀</div>
+<div class="course-item active" onclick="document.getElementById('open-course-4-btn').click();">
+<div class="course-title">📖 4. 量價關係與盤面解讀 (點擊進入)</div>
 <div class="course-desc">對照成交量與股價漲跌的互動（如價漲量增、量價背離），判斷多空雙方的企圖心與買賣力道。</div>
 </div>
-<div class="course-item">
-<div class="course-title">📖 5. 技術分析與指標應用</div>
+<div class="course-item locked">
+<div class="course-title">🔒 5. 技術分析與指標應用 (未開放)</div>
 <div class="course-desc">熟悉常用技術指標（如均線 MA、MACD、RSI、KDJ），掌握支撐壓力與趨勢轉折點。</div>
 </div>
-<div class="course-item">
-<div class="course-title">📖 6. 籌碼面追蹤：法人與大戶結構</div>
+<div class="course-item locked">
+<div class="course-title">🔒 6. 籌碼面追蹤：法人與大戶結構 (未開放)</div>
 <div class="course-desc">分析外資、投信、自營商動向及大戶持股比例，透過資金流向尋找主力默默佈局的標的。</div>
 </div>
-<div class="course-item">
-<div class="course-title">📖 7. 券資關係與融資融券分析</div>
+<div class="course-item locked">
+<div class="course-title">🔒 7. 券資關係與融資融券分析 (未開放)</div>
 <div class="course-desc">觀察融資餘額、融券張數與券資比變化，評估市場散戶情緒及潛在的「軋空」或「多殺多」力道。</div>
 </div>
-<div class="course-item">
-<div class="course-title">📖 8. 產業趨勢與題材選股</div>
+<div class="course-item locked">
+<div class="course-title">🔒 8. 產業趨勢與題材選股 (未開放)</div>
 <div class="course-desc">掌握主流產業輪動脈絡（如半導體、AI 供應鏈、綠能等），在對的時間點佈局具備成長爆發力的賽道。</div>
 </div>
-<div class="course-item">
-<div class="course-title">📖 9. 資金控管與風險管理</div>
+<div class="course-item locked">
+<div class="course-title">🔒 9. 資金控管與風險管理 (未開放)</div>
 <div class="course-desc">學習單筆投資部位配置、分批進場策略、停損停利機制，避免因情緒失控而遭受重大虧損。</div>
 </div>
-<div class="course-item">
-<div class="course-title">📖 10. 交易心理學與個人策略總結</div>
+<div class="course-item locked">
+<div class="course-title">🔒 10. 交易心理學與個人策略總結 (未開放)</div>
 <div class="course-desc">克服貪婪與恐懼的心理障礙，並回測、修正並建立專屬於自己的穩定獲利交易系統。</div>
 </div>
 </div>
 </div>"""
+
+        else:
+            # =========================
+            # 📖 第4課詳情 (Detail View)
+            # =========================
+            html_code = """<style>
+.npc-overlay {
+position: fixed; bottom: 30px; right: 30px;
+width: 800px; height: 85vh; max-height: 900px;
+background: rgba(15, 23, 42, 0.98);
+border: 2px solid #00D2FF; border-radius: 12px;
+z-index: 9999999; display: flex; flex-direction: column;
+padding: 25px; box-shadow: 0 8px 30px rgba(0, 210, 255, 0.4);
+color: white; animation: slideUpNPC 0.4s cubic-bezier(0.175, 0.885, 0.32, 1.275);
+}
+.top-actions { position: absolute; top: 15px; right: 20px; display: flex; gap: 12px; z-index: 10; }
+.action-btn { cursor: pointer; color: #94A3B8; font-size: 20px; font-weight:bold; transition: 0.2s; display: flex; align-items: center; justify-content: center; background: rgba(0,0,0,0.5); width: 32px; height: 32px; border-radius: 50%; border: 1px solid rgba(255,255,255,0.1); }
+.action-btn:hover { background: rgba(0,210,255,0.3); color: #FFF; transform: scale(1.1); border-color: #00D2FF; }
+.action-btn.close:hover { background: rgba(255,76,76,0.8); border-color: #FF4C4C; }
+
+.detail-header { display: flex; align-items: flex-end; margin-bottom: 15px; border-bottom: 1px solid rgba(255,255,255,0.1); padding-bottom: 15px; gap: 20px; }
+.npc-big-image {
+width: 160px; height: 180px;
+background-image: url('app/static/npcroxy.png'); 
+background-size: contain; background-repeat: no-repeat; background-position: bottom;
+filter: drop-shadow(0 0 10px rgba(0,210,255,0.6)); flex-shrink: 0;
+}
+.dialogue-box {
+flex: 1; background: rgba(0, 210, 255, 0.08); border: 1px solid rgba(0, 210, 255, 0.3);
+border-radius: 12px; padding: 18px; position: relative; margin-bottom: 10px;
+}
+.dialogue-box::before {
+content: ''; position: absolute; left: -14px; bottom: 30px;
+border-width: 12px 14px 12px 0; border-style: solid; border-color: transparent rgba(0, 210, 255, 0.3) transparent transparent;
+}
+.npc-name { color: #00D2FF; font-weight: bold; font-size: 20px; margin-bottom: 8px; }
+.npc-text { font-size: 15px; color: #E2E8F0; line-height: 1.6; }
+
+.table-container { flex: 1; overflow-y: auto; padding-right: 10px; }
+.table-container::-webkit-scrollbar { width: 8px; }
+.table-container::-webkit-scrollbar-thumb { background: rgba(0, 210, 255, 0.4); border-radius: 4px; }
+
+.pv-table { width: 100%; border-collapse: collapse; font-size: 15px; text-align: center; }
+.pv-table th { background: rgba(0, 210, 255, 0.15); color: #00D2FF; padding: 12px; border-bottom: 2px solid #00D2FF; font-weight: bold; }
+.pv-table td { padding: 12px; border-bottom: 1px solid rgba(255,255,255,0.08); color: #CBD5E1; }
+.pv-table tr:hover td { background: rgba(255,255,255,0.05); color: #FFF; }
+.trend-up { color: #FF4C4C; font-weight: bold; }
+.trend-down { color: #00E676; font-weight: bold; }
+.trend-flat { color: #FFD700; font-weight: bold; }
+@keyframes slideUpNPC { from { transform: translateY(100px) scale(0.8); opacity: 0; } to { transform: translateY(0) scale(1); opacity: 1; } }
+</style>
+
+<div class="npc-overlay">
+<div class="top-actions">
+<div class="action-btn" onclick="document.getElementById('back-course-btn').click();" title="返回列表">↩</div>
+<div class="action-btn close" onclick="document.getElementById('close-npc-btn').click();" title="關閉">✕</div>
+</div>
+
+<div class="detail-header">
+<div class="npc-big-image"></div>
+<div class="dialogue-box">
+<div class="npc-name">籌碼導師 蘿西</div>
+<div class="npc-text">「量價關係是市場最真實的足跡！仔細看這張表，當『量』與『價』出現背離時，就是趨勢即將反轉的危險警訊喔！」</div>
+</div>
+</div>
+
+<div class="table-container">
+<table class="pv-table">
+<thead>
+<tr><th width="15%">趨勢</th><th width="20%">狀態</th><th width="65%">市場含義</th></tr>
+</thead>
+<tbody>
+<tr><td class="trend-up">上漲</td><td>價升量縮</td><td style="text-align: left;">量價背離，下方有承接，短期回調，後續拉高</td></tr>
+<tr><td class="trend-up">上漲</td><td>放量滯漲</td><td style="text-align: left;">趨勢高位，拋壓增大，即將見頂反轉，減倉清倉</td></tr>
+<tr><td class="trend-up">上漲</td><td>縮量大漲</td><td style="text-align: left;">趨勢中途，縮量加速，鎖倉高控盤，延續上漲</td></tr>
+<tr><td class="trend-up">上漲</td><td>放量大漲</td><td style="text-align: left;">價漲量增，量價齊升，多方吸籌，持續看漲</td></tr>
+<tr><td class="trend-down">下跌</td><td>縮量小跌</td><td style="text-align: left;">主力洗盤，拋壓減弱，止跌位置，擇機進場</td></tr>
+<tr><td class="trend-down">下跌</td><td>放量小跌</td><td style="text-align: left;">見底信號，買方增強，越跌越買，反轉新倉</td></tr>
+<tr><td class="trend-down">下跌</td><td>縮量大跌</td><td style="text-align: left;">一致看空，無人接盤，下跌中繼，加速下跌</td></tr>
+<tr><td class="trend-down">下跌</td><td>放量大跌</td><td style="text-align: left;">跟風砸盤，大量賣出，高位出貨，持續下跌</td></tr>
+<tr><td class="trend-flat">平量</td><td>平量滯漲</td><td style="text-align: left;">拋壓增大，越漲越難，高位見頂</td></tr>
+<tr><td class="trend-flat">平量</td><td>平量大漲</td><td style="text-align: left;">一致看漲，沒有拋壓，鎖倉高控盤，加速上漲</td></tr>
+<tr><td class="trend-flat">平量</td><td>平量價縮</td><td style="text-align: left;">下跌中繼，弱反彈信號，逢高減倉</td></tr>
+<tr><td class="trend-flat">平量</td><td>平量大跌</td><td style="text-align: left;">一致看空，沒有承接，下跌中繼，加速下跌</td></tr>
+</tbody>
+</table>
+</div>
+</div>"""
+
+        # 渲染畫面
+        st.markdown(html_code, unsafe_allow_html=True)
         
-        st.markdown(npc_html, unsafe_allow_html=True)
+        # =========================
+        # 🔗 後端路由控制器 (隱形按鈕)
+        # =========================
+        # 修正：不使用 display: none 隱藏，而是使用透明度和負的絕對位置，確保 React 能順利觸發事件
+        st.markdown("<div style='opacity:0; position:absolute; left:-9999px;'>", unsafe_allow_html=True)
         
-        if st.button("CloseNPC", key="close_npc_hidden_btn"):
+        if st.button("CloseNPC", key="close_npc_btn"):
             st.session_state['show_course_npc'] = False
+            st.session_state['course_view'] = 'list'  # 關閉時重置回選單
             st.rerun()
             
+        if st.button("OpenCourse4", key="open_course4_btn"):
+            st.session_state['course_view'] = 'detail' # 進入第4課
+            st.rerun()
+            
+        if st.button("BackToList", key="back_to_list_btn"):
+            st.session_state['course_view'] = 'list'   # 返回選單
+            st.rerun()
+            
+        st.markdown("</div>", unsafe_allow_html=True)
+            
+        # JS 綁定對應的 ID 給上面的 Python 按鈕
         bind_js = """<script>
 setTimeout(() => {
 const btns = window.parent.document.querySelectorAll('button');
 btns.forEach(b => {
-if(b.textContent.trim() === 'CloseNPC') { 
-b.id = 'close-npc-btn'; 
-b.style.display = 'none'; 
-}
+const txt = b.textContent.trim();
+if(txt === 'CloseNPC') { b.id = 'close-npc-btn'; b.style.opacity = '0'; b.style.position = 'absolute'; b.style.left = '-9999px'; }
+if(txt === 'OpenCourse4') { b.id = 'open-course-4-btn'; b.style.opacity = '0'; b.style.position = 'absolute'; b.style.left = '-9999px'; }
+if(txt === 'BackToList') { b.id = 'back-course-btn'; b.style.opacity = '0'; b.style.position = 'absolute'; b.style.left = '-9999px'; }
 });
-}, 100);
+}, 50);
 </script>"""
         components.html(bind_js, height=0, width=0)
