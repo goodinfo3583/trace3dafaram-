@@ -216,28 +216,28 @@ def inject_custom_header(is_logged_in=False):
                     
                     <div class="dropdown-item actionable">
                         <a href="https://www.facebook.com/DOUBLEE04/?locale=zh_TW" target="_blank" class="dropdown-title" style="text-decoration: none;">
-                            <img src="app/static/magicbook2.png" class="menu-icon" alt="fb-group"> 靠北投顧 3.0 
+                            <img src="app/static/icon-scam.png" class="menu-icon" alt="fb-group"> 靠北投顧 3.0 
                         </a>
-                        <p class="dropdown-text">分享分析師真實績效，避免受話術白白繳學費。</p>
+                        <p class="dropdown-text">分享分析師真實績效，避免受話術白繳學費。</p>
                     </div>
                     
                     <div class="dropdown-item actionable">
                         <a href="#" data-target="NavToCourses" class="dropdown-title internal-nav">
-                            <img src="app/static/magicbookleaf.png" class="menu-icon" alt="courses"> 基礎課程
+                            <img src="app/static/icon-education.png" class="menu-icon" alt="courses"> 課程
                         </a>
-                        <p class="dropdown-text">量價關係、籌碼結構等10堂基礎課，強化自身能力不求人。</p>
+                        <p class="dropdown-text">增加最大智識，提升能力不求人。</p>
                     </div>
                     
                     <div class="dropdown-item locked-item">
                         <span class="dropdown-title">
-                            <img src="app/static/icon-podiumaward.png" class="menu-icon" alt="lock"> 券商分點 (先不開放)
+                            <img src="app/static/icon-podiumaward.png" class="menu-icon" alt="lock"> 券商分點 (開發中)
                         </span>
                         <p class="dropdown-text">追蹤特定券商分點進出動向。</p>
                     </div>
                     
                     <div class="dropdown-item locked-item">
                         <span class="dropdown-title">
-                            <img src="app/static/icon-podiumaward.png" class="menu-icon" alt="lock"> 主力追蹤 (先不開放)
+                            <img src="app/static/icon-podiumaward.png" class="menu-icon" alt="lock"> 主力追蹤 (開發中)
                         </span>
                         <p class="dropdown-text">深度解析主力籌碼囤積路徑。</p>
                     </div>
