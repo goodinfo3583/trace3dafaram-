@@ -827,7 +827,7 @@ margin-right: 20px; filter: drop-shadow(0 0 5px rgba(0,210,255,0.5));
 
 <!-- 💡 放棄 onclick，改用 id="btn-open-course-4" -->
 <div class="course-item active" id="btn-open-course-4">
-<div class="course-title"><img src="app/static/icon-class.png" class="course-icon"> 4. 量價關係與盤面解讀 (點擊進入)</div>
+<div class="course-title"><img src="app/static/icon-course1.png" class="course-icon"> 4. 量價關係與盤面解讀 (點擊進入)</div>
 <div class="course-desc">對照成交量與股價漲跌的互動（如價漲量增、量價背離），判斷多空雙方的企圖心與買賣力道。</div>
 </div>
 
@@ -844,15 +844,15 @@ margin-right: 20px; filter: drop-shadow(0 0 5px rgba(0,210,255,0.5));
 <div class="course-desc">觀察融資餘額、融券張數與券資比變化，評估市場散戶情緒及潛在的「軋空」或「多殺多」力道。</div>
 </div>
 <div class="course-item locked">
-<div class="course-title"><img src="app/static/icon-class.png" class="course-icon"> 8. 產業趨勢與題材選股 (未開放)</div>
+<div class="course-title"><img src="app/static/icon-course1.png" class="course-icon"> 8. 產業趨勢與題材選股 (未開放)</div>
 <div class="course-desc">掌握主流產業輪動脈絡（如半導體、AI 供應鏈、綠能等），在對的時間點佈局具備成長爆發力的賽道。</div>
 </div>
 <div class="course-item locked">
-<div class="course-title"><img src="app/static/icon-class.png" class="course-icon"> 9. 資金控管與風險管理 (未開放)</div>
+<div class="course-title"><img src="app/static/icon-course1.png" class="course-icon"> 9. 資金控管與風險管理 (未開放)</div>
 <div class="course-desc">學習單筆投資部位配置、分批進場策略、停損停利機制，避免因情緒失控而遭受重大虧損。</div>
 </div>
 <div class="course-item locked">
-<div class="course-title"><img src="app/static/icon-class.png" class="course-icon"> 10. 交易心理學與個人策略總結 (未開放)</div>
+<div class="course-title"><img src="app/static/icon-course1.png" class="course-icon"> 10. 交易心理學與個人策略總結 (未開放)</div>
 <div class="course-desc">克服貪婪與恐懼的心理障礙，並回測、修正並建立專屬於自己的穩定獲利交易系統。</div>
 </div>
 
