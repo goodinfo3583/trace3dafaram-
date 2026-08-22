@@ -5,8 +5,8 @@ import os
 import random
 
 def load_global_css():
-    """載入全站共用的隱藏設定、縮排與動態主題 (暗黑/亮白) CSS"""
-    theme = st.session_state.get('theme', 'dark') # 預設暗黑
+    """載入全站共用的隱藏設定、縮排與動態主題 (深色濾鏡護眼版) CSS"""
+    theme = st.session_state.get('theme', 'dark')
     
     hide_streamlit_style = """
         <style>
@@ -19,49 +19,53 @@ def load_global_css():
     """
     st.markdown(hide_streamlit_style, unsafe_allow_html=True)
 
-    if theme == 'dark':
-        # 🌙 暗黑護眼化 (你原本的設定)
-        theme_css = """
-            <style>
-            .stApp { background-color: #0A0D14 !important; }
-            h1, h2, h3, h4, h5, h6, p, label, .stMarkdown, .stText { color: #E2E8F0 !important; }
-            [data-testid="stAlert"] { background-color: transparent !important; border: 1px solid #2D3748 !important; }
-            [data-testid="stSidebar"] { background-color: #111622 !important; border-right: 1px solid #1E293B; }
-            .stTextInput>div>div>input { background-color: #1A202C !important; color: #FFFFFF !important; border: 1px solid #4A5568 !important; }
-            div[data-testid="stDataFrame"] { background-color: #111622 !important; border: 1px solid #1E293B !important; border-radius: 6px; }
-            /* ... 原本的 dark css 細節 ... */
-            </style>
-        """
-    else:
-        # ☀️ 亮白模式 (文字轉深灰、背景轉白)
-        theme_css = """
-            <style>
-            .stApp { background-color: #F8FAFC !important; }
-            h1, h2, h3, h4, h5, h6, p, label, .stMarkdown, .stText { color: #1E293B !important; }
-            [data-testid="stAlert"] { background-color: transparent !important; border: 1px solid #CBD5E1 !important; color: #1E293B !important; }
-            [data-testid="stSidebar"] { background-color: #F1F5F9 !important; border-right: 1px solid #E2E8F0; }
-            .stTextInput>div>div>input { background-color: #FFFFFF !important; color: #1E293B !important; border: 1px solid #CBD5E1 !important; }
-            div[data-testid="stDataFrame"] { background-color: #FFFFFF !important; border: 1px solid #E2E8F0 !important; border-radius: 6px; }
-            
-            .stButton > button, .stLinkButton > a {
-                background-color: #FFFFFF !important; 
-                color: #334155 !important; 
-                border: 1px solid #CBD5E1 !important;
-                transition: all 0.2s ease-in-out;
-            }
-            .stButton > button:hover, .stLinkButton > a:hover {
-                border-color: #00D2FF !important; color: #00D2FF !important;
-                box-shadow: 0 0 8px rgba(0, 210, 255, 0.2);
-            }
-            </style>
-        """
+    # 💡 保留所有你自訂的暗黑文字與框線顏色，只微調極致背景色
+    bg_color = "#0A0D14" # 專業暗黑 (預設)
+    if theme == 'pink': bg_color = "#170A10"  # 櫻花暗粉
+    elif theme == 'green': bg_color = "#0A140F" # 森林暗綠
+    elif theme == 'blue': bg_color = "#0A0D1A"  # 星空深藍
+
+    theme_css = f"""
+        <style>
+        .stApp {{ background-color: {bg_color} !important; }}
+        h1, h2, h3, h4, h5, h6, p, label, .stMarkdown, .stText {{ color: #E2E8F0 !important; }}
+        [data-testid="stAlert"] {{ background-color: transparent !important; border: 1px solid #2D3748 !important; }}
+        [data-testid="stSidebar"] {{ background-color: rgba(17, 22, 34, 0.95) !important; border-right: 1px solid #1E293B; }}
+        .stTextInput>div>div>input {{ background-color: #1A202C !important; color: #FFFFFF !important; border: 1px solid #4A5568 !important; }}
+        div[data-testid="stDataFrame"] {{ background-color: #111622 !important; border: 1px solid #1E293B !important; border-radius: 6px; }}
+        
+        .stButton > button, .stLinkButton > a {{
+            background-color: #1E293B !important; 
+            color: #94A3B8 !important; 
+            border: 1px solid #334155 !important;
+            transition: all 0.2s ease-in-out;
+        }}
+        .stButton > button:hover, .stLinkButton > a:hover {{
+            border-color: #00D2FF !important;
+            color: #00D2FF !important;
+            box-shadow: 0 0 8px rgba(0, 210, 255, 0.2);
+        }}
+        </style>
+    """
     st.markdown(theme_css, unsafe_allow_html=True)
 
 def set_background(image_path):
-    """網站主視覺背景設定引擎 (支援主題透明度變更)"""
+    """網站主視覺背景設定引擎 (支援濾鏡主題)"""
     theme = st.session_state.get('theme', 'dark')
-    overlay = "rgba(15, 23, 42, 0.88)" if theme == 'dark' else "rgba(248, 250, 252, 0.90)"
-    block_bg = "rgba(15, 23, 42, 0.6)" if theme == 'dark' else "rgba(255, 255, 255, 0.6)"
+    
+    # 💡 根據主題動態改變背景圖片上方的遮罩濾鏡顏色
+    if theme == 'pink':
+        overlay = "rgba(35, 15, 25, 0.88)"
+        block_bg = "rgba(35, 15, 25, 0.6)"
+    elif theme == 'green':
+        overlay = "rgba(15, 35, 20, 0.88)"
+        block_bg = "rgba(15, 35, 20, 0.6)"
+    elif theme == 'blue':
+        overlay = "rgba(15, 20, 40, 0.88)"
+        block_bg = "rgba(15, 20, 40, 0.6)"
+    else: # 預設 dark
+        overlay = "rgba(15, 23, 42, 0.88)"
+        block_bg = "rgba(15, 23, 42, 0.6)"
     
     try:
         with open(image_path, "rb") as file:
@@ -86,6 +90,7 @@ def set_background(image_path):
         st.markdown(css, unsafe_allow_html=True)
     except FileNotFoundError:
         pass
+    
 def render_fireflies():
     """純代碼動態螢火蟲引擎"""
     num_fireflies = 5 
@@ -600,37 +605,27 @@ def render_b5_top10_glass_card():
         st.markdown(card_html, unsafe_allow_html=True)
     except Exception as e: pass
 
-## ==========================================
-# ⚙️ 系統設定 懸浮玻璃卡片 (新增在 style_manager.py 最下方)
+# ==========================================
+# ⚙️ 系統設定 懸浮玻璃卡片 (放在 style_manager.py 最下方)
 # ==========================================
 def render_settings_modal():
     import streamlit as st
     if st.session_state.get('show_settings', False):
         settings_css = """
         <style>
-        /* 半透明黑幕遮罩 */
         .settings-overlay {
             position: fixed; top: 0; left: 0; width: 100vw; height: 100vh;
-            background: rgba(0, 0, 0, 0.7); backdrop-filter: blur(3px);
+            background: rgba(0, 0, 0, 0.75); backdrop-filter: blur(4px);
             z-index: 9999998; pointer-events: none;
         }
-        /* 抓出包含設定錨點的 Streamlit 原生區塊，強制它變成浮動卡片 */
         div[data-testid="stVerticalBlock"]:has(.setting-anchor) {
             position: fixed !important; 
-            top: 50% !important; 
-            left: 50% !important; 
-            transform: translate(-50%, -50%) !important;
-            background: rgba(17, 22, 34, 0.95) !important;
-            backdrop-filter: blur(16px) !important; 
-            border: 1px solid #00D2FF !important;
-            border-radius: 12px !important; 
-            padding: 25px !important; 
-            z-index: 9999999 !important;
-            width: 90% !important; 
-            max-width: 600px !important;
-            box-shadow: 0 0 25px rgba(0, 210, 255, 0.2) !important;
-            max-height: 85vh !important; 
-            overflow-y: auto !important;
+            top: 50% !important; left: 50% !important; transform: translate(-50%, -50%) !important;
+            background: rgba(17, 22, 34, 0.95) !important; backdrop-filter: blur(16px) !important; 
+            border: 1px solid #00D2FF !important; border-radius: 12px !important; 
+            padding: 25px !important; z-index: 9999999 !important;
+            width: 90% !important; max-width: 650px !important; box-shadow: 0 0 25px rgba(0, 210, 255, 0.2) !important;
+            max-height: 85vh !important; overflow-y: auto !important;
         }
         </style>
         <div class="settings-overlay"></div>
@@ -639,14 +634,23 @@ def render_settings_modal():
         
         with st.container():
             st.markdown('<div class="setting-anchor"></div>', unsafe_allow_html=True)
-            st.markdown("<h3 style='color:#00D2FF; margin-top:0;'>⚙️ 系統設定中心</h3>", unsafe_allow_html=True)
+            st.markdown("<h3 style='color:#00D2FF; margin-top:0;'>設置中心</h3>", unsafe_allow_html=True)
             
+            # 💡 全新護眼主題選擇器
             current_theme = st.session_state.get('theme', 'dark')
+            theme_options = ['dark', 'pink', 'green', 'blue']
+            theme_labels = {
+                'dark': "🌙 專業暗黑 (預設)",
+                'pink': "🌸 櫻花暗粉",
+                'green': "🌲 森林暗綠",
+                'blue': "🌌 星空深藍"
+            }
             theme_choice = st.radio(
-                "🎨 選擇您偏好的底色：", 
-                options=['dark', 'light'], 
-                format_func=lambda x: "🌙 專業暗黑模式 (預設)" if x == 'dark' else "☀️ 亮白模式",
-                index=0 if current_theme == 'dark' else 1
+                "🎨 選擇您偏好的背景濾鏡：", 
+                options=theme_options,
+                format_func=lambda x: theme_labels[x],
+                index=theme_options.index(current_theme) if current_theme in theme_options else 0,
+                horizontal=True
             )
             
             st.markdown("---")
@@ -654,8 +658,8 @@ def render_settings_modal():
             
             default_hotkeys = {
                 "f1": "NavToB1", "f2": "NavToB2", "f3": "NavToB3", 
-                "f4": "NavToB4", "f5": "NavToB5", "f7": "NavToB7",
-                "alt+l": "NavToWatchlist", "escape": "NavToSystem"
+                "f4": "NavToB4", "f5": "NavToB5", "f6": "NavToB6", "f7": "NavToB7",
+                "alt+l": "NavToWatchlist", "escape": "登入"
             }
             current_hotkeys = st.session_state.get('custom_hotkeys', default_hotkeys)
             reverse_map = {v: k for k, v in current_hotkeys.items()}
@@ -667,11 +671,14 @@ def render_settings_modal():
                 new_hotkeys["NavToB2"] = st.text_input("法人掃貨", value=reverse_map.get("NavToB2", "f2"))
                 new_hotkeys["NavToB3"] = st.text_input("法人連買", value=reverse_map.get("NavToB3", "f3"))
                 new_hotkeys["NavToB4"] = st.text_input("資券動向", value=reverse_map.get("NavToB4", "f4"))
+                # 💡 新增的鉅額交易 F6 欄位
+                new_hotkeys["NavToB6"] = st.text_input("鉅額交易", value=reverse_map.get("NavToB6", "f6"))
             with col2:
                 new_hotkeys["NavToB5"] = st.text_input("大腿動向", value=reverse_map.get("NavToB5", "f5"))
                 new_hotkeys["NavToB7"] = st.text_input("董監動向", value=reverse_map.get("NavToB7", "f7"))
                 new_hotkeys["NavToWatchlist"] = st.text_input("建立名單", value=reverse_map.get("NavToWatchlist", "alt+l"))
-                new_hotkeys["NavToSystem"] = st.text_input("系統首頁", value=reverse_map.get("NavToSystem", "escape"))
+                # 💡 已改為 "登入" 取代系統首頁
+                new_hotkeys["登入"] = st.text_input("登入", value=reverse_map.get("登入", "escape"))
                 
             st.markdown("<br>", unsafe_allow_html=True)
             
