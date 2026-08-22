@@ -3,9 +3,10 @@ import streamlit as st
 import base64
 import os
 import random
+import streamlit.components.v1 as components
 
 def load_global_css():
-    """載入全站共用的隱藏設定、縮排與動態主題 (深色濾鏡護眼版) CSS"""
+    """載入全站共用的隱藏設定、縮排與動態主題 (深色濾鏡護眼版) CSS，以及全域拖曳引擎"""
     theme = st.session_state.get('theme', 'dark')
     
     hide_streamlit_style = """
@@ -15,13 +16,19 @@ def load_global_css():
         header {visibility: hidden;}
         div[data-testid="stToolbar"] {visibility: hidden;}
         .block-container { padding-top: 0rem; }
+        
+        /* 啟用所有懸浮視窗的縮放功能 (右下角可拉伸) */
+        .glass-panel, .glass-panel-b2, .glass-panel-b4, .glass-panel-b5, .npc-overlay, .settings-modal-active {
+            resize: both !important; 
+            overflow: auto !important; 
+        }
         </style>
     """
     st.markdown(hide_streamlit_style, unsafe_allow_html=True)
 
     # 💡 保留所有你自訂的暗黑文字與框線顏色，只微調極致背景色
     bg_color = "#0A0D14" # 專業暗黑 (預設)
-    if theme == 'pink': bg_color = "##edb8f2"  # 櫻花暗粉
+    if theme == 'pink': bg_color = "#edb8f2"  # 櫻花暗粉
     elif theme == 'green': bg_color = "#0A140F" # 森林暗綠
     elif theme == 'blue': bg_color = "#b8ecf2"  # 星空深藍
 
@@ -49,11 +56,101 @@ def load_global_css():
     """
     st.markdown(theme_css, unsafe_allow_html=True)
 
+    # 💡 注入全域視窗拖曳引擎 (支援手機觸控與滑鼠拖曳)
+    drag_engine_js = """
+    <script>
+    (function() {
+        if (window.parent.window.customDragInitialized) return;
+        window.parent.window.customDragInitialized = true;
+        const doc = window.parent.document;
+        
+        function makeDraggable(el, handleSelector) {
+            if (!el || el.dataset.dragHooked) return;
+            el.dataset.dragHooked = 'true';
+            
+            let handle = el.querySelector(handleSelector) || el;
+            let isDragging = false, startX, startY, initialX, initialY;
+            
+            const onDown = (e) => {
+                // 排除點擊按鈕、輸入框等元素
+                if (e.target.closest('.action-btn') || e.target.closest('.action-btn-b2') || 
+                    e.target.closest('.action-btn-b4') || e.target.closest('.action-btn-b5') ||
+                    e.target.tagName === 'INPUT' || e.target.tagName === 'BUTTON' || e.target.tagName === 'LABEL') return;
+                
+                isDragging = true;
+                let clientX = e.touches ? e.touches[0].clientX : e.clientX;
+                let clientY = e.touches ? e.touches[0].clientY : e.clientY;
+                startX = clientX;
+                startY = clientY;
+                
+                let rect = el.getBoundingClientRect();
+                // 鎖定絕對位置，解除 right/bottom 限制
+                el.style.left = rect.left + 'px';
+                el.style.top = rect.top + 'px';
+                el.style.right = 'auto';
+                el.style.bottom = 'auto';
+                el.style.transform = 'none';
+                el.style.margin = '0';
+                
+                initialX = rect.left;
+                initialY = rect.top;
+                
+                doc.addEventListener('mousemove', onMove, {passive: false});
+                doc.addEventListener('mouseup', onUp);
+                doc.addEventListener('touchmove', onMove, {passive: false});
+                doc.addEventListener('touchend', onUp);
+                handle.style.cursor = 'grabbing';
+            };
+            
+            const onMove = (e) => {
+                if (!isDragging) return;
+                e.preventDefault(); // 防止手機畫面捲動
+                let clientX = e.touches ? e.touches[0].clientX : e.clientX;
+                let clientY = e.touches ? e.touches[0].clientY : e.clientY;
+                el.style.left = (initialX + (clientX - startX)) + 'px';
+                el.style.top = (initialY + (clientY - startY)) + 'px';
+            };
+            
+            const onUp = () => {
+                isDragging = false;
+                doc.removeEventListener('mousemove', onMove);
+                doc.removeEventListener('mouseup', onUp);
+                doc.removeEventListener('touchmove', onMove);
+                doc.removeEventListener('touchend', onUp);
+                handle.style.cursor = 'grab';
+            };
+            
+            handle.addEventListener('mousedown', onDown);
+            handle.addEventListener('touchstart', onDown, {passive: false});
+            handle.style.cursor = 'grab';
+            handle.title = '按住此處可拖曳視窗';
+        }
+
+        // 持續掃描並綁定 Streamlit 動態生成的視窗
+        setInterval(() => {
+            makeDraggable(doc.getElementById('b2-top10-card'), '.header-bar-b2');
+            makeDraggable(doc.getElementById('b3-top10-card'), '.header-bar');
+            makeDraggable(doc.getElementById('b4-top10-card'), '.header-bar-b4');
+            makeDraggable(doc.getElementById('b5-top10-card'), '.header-bar-b5');
+            
+            let npc = doc.querySelector('.npc-overlay');
+            if (npc) {
+                if (npc.querySelector('.npc-header')) makeDraggable(npc, '.npc-header');
+                else if (npc.querySelector('.detail-header')) makeDraggable(npc, '.detail-header');
+            }
+            
+            let settingsModal = doc.querySelector('.settings-modal-active');
+            if (settingsModal) makeDraggable(settingsModal, '.settings-drag-handle');
+        }, 500);
+    })();
+    </script>
+    """
+    components.html(drag_engine_js, height=0, width=0)
+
 def set_background(image_path):
     """網站主視覺背景設定引擎 (支援濾鏡主題)"""
     theme = st.session_state.get('theme', 'dark')
     
-    # 💡 根據主題動態改變背景圖片上方的遮罩濾鏡顏色
     if theme == 'pink':
         overlay = "rgba(35, 15, 25, 0.88)"
         block_bg = "rgba(35, 15, 25, 0.6)"
@@ -269,7 +366,6 @@ def render_b2_top10_glass_card():
 #pause-b2-card:checked ~ #b2-top10-card .pause-icon-b2::after {{ content: '▶'; font-size: 11px; color: #FFD700; }}
 #pause-b2-card:not(:checked) ~ #b2-top10-card .pause-icon-b2::after {{ content: '⏸'; font-size: 11px; }}
 @keyframes slideInDownB2 {{ from {{ transform: translateY(-50%); opacity: 0; }} to {{ transform: translateY(0); opacity: 1; }} }}
-/* 💡 將 top: 75px 改為 top: 100px */
 .glass-panel-b2 {{position: fixed; top: 85px; left: 84.5vw; width: 15.5vw; min-width: 220px; background: rgba(30, 20, 20, 0.88); backdrop-filter: blur(12px); -webkit-backdrop-filter: blur(12px); border: 1px solid rgba(255, 76, 76, 0.35); border-radius: 0 12px 12px 0; padding: 10px 12px; z-index: 999998; color: #E2E8F0; animation: slideInDownB2 0.9s cubic-bezier(0.25, 0.8, 0.25, 1); transition: all 0.3s ease; box-sizing: border-box; }}
 .header-bar-b2 {{ display: flex; justify-content: space-between; align-items: center; border-bottom: 1px solid rgba(255,255,255,0.1); padding-bottom: 6px; margin-bottom: 8px; cursor: default; }}
 .header-title-b2 {{ font-size: 13px; font-weight: bold; color: #FF7676; white-space:nowrap; }}
@@ -362,7 +458,6 @@ def render_top10_glass_card():
 #pause-card:checked ~ #b3-top10-card .pause-icon::after {{ content: '▶'; font-size: 11px; color: #FFD700; }}
 #pause-card:not(:checked) ~ #b3-top10-card .pause-icon::after {{ content: '⏸'; font-size: 11px; }}
 @keyframes slideInDownB3 {{ from {{ transform: translateY(-50%); opacity: 0; }} to {{ transform: translateY(0); opacity: 1; }} }}
-/* 💡 將 top: 75px 改為 top: 100px */
 .glass-panel {{position: fixed; top: 85px; left: 69vw; width: 15.5vw; min-width: 220px; background: rgba(15, 23, 42, 0.88); backdrop-filter: blur(12px); -webkit-backdrop-filter: blur(12px); border: 1px solid rgba(0, 210, 255, 0.35); border-right: none; border-radius: 0; padding: 10px 12px; z-index: 999999; color: #E2E8F0; animation: slideInDownB3 0.8s cubic-bezier(0.25, 0.8, 0.25, 1); transition: all 0.3s ease; box-sizing: border-box;}}
 .header-bar {{ display: flex; justify-content: space-between; align-items: center; border-bottom: 1px solid rgba(255,255,255,0.1); padding-bottom: 6px; margin-bottom: 8px; cursor: default; }}
 .header-title {{ font-size: 13px; font-weight: bold; color: #64748B; white-space:nowrap; }}
@@ -457,7 +552,6 @@ def render_b4_top10_glass_card():
 #pause-b4-card:not(:checked) ~ #b4-top10-card .pause-icon-b4::after {{ content: '⏸'; font-size: 11px; }}
 @keyframes slideInDownB4 {{ from {{ transform: translateY(-50%); opacity: 0; }} to {{ transform: translateY(0); opacity: 1; }} }}
 @keyframes radarBreath {{ 0%, 49.9% {{ border-color: rgba(188, 19, 254, 0.4); box-shadow: 0 4px 15px rgba(188, 19, 254, 0.15); }} 50%, 100% {{ border-color: rgba(0, 230, 118, 0.4); box-shadow: 0 4px 15px rgba(0, 230, 118, 0.1); }} }}
-/* 💡 將 top: 75px 改為 top: 100px */
 .glass-panel-b4 {{ position: fixed; top: 85px; left: 38vw; width: 15.5vw; min-width: 220px; background: rgba(20, 22, 35, 0.88); backdrop-filter: blur(12px); -webkit-backdrop-filter: blur(12px); border: 1px solid rgba(188, 19, 254, 0.35); border-right: none; border-radius: 12px 0 0 12px; padding: 10px 12px; z-index: 999997; color: #E2E8F0;animation: slideInDownB4 0.6s cubic-bezier(0.25, 0.8, 0.25, 1);     transition: all 0.3s ease; box-sizing: border-box; }}
 .header-bar-b4 {{ display: flex; justify-content: space-between; align-items: center; border-bottom: 1px solid rgba(255,255,255,0.1); padding-bottom: 6px; margin-bottom: 8px; cursor: default; }}
 .header-title-b4 {{ font-size: 13px; font-weight: bold; color: #E2E8F0; white-space:nowrap; }}
@@ -541,12 +635,13 @@ def render_b5_top10_glass_card():
             if df.empty: return "<p style='font-size:13.5px; text-align:center; color:#94A3B8; margin-top:40px;'>尚無共振標的</p>"
             html = "<ul style='padding-left: 0; margin: 0; list-style-type: none;'>"
             for i, row in enumerate(df.to_dict('records')):
+                # 💡 修正 1：調整 B5 卡片的字體大小為 13.5px，與其他卡片保持一致
                 if is_6w:
                     v1, v2 = row['6周(千)_val'], row['6周(四)_val']
-                    info_html = f"<div style='display:flex; width:45%; justify-content:flex-end; color:#F59E0B; font-weight:bold; font-size:11px;'><span style='width:40px; text-align:right;'>{v1:.1f}%</span><span style='color:#94A3B8; font-size:9px; margin:0 2px;'>/</span><span style='width:40px; text-align:right;'>{v2:.1f}%</span></div>"
+                    info_html = f"<div style='display:flex; width:45%; justify-content:flex-end; color:#F59E0B; font-weight:bold; font-size:13.5px;'><span style='width:45px; text-align:right;'>{v1:.1f}%</span><span style='color:#94A3B8; font-size:12px; margin:0 2px;'>/</span><span style='width:45px; text-align:right;'>{v2:.1f}%</span></div>"
                 else:
                     s1, s2 = unify_status_text(row.get('狀態(千)', '')), unify_status_text(row.get('狀態(四)', ''))
-                    info_html = f"<div style='display:flex; width:45%; justify-content:flex-end; color:#F59E0B; font-size:10px;'><span style='width:40px; text-align:right;'>{s1}</span><span style='color:#94A3B8; font-size:9px; margin:0 2px;'>/</span><span style='width:40px; text-align:right;'>{s2}</span></div>"
+                    info_html = f"<div style='display:flex; width:45%; justify-content:flex-end; color:#F59E0B; font-size:13.5px;'><span style='width:45px; text-align:right;'>{s1}</span><span style='color:#94A3B8; font-size:12px; margin:0 2px;'>/</span><span style='width:45px; text-align:right;'>{s2}</span></div>"
                 
                 html += (
                     f"<li style='display:flex; align-items:center; justify-content:space-between; margin-bottom:6px; font-size:13.5px; line-height:1.4;'>"
@@ -574,7 +669,6 @@ def render_b5_top10_glass_card():
 #pause-b5-card:checked ~ #b5-top10-card .pause-icon-b5::after {{ content: '▶'; font-size: 11px; color: #FFD700; }}
 #pause-b5-card:not(:checked) ~ #b5-top10-card .pause-icon-b5::after {{ content: '⏸'; font-size: 11px; }}
 @keyframes slideInDownB5 {{ from {{ transform: translateY(-50%); opacity: 0; }} to {{ transform: translateY(0); opacity: 1; }} }}
-/* 💡 將 top: 75px 改為 top: 100px */
 .glass-panel-b5 {{position: fixed; top: 85px; left: 53.5vw; width: 15.5vw; min-width: 220px; background: rgba(30, 25, 10, 0.88); backdrop-filter: blur(12px); -webkit-backdrop-filter: blur(12px); border: 1px solid rgba(245, 158, 11, 0.4); border-right: none; border-radius: 0; padding: 10px 12px; z-index: 999996; color: #E2E8F0; animation: slideInDownB5 0.7s cubic-bezier(0.25, 0.8, 0.25, 1); transition: all 0.3s ease; box-sizing: border-box;}}
 .header-bar-b5 {{ display: flex; justify-content: space-between; align-items: center; border-bottom: 1px solid rgba(255,255,255,0.1); padding-bottom: 6px; margin-bottom: 8px; cursor: default; }}
 .header-title-b5 {{ font-size: 13px; font-weight: bold; color: #FCD34D; white-space:nowrap; }}
@@ -614,24 +708,30 @@ def render_settings_modal():
     if st.session_state.get('show_settings', False):
         settings_css = """
         <style>
-        /* 💡 徹底消滅雙重捲軸與背景雜訊：將背景改為不透明深色，並鎖死外層滾動條 */
         .stApp { overflow: hidden !important; } 
         
         .settings-overlay {
             position: fixed; top: 0; left: 0; width: 100vw; height: 100vh;
-            background: #0A0D14; /* 實心深黑背景，不會透出雜訊 */
+            background: #0A0D14; 
             z-index: 9999998; pointer-events: auto;
         }
         
-        div[data-testid="stVerticalBlock"]:has(.setting-anchor) {
+        /* 💡 修正 3：取消使用易導致巢狀重疊的 CSS :has，改以 JavaScript 精準定位單一外框 */
+        .settings-modal-active {
             position: fixed !important; 
             top: 50% !important; left: 50% !important; transform: translate(-50%, -50%) !important;
             background: rgba(17, 22, 34, 1) !important; 
             border: 1px solid #00D2FF !important; border-radius: 12px !important; 
             padding: 25px !important; z-index: 9999999 !important;
             width: 90% !important; max-width: 650px !important; box-shadow: 0 0 25px rgba(0, 210, 255, 0.2) !important;
-            max-height: 85vh !important; overflow-y: auto !important;
+            max-height: 85vh !important;
         }
+        .settings-drag-handle {
+            cursor: grab;
+            display: inline-block;
+            width: 100%;
+        }
+        .settings-drag-handle:active { cursor: grabbing; }
         </style>
         <div class="settings-overlay"></div>
         """
@@ -639,7 +739,8 @@ def render_settings_modal():
         
         with st.container():
             st.markdown('<div class="setting-anchor"></div>', unsafe_allow_html=True)
-            st.markdown("<h3 style='color:#00D2FF; margin-top:0;'>設置中心</h3>", unsafe_allow_html=True)
+            # 添加了可拖曳的 class 識別標籤
+            st.markdown("<h3 class='settings-drag-handle' style='color:#00D2FF; margin-top:0;'>⚙️ 設置中心 (按住此處可拖曳)</h3>", unsafe_allow_html=True)
             
             current_theme = st.session_state.get('theme', 'dark')
             theme_options = ['dark', 'pink', 'green', 'blue']
@@ -697,15 +798,18 @@ def render_settings_modal():
                     st.session_state['show_settings'] = False
                     st.rerun()
                     
-        # 💡 電競級動態按鍵綁定引擎 (注入 JS 攔截輸入)
         keybind_js = """
         <script>
         setTimeout(() => {
             const parentDoc = window.parent.document;
-            const settingsBlock = parentDoc.querySelector('.setting-anchor');
-            if (!settingsBlock) return;
-            const container = settingsBlock.closest('div[data-testid="stVerticalBlock"]');
-            if (!container) return;
+            const anchor = parentDoc.querySelector('.setting-anchor');
+            if (!anchor) return;
+            
+            // 💡 修正 3：由 Javascript 精確找尋當前唯一的外層元件，解決巢狀視窗破圖
+            const container = anchor.closest('div[data-testid="stVerticalBlock"]');
+            if (container && !container.classList.contains('settings-modal-active')) {
+                container.classList.add('settings-modal-active');
+            }
             
             const inputs = container.querySelectorAll('input[type="text"]');
             inputs.forEach(input => {
@@ -728,7 +832,6 @@ def render_settings_modal():
                     combo.push(keyName);
                     let finalKey = combo.join('+');
                     
-                    // React Hack: 寫入 Streamlit 元件
                     let nativeInputValueSetter = Object.getOwnPropertyDescriptor(window.HTMLInputElement.prototype, "value").set;
                     nativeInputValueSetter.call(this, finalKey);
                     let ev2 = new Event('input', { bubbles: true});
@@ -758,9 +861,6 @@ def render_course_npc():
         current_view = st.session_state['course_view']
         
         if current_view == 'list':
-            # =========================
-            # 📜 課程列表 (List View)
-            # =========================
             html_code = """<style>
 .npc-overlay {
 position: fixed; bottom: 30px; right: 30px;
@@ -771,14 +871,15 @@ z-index: 9999999; display: flex; flex-direction: column;
 padding: 25px; box-shadow: 0 8px 30px rgba(0, 210, 255, 0.3);
 color: white; animation: slideUpNPC 0.4s cubic-bezier(0.175, 0.885, 0.32, 1.275);
 }
-.npc-header { display: flex; align-items: flex-end; margin-bottom: 20px; border-bottom: 1px solid rgba(255,255,255,0.1); padding-bottom: 15px; }
+.npc-header { display: flex; align-items: flex-end; margin-bottom: 20px; border-bottom: 1px solid rgba(255,255,255,0.1); padding-bottom: 15px; cursor: grab; }
+.npc-header:active { cursor: grabbing; }
 .npc-image {
 width: 90px; height: 90px;
 background-image: url('app/static/npcnatzu.png'); 
 background-size: contain; background-repeat: no-repeat; background-position: bottom;
 margin-right: 20px; filter: drop-shadow(0 0 5px rgba(0,210,255,0.5));
 }
-.npc-title-box { flex: 1; }
+.npc-title-box { flex: 1; pointer-events: none; }
 .npc-name { color: #00D2FF; font-weight: bold; font-size: 22px; margin-bottom: 6px; }
 .npc-greet { font-size: 15px; color: #94A3B8; }
 .course-list { flex: 1; overflow-y: auto; padding-right: 15px; }
@@ -801,9 +902,8 @@ margin-right: 20px; filter: drop-shadow(0 0 5px rgba(0,210,255,0.5));
 </style>
 
 <div class="npc-overlay">
-<!-- 💡 放棄 onclick，改用 id 讓外部 JS 尋找並綁定事件 -->
-<div class="close-btn" id="btn-close-list">✕</div>
-<div class="npc-header">
+<div class="close-btn action-btn" id="btn-close-list">✕</div>
+<div class="npc-header" title="按住此處可拖曳視窗">
 <div class="npc-image"></div>
 <div class="npc-title-box">
 <div class="npc-name">籌碼導師</div>
@@ -811,58 +911,23 @@ margin-right: 20px; filter: drop-shadow(0 0 5px rgba(0,210,255,0.5));
 </div>
 </div>
 <div class="course-list">
-
-<div class="course-item locked">
-<div class="course-title"><img src="app/static/icon-course1.png" class="course-icon"> 1. 宏觀經濟與景氣循環 (未開放)</div>
-<div class="course-desc">學習解讀 GDP、CPI、利率與匯率等基本總體經濟指標，判斷目前大盤處於景氣擴張或衰退的哪個階段。</div>
-</div>
-<div class="course-item locked">
-<div class="course-title"><img src="app/static/icon-course1.png" class="course-icon"> 2. 股市基本架構與名詞解析 (未開放)</div>
-<div class="course-desc">認識台股交易規則、漲跌幅限制、各類委託單與基本盤面術語，建立進場前的基礎常識。</div>
-</div>
-<div class="course-item locked">
-<div class="course-title"><img src="app/static/icon-course1.png" class="course-icon"> 3. 財報與基本面入門 (未開放)</div>
-<div class="course-desc">學習閱讀三大財務報表（綜合損益表、資產負債表、現金流量表），學會挑選具備長期競爭力的公司。</div>
-</div>
-
-<!-- 💡 放棄 onclick，改用 id="btn-open-course-4" -->
-<div class="course-item active" id="btn-open-course-4">
+<div class="course-item locked"><div class="course-title"><img src="app/static/icon-course1.png" class="course-icon"> 1. 宏觀經濟與景氣循環 (未開放)</div><div class="course-desc">學習解讀 GDP、CPI、利率與匯率等基本總體經濟指標，判斷目前大盤處於景氣擴張或衰退的哪個階段。</div></div>
+<div class="course-item locked"><div class="course-title"><img src="app/static/icon-course1.png" class="course-icon"> 2. 股市基本架構與名詞解析 (未開放)</div><div class="course-desc">認識台股交易規則、漲跌幅限制、各類委託單與基本盤面術語，建立進場前的基礎常識。</div></div>
+<div class="course-item locked"><div class="course-title"><img src="app/static/icon-course1.png" class="course-icon"> 3. 財報與基本面入門 (未開放)</div><div class="course-desc">學習閱讀三大財務報表（綜合損益表、資產負債表、現金流量表），學會挑選具備長期競爭力的公司。</div></div>
+<div class="course-item active action-btn" id="btn-open-course-4">
 <div class="course-title"><img src="app/static/icon-course1.png" class="course-icon"> 4. 量價關係與盤面解讀 (點擊進入)</div>
 <div class="course-desc">對照成交量與股價漲跌的互動（如價漲量增、量價背離），判斷多空雙方的企圖心與買賣力道。</div>
 </div>
-
-<div class="course-item locked">
-<div class="course-title"><img src="app/static/icon-course1.png" class="course-icon"> 5. 技術分析與指標應用 (未開放)</div>
-<div class="course-desc">熟悉常用技術指標（如均線 MA、MACD、RSI、KDJ），掌握支撐壓力與趨勢轉折點。</div>
-</div>
-<div class="course-item locked">
-<div class="course-title"><img src="app/static/icon-course1.png" class="course-icon"> 6. 籌碼面追蹤：法人與大戶結構 (未開放)</div>
-<div class="course-desc">分析外資、投信、自營商動向及大戶持股比例，透過資金流向尋找主力默默佈局的標的。</div>
-</div>
-<div class="course-item locked">
-<div class="course-title"><img src="app/static/icon-course1.png" class="course-icon"> 7. 券資關係與融資融券分析 (未開放)</div>
-<div class="course-desc">觀察融資餘額、融券張數與券資比變化，評估市場散戶情緒及潛在的「軋空」或「多殺多」力道。</div>
-</div>
-<div class="course-item locked">
-<div class="course-title"><img src="app/static/icon-course1.png" class="course-icon"> 8. 產業趨勢與題材選股 (未開放)</div>
-<div class="course-desc">掌握主流產業輪動脈絡（如半導體、AI 供應鏈、綠能等），在對的時間點佈局具備成長爆發力的賽道。</div>
-</div>
-<div class="course-item locked">
-<div class="course-title"><img src="app/static/icon-course1.png" class="course-icon"> 9. 資金控管與風險管理 (未開放)</div>
-<div class="course-desc">學習單筆投資部位配置、分批進場策略、停損停利機制，避免因情緒失控而遭受重大虧損。</div>
-</div>
-<div class="course-item locked">
-<div class="course-title"><img src="app/static/icon-course1.png" class="course-icon"> 10. 交易心理學與個人策略總結 (未開放)</div>
-<div class="course-desc">克服貪婪與恐懼的心理障礙，並回測、修正並建立專屬於自己的穩定獲利交易系統。</div>
-</div>
-
+<div class="course-item locked"><div class="course-title"><img src="app/static/icon-course1.png" class="course-icon"> 5. 技術分析與指標應用 (未開放)</div><div class="course-desc">熟悉常用技術指標（如均線 MA、MACD、RSI、KDJ），掌握支撐壓力與趨勢轉折點。</div></div>
+<div class="course-item locked"><div class="course-title"><img src="app/static/icon-course1.png" class="course-icon"> 6. 籌碼面追蹤：法人與大戶結構 (未開放)</div><div class="course-desc">分析外資、投信、自營商動向及大戶持股比例，透過資金流向尋找主力默默佈局的標的。</div></div>
+<div class="course-item locked"><div class="course-title"><img src="app/static/icon-course1.png" class="course-icon"> 7. 券資關係與融資融券分析 (未開放)</div><div class="course-desc">觀察融資餘額、融券張數與券資比變化，評估市場散戶情緒及潛在的「軋空」或「多殺多」力道。</div></div>
+<div class="course-item locked"><div class="course-title"><img src="app/static/icon-course1.png" class="course-icon"> 8. 產業趨勢與題材選股 (未開放)</div><div class="course-desc">掌握主流產業輪動脈絡（如半導體、AI 供應鏈、綠能等），在對的時間點佈局具備成長爆發力的賽道。</div></div>
+<div class="course-item locked"><div class="course-title"><img src="app/static/icon-course1.png" class="course-icon"> 9. 資金控管與風險管理 (未開放)</div><div class="course-desc">學習單筆投資部位配置、分批進場策略、停損停利機制，避免因情緒失控而遭受重大虧損。</div></div>
+<div class="course-item locked"><div class="course-title"><img src="app/static/icon-course1.png" class="course-icon"> 10. 交易心理學與個人策略總結 (未開放)</div><div class="course-desc">克服貪婪與恐懼的心理障礙，並回測、修正並建立專屬於自己的穩定獲利交易系統。</div></div>
 </div>
 </div>"""
 
         else:
-            # =========================
-            # 📖 第4課詳情 (Detail View)
-            # =========================
             html_code = """<style>
 .npc-overlay {
 position: fixed; bottom: 30px; right: 30px;
@@ -877,16 +942,17 @@ color: white; animation: slideUpNPC 0.4s cubic-bezier(0.175, 0.885, 0.32, 1.275)
 .action-btn { cursor: pointer; color: #94A3B8; font-size: 20px; font-weight:bold; transition: 0.2s; display: flex; align-items: center; justify-content: center; background: rgba(0,0,0,0.5); width: 32px; height: 32px; border-radius: 50%; border: 1px solid rgba(255,255,255,0.1); }
 .action-btn:hover { background: rgba(0,210,255,0.3); color: #FFF; transform: scale(1.1); border-color: #00D2FF; }
 .action-btn.close:hover { background: rgba(255,76,76,0.8); border-color: #FF4C4C; }
-.detail-header { display: flex; align-items: flex-end; margin-bottom: 15px; border-bottom: 1px solid rgba(255,255,255,0.1); padding-bottom: 15px; gap: 20px; }
+.detail-header { display: flex; align-items: flex-end; margin-bottom: 15px; border-bottom: 1px solid rgba(255,255,255,0.1); padding-bottom: 15px; gap: 20px; cursor: grab; }
+.detail-header:active { cursor: grabbing; }
 .npc-big-image {
 width: 160px; height: 180px;
 background-image: url('app/static/npcroxy.png'); 
 background-size: contain; background-repeat: no-repeat; background-position: bottom;
-filter: drop-shadow(0 0 10px rgba(0,210,255,0.6)); flex-shrink: 0;
+filter: drop-shadow(0 0 10px rgba(0,210,255,0.6)); flex-shrink: 0; pointer-events: none;
 }
 .dialogue-box {
 flex: 1; background: rgba(0, 210, 255, 0.08); border: 1px solid rgba(0, 210, 255, 0.3);
-border-radius: 12px; padding: 18px; position: relative; margin-bottom: 10px;
+border-radius: 12px; padding: 18px; position: relative; margin-bottom: 10px; pointer-events: none;
 }
 .dialogue-box::before {
 content: ''; position: absolute; left: -14px; bottom: 30px;
@@ -904,17 +970,15 @@ border-width: 12px 14px 12px 0; border-style: solid; border-color: transparent r
 .trend-up { color: #FF4C4C; font-weight: bold; }
 .trend-down { color: #00E676; font-weight: bold; }
 .trend-flat { color: #FFD700; font-weight: bold; }
-@keyframes slideUpNPC { from { transform: translateY(100px) scale(0.8); opacity: 0; } to { transform: translateY(0) scale(1); opacity: 1; } }
 </style>
 
 <div class="npc-overlay">
 <div class="top-actions">
-<!-- 💡 同樣放棄 onclick，賦予專屬 ID -->
 <div class="action-btn" id="btn-back-detail" title="返回列表">↩</div>
 <div class="action-btn close" id="btn-close-detail" title="關閉">✕</div>
 </div>
 
-<div class="detail-header">
+<div class="detail-header" title="按住此處可拖曳視窗">
 <div class="npc-big-image"></div>
 <div class="dialogue-box">
 <div class="npc-name">籌碼導師 蘿西</div>
@@ -949,35 +1013,33 @@ border-width: 12px 14px 12px 0; border-style: solid; border-color: transparent r
         st.markdown(html_code, unsafe_allow_html=True)
         
         # =========================
-        # 🔗 核心隱藏按鈕 (真實操控狀態的樞紐)
+        # 💡 修正 2：核心隱藏按鈕賦予絕對獨特的辨識碼，防止腳本誤觸！
         # =========================
-        if st.button("CloseNPC"):
+        if st.button("__BTN_CLOSE_NPC__"):
             st.session_state['show_course_npc'] = False
             st.session_state['course_view'] = 'list'
             st.rerun()
             
-        if st.button("OpenCourse4"):
+        if st.button("__BTN_OPEN_COURSE_4__"):
             st.session_state['course_view'] = 'detail'
             st.rerun()
             
-        if st.button("BackToList"):
+        if st.button("__BTN_BACK_TO_LIST__"):
             st.session_state['course_view'] = 'list'
             st.rerun()
             
-        # 💡 JS 強制綁定與隱形引擎：這段腳本會去尋找上面那三顆真實的 Streamlit 按鈕，把他們藏到畫面之外 (避免破壞 UI)
-        # 然後主動捕捉帶有我們 ID (如 btn-close-list) 的 HTML 元素，並注入點擊事件！
+        # JS 強制綁定與隱形引擎
         bind_js = """<script>
 setInterval(() => {
     const doc = window.parent.document;
     if (!doc) return;
     
-    // 尋找 Streamlit 生成的實體按鈕
     const stBtns = Array.from(doc.querySelectorAll('button'));
-    const btnClose = stBtns.find(b => b.textContent.includes('CloseNPC'));
-    const btnOpen4 = stBtns.find(b => b.textContent.includes('OpenCourse4'));
-    const btnBack = stBtns.find(b => b.textContent.includes('BackToList'));
+    const btnClose = stBtns.find(b => b.textContent.includes('__BTN_CLOSE_NPC__'));
+    const btnOpen4 = stBtns.find(b => b.textContent.includes('__BTN_OPEN_COURSE_4__'));
+    const btnBack = stBtns.find(b => b.textContent.includes('__BTN_BACK_TO_LIST__'));
     
-    // 安全隱藏實體按鈕 (將他們趕出畫面外，保證 React 能捕捉點擊)
+    // 安全隱藏實體按鈕
     [btnClose, btnOpen4, btnBack].forEach(b => {
         if(b) {
             const container = b.closest('div[data-testid="stElementContainer"]');
@@ -989,25 +1051,23 @@ setInterval(() => {
         }
     });
 
-    // 建立事件綁定工廠
     const bindEvent = (uiId, stBtn) => {
         const uiEl = doc.getElementById(uiId);
-        // 若找到該 UI 元素且尚未被綁定過
         if(uiEl && !uiEl.dataset.hooked) {
-            uiEl.dataset.hooked = 'true'; // 標記為已綁定
+            uiEl.dataset.hooked = 'true'; 
             uiEl.style.cursor = 'pointer'; 
             uiEl.addEventListener('click', (e) => {
                 e.preventDefault();
-                if(stBtn) stBtn.click(); // 點擊時，觸發被隱藏的 Streamlit 按鈕
+                if(stBtn) stBtn.click();
             });
         }
     };
 
-    // 替我們的自訂 UI 注入對應的點擊事件
+    // 精準配對，確保 'btn-back-detail' 絕對只會觸發 'btnBack'
     bindEvent('btn-close-list', btnClose);
     bindEvent('btn-open-course-4', btnOpen4);
-    bindEvent('btn-back-detail', btnBack);
+    bindEvent('btn-back-detail', btnBack); 
     bindEvent('btn-close-detail', btnClose);
-}, 300); // 每 300 毫秒掃描一次，保證絕對綁定成功
+}, 300);
 </script>"""
         components.html(bind_js, height=0, width=0)
