@@ -21,9 +21,9 @@ def load_global_css():
 
     # 💡 保留所有你自訂的暗黑文字與框線顏色，只微調極致背景色
     bg_color = "#0A0D14" # 專業暗黑 (預設)
-    if theme == 'pink': bg_color = "#170A10"  # 櫻花暗粉
+    if theme == 'pink': bg_color = "##edb8f2"  # 櫻花暗粉
     elif theme == 'green': bg_color = "#0A140F" # 森林暗綠
-    elif theme == 'blue': bg_color = "#0A0D1A"  # 星空深藍
+    elif theme == 'blue': bg_color = "#b8ecf2"  # 星空深藍
 
     theme_css = f"""
         <style>
@@ -644,8 +644,8 @@ def render_settings_modal():
             current_theme = st.session_state.get('theme', 'dark')
             theme_options = ['dark', 'pink', 'green', 'blue']
             theme_labels = {
-                'dark': "🌙 專業暗黑", 'pink': "🌸 櫻花暗粉",
-                'green': "🌲 森林暗綠", 'blue': "🌌 星空深藍"
+                'dark': "🌙 專業暗黑", 'pink': "🌸 櫻花粉",
+                'green': "🌲 翡翠綠", 'blue': "🌌 天空藍"
             }
             theme_choice = st.radio(
                 "🎨 選擇背景濾鏡：", options=theme_options,
