@@ -816,7 +816,7 @@ margin-right: 20px; filter: drop-shadow(0 0 5px rgba(0,210,255,0.5));
 <div class="course-list">
 
 <div class="course-item locked">
-<div class="course-title"><img src="app/static/icon-class.png" class="course-icon"> 1. 宏觀經濟與景氣循環 (未開放)</div>
+<div class="course-title"><img src="app/static/icon-course1.png" class="course-icon"> 1. 宏觀經濟與景氣循環 (未開放)</div>
 <div class="course-desc">學習解讀 GDP、CPI、利率與匯率等基本總體經濟指標，判斷目前大盤處於景氣擴張或衰退的哪個階段。</div>
 </div>
 <div class="course-item locked">
