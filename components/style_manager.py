@@ -667,177 +667,87 @@ def render_settings_modal():
 
 
 # ==========================================
-
 # 🎓 課程 NPC 懸浮對話框
-
 # ==========================================
-
 def render_course_npc():
-
     import streamlit as st
-
     import streamlit.components.v1 as components
 
-    
-
-    if st.session_state.get('show_course_npc', False):
-
-        
-
+    if st.session_state.get('show_course_npc', False):      
         if 'course_view' not in st.session_state:
-
             st.session_state['course_view'] = 'list'
-
-            
-
-        current_view = st.session_state['course_view']
-
-        
-
+        current_view = st.session_state['course_view']     
         if current_view == 'list':
-
             # =========================
-
             # 📜 課程列表 (List View)
-
             # =========================
-
             html_code = """<style>
-
 .npc-overlay {
-
 position: fixed; bottom: 30px; right: 30px;
-
 width: 650px; height: 75vh; max-height: 800px;
-
 background: rgba(15, 23, 42, 0.96);
-
 border: 2px solid #00D2FF; border-radius: 12px;
-
 z-index: 9999999; display: flex; flex-direction: column;
-
 padding: 25px; box-shadow: 0 8px 30px rgba(0, 210, 255, 0.3);
-
 color: white; animation: slideUpNPC 0.4s cubic-bezier(0.175, 0.885, 0.32, 1.275);
-
 }
-
 .npc-header { display: flex; align-items: flex-end; margin-bottom: 20px; border-bottom: 1px solid rgba(255,255,255,0.1); padding-bottom: 15px; }
-
 .npc-image {
-
 width: 90px; height: 90px;
-
 background-image: url('app/static/npcnatzu.png'); 
-
 background-size: contain; background-repeat: no-repeat; background-position: bottom;
-
 margin-right: 20px; filter: drop-shadow(0 0 5px rgba(0,210,255,0.5));
-
 }
-
 .npc-title-box { flex: 1; }
-
 .npc-name { color: #00D2FF; font-weight: bold; font-size: 22px; margin-bottom: 6px; }
-
 .npc-greet { font-size: 15px; color: #94A3B8; }
-
 .course-list { flex: 1; overflow-y: auto; padding-right: 15px; }
-
 .course-list::-webkit-scrollbar { width: 8px; }
-
 .course-list::-webkit-scrollbar-thumb { background: rgba(0, 210, 255, 0.4); border-radius: 4px; }
-
 .course-item { margin-bottom: 18px; padding: 15px; background: rgba(255,255,255,0.03); border: 1px solid rgba(255,255,255,0.08); border-radius: 10px; transition: 0.2s; }
-
 .course-item.locked { cursor: not-allowed; background: rgba(0,0,0,0.2); }
-
 .course-item.active { cursor: pointer; border-color: rgba(0, 210, 255, 0.4); }
-
 .course-item.active:hover { background: rgba(0, 210, 255, 0.1); border-color: #00D2FF; transform: translateY(-2px); box-shadow: 0 4px 15px rgba(0,210,255,0.2); }
-
 .course-icon { width: 24px; height: 24px; object-fit: contain; margin-right: 8px; filter: drop-shadow(0 0 5px rgba(0,210,255,0.8)); transition: 0.3s; }
-
 .course-item.locked .course-icon { filter: grayscale(100%) opacity(0.4); }
-
 .course-item.active:hover .course-icon { filter: drop-shadow(0 0 10px #FFD700); transform: scale(1.1); }
-
 .course-title { font-weight: bold; font-size: 16px; margin-bottom: 8px; display: flex; align-items: center; }
-
 .course-item.locked .course-title { color: #64748B; }
-
 .course-item.active .course-title { color: #FFD700; }
-
 .course-desc { font-size: 14px; color: #CBD5E1; line-height: 1.6; }
-
 .close-btn { position: absolute; top: 15px; right: 20px; cursor: pointer; color: #94A3B8; font-size: 24px; transition: 0.2s; z-index: 10; font-weight: bold; }
-
 .close-btn:hover { color: #FF4C4C; transform: scale(1.1); }
 
 @keyframes slideUpNPC { from { transform: translateY(100px) scale(0.8); opacity: 0; } to { transform: translateY(0) scale(1); opacity: 1; } }
-
 </style>
-
-
-
 <div class="npc-overlay">
-
 <!-- 💡 放棄 onclick，改用 id 讓外部 JS 尋找並綁定事件 -->
-
 <div class="close-btn" id="btn-close-list">✕</div>
-
 <div class="npc-header">
-
 <div class="npc-image"></div>
-
 <div class="npc-title-box">
-
 <div class="npc-name">籌碼導師</div>
-
 <div class="npc-greet">「冒險者，選擇你想強化的能力吧！」</div>
-
 </div>
-
 </div>
-
 <div class="course-list">
-
-
-
 <div class="course-item locked">
-
 <div class="course-title"><img src="app/static/icon-course1.png" class="course-icon"> 1. 宏觀經濟與景氣循環 (未開放)</div>
-
 <div class="course-desc">學習解讀 GDP、CPI、利率與匯率等基本總體經濟指標，判斷目前大盤處於景氣擴張或衰退的哪個階段。</div>
-
 </div>
-
 <div class="course-item locked">
-
 <div class="course-title"><img src="app/static/icon-course1.png" class="course-icon"> 2. 股市基本架構與名詞解析 (未開放)</div>
-
 <div class="course-desc">認識台股交易規則、漲跌幅限制、各類委託單與基本盤面術語，建立進場前的基礎常識。</div>
-
 </div>
-
 <div class="course-item locked">
-
 <div class="course-title"><img src="app/static/icon-course1.png" class="course-icon"> 3. 財報與基本面入門 (未開放)</div>
-
 <div class="course-desc">學習閱讀三大財務報表（綜合損益表、資產負債表、現金流量表），學會挑選具備長期競爭力的公司。</div>
-
 </div>
-
-
 
 <!-- 💡 放棄 onclick，改用 id="btn-open-course-4" -->
-
 <div class="course-item active" id="btn-open-course-4">
-
 <div class="course-title"><img src="app/static/icon-course1.png" class="course-icon"> 4. 量價關係與盤面解讀 (點擊進入)</div>
-
 <div class="course-desc">對照成交量與股價漲跌的互動（如價漲量增、量價背離），判斷多空雙方的企圖心與買賣力道。</div>
-
 </div>
 
 
