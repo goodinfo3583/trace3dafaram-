@@ -216,7 +216,7 @@ def inject_custom_header(is_logged_in=False):
                     
                     <div class="dropdown-item actionable">
                         <a href="https://www.facebook.com/DOUBLEE04/?locale=zh_TW" target="_blank" class="dropdown-title" style="text-decoration: none;">
-                            <img src="app/static/icon-scam.png" class="menu-icon" alt="fb-group"> 靠北投顧 3.0 
+                            <img src="app/static/icon-scam1.png" class="menu-icon" alt="fb-group"> 靠北投顧 3.0 
                         </a>
                         <p class="dropdown-text">分享分析師真實績效，避免受話術白繳學費。</p>
                     </div>
