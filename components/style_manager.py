@@ -26,10 +26,11 @@ def load_global_css():
     """
     st.markdown(hide_streamlit_style, unsafe_allow_html=True)
 
-    bg_color = "#0A0D14" 
-    if theme == 'pink': bg_color = "#edb8f2"  
-    elif theme == 'green': bg_color = "#0A140F" 
-    elif theme == 'blue': bg_color = "#b8ecf2"  
+    # 💡 保留所有你自訂的暗黑文字與框線顏色，只微調極致背景色
+    bg_color = "#0A0D14" # 專業暗黑 (預設)
+    if theme == 'pink': bg_color = "#edb8f2"  # 櫻花暗粉
+    elif theme == 'green': bg_color = "#0A140F" # 森林暗綠
+    elif theme == 'blue': bg_color = "#b8ecf2"  # 星空深藍
 
     theme_css = f"""
         <style>
@@ -55,7 +56,7 @@ def load_global_css():
     """
     st.markdown(theme_css, unsafe_allow_html=True)
 
-    # 💡 升級版全域視窗拖曳引擎：加入解除 transition 延遲的機制，讓玻璃卡片拖曳變絲滑
+    # 💡 注入全域視窗拖曳引擎 (支援手機觸控與滑鼠拖曳)
     drag_engine_js = """
     <script>
     (function() {
@@ -71,6 +72,7 @@ def load_global_css():
             let isDragging = false, startX, startY, initialX, initialY;
             
             const onDown = (e) => {
+                // 排除點擊按鈕、輸入框等元素
                 if (e.target.closest('.action-btn') || e.target.closest('.action-btn-b2') || 
                     e.target.closest('.action-btn-b4') || e.target.closest('.action-btn-b5') ||
                     e.target.tagName === 'INPUT' || e.target.tagName === 'BUTTON' || e.target.tagName === 'LABEL') return;
@@ -82,10 +84,7 @@ def load_global_css():
                 startY = clientY;
                 
                 let rect = el.getBoundingClientRect();
-                
-                // 🚀 關鍵修正：拖曳瞬間關閉 CSS 動畫，消除延遲手感
-                el.style.transition = 'none';
-                
+                // 鎖定絕對位置，解除 right/bottom 限制
                 el.style.left = rect.left + 'px';
                 el.style.top = rect.top + 'px';
                 el.style.right = 'auto';
@@ -105,7 +104,7 @@ def load_global_css():
             
             const onMove = (e) => {
                 if (!isDragging) return;
-                e.preventDefault(); 
+                e.preventDefault(); // 防止手機畫面捲動
                 let clientX = e.touches ? e.touches[0].clientX : e.clientX;
                 let clientY = e.touches ? e.touches[0].clientY : e.clientY;
                 el.style.left = (initialX + (clientX - startX)) + 'px';
@@ -114,8 +113,6 @@ def load_global_css():
             
             const onUp = () => {
                 isDragging = false;
-                // 🚀 拖曳結束後恢復漸變動畫
-                el.style.transition = ''; 
                 doc.removeEventListener('mousemove', onMove);
                 doc.removeEventListener('mouseup', onUp);
                 doc.removeEventListener('touchmove', onMove);
@@ -129,14 +126,18 @@ def load_global_css():
             handle.title = '按住此處可拖曳視窗';
         }
 
+        // 持續掃描並綁定 Streamlit 動態生成的視窗
         setInterval(() => {
             makeDraggable(doc.getElementById('b2-top10-card'), '.header-bar-b2');
             makeDraggable(doc.getElementById('b3-top10-card'), '.header-bar');
             makeDraggable(doc.getElementById('b4-top10-card'), '.header-bar-b4');
             makeDraggable(doc.getElementById('b5-top10-card'), '.header-bar-b5');
             
-            let npc = doc.querySelector('.npc-wrapper');
-            if (npc) makeDraggable(npc, '.npc-drag-handle');
+            let npc = doc.querySelector('.npc-overlay');
+            if (npc) {
+                if (npc.querySelector('.npc-header')) makeDraggable(npc, '.npc-header');
+                else if (npc.querySelector('.detail-header')) makeDraggable(npc, '.detail-header');
+            }
             
             let settingsModal = doc.querySelector('.settings-modal-active');
             if (settingsModal) makeDraggable(settingsModal, '.settings-drag-handle');
@@ -147,15 +148,21 @@ def load_global_css():
     components.html(drag_engine_js, height=0, width=0)
 
 def set_background(image_path):
+    """網站主視覺背景設定引擎 (支援濾鏡主題)"""
     theme = st.session_state.get('theme', 'dark')
+    
     if theme == 'pink':
-        overlay, block_bg = "rgba(35, 15, 25, 0.88)", "rgba(35, 15, 25, 0.6)"
+        overlay = "rgba(35, 15, 25, 0.88)"
+        block_bg = "rgba(35, 15, 25, 0.6)"
     elif theme == 'green':
-        overlay, block_bg = "rgba(15, 35, 20, 0.88)", "rgba(15, 35, 20, 0.6)"
+        overlay = "rgba(15, 35, 20, 0.88)"
+        block_bg = "rgba(15, 35, 20, 0.6)"
     elif theme == 'blue':
-        overlay, block_bg = "rgba(15, 20, 40, 0.88)", "rgba(15, 20, 40, 0.6)"
-    else: 
-        overlay, block_bg = "rgba(15, 23, 42, 0.88)", "rgba(15, 23, 42, 0.6)"
+        overlay = "rgba(15, 20, 40, 0.88)"
+        block_bg = "rgba(15, 20, 40, 0.6)"
+    else: # 預設 dark
+        overlay = "rgba(15, 23, 42, 0.88)"
+        block_bg = "rgba(15, 23, 42, 0.6)"
     
     try:
         with open(image_path, "rb") as file:
@@ -164,94 +171,161 @@ def set_background(image_path):
         css = f"""
         <style>
         .stApp {{
-            background-image: linear-gradient({overlay}, {overlay}), url(data:image/png;base64,{encoded_string});
-            background-size: cover; background-position: center center; background-attachment: fixed;
+            background-image: 
+                linear-gradient({overlay}, {overlay}), 
+                url(data:image/png;base64,{encoded_string});
+            background-size: cover;
+            background-position: center center;
+            background-attachment: fixed;
         }}
         div[data-testid="stVerticalBlock"] > div[style*="border"] {{
-            background-color: {block_bg} !important; backdrop-filter: blur(4px); 
+            background-color: {block_bg} !important;
+            backdrop-filter: blur(4px); 
         }}
         </style>
         """
         st.markdown(css, unsafe_allow_html=True)
-    except FileNotFoundError: pass
-
+    except FileNotFoundError:
+        pass
+    
 def render_fireflies():
+    """純代碼動態螢火蟲引擎"""
     num_fireflies = 5 
-    css_rules, html_divs = [], []
+    css_rules = []
+    html_divs = []
+    
     for i in range(num_fireflies):
         size = random.uniform(2, 5)          
-        start_x, start_y = random.uniform(0, 100), random.uniform(0, 100)     
-        move_x, move_y = random.uniform(-20, 20), random.uniform(-20, 20)     
-        duration, delay, pulse_dur = random.uniform(10, 25), random.uniform(0, 10), random.uniform(2, 5)     
+        start_x = random.uniform(0, 100)     
+        start_y = random.uniform(0, 100)     
+        move_x = random.uniform(-20, 20)     
+        move_y = random.uniform(-20, 20)     
+        duration = random.uniform(10, 25)    
+        delay = random.uniform(0, 10)        
+        pulse_dur = random.uniform(2, 5)     
         
         css_rules.append(f"""
-        .firefly-{i} {{ position: absolute; width: {size}px; height: {size}px; left: {start_x}vw; top: {start_y}vh; background: #FFFFDF; border-radius: 50%; box-shadow: 0 0 {size*3}px {size}px rgba(255, 215, 0, 0.6); animation: drift-{i} {duration}s infinite ease-in-out {delay}s, flash-{i} {pulse_dur}s infinite ease-in-out {delay}s; opacity: 0; }}
-        @keyframes drift-{i} {{ 0% {{ transform: translate(0px, 0px); }} 25% {{ transform: translate({move_x}vw, {move_y}vh); }} 50% {{ transform: translate({move_x/2}vw, {move_y*1.5}vh); }} 75% {{ transform: translate({-move_x}vw, {move_y/2}vh); }} 100% {{ transform: translate(0px, 0px); }} }}
-        @keyframes flash-{i} {{ 0%, 100% {{ opacity: 0; }} 50% {{ opacity: {random.uniform(0.5, 1.0)}; }} }}
+        .firefly-{i} {{
+            position: absolute; width: {size}px; height: {size}px;
+            left: {start_x}vw; top: {start_y}vh; background: #FFFFDF; border-radius: 50%;
+            box-shadow: 0 0 {size*3}px {size}px rgba(255, 215, 0, 0.6);
+            animation: drift-{i} {duration}s infinite ease-in-out {delay}s, flash-{i} {pulse_dur}s infinite ease-in-out {delay}s;
+            opacity: 0;
+        }}
+        @keyframes drift-{i} {{
+            0% {{ transform: translate(0px, 0px); }}
+            25% {{ transform: translate({move_x}vw, {move_y}vh); }}
+            50% {{ transform: translate({move_x/2}vw, {move_y*1.5}vh); }}
+            75% {{ transform: translate({-move_x}vw, {move_y/2}vh); }}
+            100% {{ transform: translate(0px, 0px); }}
+        }}
+        @keyframes flash-{i} {{
+            0%, 100% {{ opacity: 0; }}
+            50% {{ opacity: {random.uniform(0.5, 1.0)}; }}
+        }}
         """)
         html_divs.append(f"<div class='firefly-{i}'></div>")
     
-    st.markdown(f"<style>.fireflies-container {{ position: fixed; top: 0; left: 0; width: 100vw; height: 100vh; pointer-events: none; z-index: 1000; overflow: hidden; }} {''.join(css_rules)}</style><div class='fireflies-container'>{''.join(html_divs)}</div>", unsafe_allow_html=True)
+    full_code = f"""
+    <style>
+    .fireflies-container {{
+        position: fixed; top: 0; left: 0; width: 100vw; height: 100vh;
+        pointer-events: none; z-index: 1000; overflow: hidden;
+    }}
+    {''.join(css_rules)}
+    </style>
+    <div class="fireflies-container">{''.join(html_divs)}</div>
+    """
+    st.markdown(full_code, unsafe_allow_html=True)
 
 def render_marquee():
+    """跑馬燈區塊渲染"""
     def get_image_base64(image_path):
         with open(image_path, "rb") as image_file:
-            encoded_string = base64.b64encode(image_file.read()).decode()
+            data = image_file.read()
             mime_type = "image/gif" if image_path.lower().endswith('.gif') else "image/png"
+            encoded_string = base64.b64encode(data).decode()
         return f"data:{mime_type};base64,{encoded_string}"
 
-    image_folder, image_files = "static", ["沙漠之城.png", "法人意向.png", "月影綠洲.png", "組合化學晶礦.png", "鐵風堡b.png"]
-    total_images, time_per_slide = len(image_files), 5  
-    total_time, visible_percent = total_images * time_per_slide, (1 / total_images) * 100 
+    image_folder = "static" 
+    image_files = ["沙漠之城.png", "法人意向.png", "月影綠洲.png", "組合化學晶礦.png", "鐵風堡b.png"]
+    
+    total_images = len(image_files)
+    time_per_slide = 5  
+    total_time = total_images * time_per_slide
+    visible_percent = (1 / total_images) * 100 
 
-    image_tags, delay_css = "", ""
+    image_tags = ""
+    delay_css = ""
     for i, img_name in enumerate(image_files):
         img_path = os.path.join(image_folder, img_name)
         if os.path.exists(img_path):
-            image_tags += f'<img class="slide slide-{i}" src="{get_image_base64(img_path)}">'
+            b64 = get_image_base64(img_path)
+            image_tags += f'<img class="slide slide-{i}" src="{b64}">'
             delay_css += f"    .slide-{i} {{ animation-delay: {i * time_per_slide}s; }}\n"
-        else: st.error(f"系統找不到圖片：{img_path}")
+        else:
+            st.error(f"系統找不到這張圖片：{img_path}")
 
-    st.markdown(f"""
+    marquee_code = f"""
     <style>
-        .slideshow-container {{ position: relative; width: 800px; height: 100px; margin: 0 auto 10px auto; background-color: #0A0D14; display: flex; justify-content: center; align-items: center; overflow: hidden; }}
-        .slide {{ position: absolute; height: 100%; object-fit: contain; visibility: hidden; opacity: 0; animation: cut {total_time}s infinite; }}
-        {delay_css}
-        @keyframes cut {{ 0%, {visible_percent - 0.01:.2f}% {{ visibility: visible; opacity: 1; }} {visible_percent:.2f}%, 100% {{ visibility: hidden; opacity: 0; }} }}
+        .slideshow-container {{
+            position: relative; width: 800px; height: 100px;
+            margin: 0 auto 10px auto; background-color: #0A0D14;
+            display: flex; justify-content: center; align-items: center; overflow: hidden;
+        }}
+        .slide {{
+            position: absolute; height: 100%; object-fit: contain; 
+            visibility: hidden; opacity: 0; animation: cut {total_time}s infinite; 
+        }}
+    {delay_css}
+        @keyframes cut {{
+            0%, {visible_percent - 0.01:.2f}%   {{ visibility: visible; opacity: 1; }} 
+            {visible_percent:.2f}%, 100%        {{ visibility: hidden; opacity: 0; }}  
+        }}
     </style>
     <div class="slideshow-container">{image_tags}</div>
-    """, unsafe_allow_html=True)
+    """
+    st.markdown(marquee_code, unsafe_allow_html=True)
 
+#跑馬燈懸浮卡片
 #B2法人掃貨
 def render_b2_top10_glass_card():
     import pandas as pd
     import streamlit as st
     if 'df_blk2_1' not in st.session_state: return
     try:
-        raw_df_21, raw_df_22, raw_df_23, raw_df_24 = [st.session_state.get(f'df_blk2_{i}', pd.DataFrame()) for i in range(1,5)]
+        raw_df_21 = st.session_state.get('df_blk2_1', pd.DataFrame()) 
+        raw_df_22 = st.session_state.get('df_blk2_2', pd.DataFrame()) 
+        raw_df_23 = st.session_state.get('df_blk2_3', pd.DataFrame()) 
+        raw_df_24 = st.session_state.get('df_blk2_4', pd.DataFrame()) 
 
         def get_top10(df, target_col):
             if df is None or df.empty or target_col not in df.columns: return pd.DataFrame()
-            pure = df[(df['股票代號'].astype(str).str.strip().str.len() == 4) & (~df['股票代號'].astype(str).str.startswith('00'))].copy()
+            df['股票代號'] = df['股票代號'].astype(str).str.strip()
+            pure = df[(df['股票代號'].str.len() == 4) & (~df['股票代號'].str.startswith('00'))].copy()
             pure[target_col] = pd.to_numeric(pure[target_col], errors='coerce').fillna(0)
             return pure.sort_values(by=target_col, ascending=False).head(10)
 
         def get_col(df, kw):
             cols = [c for c in df.columns if kw in c]
-            return (cols[0], cols[0].replace(kw, "")) if cols else (None, "未知")
+            if not cols: return None, "未知"
+            return cols[0], cols[0].replace(kw, "")
 
         c21, d21 = get_col(raw_df_21, "成交比%")
         c22, d22 = get_col(raw_df_22, "成交比%")
         c23, d23 = get_col(raw_df_23, "發行數%")
         c24, d24 = get_col(raw_df_24, "發行數%")
 
-        df_21, df_22, df_23, df_24 = get_top10(raw_df_21, c21), get_top10(raw_df_22, c22), get_top10(raw_df_23, c23), get_top10(raw_df_24, c24)
+        df_21, df_22 = get_top10(raw_df_21, c21), get_top10(raw_df_22, c22)
+        df_23, df_24 = get_top10(raw_df_23, c23), get_top10(raw_df_24, c24)
 
         def make_list_html(df, val_col):
             if df.empty or val_col is None: return "<p style='font-size:13.5px; text-align:center; color:#94A3B8; margin-top:40px;'>無資料</p>"
             html = "<ul style='padding-left: 0; margin: 0; list-style-type: none;'>"
             for i, row in enumerate(df.to_dict('records')):
-                val, cs = row.get(val_col, 0), row.get('今日短動態', '').split('(')[0].strip()
+                val = row.get(val_col, 0)
+                cs = row.get('今日短動態', '').split('(')[0].strip()
+                
                 if "轉賣反轉" in cs: short_status = "🚨轉賣"
                 elif "卡位" in cs: short_status = "🆕卡位"
                 elif "加碼" in cs: short_status = "🔥加碼"
@@ -262,13 +336,26 @@ def render_b2_top10_glass_card():
                 elif "趨緩" in cs: short_status = "⚠️趨緩"
                 else: short_status = cs[:3]
 
-                html += f"<li style='display: flex; align-items: center; justify-content: space-between; margin-bottom: 6px; font-size: 13.5px; line-height: 1.4;'><div style='display: flex; align-items: center; width: 50%; overflow: hidden;'><b style='color:#FFF; width:22px; flex-shrink: 0;'>{i+1}.</b><span style='white-space:nowrap; overflow:hidden; text-overflow:ellipsis;'>{row['股票代號']}{row['股票名稱']}</span></div><div style='width: 25%; color:#FFD700; font-size: 11px; text-align: right; white-space:nowrap;'>{short_status}</div><div style='width: 25%; color:#FF4C4C; font-weight:bold; text-align: right;'>{val:.1f}%</div></li>"
-            return html + "</ul>"
+                html += (
+                    f"<li style='display: flex; align-items: center; justify-content: space-between; margin-bottom: 6px; font-size: 13.5px; line-height: 1.4;'>"
+                    f"  <div style='display: flex; align-items: center; width: 50%; overflow: hidden;'>"
+                    f"      <b style='color:#FFF; width:22px; flex-shrink: 0;'>{i+1}.</b>"
+                    f"      <span style='white-space:nowrap; overflow:hidden; text-overflow:ellipsis;'>{row['股票代號']}{row['股票名稱']}</span>"
+                    f"  </div>"
+                    f"  <div style='width: 25%; color:#FFD700; font-size: 11px; text-align: right; white-space:nowrap;'>{short_status}</div>"
+                    f"  <div style='width: 25%; color:#FF4C4C; font-weight:bold; text-align: right;'>{val:.1f}%</div>"
+                    f"</li>"
+                )
+            html += "</ul>"
+            return html
 
-        h_21, h_22, h_23, h_24 = make_list_html(df_21, c21), make_list_html(df_22, c22), make_list_html(df_23, c23), make_list_html(df_24, c24)
+        h_21, h_22 = make_list_html(df_21, c21), make_list_html(df_22, c22)
+        h_23, h_24 = make_list_html(df_23, c23), make_list_html(df_24, c24)
 
         card_html = f"""
-<input type="checkbox" id="close-b2-card" style="display:none;"><input type="checkbox" id="min-b2-card" style="display:none;"><input type="checkbox" id="pause-b2-card" style="display:none;">
+<input type="checkbox" id="close-b2-card" style="display:none;">
+<input type="checkbox" id="min-b2-card" style="display:none;">
+<input type="checkbox" id="pause-b2-card" style="display:none;">
 <style>
 #close-b2-card:checked ~ #b2-top10-card {{ display: none !important; }}
 #min-b2-card:checked ~ #b2-top10-card .carousel-wrapper-b2 {{ max-height: 0; opacity: 0; margin-top: 0; }}
@@ -281,7 +368,7 @@ def render_b2_top10_glass_card():
 @keyframes slideInDownB2 {{ from {{ transform: translateY(-50%); opacity: 0; }} to {{ transform: translateY(0); opacity: 1; }} }}
 .glass-panel-b2 {{position: fixed; top: 85px; left: 84.5vw; width: 15.5vw; min-width: 220px; background: rgba(30, 20, 20, 0.88); backdrop-filter: blur(12px); -webkit-backdrop-filter: blur(12px); border: 1px solid rgba(255, 76, 76, 0.35); border-radius: 0 12px 12px 0; padding: 10px 12px; z-index: 999998; color: #E2E8F0; animation: slideInDownB2 0.9s cubic-bezier(0.25, 0.8, 0.25, 1); transition: all 0.3s ease; box-sizing: border-box; }}
 .header-bar-b2 {{ display: flex; justify-content: space-between; align-items: center; border-bottom: 1px solid rgba(255,255,255,0.1); padding-bottom: 6px; margin-bottom: 8px; cursor: default; }}
-.header-title-b2 {{ font-size: 13px; font-weight: bold; color: #FF7676; white-space:nowrap; display: flex; align-items: center; }}
+.header-title-b2 {{ font-size: 13px; font-weight: bold; color: #FF7676; white-space:nowrap; }}
 .action-btns-b2 {{ display: flex; gap: 8px; align-items: center; }}
 .action-btn-b2 {{ cursor: pointer; color: #94A3B8; font-weight: bold; transition: color 0.2s; user-select: none; display: flex; align-items: center; justify-content: center; }}
 .action-btn-b2:hover {{ color: #FF4C4C; }}
@@ -289,14 +376,15 @@ def render_b2_top10_glass_card():
 .date-badge-b2 {{ font-size: 10px; color: #94A3B8; font-weight: normal; }}
 .carousel-wrapper-b2 {{ position: relative; max-height: 285px; height: 285px; overflow: hidden; transition: all 0.3s ease; opacity: 1; }}
 .carousel-item-b2 {{ position: absolute; top: 0; left: 0; width: 100%; opacity: 0; animation: fadeSwitchB2 20s infinite; }}
-.carousel-item-b2:nth-child(1) {{ animation-delay: 0s; }} .carousel-item-b2:nth-child(2) {{ animation-delay: 5s; }} .carousel-item-b2:nth-child(3) {{ animation-delay: 10s; }} .carousel-item-b2:nth-child(4) {{ animation-delay: 15s; }}
+.carousel-item-b2:nth-child(1) {{ animation-delay: 0s; }}
+.carousel-item-b2:nth-child(2) {{ animation-delay: 5s; }}
+.carousel-item-b2:nth-child(3) {{ animation-delay: 10s; }}
+.carousel-item-b2:nth-child(4) {{ animation-delay: 15s; }}
 @keyframes fadeSwitchB2 {{ 0%, 22% {{ opacity: 1; z-index: 2; }} 25%, 97% {{ opacity: 0; z-index: 1; }} 100% {{ opacity: 1; z-index: 2; }} }}
 @media (max-width: 1200px) {{ .glass-panel-b2 {{ position: relative; top: auto; left: auto; width: 90%; max-width: 350px; margin: 10px auto; display: block; }} }}
 </style>
 <div class="glass-panel-b2" id="b2-top10-card">
-<div class="header-bar-b2">
-    <!-- 💡 替換 Icon 範例：可將 🚀 改為 img 標籤 -->
-    <span class="header-title-b2"><img src="app/static/icon_b2.png" style="width:16px; margin-right:4px; display:none;" onerror="this.style.display='none'">🚀 法人掃貨</span>
+<div class="header-bar-b2"><span class="header-title-b2">🚀 法人掃貨</span>
 <div class="action-btns-b2">
 <label for="pause-b2-card" class="action-btn-b2 pause-icon-b2" title="暫停/播放輪播"></label>
 <label for="min-b2-card" class="action-btn-b2 min-icon-b2" title="縮放"></label>
@@ -325,7 +413,8 @@ def render_top10_glass_card():
 
         def get_top10(df):
             if df is None or df.empty: return pd.DataFrame()
-            return df[(df['股票代號'].astype(str).str.strip().str.len() == 4) & (~df['股票代號'].astype(str).str.startswith('00'))].head(10) 
+            df['股票代號'] = df['股票代號'].astype(str).str.strip()
+            return df[(df['股票代號'].str.len() == 4) & (~df['股票代號'].str.startswith('00'))].head(10) 
 
         fo_day_df, it_day_df = get_top10(raw_fo_day_df), get_top10(raw_it_day_df)
         fo_wk_df, it_wk_df = get_top10(raw_fo_wk_df), get_top10(raw_it_wk_df)
@@ -337,14 +426,28 @@ def render_top10_glass_card():
             if df is None or df.empty: return "<p style='font-size:13.5px; text-align:center; color:#94A3B8; margin-top:40px;'>無資料</p>"
             html = "<ul style='padding-left: 0px; margin: 0; list-style-type: none;'>"
             for i, row in enumerate(df.to_dict('records')):
-                html += f"<li style='display:flex; justify-content:space-between; align-items:center; margin-bottom:6px; font-size: 13.5px; line-height: 1.4;'><div style='display:flex; width:55%; overflow:hidden;'><b style='color:#FFF; display:inline-block; width:22px; flex-shrink:0;'>{i+1}.</b><span style='white-space:nowrap; overflow:hidden; text-overflow:ellipsis;'>{row['股票代號']}{row['股票名稱']}</span></div><div style='width:45%; text-align:right; white-space:nowrap;'><span style='color:#FFD700; font-size: 11px; margin-right:4px;'>{row.get('狀態動態', '')}</span><span style='color:#00D2FF; font-weight:bold;'>{row.get(col_days, 0)}{unit}</span></div></li>"
-            return html + "</ul>"
+                val, status = row.get(col_days, 0), row.get('狀態動態', '')
+                html += (
+                    f"<li style='display:flex; justify-content:space-between; align-items:center; margin-bottom:6px; font-size: 13.5px; line-height: 1.4;'>"
+                    f"<div style='display:flex; width:55%; overflow:hidden;'>"
+                    f"<b style='color:#FFF; display:inline-block; width:22px; flex-shrink:0;'>{i+1}.</b>"
+                    f"<span style='white-space:nowrap; overflow:hidden; text-overflow:ellipsis;'>{row['股票代號']}{row['股票名稱']}</span>"
+                    f"</div>"
+                    f"<div style='width:45%; text-align:right; white-space:nowrap;'>"
+                    f"<span style='color:#FFD700; font-size: 11px; margin-right:4px;'>{status}</span>"
+                    f"<span style='color:#00D2FF; font-weight:bold;'>{val}{unit}</span>"
+                    f"</div></li>"
+                )
+            html += "</ul>"
+            return html
 
         fo_day_html, it_day_html = make_list_html(fo_day_df, "最新連買天數", "天"), make_list_html(it_day_df, "最新連買天數", "天")
         fo_wk_html, it_wk_html = make_list_html(fo_wk_df, "最新連買週數", "週"), make_list_html(it_wk_df, "最新連買週數", "週")
 
         card_html = f"""
-<input type="checkbox" id="close-card" style="display:none;"><input type="checkbox" id="min-card" style="display:none;"><input type="checkbox" id="pause-card" style="display:none;">
+<input type="checkbox" id="close-card" style="display:none;">
+<input type="checkbox" id="min-card" style="display:none;">
+<input type="checkbox" id="pause-card" style="display:none;">
 <style>
 #close-card:checked ~ #b3-top10-card {{ display: none !important; }}
 #min-card:checked ~ #b3-top10-card .carousel-wrapper {{ max-height: 0; opacity: 0; margin-top: 0; }}
@@ -357,23 +460,28 @@ def render_top10_glass_card():
 @keyframes slideInDownB3 {{ from {{ transform: translateY(-50%); opacity: 0; }} to {{ transform: translateY(0); opacity: 1; }} }}
 .glass-panel {{position: fixed; top: 85px; left: 69vw; width: 15.5vw; min-width: 220px; background: rgba(15, 23, 42, 0.88); backdrop-filter: blur(12px); -webkit-backdrop-filter: blur(12px); border: 1px solid rgba(0, 210, 255, 0.35); border-right: none; border-radius: 0; padding: 10px 12px; z-index: 999999; color: #E2E8F0; animation: slideInDownB3 0.8s cubic-bezier(0.25, 0.8, 0.25, 1); transition: all 0.3s ease; box-sizing: border-box;}}
 .header-bar {{ display: flex; justify-content: space-between; align-items: center; border-bottom: 1px solid rgba(255,255,255,0.1); padding-bottom: 6px; margin-bottom: 8px; cursor: default; }}
-.header-title {{ font-size: 13px; font-weight: bold; color: #64748B; white-space:nowrap; display: flex; align-items: center; }}
+.header-title {{ font-size: 13px; font-weight: bold; color: #64748B; white-space:nowrap; }}
 .action-btns {{ display: flex; gap: 8px; align-items: center; }}
 .action-btn {{ cursor: pointer; color: #94A3B8; font-weight: bold; transition: color 0.2s; user-select: none; display: flex; align-items: center; justify-content: center; }}
-.action-btn:hover {{ color: #00D2FF; }} .close-btn:hover {{ color: #FF4C4C; }}
+.action-btn:hover {{ color: #00D2FF; }}
+.close-btn:hover {{ color: #FF4C4C; }}
 .panel-title {{ margin: 0 0 8px 0; font-size: 12.5px; font-weight: bold; color: #00D2FF; display: flex; justify-content: space-between; align-items: flex-end; }}
 .date-badge {{ font-size: 10px; color: #94A3B8; font-weight: normal; }}
 .carousel-wrapper {{ position: relative; max-height: 285px; height: 285px; overflow: hidden; transition: all 0.3s ease; opacity: 1; }}
 .carousel-item {{ position: absolute; top: 0; left: 0; width: 100%; opacity: 0; animation: fadeSwitch 20s infinite; }}
-.carousel-item:nth-child(1) {{ animation-delay: 0s; }} .carousel-item:nth-child(2) {{ animation-delay: 5s; }} .carousel-item:nth-child(3) {{ animation-delay: 10s; }} .carousel-item:nth-child(4) {{ animation-delay: 15s; }}
+.carousel-item:nth-child(1) {{ animation-delay: 0s; }}
+.carousel-item:nth-child(2) {{ animation-delay: 5s; }}
+.carousel-item:nth-child(3) {{ animation-delay: 10s; }}
+.carousel-item:nth-child(4) {{ animation-delay: 15s; }}
 @keyframes fadeSwitch {{ 0%, 22% {{ opacity: 1; z-index: 2; }} 25%, 97% {{ opacity: 0; z-index: 1; }} 100% {{ opacity: 1; z-index: 2; }} }}
 @media (max-width: 1200px) {{ .glass-panel {{ position: relative; top: auto; left: auto; width: 90%; max-width: 350px; margin: 10px auto; display: block; }} }}
 </style>
 <div class="glass-panel" id="b3-top10-card">
-<div class="header-bar">
-    <span class="header-title"><img src="app/static/icon_b3.png" style="width:16px; margin-right:4px; display:none;" onerror="this.style.display='none'">📊 法人連買</span>
+<div class="header-bar"><span class="header-title">📊 法人連買</span>
 <div class="action-btns">
-<label for="pause-card" class="action-btn pause-icon" title="暫停/播放輪播"></label><label for="min-card" class="action-btn min-icon" title="縮放"></label><label for="close-card" class="action-btn close-btn" title="關閉">✕</label>
+<label for="pause-card" class="action-btn pause-icon" title="暫停/播放輪播"></label>
+<label for="min-card" class="action-btn min-icon" title="縮放"></label>
+<label for="close-card" class="action-btn close-btn" title="關閉">✕</label>
 </div></div>
 <div class="carousel-wrapper">
 <div class="carousel-item"><div class="panel-title"><span>🌐 外資日連買</span><span class="date-badge">{d_fo_day}</span></div>{fo_day_html}</div>
@@ -396,11 +504,12 @@ def render_b4_top10_glass_card():
         date_sq = sq_data['date'][-4:] if sq_data['date'] and len(sq_data['date']) >= 4 else "未知"
         date_rk = rk_data['date'][-4:] if rk_data['date'] and len(rk_data['date']) >= 4 else "未知"
 
-        def get_pure(df):
+        def get_pure_radar_stocks(df):
             if df is None or df.empty: return pd.DataFrame()
-            return df[(df['代號'].astype(str).str.strip().str.len() == 4) & (~df['代號'].astype(str).str.startswith('00'))].copy()
+            df['代號'] = df['代號'].astype(str).str.strip()
+            return df[(df['代號'].str.len() == 4) & (~df['代號'].str.startswith('00'))].copy()
 
-        pure_sq, pure_rk = get_pure(df_sq).head(20), get_pure(df_rk).head(20)
+        pure_sq, pure_rk = get_pure_radar_stocks(df_sq).head(20), get_pure_radar_stocks(df_rk).head(20)
 
         def make_radar_html(df, start_idx, theme):
             sub_df = df.iloc[start_idx : start_idx+10]
@@ -408,16 +517,30 @@ def render_b4_top10_glass_card():
             html = "<ul style='padding-left: 0; margin: 0; list-style-type: none;'>"
             for i, row in enumerate(sub_df.to_dict('records')):
                 status = row.get('軋空評估', '') if theme == 'sq' else row.get('套牢評估', '')
-                pct, short_status = row.get('漲跌幅', 0.0), status[:7] if len(status) > 7 else status
+                pct = row.get('漲跌幅', 0.0)
+                short_status = status[:7] if len(status) > 7 else status
                 pct_color = "#FF4C4C" if theme == 'sq' else "#00e676"
-                html += f"<li style='display: flex; align-items: center; justify-content: space-between; margin-bottom: 6px; font-size: 13.5px; line-height: 1.4;'><div style='display: flex; align-items: center; width: 55%; overflow: hidden;'><b style='color:#FFF; width:22px; flex-shrink: 0;'>{start_idx + i + 1}.</b><span style='white-space:nowrap; overflow:hidden; text-overflow:ellipsis;'>{row['代號']}{row['名稱']}</span></div><div style='width: 25%; color:#FFD700; font-size: 11px; text-align: left; white-space:nowrap;'>{short_status}</div><div style='width: 20%; color:{pct_color}; font-weight:bold; text-align: right;'>{pct}%</div></li>"
-            return html + "</ul>"
+                
+                html += (
+                    f"<li style='display: flex; align-items: center; justify-content: space-between; margin-bottom: 6px; font-size: 13.5px; line-height: 1.4;'>"
+                    f"  <div style='display: flex; align-items: center; width: 55%; overflow: hidden;'>"
+                    f"      <b style='color:#FFF; width:22px; flex-shrink: 0;'>{start_idx + i + 1}.</b>"
+                    f"      <span style='white-space:nowrap; overflow:hidden; text-overflow:ellipsis;'>{row['代號']}{row['名稱']}</span>"
+                    f"  </div>"
+                    f"  <div style='width: 25%; color:#FFD700; font-size: 11px; text-align: left; white-space:nowrap;'>{short_status}</div>"
+                    f"  <div style='width: 20%; color:{pct_color}; font-weight:bold; text-align: right;'>{pct}%</div>"
+                    f"</li>"
+                )
+            html += "</ul>"
+            return html
 
         h_sq_1_10, h_sq_11_20 = make_radar_html(pure_sq, 0, 'sq'), make_radar_html(pure_sq, 10, 'sq')
         h_rk_1_10, h_rk_11_20 = make_radar_html(pure_rk, 0, 'rk'), make_radar_html(pure_rk, 10, 'rk')
 
         card_html = f"""
-<input type="checkbox" id="close-b4-card" style="display:none;"><input type="checkbox" id="min-b4-card" style="display:none;"><input type="checkbox" id="pause-b4-card" style="display:none;">
+<input type="checkbox" id="close-b4-card" style="display:none;">
+<input type="checkbox" id="min-b4-card" style="display:none;">
+<input type="checkbox" id="pause-b4-card" style="display:none;">
 <style>
 #close-b4-card:checked ~ #b4-top10-card {{ display: none !important; }}
 #min-b4-card:checked ~ #b4-top10-card .carousel-wrapper-b4 {{ max-height: 0; opacity: 0; margin-top: 0; }}
@@ -428,9 +551,10 @@ def render_b4_top10_glass_card():
 #pause-b4-card:checked ~ #b4-top10-card .pause-icon-b4::after {{ content: '▶'; font-size: 11px; color: #FFD700; }}
 #pause-b4-card:not(:checked) ~ #b4-top10-card .pause-icon-b4::after {{ content: '⏸'; font-size: 11px; }}
 @keyframes slideInDownB4 {{ from {{ transform: translateY(-50%); opacity: 0; }} to {{ transform: translateY(0); opacity: 1; }} }}
-.glass-panel-b4 {{ position: fixed; top: 85px; left: 38vw; width: 15.5vw; min-width: 220px; background: rgba(20, 22, 35, 0.88); backdrop-filter: blur(12px); -webkit-backdrop-filter: blur(12px); border: 1px solid rgba(188, 19, 254, 0.35); border-right: none; border-radius: 12px 0 0 12px; padding: 10px 12px; z-index: 999997; color: #E2E8F0;animation: slideInDownB4 0.6s cubic-bezier(0.25, 0.8, 0.25, 1); transition: all 0.3s ease; box-sizing: border-box; }}
+@keyframes radarBreath {{ 0%, 49.9% {{ border-color: rgba(188, 19, 254, 0.4); box-shadow: 0 4px 15px rgba(188, 19, 254, 0.15); }} 50%, 100% {{ border-color: rgba(0, 230, 118, 0.4); box-shadow: 0 4px 15px rgba(0, 230, 118, 0.1); }} }}
+.glass-panel-b4 {{ position: fixed; top: 85px; left: 38vw; width: 15.5vw; min-width: 220px; background: rgba(20, 22, 35, 0.88); backdrop-filter: blur(12px); -webkit-backdrop-filter: blur(12px); border: 1px solid rgba(188, 19, 254, 0.35); border-right: none; border-radius: 12px 0 0 12px; padding: 10px 12px; z-index: 999997; color: #E2E8F0;animation: slideInDownB4 0.6s cubic-bezier(0.25, 0.8, 0.25, 1);     transition: all 0.3s ease; box-sizing: border-box; }}
 .header-bar-b4 {{ display: flex; justify-content: space-between; align-items: center; border-bottom: 1px solid rgba(255,255,255,0.1); padding-bottom: 6px; margin-bottom: 8px; cursor: default; }}
-.header-title-b4 {{ font-size: 13px; font-weight: bold; color: #E2E8F0; white-space:nowrap; display: flex; align-items: center; }}
+.header-title-b4 {{ font-size: 13px; font-weight: bold; color: #E2E8F0; white-space:nowrap; }}
 .action-btns-b4 {{ display: flex; gap: 8px; align-items: center; }}
 .action-btn-b4 {{ cursor: pointer; color: #94A3B8; font-weight: bold; transition: color 0.2s; user-select: none; display: flex; align-items: center; justify-content: center; }}
 .action-btn-b4:hover {{ color: #00D2FF; }}
@@ -439,15 +563,19 @@ def render_b4_top10_glass_card():
 .date-badge-b4 {{ font-size: 10px; color: #94A3B8; font-weight: normal; }}
 .carousel-wrapper-b4 {{ position: relative; max-height: 285px; height: 285px; overflow: hidden; transition: all 0.3s ease; opacity: 1; }}
 .carousel-item-b4 {{ position: absolute; top: 0; left: 0; width: 100%; opacity: 0; animation: fadeSwitchB4 20s infinite; }}
-.carousel-item-b4:nth-child(1) {{ animation-delay: 0s; }} .carousel-item-b4:nth-child(2) {{ animation-delay: 5s; }} .carousel-item-b4:nth-child(3) {{ animation-delay: 10s; }} .carousel-item-b4:nth-child(4) {{ animation-delay: 15s; }}
+.carousel-item-b4:nth-child(1) {{ animation-delay: 0s; }}
+.carousel-item-b4:nth-child(2) {{ animation-delay: 5s; }}
+.carousel-item-b4:nth-child(3) {{ animation-delay: 10s; }}
+.carousel-item-b4:nth-child(4) {{ animation-delay: 15s; }}
 @keyframes fadeSwitchB4 {{ 0%, 22% {{ opacity: 1; z-index: 2; }} 25%, 97% {{ opacity: 0; z-index: 1; }} 100% {{ opacity: 1; z-index: 2; }} }}
 @media (max-width: 1200px) {{ .glass-panel-b4 {{ position: relative; top: auto; left: auto; width: 90%; max-width: 350px; margin: 10px auto; display: block; }} }}
 </style>
 <div class="glass-panel-b4" id="b4-top10-card">
-<div class="header-bar-b4">
-    <span class="header-title-b4"><img src="app/static/icon_b4.png" style="width:16px; margin-right:4px; display:none;" onerror="this.style.display='none'">📡 資券雷達</span>
+<div class="header-bar-b4"><span class="header-title-b4">📡 資券雷達</span>
 <div class="action-btns-b4">
-<label for="pause-b4-card" class="action-btn-b4 pause-icon-b4" title="暫停/播放輪播"></label><label for="min-b4-card" class="action-btn-b4 min-icon-b4" title="縮放"></label><label for="close-b4-card" class="action-btn-b4" title="關閉">✕</label>
+<label for="pause-b4-card" class="action-btn-b4 pause-icon-b4" title="暫停/播放輪播"></label>
+<label for="min-b4-card" class="action-btn-b4 min-icon-b4" title="縮放"></label>
+<label for="close-b4-card" class="action-btn-b4" title="關閉">✕</label>
 </div></div>
 <div class="carousel-wrapper-b4">
 <div class="carousel-item-b4"><div class="panel-title-b4"><span>🚀 軋空(1-10)</span><span class="date-badge-b4">{date_sq}</span></div>{h_sq_1_10}</div>
@@ -473,10 +601,13 @@ def render_b5_top10_glass_card():
         date_str = latest_col_1000.replace('▼', '') 
 
         def get_pure(df):
-            return df[(df['股票代號'].astype(str).str.strip().str.len() == 4) & (~df['股票代號'].astype(str).str.startswith('00'))].copy()
+            df['股票代號'] = df['股票代號'].astype(str).str.strip()
+            return df[(df['股票代號'].str.len() == 4) & (~df['股票代號'].str.startswith('00'))].copy()
 
-        df_1k_sub = get_pure(df_1000)[['股票代號', '股票名稱', '週動態', '▼6周增減', latest_col_1000]].rename(columns={'▼6周增減': '6周(千)', latest_col_1000: '最新(千)', '週動態': '狀態(千)'})
-        df_400_sub = get_pure(df_400)[['股票代號', '週動態', '▼6周增減', latest_col_400]].rename(columns={'▼6周增減': '6周(四)', latest_col_400: '最新(四)', '週動態': '狀態(四)'})
+        df_1k_sub = get_pure(df_1000)[['股票代號', '股票名稱', '週動態', '▼6周增減', latest_col_1000]].copy()
+        df_1k_sub = df_1k_sub.rename(columns={'▼6周增減': '6周(千)', latest_col_1000: '最新(千)', '週動態': '狀態(千)'})
+        df_400_sub = get_pure(df_400)[['股票代號', '週動態', '▼6周增減', latest_col_400]].copy()
+        df_400_sub = df_400_sub.rename(columns={'▼6周增減': '6周(四)', latest_col_400: '最新(四)', '週動態': '狀態(四)'})
 
         sync_df = pd.merge(df_1k_sub, df_400_sub, on='股票代號', how='inner')
         for col in ['6周(千)', '最新(千)', '6周(四)', '最新(四)']:
@@ -504,17 +635,17 @@ def render_b5_top10_glass_card():
             if df.empty: return "<p style='font-size:13.5px; text-align:center; color:#94A3B8; margin-top:40px;'>尚無共振標的</p>"
             html = "<ul style='padding-left: 0; margin: 0; list-style-type: none;'>"
             for i, row in enumerate(df.to_dict('records')):
-                # 💡 修正 1: 拉近間距！將左側寬度設為 50%，右側 50% 且向左對齊 (flex-start)
+                # 💡 修正 1：調整 B5 卡片的字體大小為 13.5px，與其他卡片保持一致
                 if is_6w:
                     v1, v2 = row['6周(千)_val'], row['6周(四)_val']
-                    info_html = f"<div style='display:flex; width:50%; justify-content:flex-start; color:#F59E0B; font-weight:bold; font-size:13.5px;'><span style='text-align:left;'>{v1:.1f}%</span><span style='color:#94A3B8; font-size:12px; margin:0 4px;'>/</span><span style='text-align:left;'>{v2:.1f}%</span></div>"
+                    info_html = f"<div style='display:flex; width:45%; justify-content:flex-end; color:#F59E0B; font-weight:bold; font-size:13.5px;'><span style='width:45px; text-align:right;'>{v1:.1f}%</span><span style='color:#94A3B8; font-size:12px; margin:0 2px;'>/</span><span style='width:45px; text-align:right;'>{v2:.1f}%</span></div>"
                 else:
                     s1, s2 = unify_status_text(row.get('狀態(千)', '')), unify_status_text(row.get('狀態(四)', ''))
-                    info_html = f"<div style='display:flex; width:50%; justify-content:flex-start; color:#F59E0B; font-size:13.5px;'><span style='text-align:left;'>{s1}</span><span style='color:#94A3B8; font-size:12px; margin:0 4px;'>/</span><span style='text-align:left;'>{s2}</span></div>"
+                    info_html = f"<div style='display:flex; width:45%; justify-content:flex-end; color:#F59E0B; font-size:13.5px;'><span style='width:45px; text-align:right;'>{s1}</span><span style='color:#94A3B8; font-size:12px; margin:0 2px;'>/</span><span style='width:45px; text-align:right;'>{s2}</span></div>"
                 
                 html += (
                     f"<li style='display:flex; align-items:center; justify-content:space-between; margin-bottom:6px; font-size:13.5px; line-height:1.4;'>"
-                    f"  <div style='display:flex; align-items:center; width:50%; overflow:hidden;'>"
+                    f"  <div style='display:flex; align-items:center; width:55%; overflow:hidden;'>"
                     f"      <b style='color:#FFF; width:22px; flex-shrink:0;'>{i+1}.</b>"
                     f"      <span style='white-space:nowrap; overflow:hidden; text-overflow:ellipsis;'>{row['股票代號']}{row['股票名稱']}</span>"
                     f"  </div>{info_html}</li>"
@@ -525,7 +656,9 @@ def render_b5_top10_glass_card():
         h_6w, h_latest = make_resonance_html(top10_6w, True), make_resonance_html(top10_latest, False)
 
         card_html = f"""
-<input type="checkbox" id="close-b5-card" style="display:none;"><input type="checkbox" id="min-b5-card" style="display:none;"><input type="checkbox" id="pause-b5-card" style="display:none;">
+<input type="checkbox" id="close-b5-card" style="display:none;">
+<input type="checkbox" id="min-b5-card" style="display:none;">
+<input type="checkbox" id="pause-b5-card" style="display:none;">
 <style>
 #close-b5-card:checked ~ #b5-top10-card {{ display: none !important; }}
 #min-b5-card:checked ~ #b5-top10-card .carousel-wrapper-b5 {{ max-height: 0; opacity: 0; margin-top: 0; }}
@@ -538,7 +671,7 @@ def render_b5_top10_glass_card():
 @keyframes slideInDownB5 {{ from {{ transform: translateY(-50%); opacity: 0; }} to {{ transform: translateY(0); opacity: 1; }} }}
 .glass-panel-b5 {{position: fixed; top: 85px; left: 53.5vw; width: 15.5vw; min-width: 220px; background: rgba(30, 25, 10, 0.88); backdrop-filter: blur(12px); -webkit-backdrop-filter: blur(12px); border: 1px solid rgba(245, 158, 11, 0.4); border-right: none; border-radius: 0; padding: 10px 12px; z-index: 999996; color: #E2E8F0; animation: slideInDownB5 0.7s cubic-bezier(0.25, 0.8, 0.25, 1); transition: all 0.3s ease; box-sizing: border-box;}}
 .header-bar-b5 {{ display: flex; justify-content: space-between; align-items: center; border-bottom: 1px solid rgba(255,255,255,0.1); padding-bottom: 6px; margin-bottom: 8px; cursor: default; }}
-.header-title-b5 {{ font-size: 13px; font-weight: bold; color: #FCD34D; white-space:nowrap; display: flex; align-items: center; }}
+.header-title-b5 {{ font-size: 13px; font-weight: bold; color: #FCD34D; white-space:nowrap; }}
 .action-btns-b5 {{ display: flex; gap: 8px; align-items: center; }}
 .action-btn-b5 {{ cursor: pointer; color: #94A3B8; font-weight: bold; transition: color 0.2s; user-select: none; display: flex; align-items: center; justify-content: center; }}
 .action-btn-b5:hover {{ color: #F59E0B; }}
@@ -546,15 +679,17 @@ def render_b5_top10_glass_card():
 .date-badge-b5 {{ font-size: 10px; color: #94A3B8; font-weight: normal; }}
 .carousel-wrapper-b5 {{ position: relative; max-height: 285px; height: 285px; overflow: hidden; transition: all 0.3s ease; opacity: 1; }}
 .carousel-item-b5 {{ position: absolute; top: 0; left: 0; width: 100%; opacity: 0; animation: fadeSwitchB5 10s infinite; }}
-.carousel-item-b5:nth-child(1) {{ animation-delay: 0s; }} .carousel-item-b5:nth-child(2) {{ animation-delay: 5s; }}
+.carousel-item-b5:nth-child(1) {{ animation-delay: 0s; }}
+.carousel-item-b5:nth-child(2) {{ animation-delay: 5s; }}
 @keyframes fadeSwitchB5 {{ 0%, 45% {{ opacity: 1; z-index: 2; }} 50%, 95% {{ opacity: 0; z-index: 1; }} 100% {{ opacity: 1; z-index: 2; }} }}
 @media (max-width: 1200px) {{ .glass-panel-b5 {{ position: relative; top: auto; left: auto; width: 90%; max-width: 350px; margin: 10px auto; display: block; }} }}
 </style>
 <div class="glass-panel-b5" id="b5-top10-card">
-<div class="header-bar-b5">
-    <span class="header-title-b5"><img src="app/static/icon_b5.png" style="width:16px; margin-right:4px; display:none;" onerror="this.style.display='none'">🔥 大腿共振</span>
+<div class="header-bar-b5"><span class="header-title-b5">🔥 大腿共振</span>
 <div class="action-btns-b5">
-<label for="pause-b5-card" class="action-btn-b5 pause-icon-b5" title="暫停/播放輪播"></label><label for="min-b5-card" class="action-btn-b5 min-icon-b5" title="縮放"></label><label for="close-b5-card" class="action-btn-b5" title="關閉">✕</label>
+<label for="pause-b5-card" class="action-btn-b5 pause-icon-b5" title="暫停/播放輪播"></label>
+<label for="min-b5-card" class="action-btn-b5 min-icon-b5" title="縮放"></label>
+<label for="close-b5-card" class="action-btn-b5" title="關閉">✕</label>
 </div></div>
 <div class="carousel-wrapper-b5">
 <div class="carousel-item-b5"><div class="panel-title-b5"><span>📊 6周累積(1000/400)</span><span class="date-badge-b5">{date_str}</span></div>{h_6w}</div>
@@ -565,50 +700,71 @@ def render_b5_top10_glass_card():
     except Exception as e: pass
 
 # ==========================================
-# ⚙️ 設置中心 懸浮卡片 (與課程視窗結構統一)
+# 設置中心 懸浮玻璃卡片 (放在 style_manager.py 最下方)
 # ==========================================
 def render_settings_modal():
     import streamlit as st
+    import streamlit.components.v1 as components
     if st.session_state.get('show_settings', False):
         settings_css = """
         <style>
-        /* 💡 修正 4：解除鎖死底部首頁，移除全螢幕黑幕，並改為上方彈出視窗 */
+        .stApp { overflow: hidden !important; } 
+        
+        .settings-overlay {
+            position: fixed; top: 0; left: 0; width: 100vw; height: 100vh;
+            background: #0A0D14; 
+            z-index: 9999998; pointer-events: auto;
+        }
+        
+        /* 💡 修正 3：取消使用易導致巢狀重疊的 CSS :has，改以 JavaScript 精準定位單一外框 */
         .settings-modal-active {
             position: fixed !important; 
-            top: 15% !important; left: 50% !important; transform: translateX(-50%) !important;
-            background: rgba(15, 23, 42, 0.98) !important; 
-            border: 2px solid #00D2FF !important; border-radius: 12px !important; 
-            padding: 20px 25px !important; z-index: 9999999 !important;
-            width: 90% !important; max-width: 650px !important; box-shadow: 0 8px 30px rgba(0, 210, 255, 0.4) !important;
-            max-height: 80vh !important; overflow-y: auto !important;
+            top: 50% !important; left: 50% !important; transform: translate(-50%, -50%) !important;
+            background: rgba(17, 22, 34, 1) !important; 
+            border: 1px solid #00D2FF !important; border-radius: 12px !important; 
+            padding: 25px !important; z-index: 9999999 !important;
+            width: 90% !important; max-width: 650px !important; box-shadow: 0 0 25px rgba(0, 210, 255, 0.2) !important;
+            max-height: 85vh !important;
         }
-        .settings-drag-handle { cursor: grab; }
+        .settings-drag-handle {
+            cursor: grab;
+            display: inline-block;
+            width: 100%;
+        }
         .settings-drag-handle:active { cursor: grabbing; }
         </style>
+        <div class="settings-overlay"></div>
         """
         st.markdown(settings_css, unsafe_allow_html=True)
         
-        # 使用 Streamlit 容器，由 JS 自動加上 class 變為浮動視窗
         with st.container():
             st.markdown('<div class="setting-anchor"></div>', unsafe_allow_html=True)
+            # 添加了可拖曳的 class 識別標籤
+            st.markdown("<h3 class='settings-drag-handle' style='color:#00D2FF; margin-top:0;'>⚙️ 設置中心 (按住此處可拖曳)</h3>", unsafe_allow_html=True)
             
-            # 💡 修正 4：將 儲存 與 關閉 的 Streamlit 原生按鈕與標題並排於頂部！
-            col_title, col_save, col_close = st.columns([6, 2, 2])
-            with col_title:
-                st.markdown("<h3 class='settings-drag-handle' style='color:#00D2FF; margin-top:0;' title='按住此處可拖曳視窗'>⚙️ 設置中心</h3>", unsafe_allow_html=True)
-            with col_save:
-                save_clicked = st.button("💾 儲存", use_container_width=True)
-            with col_close:
-                close_clicked = st.button("❌ 關閉", use_container_width=True)
-
             current_theme = st.session_state.get('theme', 'dark')
             theme_options = ['dark', 'pink', 'green', 'blue']
-            theme_choice = st.radio("🎨 選擇背景濾鏡：", options=theme_options, format_func=lambda x: {'dark': "🌙 專業暗黑", 'pink': "🌸 櫻花粉", 'green': "🌲 翡翠綠", 'blue': "🌌 天空藍"}[x], index=theme_options.index(current_theme) if current_theme in theme_options else 0, horizontal=True)
+            theme_labels = {
+                'dark': "🌙 專業暗黑", 'pink': "🌸 櫻花粉",
+                'green': "🌲 翡翠綠", 'blue': "🌌 天空藍"
+            }
+            theme_choice = st.radio(
+                "🎨 選擇背景濾鏡：", options=theme_options,
+                format_func=lambda x: theme_labels[x],
+                index=theme_options.index(current_theme) if current_theme in theme_options else 0,
+                horizontal=True
+            )
             
             st.markdown("---")
             st.markdown("<h4 style='color:#E2E8F0; font-size: 16px;'>⌨️ 快捷鍵配置 (點擊欄位後直接按下按鍵)</h4>", unsafe_allow_html=True)
             
-            reverse_map = {v: k for k, v in st.session_state.get('custom_hotkeys', {"f1": "NavToB1", "f2": "NavToB2", "f3": "NavToB3", "f4": "NavToB4", "f5": "NavToB5", "f6": "NavToB6", "f7": "NavToB7", "alt+l": "NavToWatchlist", "escape": "登入"}).items()}
+            default_hotkeys = {
+                "f1": "NavToB1", "f2": "NavToB2", "f3": "NavToB3", "f4": "NavToB4", 
+                "f5": "NavToB5", "f6": "NavToB6", "f7": "NavToB7",
+                "alt+l": "NavToWatchlist", "escape": "登入"
+            }
+            current_hotkeys = st.session_state.get('custom_hotkeys', default_hotkeys)
+            reverse_map = {v: k for k, v in current_hotkeys.items()}
             
             col1, col2 = st.columns(2)
             new_hotkeys = {}
@@ -623,126 +779,190 @@ def render_settings_modal():
                 new_hotkeys["NavToB7"] = st.text_input("董監動向", value=reverse_map.get("NavToB7", "f7"), key="kb7")
                 new_hotkeys["NavToWatchlist"] = st.text_input("建立名單", value=reverse_map.get("NavToWatchlist", "alt+l"), key="kb_wl")
                 new_hotkeys["登入"] = st.text_input("登入", value=reverse_map.get("登入", "escape"), key="kb_login")
-
-            # 處理上方按鈕的邏輯
-            if save_clicked:
-                st.session_state['theme'] = theme_choice
-                st.session_state['custom_hotkeys'] = {k.strip().lower(): v for v, k in new_hotkeys.items() if k.strip().lower()}
-                st.session_state['show_settings'] = False
-                st.rerun()
-            if close_clicked:
-                st.session_state['show_settings'] = False
-                st.rerun()
+                
+            st.markdown("<br>", unsafe_allow_html=True)
+            
+            btn_col1, btn_col2 = st.columns([1, 1])
+            with btn_col1:
+                if st.button("💾 儲存並套用", use_container_width=True):
+                    st.session_state['theme'] = theme_choice
+                    final_hotkeys_dict = {
+                        key.strip().lower(): target 
+                        for target, key in new_hotkeys.items() if key.strip().lower()
+                    }
+                    st.session_state['custom_hotkeys'] = final_hotkeys_dict
+                    st.session_state['show_settings'] = False
+                    st.rerun()
+            with btn_col2:
+                if st.button("❌ 關閉", use_container_width=True):
+                    st.session_state['show_settings'] = False
+                    st.rerun()
                     
         keybind_js = """
         <script>
         setTimeout(() => {
-            const container = window.parent.document.querySelector('.setting-anchor').closest('div[data-testid="stVerticalBlock"]');
+            const parentDoc = window.parent.document;
+            const anchor = parentDoc.querySelector('.setting-anchor');
+            if (!anchor) return;
+            
+            // 💡 修正 3：由 Javascript 精確找尋當前唯一的外層元件，解決巢狀視窗破圖
+            const container = anchor.closest('div[data-testid="stVerticalBlock"]');
             if (container && !container.classList.contains('settings-modal-active')) {
                 container.classList.add('settings-modal-active');
             }
-            container.querySelectorAll('input[type="text"]').forEach(input => {
+            
+            const inputs = container.querySelectorAll('input[type="text"]');
+            inputs.forEach(input => {
                 if(input.dataset.keybound) return;
                 input.dataset.keybound = "true";
+                
                 input.addEventListener('keydown', function(e) {
-                    e.preventDefault(); e.stopPropagation();
+                    e.preventDefault();
+                    e.stopPropagation();
+                    
                     let combo = [];
-                    if (e.ctrlKey) combo.push('ctrl'); if (e.altKey) combo.push('alt'); if (e.shiftKey) combo.push('shift');
+                    if (e.ctrlKey) combo.push('ctrl');
+                    if (e.altKey) combo.push('alt');
+                    if (e.shiftKey) combo.push('shift');
+                    
                     let keyName = e.key.toLowerCase();
                     if (['control', 'alt', 'shift', 'meta', 'process'].includes(keyName)) return; 
                     if (keyName === ' ') keyName = 'space';
+                    
                     combo.push(keyName);
+                    let finalKey = combo.join('+');
+                    
                     let nativeInputValueSetter = Object.getOwnPropertyDescriptor(window.HTMLInputElement.prototype, "value").set;
-                    nativeInputValueSetter.call(this, combo.join('+'));
-                    this.dispatchEvent(new Event('input', { bubbles: true}));
+                    nativeInputValueSetter.call(this, finalKey);
+                    let ev2 = new Event('input', { bubbles: true});
+                    this.dispatchEvent(ev2);
                 });
+                
                 input.addEventListener('focus', function() { this.style.boxShadow = '0 0 10px #FFD700'; });
                 input.addEventListener('blur', function() { this.style.boxShadow = 'none'; });
             });
         }, 500);
         </script>
         """
-        import streamlit.components.v1 as components
         components.html(keybind_js, height=0, width=0)
 
 # ==========================================
-# 🎓 課程 NPC 懸浮對話框 (💡 修正 3：徹底改寫為純 HTML/CSS 架構，保證 100% 絕對運作)
+# 🎓 課程 NPC 懸浮對話框
 # ==========================================
 def render_course_npc():
     import streamlit as st
+    import streamlit.components.v1 as components
     
     if st.session_state.get('show_course_npc', False):
-        # 由於已統一為純 CSS 狀態管理 (Radio/Checkbox)，我們不需要再使用 Streamlit 隱藏按鈕與 JS 模擬點擊了。
-        html_code = """
-<input type="checkbox" id="close-npc" style="display:none;">
-<input type="radio" name="course_tabs" id="tab-list" checked style="display:none;">
-<input type="radio" name="course_tabs" id="tab-detail-4" style="display:none;">
-
-<style>
-/* CSS 核取方塊總開關 */
-#close-npc:checked ~ .npc-wrapper { display: none !important; }
-
-/* CSS 頁籤切換機制 */
-#tab-list:checked ~ .npc-wrapper .view-list { display: flex; }
-#tab-list:not(:checked) ~ .npc-wrapper .view-list { display: none; }
-
-#tab-detail-4:checked ~ .npc-wrapper .view-detail { display: flex; }
-#tab-detail-4:not(:checked) ~ .npc-wrapper .view-detail { display: none; }
-
-/* 視窗共用樣式 */
-.npc-wrapper {
-    position: fixed; bottom: 30px; right: 30px;
-    z-index: 9999999;
-}
+        
+        if 'course_view' not in st.session_state:
+            st.session_state['course_view'] = 'list'
+            
+        current_view = st.session_state['course_view']
+        
+        if current_view == 'list':
+            html_code = """<style>
 .npc-overlay {
-    width: 650px; height: 75vh; max-height: 800px;
-    background: rgba(15, 23, 42, 0.96); border: 2px solid #00D2FF; border-radius: 12px;
-    display: flex; flex-direction: column; padding: 25px; 
-    box-shadow: 0 8px 30px rgba(0, 210, 255, 0.3); color: white; 
-    animation: slideUpNPC 0.4s cubic-bezier(0.175, 0.885, 0.32, 1.275);
+position: fixed; bottom: 30px; right: 30px;
+width: 650px; height: 75vh; max-height: 800px;
+background: rgba(15, 23, 42, 0.96);
+border: 2px solid #00D2FF; border-radius: 12px;
+z-index: 9999999; display: flex; flex-direction: column;
+padding: 25px; box-shadow: 0 8px 30px rgba(0, 210, 255, 0.3);
+color: white; animation: slideUpNPC 0.4s cubic-bezier(0.175, 0.885, 0.32, 1.275);
 }
-.npc-overlay.wide { width: 800px; height: 85vh; max-height: 900px; }
-
-.npc-drag-handle { display: flex; align-items: flex-end; margin-bottom: 20px; border-bottom: 1px solid rgba(255,255,255,0.1); padding-bottom: 15px; cursor: grab; }
-.npc-drag-handle:active { cursor: grabbing; }
-
-.npc-image { width: 90px; height: 90px; background-image: url('app/static/npcnatzu.png'); background-size: contain; background-repeat: no-repeat; background-position: bottom; margin-right: 20px; filter: drop-shadow(0 0 5px rgba(0,210,255,0.5)); pointer-events: none; }
-.npc-big-image { width: 160px; height: 180px; background-image: url('app/static/npcroxy.png'); background-size: contain; background-repeat: no-repeat; background-position: bottom; filter: drop-shadow(0 0 10px rgba(0,210,255,0.6)); flex-shrink: 0; pointer-events: none; }
-
+.npc-header { display: flex; align-items: flex-end; margin-bottom: 20px; border-bottom: 1px solid rgba(255,255,255,0.1); padding-bottom: 15px; cursor: grab; }
+.npc-header:active { cursor: grabbing; }
+.npc-image {
+width: 90px; height: 90px;
+background-image: url('app/static/npcnatzu.png'); 
+background-size: contain; background-repeat: no-repeat; background-position: bottom;
+margin-right: 20px; filter: drop-shadow(0 0 5px rgba(0,210,255,0.5));
+}
 .npc-title-box { flex: 1; pointer-events: none; }
 .npc-name { color: #00D2FF; font-weight: bold; font-size: 22px; margin-bottom: 6px; }
 .npc-greet { font-size: 15px; color: #94A3B8; }
-
-.course-list, .table-container { flex: 1; overflow-y: auto; padding-right: 15px; }
-.course-list::-webkit-scrollbar, .table-container::-webkit-scrollbar { width: 8px; }
-.course-list::-webkit-scrollbar-thumb, .table-container::-webkit-scrollbar-thumb { background: rgba(0, 210, 255, 0.4); border-radius: 4px; }
-
-.course-item { margin-bottom: 18px; padding: 15px; background: rgba(255,255,255,0.03); border: 1px solid rgba(255,255,255,0.08); border-radius: 10px; transition: 0.2s; display: block; }
+.course-list { flex: 1; overflow-y: auto; padding-right: 15px; }
+.course-list::-webkit-scrollbar { width: 8px; }
+.course-list::-webkit-scrollbar-thumb { background: rgba(0, 210, 255, 0.4); border-radius: 4px; }
+.course-item { margin-bottom: 18px; padding: 15px; background: rgba(255,255,255,0.03); border: 1px solid rgba(255,255,255,0.08); border-radius: 10px; transition: 0.2s; }
 .course-item.locked { cursor: not-allowed; background: rgba(0,0,0,0.2); }
 .course-item.active { cursor: pointer; border-color: rgba(0, 210, 255, 0.4); }
 .course-item.active:hover { background: rgba(0, 210, 255, 0.1); border-color: #00D2FF; transform: translateY(-2px); box-shadow: 0 4px 15px rgba(0,210,255,0.2); }
-
-.course-icon { width: 24px; height: 24px; object-fit: contain; margin-right: 8px; filter: drop-shadow(0 0 5px rgba(0,210,255,0.8)); transition: 0.3s; vertical-align: middle; }
+.course-icon { width: 24px; height: 24px; object-fit: contain; margin-right: 8px; filter: drop-shadow(0 0 5px rgba(0,210,255,0.8)); transition: 0.3s; }
 .course-item.locked .course-icon { filter: grayscale(100%) opacity(0.4); }
 .course-item.active:hover .course-icon { filter: drop-shadow(0 0 10px #FFD700); transform: scale(1.1); }
-.course-title { font-weight: bold; font-size: 16px; margin-bottom: 8px; }
+.course-title { font-weight: bold; font-size: 16px; margin-bottom: 8px; display: flex; align-items: center; }
 .course-item.locked .course-title { color: #64748B; }
 .course-item.active .course-title { color: #FFD700; }
 .course-desc { font-size: 14px; color: #CBD5E1; line-height: 1.6; }
-
-/* 絕對純 CSS 右上角按鈕 */
 .close-btn { position: absolute; top: 15px; right: 20px; cursor: pointer; color: #94A3B8; font-size: 24px; transition: 0.2s; z-index: 10; font-weight: bold; }
 .close-btn:hover { color: #FF4C4C; transform: scale(1.1); }
+@keyframes slideUpNPC { from { transform: translateY(100px) scale(0.8); opacity: 0; } to { transform: translateY(0) scale(1); opacity: 1; } }
+</style>
+
+<div class="npc-overlay">
+<div class="close-btn action-btn" id="btn-close-list">✕</div>
+<div class="npc-header" title="按住此處可拖曳視窗">
+<div class="npc-image"></div>
+<div class="npc-title-box">
+<div class="npc-name">籌碼導師</div>
+<div class="npc-greet">「冒險者，選擇你想強化的能力吧！」</div>
+</div>
+</div>
+<div class="course-list">
+<div class="course-item locked"><div class="course-title"><img src="app/static/icon-course1.png" class="course-icon"> 1. 宏觀經濟與景氣循環 (未開放)</div><div class="course-desc">學習解讀 GDP、CPI、利率與匯率等基本總體經濟指標，判斷目前大盤處於景氣擴張或衰退的哪個階段。</div></div>
+<div class="course-item locked"><div class="course-title"><img src="app/static/icon-course1.png" class="course-icon"> 2. 股市基本架構與名詞解析 (未開放)</div><div class="course-desc">認識台股交易規則、漲跌幅限制、各類委託單與基本盤面術語，建立進場前的基礎常識。</div></div>
+<div class="course-item locked"><div class="course-title"><img src="app/static/icon-course1.png" class="course-icon"> 3. 財報與基本面入門 (未開放)</div><div class="course-desc">學習閱讀三大財務報表（綜合損益表、資產負債表、現金流量表），學會挑選具備長期競爭力的公司。</div></div>
+<div class="course-item active action-btn" id="btn-open-course-4">
+<div class="course-title"><img src="app/static/icon-course1.png" class="course-icon"> 4. 量價關係與盤面解讀 (點擊進入)</div>
+<div class="course-desc">對照成交量與股價漲跌的互動（如價漲量增、量價背離），判斷多空雙方的企圖心與買賣力道。</div>
+</div>
+<div class="course-item locked"><div class="course-title"><img src="app/static/icon-course1.png" class="course-icon"> 5. 技術分析與指標應用 (未開放)</div><div class="course-desc">熟悉常用技術指標（如均線 MA、MACD、RSI、KDJ），掌握支撐壓力與趨勢轉折點。</div></div>
+<div class="course-item locked"><div class="course-title"><img src="app/static/icon-course1.png" class="course-icon"> 6. 籌碼面追蹤：法人與大戶結構 (未開放)</div><div class="course-desc">分析外資、投信、自營商動向及大戶持股比例，透過資金流向尋找主力默默佈局的標的。</div></div>
+<div class="course-item locked"><div class="course-title"><img src="app/static/icon-course1.png" class="course-icon"> 7. 券資關係與融資融券分析 (未開放)</div><div class="course-desc">觀察融資餘額、融券張數與券資比變化，評估市場散戶情緒及潛在的「軋空」或「多殺多」力道。</div></div>
+<div class="course-item locked"><div class="course-title"><img src="app/static/icon-course1.png" class="course-icon"> 8. 產業趨勢與題材選股 (未開放)</div><div class="course-desc">掌握主流產業輪動脈絡（如半導體、AI 供應鏈、綠能等），在對的時間點佈局具備成長爆發力的賽道。</div></div>
+<div class="course-item locked"><div class="course-title"><img src="app/static/icon-course1.png" class="course-icon"> 9. 資金控管與風險管理 (未開放)</div><div class="course-desc">學習單筆投資部位配置、分批進場策略、停損停利機制，避免因情緒失控而遭受重大虧損。</div></div>
+<div class="course-item locked"><div class="course-title"><img src="app/static/icon-course1.png" class="course-icon"> 10. 交易心理學與個人策略總結 (未開放)</div><div class="course-desc">克服貪婪與恐懼的心理障礙，並回測、修正並建立專屬於自己的穩定獲利交易系統。</div></div>
+</div>
+</div>"""
+
+        else:
+            html_code = """<style>
+.npc-overlay {
+position: fixed; bottom: 30px; right: 30px;
+width: 800px; height: 85vh; max-height: 900px;
+background: rgba(15, 23, 42, 0.98);
+border: 2px solid #00D2FF; border-radius: 12px;
+z-index: 9999999; display: flex; flex-direction: column;
+padding: 25px; box-shadow: 0 8px 30px rgba(0, 210, 255, 0.4);
+color: white; animation: slideUpNPC 0.4s cubic-bezier(0.175, 0.885, 0.32, 1.275);
+}
 .top-actions { position: absolute; top: 15px; right: 20px; display: flex; gap: 12px; z-index: 10; }
 .action-btn { cursor: pointer; color: #94A3B8; font-size: 20px; font-weight:bold; transition: 0.2s; display: flex; align-items: center; justify-content: center; background: rgba(0,0,0,0.5); width: 32px; height: 32px; border-radius: 50%; border: 1px solid rgba(255,255,255,0.1); }
 .action-btn:hover { background: rgba(0,210,255,0.3); color: #FFF; transform: scale(1.1); border-color: #00D2FF; }
 .action-btn.close:hover { background: rgba(255,76,76,0.8); border-color: #FF4C4C; }
-
-/* 詳情頁專屬 */
-.dialogue-box { flex: 1; background: rgba(0, 210, 255, 0.08); border: 1px solid rgba(0, 210, 255, 0.3); border-radius: 12px; padding: 18px; position: relative; margin-bottom: 10px; pointer-events: none; }
-.dialogue-box::before { content: ''; position: absolute; left: -14px; bottom: 30px; border-width: 12px 14px 12px 0; border-style: solid; border-color: transparent rgba(0, 210, 255, 0.3) transparent transparent; }
+.detail-header { display: flex; align-items: flex-end; margin-bottom: 15px; border-bottom: 1px solid rgba(255,255,255,0.1); padding-bottom: 15px; gap: 20px; cursor: grab; }
+.detail-header:active { cursor: grabbing; }
+.npc-big-image {
+width: 160px; height: 180px;
+background-image: url('app/static/npcroxy.png'); 
+background-size: contain; background-repeat: no-repeat; background-position: bottom;
+filter: drop-shadow(0 0 10px rgba(0,210,255,0.6)); flex-shrink: 0; pointer-events: none;
+}
+.dialogue-box {
+flex: 1; background: rgba(0, 210, 255, 0.08); border: 1px solid rgba(0, 210, 255, 0.3);
+border-radius: 12px; padding: 18px; position: relative; margin-bottom: 10px; pointer-events: none;
+}
+.dialogue-box::before {
+content: ''; position: absolute; left: -14px; bottom: 30px;
+border-width: 12px 14px 12px 0; border-style: solid; border-color: transparent rgba(0, 210, 255, 0.3) transparent transparent;
+}
+.npc-name { color: #00D2FF; font-weight: bold; font-size: 20px; margin-bottom: 8px; }
 .npc-text { font-size: 15px; color: #E2E8F0; line-height: 1.6; }
-
+.table-container { flex: 1; overflow-y: auto; padding-right: 10px; }
+.table-container::-webkit-scrollbar { width: 8px; }
+.table-container::-webkit-scrollbar-thumb { background: rgba(0, 210, 255, 0.4); border-radius: 4px; }
 .pv-table { width: 100%; border-collapse: collapse; font-size: 15px; text-align: center; }
 .pv-table th { background: rgba(0, 210, 255, 0.15); color: #00D2FF; padding: 12px; border-bottom: 2px solid #00D2FF; font-weight: bold; }
 .pv-table td { padding: 12px; border-bottom: 1px solid rgba(255,255,255,0.08); color: #CBD5E1; }
@@ -750,80 +970,104 @@ def render_course_npc():
 .trend-up { color: #FF4C4C; font-weight: bold; }
 .trend-down { color: #00E676; font-weight: bold; }
 .trend-flat { color: #FFD700; font-weight: bold; }
-
-@keyframes slideUpNPC { from { transform: translateY(100px) scale(0.8); opacity: 0; } to { transform: translateY(0) scale(1); opacity: 1; } }
 </style>
 
-<div class="npc-wrapper">
-    <!-- =========================
-         📜 視圖 1: 課程列表 
-         ========================= -->
-    <div class="npc-overlay view-list">
-        <label for="close-npc" class="close-btn" title="關閉">✕</label>
-        <div class="npc-drag-handle" title="按住此處可拖曳視窗">
-            <div class="npc-image"></div>
-            <div class="npc-title-box">
-                <div class="npc-name">籌碼導師</div>
-                <div class="npc-greet">「冒險者，選擇你想強化的能力吧！」</div>
-            </div>
-        </div>
-        <div class="course-list">
-            <div class="course-item locked"><div class="course-title"><img src="app/static/icon-course1.png" class="course-icon"> 1. 宏觀經濟與景氣循環 (未開放)</div><div class="course-desc">學習解讀 GDP、CPI、利率與匯率等基本總體經濟指標，判斷目前大盤處於景氣擴張或衰退的哪個階段。</div></div>
-            <div class="course-item locked"><div class="course-title"><img src="app/static/icon-course1.png" class="course-icon"> 2. 股市基本架構與名詞解析 (未開放)</div><div class="course-desc">認識台股交易規則、漲跌幅限制、各類委託單與基本盤面術語，建立進場前的基礎常識。</div></div>
-            <div class="course-item locked"><div class="course-title"><img src="app/static/icon-course1.png" class="course-icon"> 3. 財報與基本面入門 (未開放)</div><div class="course-desc">學習閱讀三大財務報表（綜合損益表、資產負債表、現金流量表），學會挑選具備長期競爭力的公司。</div></div>
-            
-            <!-- 💡 點擊這個標籤，會自動切換 CSS 狀態到詳情頁，100%零延遲 -->
-            <label for="tab-detail-4" class="course-item active">
-                <div class="course-title"><img src="app/static/icon-course1.png" class="course-icon"> 4. 量價關係與盤面解讀 (點擊進入)</div>
-                <div class="course-desc">對照成交量與股價漲跌的互動（如價漲量增、量價背離），判斷多空雙方的企圖心與買賣力道。</div>
-            </label>
-            
-            <div class="course-item locked"><div class="course-title"><img src="app/static/icon-course1.png" class="course-icon"> 5. 技術分析與指標應用 (未開放)</div><div class="course-desc">熟悉常用技術指標（如均線 MA、MACD、RSI、KDJ），掌握支撐壓力與趨勢轉折點。</div></div>
-            <div class="course-item locked"><div class="course-title"><img src="app/static/icon-course1.png" class="course-icon"> 6. 籌碼面追蹤：法人與大戶結構 (未開放)</div><div class="course-desc">分析外資、投信、自營商動向及大戶持股比例，透過資金流向尋找主力默默佈局的標的。</div></div>
-            <div class="course-item locked"><div class="course-title"><img src="app/static/icon-course1.png" class="course-icon"> 7. 券資關係與融資融券分析 (未開放)</div><div class="course-desc">觀察融資餘額、融券張數與券資比變化，評估市場散戶情緒及潛在的「軋空」或「多殺多」力道。</div></div>
-            <div class="course-item locked"><div class="course-title"><img src="app/static/icon-course1.png" class="course-icon"> 8. 產業趨勢與題材選股 (未開放)</div><div class="course-desc">掌握主流產業輪動脈絡（如半導體、AI 供應鏈、綠能等），在對的時間點佈局具備成長爆發力的賽道。</div></div>
-            <div class="course-item locked"><div class="course-title"><img src="app/static/icon-course1.png" class="course-icon"> 9. 資金控管與風險管理 (未開放)</div><div class="course-desc">學習單筆投資部位配置、分批進場策略、停損停利機制，避免因情緒失控而遭受重大虧損。</div></div>
-            <div class="course-item locked"><div class="course-title"><img src="app/static/icon-course1.png" class="course-icon"> 10. 交易心理學與個人策略總結 (未開放)</div><div class="course-desc">克服貪婪與恐懼的心理障礙，並回測、修正並建立專屬於自己的穩定獲利交易系統。</div></div>
-        </div>
-    </div>
-
-    <!-- =========================
-         📖 視圖 2: 第4課詳情 
-         ========================= -->
-    <div class="npc-overlay wide view-detail">
-        <div class="top-actions">
-            <label for="tab-list" class="action-btn" title="返回列表">↩</label>
-            <label for="close-npc" class="action-btn close" title="關閉">✕</label>
-        </div>
-        <div class="npc-drag-handle" style="gap:20px;" title="按住此處可拖曳視窗">
-            <div class="npc-big-image"></div>
-            <div class="dialogue-box">
-                <div class="npc-name">籌碼導師 蘿西</div>
-                <div class="npc-text">「量價關係是市場最真實的足跡！仔細看這張表，當『量』與『價』出現背離時，就是趨勢即將反轉的危險警訊喔！」</div>
-            </div>
-        </div>
-        <div class="table-container">
-            <table class="pv-table">
-            <thead>
-            <tr><th width="15%">趨勢</th><th width="20%">狀態</th><th width="65%">市場含義</th></tr>
-            </thead>
-            <tbody>
-            <tr><td class="trend-up">上漲</td><td>價升量縮</td><td style="text-align: left;">量價背離，下方有承接，短期回調，後續拉高</td></tr>
-            <tr><td class="trend-up">上漲</td><td>放量滯漲</td><td style="text-align: left;">趨勢高位，拋壓增大，即將見頂反轉，減倉清倉</td></tr>
-            <tr><td class="trend-up">上漲</td><td>縮量大漲</td><td style="text-align: left;">趨勢中途，縮量加速，鎖倉高控盤，延續上漲</td></tr>
-            <tr><td class="trend-up">上漲</td><td>放量大漲</td><td style="text-align: left;">價漲量增，量價齊升，多方吸籌，持續看漲</td></tr>
-            <tr><td class="trend-down">下跌</td><td>縮量小跌</td><td style="text-align: left;">主力洗盤，拋壓減弱，止跌位置，擇機進場</td></tr>
-            <tr><td class="trend-down">下跌</td><td>放量小跌</td><td style="text-align: left;">見底信號，買方增強，越跌越買，反轉新倉</td></tr>
-            <tr><td class="trend-down">下跌</td><td>縮量大跌</td><td style="text-align: left;">一致看空，無人接盤，下跌中繼，加速下跌</td></tr>
-            <tr><td class="trend-down">下跌</td><td>放量大跌</td><td style="text-align: left;">跟風砸盤，大量賣出，高位出貨，持續下跌</td></tr>
-            <tr><td class="trend-flat">平量</td><td>平量滯漲</td><td style="text-align: left;">拋壓增大，越漲越難，高位見頂</td></tr>
-            <tr><td class="trend-flat">平量</td><td>平量大漲</td><td style="text-align: left;">一致看漲，沒有拋壓，鎖倉高控盤，加速上漲</td></tr>
-            <tr><td class="trend-flat">平量</td><td>平量價縮</td><td style="text-align: left;">下跌中繼，弱反彈信號，逢高減倉</td></tr>
-            <tr><td class="trend-flat">平量</td><td>平量大跌</td><td style="text-align: left;">一致看空，沒有承接，下跌中繼，加速下跌</td></tr>
-            </tbody>
-            </table>
-        </div>
-    </div>
+<div class="npc-overlay">
+<div class="top-actions">
+<div class="action-btn" id="btn-back-detail" title="返回列表">↩</div>
+<div class="action-btn close" id="btn-close-detail" title="關閉">✕</div>
 </div>
-"""
+
+<div class="detail-header" title="按住此處可拖曳視窗">
+<div class="npc-big-image"></div>
+<div class="dialogue-box">
+<div class="npc-name">籌碼導師 蘿西</div>
+<div class="npc-text">「量價關係是市場最真實的足跡！仔細看這張表，當『量』與『價』出現背離時，就是趨勢即將反轉的危險警訊喔！」</div>
+</div>
+</div>
+
+<div class="table-container">
+<table class="pv-table">
+<thead>
+<tr><th width="15%">趨勢</th><th width="20%">狀態</th><th width="65%">市場含義</th></tr>
+</thead>
+<tbody>
+<tr><td class="trend-up">上漲</td><td>價升量縮</td><td style="text-align: left;">量價背離，下方有承接，短期回調，後續拉高</td></tr>
+<tr><td class="trend-up">上漲</td><td>放量滯漲</td><td style="text-align: left;">趨勢高位，拋壓增大，即將見頂反轉，減倉清倉</td></tr>
+<tr><td class="trend-up">上漲</td><td>縮量大漲</td><td style="text-align: left;">趨勢中途，縮量加速，鎖倉高控盤，延續上漲</td></tr>
+<tr><td class="trend-up">上漲</td><td>放量大漲</td><td style="text-align: left;">價漲量增，量價齊升，多方吸籌，持續看漲</td></tr>
+<tr><td class="trend-down">下跌</td><td>縮量小跌</td><td style="text-align: left;">主力洗盤，拋壓減弱，止跌位置，擇機進場</td></tr>
+<tr><td class="trend-down">下跌</td><td>放量小跌</td><td style="text-align: left;">見底信號，買方增強，越跌越買，反轉新倉</td></tr>
+<tr><td class="trend-down">下跌</td><td>縮量大跌</td><td style="text-align: left;">一致看空，無人接盤，下跌中繼，加速下跌</td></tr>
+<tr><td class="trend-down">下跌</td><td>放量大跌</td><td style="text-align: left;">跟風砸盤，大量賣出，高位出貨，持續下跌</td></tr>
+<tr><td class="trend-flat">平量</td><td>平量滯漲</td><td style="text-align: left;">拋壓增大，越漲越難，高位見頂</td></tr>
+<tr><td class="trend-flat">平量</td><td>平量大漲</td><td style="text-align: left;">一致看漲，沒有拋壓，鎖倉高控盤，加速上漲</td></tr>
+<tr><td class="trend-flat">平量</td><td>平量價縮</td><td style="text-align: left;">下跌中繼，弱反彈信號，逢高減倉</td></tr>
+<tr><td class="trend-flat">平量</td><td>平量大跌</td><td style="text-align: left;">一致看空，沒有承接，下跌中繼，加速下跌</td></tr>
+</tbody>
+</table>
+</div>
+</div>"""
+
+        # 渲染畫面
         st.markdown(html_code, unsafe_allow_html=True)
+        
+        # =========================
+        # 💡 修正 2：核心隱藏按鈕賦予絕對獨特的辨識碼，防止腳本誤觸！
+        # =========================
+        if st.button("__BTN_CLOSE_NPC__"):
+            st.session_state['show_course_npc'] = False
+            st.session_state['course_view'] = 'list'
+            st.rerun()
+            
+        if st.button("__BTN_OPEN_COURSE_4__"):
+            st.session_state['course_view'] = 'detail'
+            st.rerun()
+            
+        if st.button("__BTN_BACK_TO_LIST__"):
+            st.session_state['course_view'] = 'list'
+            st.rerun()
+            
+        # JS 強制綁定與隱形引擎
+        bind_js = """<script>
+setInterval(() => {
+    const doc = window.parent.document;
+    if (!doc) return;
+    
+    const stBtns = Array.from(doc.querySelectorAll('button'));
+    const btnClose = stBtns.find(b => b.textContent.includes('__BTN_CLOSE_NPC__'));
+    const btnOpen4 = stBtns.find(b => b.textContent.includes('__BTN_OPEN_COURSE_4__'));
+    const btnBack = stBtns.find(b => b.textContent.includes('__BTN_BACK_TO_LIST__'));
+    
+    // 安全隱藏實體按鈕
+    [btnClose, btnOpen4, btnBack].forEach(b => {
+        if(b) {
+            const container = b.closest('div[data-testid="stElementContainer"]');
+            if(container) {
+                container.style.position = 'fixed';
+                container.style.top = '-9999px';
+                container.style.left = '-9999px';
+            }
+        }
+    });
+
+    const bindEvent = (uiId, stBtn) => {
+        const uiEl = doc.getElementById(uiId);
+        if(uiEl && !uiEl.dataset.hooked) {
+            uiEl.dataset.hooked = 'true'; 
+            uiEl.style.cursor = 'pointer'; 
+            uiEl.addEventListener('click', (e) => {
+                e.preventDefault();
+                if(stBtn) stBtn.click();
+            });
+        }
+    };
+
+    // 精準配對，確保 'btn-back-detail' 絕對只會觸發 'btnBack'
+    bindEvent('btn-close-list', btnClose);
+    bindEvent('btn-open-course-4', btnOpen4);
+    bindEvent('btn-back-detail', btnBack); 
+    bindEvent('btn-close-detail', btnClose);
+}, 300);
+</script>"""
+        components.html(bind_js, height=0, width=0)
