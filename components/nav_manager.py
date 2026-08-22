@@ -167,7 +167,7 @@ def inject_custom_header(is_logged_in=False):
     headerDiv.innerHTML = `
         <div class="disclaimer-bar">
             
-            <!-- ⚙️ 系統設定 -->
+            <!--系統設定 -->
             <div class="system-menu">
                 <div class="system-menu-title" title="系統與聲明">
                     <img src="app/static/icon-system.png" class="system-icon" alt="系統">
@@ -436,30 +436,33 @@ def inject_custom_header(is_logged_in=False):
     components.html(inject_js, height=0, width=0)
 
 # ==========================================
-# python 後端需對應的 proxy 按鈕 (已移除 NavToB6)
+# python 後端需對應的 proxy 按鈕 (在 components/nav_manager.py 最下方)
 # ==========================================
 def render_proxy_buttons():
     def change_page(page_name):
         st.query_params["page"] = page_name 
         
-    # 💡 專給 NPC 課程對話框的切換功能
     def toggle_course_npc():
         st.session_state['show_course_npc'] = not st.session_state.get('show_course_npc', False)
+
+    # 💡 專給系統設定卡片的切換功能
+    def toggle_settings():
+        st.session_state['show_settings'] = not st.session_state.get('show_settings', False)
 
     def handle_logout():
         st.session_state.clear()
         st.query_params["page"] = "home"
 
     with st.container():
-        st.button("NavToSettings", on_click=change_page, args=("settings",))
+        # 💡 這裡改成觸發 toggle_settings
+        st.button("NavToSettings", on_click=toggle_settings)
+        
         st.button("NavToContact", on_click=change_page, args=("contact",))
         st.button("NavToNews", on_click=change_page, args=("news",))
         st.button("NavToPool", on_click=change_page, args=("pool",))
         st.button("NavToWatchlist", on_click=change_page, args=("watchlist",)) 
         
-        # 💡 將 NavToCourses 的行為改為切換 NPC 狀態，而不是跳轉頁面
         st.button("NavToCourses", on_click=toggle_course_npc) 
-        
         st.button("NavToSystem", on_click=change_page, args=("system",))   
         st.button("NavToB1", on_click=change_page, args=("b1",))
         st.button("NavToB2", on_click=change_page, args=("b2",))
