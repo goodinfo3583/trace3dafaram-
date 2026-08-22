@@ -749,7 +749,9 @@ def render_settings_modal():
 def render_course_npc():
     import streamlit as st
     import streamlit.components.v1 as components
+    
     if st.session_state.get('show_course_npc', False):
+        # 💡 修正 1：這份 HTML 將透過 st.markdown 直接注入主 DOM
         npc_html = """
         <style>
             .npc-overlay {
@@ -785,8 +787,10 @@ def render_course_npc():
             .close-btn:hover { color: #FF4C4C; transform: scale(1.1); }
             @keyframes slideUpNPC { from { transform: translateY(100px) scale(0.8); opacity: 0; } to { transform: translateY(0) scale(1); opacity: 1; } }
         </style>
+        
         <div class="npc-overlay">
-            <div class="close-btn" onclick="window.parent.document.getElementById('close-npc-btn').click();">✕</div>
+            <!-- 💡 修正 2：因為已經在主 DOM，所以不再需要 window.parent，直接 document 即可 -->
+            <div class="close-btn" onclick="document.getElementById('close-npc-btn').click();">✕</div>
             <div class="npc-header">
                 <div class="npc-image"></div>
                 <div class="npc-title-box">
@@ -839,17 +843,27 @@ def render_course_npc():
             </div>
         </div>
         """
-        components.html(npc_html, height=0, width=0)
         
+        # 💡 修正 3：使用 st.markdown 來渲染 UI，這樣它就會脫離 iframe 的限制，成功懸浮在主畫面上
+        st.markdown(npc_html, unsafe_allow_html=True)
+        
+        # 實體的 Streamlit 關閉按鈕 (將會被 JS 隱藏並綁定 ID)
         if st.button("CloseNPC", key="close_npc_hidden_btn"):
             st.session_state['show_course_npc'] = False
             st.rerun()
             
-        st.markdown("""
-            <script>
+        # 💡 修正 4：把 JS 腳本放回 components.html 執行。這段腳本在 iframe 內，所以用 window.parent 去抓主畫面按鈕
+        bind_js = """
+        <script>
+            setTimeout(() => {
                 const btns = window.parent.document.querySelectorAll('button');
                 btns.forEach(b => {
-                    if(b.textContent.trim() === 'CloseNPC') { b.id = 'close-npc-btn'; b.style.display = 'none'; }
+                    if(b.textContent.trim() === 'CloseNPC') { 
+                        b.id = 'close-npc-btn'; 
+                        b.style.display = 'none'; 
+                    }
                 });
-            </script>
-        """, unsafe_allow_html=True)
+            }, 100);
+        </script>
+        """
+        components.html(bind_js, height=0, width=0)
