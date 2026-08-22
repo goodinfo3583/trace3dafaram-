@@ -599,3 +599,192 @@ def render_b5_top10_glass_card():
 """
         st.markdown(card_html, unsafe_allow_html=True)
     except Exception as e: pass
+
+## ==========================================
+# ⚙️ 系統設定 懸浮玻璃卡片 (新增在 style_manager.py 最下方)
+# ==========================================
+def render_settings_modal():
+    import streamlit as st
+    if st.session_state.get('show_settings', False):
+        settings_css = """
+        <style>
+        /* 半透明黑幕遮罩 */
+        .settings-overlay {
+            position: fixed; top: 0; left: 0; width: 100vw; height: 100vh;
+            background: rgba(0, 0, 0, 0.7); backdrop-filter: blur(3px);
+            z-index: 9999998; pointer-events: none;
+        }
+        /* 抓出包含設定錨點的 Streamlit 原生區塊，強制它變成浮動卡片 */
+        div[data-testid="stVerticalBlock"]:has(.setting-anchor) {
+            position: fixed !important; 
+            top: 50% !important; 
+            left: 50% !important; 
+            transform: translate(-50%, -50%) !important;
+            background: rgba(17, 22, 34, 0.95) !important;
+            backdrop-filter: blur(16px) !important; 
+            border: 1px solid #00D2FF !important;
+            border-radius: 12px !important; 
+            padding: 25px !important; 
+            z-index: 9999999 !important;
+            width: 90% !important; 
+            max-width: 600px !important;
+            box-shadow: 0 0 25px rgba(0, 210, 255, 0.2) !important;
+            max-height: 85vh !important; 
+            overflow-y: auto !important;
+        }
+        </style>
+        <div class="settings-overlay"></div>
+        """
+        st.markdown(settings_css, unsafe_allow_html=True)
+        
+        with st.container():
+            st.markdown('<div class="setting-anchor"></div>', unsafe_allow_html=True)
+            st.markdown("<h3 style='color:#00D2FF; margin-top:0;'>⚙️ 系統設定中心</h3>", unsafe_allow_html=True)
+            
+            current_theme = st.session_state.get('theme', 'dark')
+            theme_choice = st.radio(
+                "🎨 選擇您偏好的底色：", 
+                options=['dark', 'light'], 
+                format_func=lambda x: "🌙 專業暗黑模式 (預設)" if x == 'dark' else "☀️ 亮白模式",
+                index=0 if current_theme == 'dark' else 1
+            )
+            
+            st.markdown("---")
+            st.markdown("<h4 style='color:#E2E8F0; font-size: 16px;'>⌨️ 快捷鍵配置</h4>", unsafe_allow_html=True)
+            
+            default_hotkeys = {
+                "f1": "NavToB1", "f2": "NavToB2", "f3": "NavToB3", 
+                "f4": "NavToB4", "f5": "NavToB5", "f7": "NavToB7",
+                "alt+l": "NavToWatchlist", "escape": "NavToSystem"
+            }
+            current_hotkeys = st.session_state.get('custom_hotkeys', default_hotkeys)
+            reverse_map = {v: k for k, v in current_hotkeys.items()}
+            
+            col1, col2 = st.columns(2)
+            new_hotkeys = {}
+            with col1:
+                new_hotkeys["NavToB1"] = st.text_input("法人動向", value=reverse_map.get("NavToB1", "f1"))
+                new_hotkeys["NavToB2"] = st.text_input("法人掃貨", value=reverse_map.get("NavToB2", "f2"))
+                new_hotkeys["NavToB3"] = st.text_input("法人連買", value=reverse_map.get("NavToB3", "f3"))
+                new_hotkeys["NavToB4"] = st.text_input("資券動向", value=reverse_map.get("NavToB4", "f4"))
+            with col2:
+                new_hotkeys["NavToB5"] = st.text_input("大腿動向", value=reverse_map.get("NavToB5", "f5"))
+                new_hotkeys["NavToB7"] = st.text_input("董監動向", value=reverse_map.get("NavToB7", "f7"))
+                new_hotkeys["NavToWatchlist"] = st.text_input("建立名單", value=reverse_map.get("NavToWatchlist", "alt+l"))
+                new_hotkeys["NavToSystem"] = st.text_input("系統首頁", value=reverse_map.get("NavToSystem", "escape"))
+                
+            st.markdown("<br>", unsafe_allow_html=True)
+            
+            btn_col1, btn_col2 = st.columns([1, 1])
+            with btn_col1:
+                if st.button("💾 儲存並套用", use_container_width=True):
+                    st.session_state['theme'] = theme_choice
+                    final_hotkeys_dict = {
+                        key.strip().lower(): target 
+                        for target, key in new_hotkeys.items() if key.strip().lower()
+                    }
+                    st.session_state['custom_hotkeys'] = final_hotkeys_dict
+                    st.session_state['show_settings'] = False
+                    st.rerun()
+            with btn_col2:
+                if st.button("❌ 關閉", use_container_width=True):
+                    st.session_state['show_settings'] = False
+                    st.rerun()
+
+# ==========================================
+# 🎓 課程 NPC 懸浮對話框 (新增在 style_manager.py 最下方)
+# ==========================================
+def render_course_npc():
+    import streamlit as st
+    import streamlit.components.v1 as components
+    if st.session_state.get('show_course_npc', False):
+        # NPC UI 繪製
+        npc_html = """
+        <style>
+            .npc-overlay {
+                position: fixed;
+                bottom: 25px;
+                right: 25px;
+                width: 420px;
+                min-height: 150px;
+                background: rgba(15, 23, 42, 0.95);
+                border: 2px solid #00D2FF;
+                border-radius: 12px;
+                z-index: 9999999;
+                display: flex;
+                padding: 15px;
+                box-shadow: 0 8px 30px rgba(0, 210, 255, 0.3);
+                color: white;
+                animation: slideUpNPC 0.5s cubic-bezier(0.175, 0.885, 0.32, 1.275);
+            }
+            .npc-image {
+                width: 90px;
+                height: 90px;
+                /* 替換成你想要的 NPC 去背圖網址 */
+                background-image: url('https://cdn-icons-png.flaticon.com/512/4140/4140048.png'); 
+                background-size: contain;
+                background-repeat: no-repeat;
+                background-position: center;
+                margin-right: 15px;
+            }
+            .dialog-box {
+                flex: 1;
+                display: flex;
+                flex-direction: column;
+                justify-content: center;
+            }
+            .npc-name {
+                color: #00D2FF;
+                font-weight: bold;
+                font-size: 16px;
+                margin-bottom: 8px;
+                border-bottom: 1px solid rgba(255,255,255,0.2);
+                padding-bottom: 5px;
+            }
+            .dialog-text {
+                font-size: 14px;
+                line-height: 1.6;
+                color: #E2E8F0;
+            }
+            .close-btn {
+                position: absolute; top: 10px; right: 15px;
+                cursor: pointer; color: #94A3B8; font-size: 16px;
+                font-weight: bold; transition: 0.2s;
+            }
+            .close-btn:hover { color: #FF4C4C; transform: scale(1.1); }
+            @keyframes slideUpNPC { 
+                from { transform: translateY(100px) scale(0.8); opacity: 0; } 
+                to { transform: translateY(0) scale(1); opacity: 1; } 
+            }
+        </style>
+        <div class="npc-overlay">
+            <div class="close-btn" onclick="window.parent.document.getElementById('close-npc-btn').click();">✕</div>
+            <div class="npc-image"></div>
+            <div class="dialog-box">
+                <div class="npc-name">籌碼導師 - 艾琳</div>
+                <div class="dialog-text">
+                    冒險者，歡迎來到基礎課程！<br>
+                    今天我們來談談「量價關係」。當一檔股票在底部爆出大量且收紅，這往往是主力在吃貨的跡象喔！<br>
+                    <a href="#" target="_blank" style="color:#FFD700; text-decoration:none; font-weight:bold;">👉 點此閱讀完整秘笈</a>
+                </div>
+            </div>
+        </div>
+        """
+        components.html(npc_html, height=0, width=0)
+        
+        # 隱藏的 Python 關閉按鈕 (讓 JS 模擬點擊)
+        if st.button("CloseNPC", key="close_npc_hidden_btn"):
+            st.session_state['show_course_npc'] = False
+            st.rerun()
+            
+        st.markdown("""
+            <script>
+                const btns = window.parent.document.querySelectorAll('button');
+                btns.forEach(b => {
+                    if(b.textContent.trim() === 'CloseNPC') { 
+                        b.id = 'close-npc-btn'; 
+                        b.style.display = 'none'; 
+                    }
+                });
+            </script>
+        """, unsafe_allow_html=True)

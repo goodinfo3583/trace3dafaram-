@@ -72,6 +72,10 @@ try:
     style_manager.render_b4_top10_glass_card()
     # 呼叫 B5 大腿雙向共振卡片 (左下方)
     style_manager.render_b5_top10_glass_card()
+    # 呼叫 系統設定 懸浮卡片 (置中全螢幕遮罩)
+    style_manager.render_settings_modal()
+    # 呼叫 課程NPC 懸浮卡片 (右下方)
+    style_manager.render_course_npc()   
 except AttributeError as e:
     # 避免尚未存檔完成時當機
     print(f"UI 渲染警告: {e}")
