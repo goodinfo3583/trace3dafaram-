@@ -606,22 +606,27 @@ def render_b5_top10_glass_card():
     except Exception as e: pass
 
 # ==========================================
-# ⚙️ 系統設定 懸浮玻璃卡片 (放在 style_manager.py 最下方)
+# 設置中心 懸浮玻璃卡片 (放在 style_manager.py 最下方)
 # ==========================================
 def render_settings_modal():
     import streamlit as st
+    import streamlit.components.v1 as components
     if st.session_state.get('show_settings', False):
         settings_css = """
         <style>
+        /* 💡 徹底消滅雙重捲軸與背景雜訊：將背景改為不透明深色，並鎖死外層滾動條 */
+        .stApp { overflow: hidden !important; } 
+        
         .settings-overlay {
             position: fixed; top: 0; left: 0; width: 100vw; height: 100vh;
-            background: rgba(0, 0, 0, 0.75); backdrop-filter: blur(4px);
-            z-index: 9999998; pointer-events: none;
+            background: #0A0D14; /* 實心深黑背景，不會透出雜訊 */
+            z-index: 9999998; pointer-events: auto;
         }
+        
         div[data-testid="stVerticalBlock"]:has(.setting-anchor) {
             position: fixed !important; 
             top: 50% !important; left: 50% !important; transform: translate(-50%, -50%) !important;
-            background: rgba(17, 22, 34, 0.95) !important; backdrop-filter: blur(16px) !important; 
+            background: rgba(17, 22, 34, 1) !important; 
             border: 1px solid #00D2FF !important; border-radius: 12px !important; 
             padding: 25px !important; z-index: 9999999 !important;
             width: 90% !important; max-width: 650px !important; box-shadow: 0 0 25px rgba(0, 210, 255, 0.2) !important;
@@ -636,29 +641,25 @@ def render_settings_modal():
             st.markdown('<div class="setting-anchor"></div>', unsafe_allow_html=True)
             st.markdown("<h3 style='color:#00D2FF; margin-top:0;'>設置中心</h3>", unsafe_allow_html=True)
             
-            # 💡 全新護眼主題選擇器
             current_theme = st.session_state.get('theme', 'dark')
             theme_options = ['dark', 'pink', 'green', 'blue']
             theme_labels = {
-                'dark': "🌙 專業暗黑 (預設)",
-                'pink': "🌸 櫻花暗粉",
-                'green': "🌲 森林暗綠",
-                'blue': "🌌 星空深藍"
+                'dark': "🌙 專業暗黑", 'pink': "🌸 櫻花暗粉",
+                'green': "🌲 森林暗綠", 'blue': "🌌 星空深藍"
             }
             theme_choice = st.radio(
-                "🎨 選擇您偏好的背景濾鏡：", 
-                options=theme_options,
+                "🎨 選擇背景濾鏡：", options=theme_options,
                 format_func=lambda x: theme_labels[x],
                 index=theme_options.index(current_theme) if current_theme in theme_options else 0,
                 horizontal=True
             )
             
             st.markdown("---")
-            st.markdown("<h4 style='color:#E2E8F0; font-size: 16px;'>⌨️ 快捷鍵配置</h4>", unsafe_allow_html=True)
+            st.markdown("<h4 style='color:#E2E8F0; font-size: 16px;'>⌨️ 快捷鍵配置 (點擊欄位後直接按下按鍵)</h4>", unsafe_allow_html=True)
             
             default_hotkeys = {
-                "f1": "NavToB1", "f2": "NavToB2", "f3": "NavToB3", 
-                "f4": "NavToB4", "f5": "NavToB5", "f6": "NavToB6", "f7": "NavToB7",
+                "f1": "NavToB1", "f2": "NavToB2", "f3": "NavToB3", "f4": "NavToB4", 
+                "f5": "NavToB5", "f6": "NavToB6", "f7": "NavToB7",
                 "alt+l": "NavToWatchlist", "escape": "登入"
             }
             current_hotkeys = st.session_state.get('custom_hotkeys', default_hotkeys)
@@ -667,18 +668,16 @@ def render_settings_modal():
             col1, col2 = st.columns(2)
             new_hotkeys = {}
             with col1:
-                new_hotkeys["NavToB1"] = st.text_input("法人動向", value=reverse_map.get("NavToB1", "f1"))
-                new_hotkeys["NavToB2"] = st.text_input("法人掃貨", value=reverse_map.get("NavToB2", "f2"))
-                new_hotkeys["NavToB3"] = st.text_input("法人連買", value=reverse_map.get("NavToB3", "f3"))
-                new_hotkeys["NavToB4"] = st.text_input("資券動向", value=reverse_map.get("NavToB4", "f4"))
-                # 💡 新增的鉅額交易 F6 欄位
-                new_hotkeys["NavToB6"] = st.text_input("鉅額交易", value=reverse_map.get("NavToB6", "f6"))
+                new_hotkeys["NavToB1"] = st.text_input("法人動向", value=reverse_map.get("NavToB1", "f1"), key="kb1")
+                new_hotkeys["NavToB2"] = st.text_input("法人掃貨", value=reverse_map.get("NavToB2", "f2"), key="kb2")
+                new_hotkeys["NavToB3"] = st.text_input("法人連買", value=reverse_map.get("NavToB3", "f3"), key="kb3")
+                new_hotkeys["NavToB4"] = st.text_input("資券動向", value=reverse_map.get("NavToB4", "f4"), key="kb4")
+                new_hotkeys["NavToB6"] = st.text_input("鉅額交易", value=reverse_map.get("NavToB6", "f6"), key="kb6")
             with col2:
-                new_hotkeys["NavToB5"] = st.text_input("大腿動向", value=reverse_map.get("NavToB5", "f5"))
-                new_hotkeys["NavToB7"] = st.text_input("董監動向", value=reverse_map.get("NavToB7", "f7"))
-                new_hotkeys["NavToWatchlist"] = st.text_input("建立名單", value=reverse_map.get("NavToWatchlist", "alt+l"))
-                # 💡 已改為 "登入" 取代系統首頁
-                new_hotkeys["登入"] = st.text_input("登入", value=reverse_map.get("登入", "escape"))
+                new_hotkeys["NavToB5"] = st.text_input("大腿動向", value=reverse_map.get("NavToB5", "f5"), key="kb5")
+                new_hotkeys["NavToB7"] = st.text_input("董監動向", value=reverse_map.get("NavToB7", "f7"), key="kb7")
+                new_hotkeys["NavToWatchlist"] = st.text_input("建立名單", value=reverse_map.get("NavToWatchlist", "alt+l"), key="kb_wl")
+                new_hotkeys["登入"] = st.text_input("登入", value=reverse_map.get("登入", "escape"), key="kb_login")
                 
             st.markdown("<br>", unsafe_allow_html=True)
             
@@ -697,89 +696,151 @@ def render_settings_modal():
                 if st.button("❌ 關閉", use_container_width=True):
                     st.session_state['show_settings'] = False
                     st.rerun()
+                    
+        # 💡 電競級動態按鍵綁定引擎 (注入 JS 攔截輸入)
+        keybind_js = """
+        <script>
+        setTimeout(() => {
+            const parentDoc = window.parent.document;
+            const settingsBlock = parentDoc.querySelector('.setting-anchor');
+            if (!settingsBlock) return;
+            const container = settingsBlock.closest('div[data-testid="stVerticalBlock"]');
+            if (!container) return;
+            
+            const inputs = container.querySelectorAll('input[type="text"]');
+            inputs.forEach(input => {
+                if(input.dataset.keybound) return;
+                input.dataset.keybound = "true";
+                
+                input.addEventListener('keydown', function(e) {
+                    e.preventDefault();
+                    e.stopPropagation();
+                    
+                    let combo = [];
+                    if (e.ctrlKey) combo.push('ctrl');
+                    if (e.altKey) combo.push('alt');
+                    if (e.shiftKey) combo.push('shift');
+                    
+                    let keyName = e.key.toLowerCase();
+                    if (['control', 'alt', 'shift', 'meta', 'process'].includes(keyName)) return; 
+                    if (keyName === ' ') keyName = 'space';
+                    
+                    combo.push(keyName);
+                    let finalKey = combo.join('+');
+                    
+                    // React Hack: 寫入 Streamlit 元件
+                    let nativeInputValueSetter = Object.getOwnPropertyDescriptor(window.HTMLInputElement.prototype, "value").set;
+                    nativeInputValueSetter.call(this, finalKey);
+                    let ev2 = new Event('input', { bubbles: true});
+                    this.dispatchEvent(ev2);
+                });
+                
+                input.addEventListener('focus', function() { this.style.boxShadow = '0 0 10px #FFD700'; });
+                input.addEventListener('blur', function() { this.style.boxShadow = 'none'; });
+            });
+        }, 500);
+        </script>
+        """
+        components.html(keybind_js, height=0, width=0)
 
 # ==========================================
-# 🎓 課程 NPC 懸浮對話框 (新增在 style_manager.py 最下方)
+# 🎓 課程 NPC 懸浮對話框
 # ==========================================
 def render_course_npc():
     import streamlit as st
     import streamlit.components.v1 as components
     if st.session_state.get('show_course_npc', False):
-        # NPC UI 繪製
         npc_html = """
         <style>
             .npc-overlay {
-                position: fixed;
-                bottom: 25px;
-                right: 25px;
-                width: 420px;
-                min-height: 150px;
-                background: rgba(15, 23, 42, 0.95);
-                border: 2px solid #00D2FF;
-                border-radius: 12px;
-                z-index: 9999999;
-                display: flex;
-                padding: 15px;
-                box-shadow: 0 8px 30px rgba(0, 210, 255, 0.3);
-                color: white;
-                animation: slideUpNPC 0.5s cubic-bezier(0.175, 0.885, 0.32, 1.275);
+                position: fixed; bottom: 25px; right: 25px;
+                width: 480px; height: 500px;
+                background: rgba(15, 23, 42, 0.96);
+                border: 2px solid #00D2FF; border-radius: 12px;
+                z-index: 9999999; display: flex; flex-direction: column;
+                padding: 20px; box-shadow: 0 8px 30px rgba(0, 210, 255, 0.3);
+                color: white; animation: slideUpNPC 0.5s cubic-bezier(0.175, 0.885, 0.32, 1.275);
             }
+            .npc-header { display: flex; align-items: flex-end; margin-bottom: 15px; border-bottom: 1px solid rgba(255,255,255,0.1); padding-bottom: 10px; }
             .npc-image {
-                width: 90px;
-                height: 90px;
-                /* 替換成你想要的 NPC 去背圖網址 */
-                background-image: url('https://cdn-icons-png.flaticon.com/512/4140/4140048.png'); 
-                background-size: contain;
-                background-repeat: no-repeat;
-                background-position: center;
-                margin-right: 15px;
+                width: 80px; height: 80px;
+                background-image: url('app/static/npcnatzu.png'); 
+                background-size: contain; background-repeat: no-repeat; background-position: bottom;
+                margin-right: 15px; filter: drop-shadow(0 0 5px rgba(0,210,255,0.5));
             }
-            .dialog-box {
-                flex: 1;
-                display: flex;
-                flex-direction: column;
-                justify-content: center;
-            }
-            .npc-name {
-                color: #00D2FF;
-                font-weight: bold;
-                font-size: 16px;
-                margin-bottom: 8px;
-                border-bottom: 1px solid rgba(255,255,255,0.2);
-                padding-bottom: 5px;
-            }
-            .dialog-text {
-                font-size: 14px;
-                line-height: 1.6;
-                color: #E2E8F0;
-            }
-            .close-btn {
-                position: absolute; top: 10px; right: 15px;
-                cursor: pointer; color: #94A3B8; font-size: 16px;
-                font-weight: bold; transition: 0.2s;
-            }
+            .npc-title-box { flex: 1; }
+            .npc-name { color: #00D2FF; font-weight: bold; font-size: 18px; margin-bottom: 4px; }
+            .npc-greet { font-size: 13px; color: #94A3B8; }
+            
+            .course-list { flex: 1; overflow-y: auto; padding-right: 10px; }
+            .course-list::-webkit-scrollbar { width: 6px; }
+            .course-list::-webkit-scrollbar-thumb { background: rgba(0, 210, 255, 0.4); border-radius: 3px; }
+            
+            .course-item { margin-bottom: 15px; padding: 12px; background: rgba(255,255,255,0.03); border: 1px solid rgba(255,255,255,0.08); border-radius: 8px; transition: 0.2s; cursor: pointer; }
+            .course-item:hover { background: rgba(0, 210, 255, 0.08); border-color: rgba(0, 210, 255, 0.4); transform: translateY(-2px); }
+            .course-title { color: #FFD700; font-weight: bold; font-size: 14px; margin-bottom: 6px; display: flex; align-items: center; gap: 5px; }
+            .course-desc { font-size: 12px; color: #CBD5E1; line-height: 1.5; }
+            
+            .close-btn { position: absolute; top: 12px; right: 18px; cursor: pointer; color: #94A3B8; font-size: 20px; transition: 0.2s; }
             .close-btn:hover { color: #FF4C4C; transform: scale(1.1); }
-            @keyframes slideUpNPC { 
-                from { transform: translateY(100px) scale(0.8); opacity: 0; } 
-                to { transform: translateY(0) scale(1); opacity: 1; } 
-            }
+            @keyframes slideUpNPC { from { transform: translateY(100px) scale(0.8); opacity: 0; } to { transform: translateY(0) scale(1); opacity: 1; } }
         </style>
         <div class="npc-overlay">
             <div class="close-btn" onclick="window.parent.document.getElementById('close-npc-btn').click();">✕</div>
-            <div class="npc-image"></div>
-            <div class="dialog-box">
-                <div class="npc-name">籌碼導師 - 艾琳</div>
-                <div class="dialog-text">
-                    冒險者，歡迎來到基礎課程！<br>
-                    今天我們來談談「量價關係」。當一檔股票在底部爆出大量且收紅，這往往是主力在吃貨的跡象喔！<br>
-                    <a href="#" target="_blank" style="color:#FFD700; text-decoration:none; font-weight:bold;">👉 點此閱讀完整秘笈</a>
+            <div class="npc-header">
+                <div class="npc-image"></div>
+                <div class="npc-title-box">
+                    <div class="npc-name">籌碼導師</div>
+                    <div class="npc-greet">「冒險者，選擇你想強化的能力吧！」</div>
+                </div>
+            </div>
+            
+            <div class="course-list">
+                <div class="course-item">
+                    <div class="course-title">📖 1. 宏觀經濟與景氣循環（總經介紹）</div>
+                    <div class="course-desc">學習解讀 GDP、CPI、利率與匯率等基本總體經濟指標，判斷目前大盤處於景氣擴張或衰退的哪個階段。</div>
+                </div>
+                <div class="course-item">
+                    <div class="course-title">📖 2. 股市基本架構與名詞解析</div>
+                    <div class="course-desc">認識台股交易規則、漲跌幅限制、各類委託單與基本盤面術語，建立進場前的基礎常識。</div>
+                </div>
+                <div class="course-item">
+                    <div class="course-title">📖 3. 財報與基本面入門</div>
+                    <div class="course-desc">學習閱讀三大財務報表（綜合損益表、資產負債表、現金流量表），學會挑選具備長期競爭力的公司。</div>
+                </div>
+                <div class="course-item">
+                    <div class="course-title">📖 4. 量價關係與盤面解讀</div>
+                    <div class="course-desc">對照成交量與股價漲跌的互動（如價漲量增、量價背離），判斷多空雙方的企圖心與買賣力道。</div>
+                </div>
+                <div class="course-item">
+                    <div class="course-title">📖 5. 技術分析與指標應用</div>
+                    <div class="course-desc">熟悉常用技術指標（如均線 MA、MACD、RSI、KDJ），掌握支撐壓力與趨勢轉折點。</div>
+                </div>
+                <div class="course-item">
+                    <div class="course-title">📖 6. 籌碼面追蹤：法人與大戶結構</div>
+                    <div class="course-desc">分析外資、投信、自營商動向及大戶持股比例，透過資金流向尋找主力默默佈局的標的。</div>
+                </div>
+                <div class="course-item">
+                    <div class="course-title">📖 7. 券資關係與融資融券分析</div>
+                    <div class="course-desc">觀察融資餘額、融券張數與券資比變化，評估市場散戶情緒及潛在的「軋空」或「多殺多」力道。</div>
+                </div>
+                <div class="course-item">
+                    <div class="course-title">📖 8. 產業趨勢與題材選股</div>
+                    <div class="course-desc">掌握主流產業輪動脈絡（如半導體、AI 供應鏈、綠能等），在對的時間點佈局具備成長爆發力的賽道。</div>
+                </div>
+                <div class="course-item">
+                    <div class="course-title">📖 9. 資金控管與風險管理</div>
+                    <div class="course-desc">學習單筆投資部位配置、分批進場策略、停損停利機制，避免因情緒失控而遭受重大虧損。</div>
+                </div>
+                <div class="course-item">
+                    <div class="course-title">📖 10. 交易心理學與個人策略總結</div>
+                    <div class="course-desc">克服貪婪與恐懼的心理障礙，並回測、修正並建立專屬於自己的穩定獲利交易系統。</div>
                 </div>
             </div>
         </div>
         """
         components.html(npc_html, height=0, width=0)
         
-        # 隱藏的 Python 關閉按鈕 (讓 JS 模擬點擊)
         if st.button("CloseNPC", key="close_npc_hidden_btn"):
             st.session_state['show_course_npc'] = False
             st.rerun()
@@ -788,10 +849,7 @@ def render_course_npc():
             <script>
                 const btns = window.parent.document.querySelectorAll('button');
                 btns.forEach(b => {
-                    if(b.textContent.trim() === 'CloseNPC') { 
-                        b.id = 'close-npc-btn'; 
-                        b.style.display = 'none'; 
-                    }
+                    if(b.textContent.trim() === 'CloseNPC') { b.id = 'close-npc-btn'; b.style.display = 'none'; }
                 });
             </script>
         """, unsafe_allow_html=True)

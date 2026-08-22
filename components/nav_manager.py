@@ -7,13 +7,12 @@ def inject_custom_header(is_logged_in=False):
     """注入客製化懸浮頂部導航與隱藏側邊欄邏輯 (遊戲化UI版 + 動態快捷鍵 + 設定功能)"""
     login_btn_text = "登出" if is_logged_in else "登入"
     
-    # 💡 預設快捷鍵字典：加入 f6、並將 escape 指向 "登入"
+    # 預設快捷鍵字典
     default_hotkeys = {
         "f1": "NavToB1", "f2": "NavToB2", "f3": "NavToB3", 
         "f4": "NavToB4", "f5": "NavToB5", "f6": "NavToB6", "f7": "NavToB7",
         "alt+l": "NavToWatchlist", "escape": "登入"
     }
-    # 若 Session 中有自訂快捷鍵則覆蓋，否則使用預設
     user_hotkeys = st.session_state.get('custom_hotkeys', default_hotkeys)
     hotkeys_json = json.dumps(user_hotkeys)
     
@@ -157,7 +156,6 @@ def inject_custom_header(is_logged_in=False):
     
     headerDiv.innerHTML = `
         <div class="disclaimer-bar">
-            
             <!-- ⚙️ 系統設定 -->
             <div class="system-menu">
                 <div class="system-menu-title" title="系統與聲明">
@@ -171,7 +169,6 @@ def inject_custom_header(is_logged_in=False):
                         </a>
                     </div>
                     
-                    <!-- 💡 已改名為 "設置"，並移除 Emoji -->
                     <div class="dropdown-item actionable">
                         <a href="#" data-target="NavToSettings" class="dropdown-title internal-nav">
                             <img src="app/static/icon-system.png" class="menu-icon" alt="settings"> 設置
@@ -274,6 +271,7 @@ def inject_custom_header(is_logged_in=False):
             <div class="disclaimer-item" id="mobile-nav-toggle" title="收起選單" style="cursor: pointer; padding-right: 5px;"><span id="nav-toggle-icon" style="font-size: 18px; color: #38BDF8;">📜</span></div>
         </div>
         
+        <!-- 💡 核心導覽列：加回 B6 鉅額交易 -->
         <div class="nav-btn-container" id="nav-btn-container">
             <a href="#" data-target="NavToPool" class="nav-text-link internal-nav"><img src="app/static/magicbookfire2.png" class="nav-icon" alt="icon">觀察名單</a><span class="nav-divider">|</span>
             <a href="#" data-target="NavToB1" class="nav-text-link internal-nav"><img src="app/static/magicbookleaf.png" class="nav-icon" alt="icon">法人動向</a><span class="nav-divider">|</span>
@@ -281,6 +279,7 @@ def inject_custom_header(is_logged_in=False):
             <a href="#" data-target="NavToB3" class="nav-text-link internal-nav"><img src="app/static/magicbookwater.png" class="nav-icon" alt="icon">法人連買</a><span class="nav-divider">|</span>
             <a href="#" data-target="NavToB4" class="nav-text-link internal-nav"><img src="app/static/magicbookground.png" class="nav-icon" alt="icon">資券動向</a><span class="nav-divider">|</span>
             <a href="#" data-target="NavToB5" class="nav-text-link internal-nav"><img src="app/static/wirtleg.png" class="nav-icon" alt="icon">大腿動向</a><span class="nav-divider">|</span>
+            <a href="#" data-target="NavToB6" class="nav-text-link internal-nav"><img src="app/static/magicbookfire.png" class="nav-icon" alt="icon">鉅額交易</a><span class="nav-divider">|</span>
             <a href="#" data-target="NavToB7" class="nav-text-link internal-nav"><img src="app/static/magicbookboss.png" class="nav-icon" alt="icon">董監動向</a>
         </div>
     `;
@@ -300,7 +299,7 @@ def inject_custom_header(is_logged_in=False):
             };
         });
 
-        // 2. 🔥 動態快捷鍵引擎
+        // 🔥 動態快捷鍵引擎
         const hotkeysMap = JSON.parse(`__HOTKEYS_JSON__`);
 
         if (parentWin.customHotkeyHandler) {
@@ -308,13 +307,17 @@ def inject_custom_header(is_logged_in=False):
         }
 
         parentWin.customHotkeyHandler = function(e) {
-            // 焦點在輸入框時不觸發
             const activeTag = parentDoc.activeElement ? parentDoc.activeElement.tagName.toLowerCase() : '';
             if (activeTag === 'input' || activeTag === 'textarea') return;
 
-            // 💡 神級修正：如果「設置卡片」已經打開，直接封鎖所有快捷鍵跳轉功能，避免背景雜訊穿透！
+            // 💡 防呆機制：如果設置視窗開著，封鎖一般導航跳轉！並攔截 F1~F12 避免誤觸刷新/說明
             const isSettingsOpen = parentDoc.querySelector('.settings-overlay');
-            if (isSettingsOpen) return;
+            if (isSettingsOpen) {
+                if (e.key.toLowerCase().startsWith('f')) {
+                    e.preventDefault();
+                }
+                return;
+            }
 
             let combo = [];
             if (e.ctrlKey) combo.push('ctrl');
