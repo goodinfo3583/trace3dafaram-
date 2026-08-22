@@ -30,7 +30,7 @@ def get_user_watchlist(username, conn, SHEET_URL):
 
 def save_user_watchlist(username, watchlist, conn, SHEET_URL):
     if not conn or not SHEET_URL:
-        st.error("⚠️ 無法連線至資料庫，無法存檔。")
+        st.error("無法連線至資料庫，無法存檔。")
         return
     try:
         watchlist_str = json.dumps(watchlist, ensure_ascii=False)
@@ -48,7 +48,7 @@ def save_user_watchlist(username, watchlist, conn, SHEET_URL):
             df.at[idx[0], 'Watchlist'] = watchlist_str
             conn.update(spreadsheet=SHEET_URL, worksheet="會員名冊", data=df)
     except Exception as e:
-        st.error(f"❌ 存檔失敗: {e}")
+        st.error(f"存檔失敗: {e}")
 
 # ==========================================
 # 🚀 高效能批次報價引擎
@@ -97,7 +97,7 @@ def show_watchlist_page(STOCK_DICT=None, conn=None, SHEET_URL=None):
     st.title("冒險者專屬追蹤名單")
 
     if not st.session_state.get("logged_in", False):
-        st.warning("⚠️ 守衛：「這區是 VIP 專屬！請先前往『登入頁面』出示邀請函。」")
+        st.warning("守衛：「這區是 VIP 專屬！請先前往『登入』出示邀請函。」")
         if st.button("前往登入", key="go_login_from_watchlist"):
             st.query_params["page"] = "login"
             st.rerun()
@@ -139,7 +139,7 @@ def show_watchlist_page(STOCK_DICT=None, conn=None, SHEET_URL=None):
         if st.button("加入追蹤", use_container_width=True):
             if new_stock:
                 if len(watchlist) >= MAX_STOCKS:
-                    st.error(f"⚠️ 追蹤名單已達 {MAX_STOCKS} 檔上限！")
+                    st.error(f"追蹤名單已達 {MAX_STOCKS} 檔上限！")
                 else:
                     # 💡 因為選單出來的值已經是完美的 "2330 台積電" 格式，我們不需要再做任何文字處理！
                     if new_stock not in watchlist:
@@ -162,7 +162,7 @@ def show_watchlist_page(STOCK_DICT=None, conn=None, SHEET_URL=None):
     market_data = {}
     market_date = "今日"
     if stock_codes:
-        with st.spinner("📡 正在同步即時報價與成交量..."):
+        with st.spinner("正在同步即時報價與成交量..."):
             market_data = get_watchlist_quotes(stock_codes)
             if market_data:
                 market_date = list(market_data.values())[0]["date"]
@@ -179,7 +179,7 @@ def show_watchlist_page(STOCK_DICT=None, conn=None, SHEET_URL=None):
                     if nk in st.session_state:
                         watchlist[stock] = st.session_state[nk]
                 save_user_watchlist(username, watchlist, conn, SHEET_URL)
-            st.success("✅ 存檔成功！")
+            st.success("存檔成功！")
             time.sleep(1)
             st.rerun()
             
@@ -219,7 +219,7 @@ def show_watchlist_page(STOCK_DICT=None, conn=None, SHEET_URL=None):
 
     with col_date:
         if watchlist and market_data:
-            st.markdown(f"<div style='padding-top:8px; color:#38BDF8; font-size:15px; font-weight:bold;'>📅 行情基準日：{market_date}</div>", unsafe_allow_html=True)
+            st.markdown(f"<div style='padding-top:8px; color:#38BDF8; font-size:15px; font-weight:bold;'>日期：{market_date}</div>", unsafe_allow_html=True)
 
     st.write("") 
     
@@ -302,7 +302,7 @@ def show_watchlist_page(STOCK_DICT=None, conn=None, SHEET_URL=None):
                     icon=":material/input:", # 帶入
                     key=f"import_{stock}", 
                     use_container_width=True, 
-                    help="將今日行情寫入筆記 (不覆蓋)",
+                    help="將今日行情寫入筆記",
                     on_click=append_quote_to_note,
                     args=(stock, pure_code)
                 )

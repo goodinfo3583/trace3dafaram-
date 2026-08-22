@@ -591,22 +591,28 @@ def render_settings_modal():
         # 使用 Streamlit 容器，由 JS 自動加上 class 變為浮動視窗
         with st.container():
             st.markdown('<div class="setting-anchor"></div>', unsafe_allow_html=True)
+
             
             # 💡 修正 4：將 儲存 與 關閉 的 Streamlit 原生按鈕與標題並排於頂部！
             col_title, col_save, col_close = st.columns([6, 2, 2])
             with col_title:
-                st.markdown("<h3 class='settings-drag-handle' style='color:#00D2FF; margin-top:0;' title='按住此處可拖曳視窗'>⚙️ 設置中心</h3>", unsafe_allow_html=True)
+                st.markdown("<h3 class='settings-drag-handle' style='color:#00D2FF; margin-top:0;' title='按住此處可拖曳視窗'>設置中心</h3>", unsafe_allow_html=True)
             with col_save:
-                save_clicked = st.button("💾 儲存", use_container_width=True)
+                save_clicked = st.button("確認", use_container_width=True)
             with col_close:
-                close_clicked = st.button("❌ 關閉", use_container_width=True)
+                close_clicked = st.button("取消", use_container_width=True)
 
             current_theme = st.session_state.get('theme', 'dark')
+            current_opacity = st.session_state.get('bg_opacity', 88) # 💡 新增
+            
             theme_options = ['dark', 'pink', 'green', 'blue']
-            theme_choice = st.radio("🎨 選擇背景濾鏡：", options=theme_options, format_func=lambda x: {'dark': "🌙 專業暗黑", 'pink': "🌸 櫻花粉", 'green': "🌲 翡翠綠", 'blue': "🌌 天空藍"}[x], index=theme_options.index(current_theme) if current_theme in theme_options else 0, horizontal=True)
+            theme_choice = st.radio("選擇背景主題 (將同步切換圖片)：", options=theme_options, format_func=lambda x: {'dark': "暗黑(預設)", 'pink': "櫻花粉", 'green': "翡翠綠", 'blue': "天空藍"}[x], index=theme_options.index(current_theme) if current_theme in theme_options else 0, horizontal=True)
+            
+            # 💡 新增：濾鏡透明度滑桿
+            opacity_val = st.slider("背景濾鏡透明度 (%)", min_value=0, max_value=100, value=current_opacity)
             
             st.markdown("---")
-            st.markdown("<h4 style='color:#E2E8F0; font-size: 16px;'>⌨️ 快捷鍵配置 (點擊欄位後直接按下按鍵)</h4>", unsafe_allow_html=True)
+            st.markdown("<h4 style='color:#E2E8F0; font-size: 16px;'>快捷鍵配置 (點擊欄位後直接按下按鍵)</h4>", unsafe_allow_html=True)
             
             reverse_map = {v: k for k, v in st.session_state.get('custom_hotkeys', {"f1": "NavToB1", "f2": "NavToB2", "f3": "NavToB3", "f4": "NavToB4", "f5": "NavToB5", "f6": "NavToB6", "f7": "NavToB7", "alt+l": "NavToWatchlist", "escape": "登入"}).items()}
             
