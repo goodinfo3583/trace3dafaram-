@@ -751,108 +751,105 @@ def render_course_npc():
     import streamlit.components.v1 as components
     
     if st.session_state.get('show_course_npc', False):
-        # 💡 修正 1：這份 HTML 將透過 st.markdown 直接注入主 DOM
+        # 💡 修正 1：CSS 放大了寬高 (650px寬 / 75vh高)，並同步放大字體與間距
+        # 💡 修正 2：將 HTML 標籤「完全靠左對齊」，取消所有 Python 縮排，避免被 Markdown 誤判為程式碼區塊
         npc_html = """
-        <style>
-            .npc-overlay {
-                position: fixed; bottom: 25px; right: 25px;
-                width: 480px; height: 500px;
-                background: rgba(15, 23, 42, 0.96);
-                border: 2px solid #00D2FF; border-radius: 12px;
-                z-index: 9999999; display: flex; flex-direction: column;
-                padding: 20px; box-shadow: 0 8px 30px rgba(0, 210, 255, 0.3);
-                color: white; animation: slideUpNPC 0.5s cubic-bezier(0.175, 0.885, 0.32, 1.275);
-            }
-            .npc-header { display: flex; align-items: flex-end; margin-bottom: 15px; border-bottom: 1px solid rgba(255,255,255,0.1); padding-bottom: 10px; }
-            .npc-image {
-                width: 80px; height: 80px;
-                background-image: url('app/static/npcnatzu.png'); 
-                background-size: contain; background-repeat: no-repeat; background-position: bottom;
-                margin-right: 15px; filter: drop-shadow(0 0 5px rgba(0,210,255,0.5));
-            }
-            .npc-title-box { flex: 1; }
-            .npc-name { color: #00D2FF; font-weight: bold; font-size: 18px; margin-bottom: 4px; }
-            .npc-greet { font-size: 13px; color: #94A3B8; }
-            
-            .course-list { flex: 1; overflow-y: auto; padding-right: 10px; }
-            .course-list::-webkit-scrollbar { width: 6px; }
-            .course-list::-webkit-scrollbar-thumb { background: rgba(0, 210, 255, 0.4); border-radius: 3px; }
-            
-            .course-item { margin-bottom: 15px; padding: 12px; background: rgba(255,255,255,0.03); border: 1px solid rgba(255,255,255,0.08); border-radius: 8px; transition: 0.2s; cursor: pointer; }
-            .course-item:hover { background: rgba(0, 210, 255, 0.08); border-color: rgba(0, 210, 255, 0.4); transform: translateY(-2px); }
-            .course-title { color: #FFD700; font-weight: bold; font-size: 14px; margin-bottom: 6px; display: flex; align-items: center; gap: 5px; }
-            .course-desc { font-size: 12px; color: #CBD5E1; line-height: 1.5; }
-            
-            .close-btn { position: absolute; top: 12px; right: 18px; cursor: pointer; color: #94A3B8; font-size: 20px; transition: 0.2s; }
-            .close-btn:hover { color: #FF4C4C; transform: scale(1.1); }
-            @keyframes slideUpNPC { from { transform: translateY(100px) scale(0.8); opacity: 0; } to { transform: translateY(0) scale(1); opacity: 1; } }
-        </style>
-        
-        <div class="npc-overlay">
-            <!-- 💡 修正 2：因為已經在主 DOM，所以不再需要 window.parent，直接 document 即可 -->
-            <div class="close-btn" onclick="document.getElementById('close-npc-btn').click();">✕</div>
-            <div class="npc-header">
-                <div class="npc-image"></div>
-                <div class="npc-title-box">
-                    <div class="npc-name">籌碼導師</div>
-                    <div class="npc-greet">「冒險者，選擇你想強化的能力吧！」</div>
-                </div>
-            </div>
-            
-            <div class="course-list">
-                <div class="course-item">
-                    <div class="course-title">📖 1. 宏觀經濟與景氣循環（總經介紹）</div>
-                    <div class="course-desc">學習解讀 GDP、CPI、利率與匯率等基本總體經濟指標，判斷目前大盤處於景氣擴張或衰退的哪個階段。</div>
-                </div>
-                <div class="course-item">
-                    <div class="course-title">📖 2. 股市基本架構與名詞解析</div>
-                    <div class="course-desc">認識台股交易規則、漲跌幅限制、各類委託單與基本盤面術語，建立進場前的基礎常識。</div>
-                </div>
-                <div class="course-item">
-                    <div class="course-title">📖 3. 財報與基本面入門</div>
-                    <div class="course-desc">學習閱讀三大財務報表（綜合損益表、資產負債表、現金流量表），學會挑選具備長期競爭力的公司。</div>
-                </div>
-                <div class="course-item">
-                    <div class="course-title">📖 4. 量價關係與盤面解讀</div>
-                    <div class="course-desc">對照成交量與股價漲跌的互動（如價漲量增、量價背離），判斷多空雙方的企圖心與買賣力道。</div>
-                </div>
-                <div class="course-item">
-                    <div class="course-title">📖 5. 技術分析與指標應用</div>
-                    <div class="course-desc">熟悉常用技術指標（如均線 MA、MACD、RSI、KDJ），掌握支撐壓力與趨勢轉折點。</div>
-                </div>
-                <div class="course-item">
-                    <div class="course-title">📖 6. 籌碼面追蹤：法人與大戶結構</div>
-                    <div class="course-desc">分析外資、投信、自營商動向及大戶持股比例，透過資金流向尋找主力默默佈局的標的。</div>
-                </div>
-                <div class="course-item">
-                    <div class="course-title">📖 7. 券資關係與融資融券分析</div>
-                    <div class="course-desc">觀察融資餘額、融券張數與券資比變化，評估市場散戶情緒及潛在的「軋空」或「多殺多」力道。</div>
-                </div>
-                <div class="course-item">
-                    <div class="course-title">📖 8. 產業趨勢與題材選股</div>
-                    <div class="course-desc">掌握主流產業輪動脈絡（如半導體、AI 供應鏈、綠能等），在對的時間點佈局具備成長爆發力的賽道。</div>
-                </div>
-                <div class="course-item">
-                    <div class="course-title">📖 9. 資金控管與風險管理</div>
-                    <div class="course-desc">學習單筆投資部位配置、分批進場策略、停損停利機制，避免因情緒失控而遭受重大虧損。</div>
-                </div>
-                <div class="course-item">
-                    <div class="course-title">📖 10. 交易心理學與個人策略總結</div>
-                    <div class="course-desc">克服貪婪與恐懼的心理障礙，並回測、修正並建立專屬於自己的穩定獲利交易系統。</div>
-                </div>
-            </div>
+<style>
+.npc-overlay {
+    position: fixed; bottom: 30px; right: 30px;
+    width: 650px; height: 75vh; max-height: 800px;
+    background: rgba(15, 23, 42, 0.96);
+    border: 2px solid #00D2FF; border-radius: 12px;
+    z-index: 9999999; display: flex; flex-direction: column;
+    padding: 25px; box-shadow: 0 8px 30px rgba(0, 210, 255, 0.3);
+    color: white; animation: slideUpNPC 0.5s cubic-bezier(0.175, 0.885, 0.32, 1.275);
+}
+.npc-header { display: flex; align-items: flex-end; margin-bottom: 20px; border-bottom: 1px solid rgba(255,255,255,0.1); padding-bottom: 15px; }
+.npc-image {
+    width: 90px; height: 90px;
+    background-image: url('app/static/npcnatzu.png'); 
+    background-size: contain; background-repeat: no-repeat; background-position: bottom;
+    margin-right: 20px; filter: drop-shadow(0 0 5px rgba(0,210,255,0.5));
+}
+.npc-title-box { flex: 1; }
+.npc-name { color: #00D2FF; font-weight: bold; font-size: 22px; margin-bottom: 6px; }
+.npc-greet { font-size: 15px; color: #94A3B8; }
+
+.course-list { flex: 1; overflow-y: auto; padding-right: 15px; }
+.course-list::-webkit-scrollbar { width: 8px; }
+.course-list::-webkit-scrollbar-thumb { background: rgba(0, 210, 255, 0.4); border-radius: 4px; }
+
+.course-item { margin-bottom: 18px; padding: 15px; background: rgba(255,255,255,0.03); border: 1px solid rgba(255,255,255,0.08); border-radius: 10px; transition: 0.2s; cursor: pointer; }
+.course-item:hover { background: rgba(0, 210, 255, 0.08); border-color: rgba(0, 210, 255, 0.4); transform: translateY(-2px); }
+.course-title { color: #FFD700; font-weight: bold; font-size: 16px; margin-bottom: 8px; display: flex; align-items: center; gap: 5px; }
+.course-desc { font-size: 14px; color: #CBD5E1; line-height: 1.6; }
+
+.close-btn { position: absolute; top: 15px; right: 20px; cursor: pointer; color: #94A3B8; font-size: 24px; transition: 0.2s; }
+.close-btn:hover { color: #FF4C4C; transform: scale(1.1); }
+@keyframes slideUpNPC { from { transform: translateY(100px) scale(0.8); opacity: 0; } to { transform: translateY(0) scale(1); opacity: 1; } }
+</style>
+
+<div class="npc-overlay">
+    <div class="close-btn" onclick="document.getElementById('close-npc-btn').click();">✕</div>
+    <div class="npc-header">
+        <div class="npc-image"></div>
+        <div class="npc-title-box">
+            <div class="npc-name">籌碼導師</div>
+            <div class="npc-greet">「冒險者，選擇你想強化的能力吧！」</div>
         </div>
-        """
+    </div>
+    
+    <div class="course-list">
+        <div class="course-item">
+            <div class="course-title">📖 1. 宏觀經濟與景氣循環（總經介紹）</div>
+            <div class="course-desc">學習解讀 GDP、CPI、利率與匯率等基本總體經濟指標，判斷目前大盤處於景氣擴張或衰退的哪個階段。</div>
+        </div>
+        <div class="course-item">
+            <div class="course-title">📖 2. 股市基本架構與名詞解析</div>
+            <div class="course-desc">認識台股交易規則、漲跌幅限制、各類委託單與基本盤面術語，建立進場前的基礎常識。</div>
+        </div>
+        <div class="course-item">
+            <div class="course-title">📖 3. 財報與基本面入門</div>
+            <div class="course-desc">學習閱讀三大財務報表（綜合損益表、資產負債表、現金流量表），學會挑選具備長期競爭力的公司。</div>
+        </div>
+        <div class="course-item">
+            <div class="course-title">📖 4. 量價關係與盤面解讀</div>
+            <div class="course-desc">對照成交量與股價漲跌的互動（如價漲量增、量價背離），判斷多空雙方的企圖心與買賣力道。</div>
+        </div>
+        <div class="course-item">
+            <div class="course-title">📖 5. 技術分析與指標應用</div>
+            <div class="course-desc">熟悉常用技術指標（如均線 MA、MACD、RSI、KDJ），掌握支撐壓力與趨勢轉折點。</div>
+        </div>
+        <div class="course-item">
+            <div class="course-title">📖 6. 籌碼面追蹤：法人與大戶結構</div>
+            <div class="course-desc">分析外資、投信、自營商動向及大戶持股比例，透過資金流向尋找主力默默佈局的標的。</div>
+        </div>
+        <div class="course-item">
+            <div class="course-title">📖 7. 券資關係與融資融券分析</div>
+            <div class="course-desc">觀察融資餘額、融券張數與券資比變化，評估市場散戶情緒及潛在的「軋空」或「多殺多」力道。</div>
+        </div>
+        <div class="course-item">
+            <div class="course-title">📖 8. 產業趨勢與題材選股</div>
+            <div class="course-desc">掌握主流產業輪動脈絡（如半導體、AI 供應鏈、綠能等），在對的時間點佈局具備成長爆發力的賽道。</div>
+        </div>
+        <div class="course-item">
+            <div class="course-title">📖 9. 資金控管與風險管理</div>
+            <div class="course-desc">學習單筆投資部位配置、分批進場策略、停損停利機制，避免因情緒失控而遭受重大虧損。</div>
+        </div>
+        <div class="course-item">
+            <div class="course-title">📖 10. 交易心理學與個人策略總結</div>
+            <div class="course-desc">克服貪婪與恐懼的心理障礙，並回測、修正並建立專屬於自己的穩定獲利交易系統。</div>
+        </div>
+    </div>
+</div>
+"""
         
-        # 💡 修正 3：使用 st.markdown 來渲染 UI，這樣它就會脫離 iframe 的限制，成功懸浮在主畫面上
         st.markdown(npc_html, unsafe_allow_html=True)
         
-        # 實體的 Streamlit 關閉按鈕 (將會被 JS 隱藏並綁定 ID)
         if st.button("CloseNPC", key="close_npc_hidden_btn"):
             st.session_state['show_course_npc'] = False
             st.rerun()
             
-        # 💡 修正 4：把 JS 腳本放回 components.html 執行。這段腳本在 iframe 內，所以用 window.parent 去抓主畫面按鈕
         bind_js = """
         <script>
             setTimeout(() => {
