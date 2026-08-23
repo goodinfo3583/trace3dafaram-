@@ -425,16 +425,16 @@ def inject_custom_header(is_logged_in=False):
 def render_proxy_buttons():
     def change_page(page_name):
         st.query_params["page"] = page_name 
-        st.rerun()  # 💡 關鍵修正：強制 Streamlit 立即根據新網址重新渲染主畫面
+        
         
     def toggle_course_npc():
         st.session_state['show_course_npc'] = not st.session_state.get('show_course_npc', False)
-        st.rerun()  # 💡 順便補上，確保開關 NPC 也能即時反應
+        
 
     def handle_logout():
         st.session_state.clear()
         st.query_params["page"] = "b1" # 登出後預設回首頁
-        st.rerun()
+        
 
     with st.container():
         # 這裡的按鈕全部保持你原本的寫法即可
