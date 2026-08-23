@@ -42,7 +42,9 @@ def load_global_css():
 
     if theme == 'pink': bg_color = f"rgba(237, 184, 242, {opacity})"
     elif theme == 'green': bg_color = f"rgba(10, 20, 15, {opacity})"
-    elif theme == 'blue': bg_color = f"rgba(184, 236, 242, {opacity})"
+    elif theme == 'purple': bg_color = f"rgba(184, 236, 242, {opacity})"
+    elif theme == 'brown': bg_color = f"rgba(184, 236, 242, {opacity})"
+    
     else: bg_color = f"rgba(10, 13, 20, {opacity})"
 
     theme_css = f"""
@@ -177,23 +179,23 @@ def load_global_css():
     """
     components.html(drag_engine_js, height=0, width=0)
 
-def set_background(image_path="app/static/沙漠之城.png"):
+def set_background(image_path="app/image/派對盛宴邀請.png"):
     theme = st.session_state.get('theme', 'dark')
     opacity = st.session_state.get('bg_opacity', 88) / 100.0
     block_opacity = opacity * 0.7 
     
     actual_image = image_path
     if theme == 'pink':
-        overlay, block_bg = f"rgba(35, 15, 25, {opacity})", f"rgba(35, 15, 25, {block_opacity})"
-        actual_image = "app/static/櫻花都市.png"
+        overlay, block_bg = f"rgba(139, 109, 98, {opacity})", f"rgba(139, 109, 98, {block_opacity})"
+        actual_image = "app/static/鐵風堡.png"
     elif theme == 'green':
-        overlay, block_bg = f"rgba(15, 35, 20, {opacity})", f"rgba(15, 35, 20, {block_opacity})"
+        overlay, block_bg = f"rgba(75, 159, 113, {opacity})", f"rgba(75, 159, 113, {block_opacity})"
         actual_image = "app/static/翡翠林鎮.png"
     elif theme == 'purple':
-        overlay, block_bg = f"rgba(15, 20, 40, {opacity})", f"rgba(15, 20, 40, {block_opacity})"
-        actual_image = "app/static/月下城.png"
+        overlay, block_bg = f"rgba(87, 99, 158, {opacity})", f"rgba(87, 99, 158, {block_opacity})"
+        actual_image = "app/static/月下綠洲城.png"
     elif theme == 'brown':
-        overlay, block_bg = f"rgba(209, 162, 44, {opacity})", f"rgba(209, 162, 44, {block_opacity})"
+        overlay, block_bg = f"rgba(238, 226, 188, {opacity})", f"rgba(238, 226, 188, {block_opacity})"
         actual_image = "app/static/沙漠之都.png"
         
     else: 
@@ -700,12 +702,12 @@ def render_settings_modal():
             current_opacity = st.session_state.get('bg_opacity', 88)
             
             theme_options = ['dark', 'pink', 'green', 'purple','brown']
-            theme_choice = st.radio("選擇背景主題 (將同步切換圖片)：", options=theme_options, format_func=lambda x: {'dark': "暗黑(預設)", 'pink': "櫻花粉", 'green': "翡翠綠", 'purple': "月影紫", 'brown':"沙漠褐"}[x], index=theme_options.index(current_theme) if current_theme in theme_options else 0, horizontal=True)
+            theme_choice = st.radio("選擇背景主題 (將同步切換圖片)：", options=theme_options, format_func=lambda x: {'dark': "暗黑(預設)", 'pink': "鋼鐵褐", 'green': "翡翠綠", 'purple': "月影紫", 'brown':"沙漠棕"}[x], index=theme_options.index(current_theme) if current_theme in theme_options else 0, horizontal=True)
             
             opacity_val = st.slider("背景濾鏡透明度 (%)", min_value=0, max_value=100, value=current_opacity)
             
             st.markdown("---")
-            st.markdown("<h4 style='color:#E2E8F0; font-size: 16px;'>⌨️ 快捷鍵配置 (點擊欄位後直接按下按鍵)</h4>", unsafe_allow_html=True)
+            st.markdown("<h4 style='color:#E2E8F0; font-size: 16px;'>快捷鍵配置 (點擊欄位後直接按下按鍵)</h4>", unsafe_allow_html=True)
             
             reverse_map = {v: k for k, v in st.session_state.get('custom_hotkeys', {"f1": "NavToB1", "f2": "NavToB2", "f3": "NavToB3", "f4": "NavToB4", "f5": "NavToB5", "f6": "NavToB6", "f7": "NavToB7", "alt+l": "NavToWatchlist", "escape": "登入"}).items()}
             
