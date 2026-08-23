@@ -929,9 +929,14 @@ border-width: 12px 14px 12px 0; border-style: solid; border-color: transparent r
 <div class="top-actions">
 <!-- 💡 同樣放棄 onclick，賦予專屬 ID -->
 
-<label class="action-btn close"
-       id="btn-close-detail"
-       title="關閉">✕</label>
+<div class="top-actions">
+    <label class="action-btn back"
+           id="btn-back-detail"
+           title="回到籌碼導師選單">←</label>
+
+    <label class="action-btn close"
+           id="btn-close-detail"
+           title="關閉">✕</label>
 </div>
 <div class="detail-header">
 <div class="npc-big-image"></div>
