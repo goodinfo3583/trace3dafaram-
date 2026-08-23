@@ -31,14 +31,15 @@ def render():
     col1, col2 = st.columns(2)
     new_hotkeys = {}
     with col1:
-        new_hotkeys["NavToB1"] = st.text_input("法人動向", value=reverse_map.get("NavToB1", "f1"), key="kb1")
-        new_hotkeys["NavToB2"] = st.text_input("法人掃貨", value=reverse_map.get("NavToB2", "f2"), key="kb2")
-        new_hotkeys["NavToB3"] = st.text_input("法人連買", value=reverse_map.get("NavToB3", "f3"), key="kb3")
-        new_hotkeys["NavToB4"] = st.text_input("資券動向", value=reverse_map.get("NavToB4", "f4"), key="kb4")
-        new_hotkeys["NavToB6"] = st.text_input("鉅額交易", value=reverse_map.get("NavToB6", "f6"), key="kb6")
+        new_hotkeys["NavToB1"] = st.text_input("法人動向", value=reverse_map.get("NavToB1", "F1"), key="kb1")
+        new_hotkeys["NavToB2"] = st.text_input("法人掃貨", value=reverse_map.get("NavToB2", "F2"), key="kb2")
+        new_hotkeys["NavToB3"] = st.text_input("法人連買", value=reverse_map.get("NavToB3", "F3"), key="kb3")
+        new_hotkeys["NavToB4"] = st.text_input("資券動向", value=reverse_map.get("NavToB4", "F4"), key="kb4")
+        new_hotkeys["NavToB5"] = st.text_input("大腿動向", value=reverse_map.get("NavToB5", "F6"), key="kb5")
     with col2:
-        new_hotkeys["NavToB5"] = st.text_input("大腿動向", value=reverse_map.get("NavToB5", "f5"), key="kb5")
-        new_hotkeys["NavToB7"] = st.text_input("董監動向", value=reverse_map.get("NavToB7", "f7"), key="kb7")
+        
+        new_hotkeys["NavToB6"] = st.text_input("鉅額交易", value=reverse_map.get("NavToB6", "F7"), key="kb6")
+        new_hotkeys["NavToB7"] = st.text_input("董監動向", value=reverse_map.get("NavToB7", "F8"), key="kb7")
         new_hotkeys["NavToWatchlist"] = st.text_input("建立名單", value=reverse_map.get("NavToWatchlist", "alt+l"), key="kb_wl")
         new_hotkeys["登入"] = st.text_input("登入", value=reverse_map.get("登入", "escape"), key="kb_login")
 
