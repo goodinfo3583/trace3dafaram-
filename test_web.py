@@ -159,6 +159,17 @@ elif current_page == "setting":
 with st.sidebar:
     render_sidebar_war_room(STOCK_DICT, DATA_DIR)
 
+    # 💡 增加分隔線與前往設定頁面的按鈕
+    st.markdown("---")
+    if current_page != "setting":
+        if st.button("進入系統設置", use_container_width=True):
+            st.query_params["page"] = "setting"
+            st.rerun()
+    else:
+        # 如果已經在設定頁面，可以給一個返回首頁(b1)的按鈕
+        if st.button("返回首頁", use_container_width=True):
+            st.query_params["page"] = "b1"
+            st.rerun()
 # ==========================================
 # 🏠 核心五大 區塊1-5原始碼位置
 # ==========================================
