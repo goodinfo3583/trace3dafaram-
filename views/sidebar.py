@@ -1018,6 +1018,29 @@ def render_sidebar_war_room(STOCK_DICT, DATA_DIR="data"):
                     if is_all_unranked:
                         st.write("⚪ 未進榜")
                     else:
+                        # --- 👇 新增：獨立抓取並美化最新動態、上榜與△ 👇 ---
+                        row = res_b1.iloc[0]
+                        dyn_str = str(row.get('最新動態', '-'))
+                        tag_str = str(row.get('今日上榜', ''))
+                        if not tag_str.strip(): tag_str = "未上榜"
+                        
+                        delta_val = row.get('△', 0)
+                        try:
+                            d_val = float(str(delta_val).replace('%', '').replace('+', ''))
+                            delta_str = f"+{d_val:.2f}" if d_val > 0 else f"{d_val:.2f}"
+                            delta_color = "#FF4B4B" if d_val > 0 else ("#00E676" if d_val < 0 else "#94A3B8")
+                        except:
+                            delta_str = str(delta_val)
+                            delta_color = "#94A3B8"
+
+                        st.markdown(f"""
+                        <div style='background-color: rgba(255,255,255,0.05); border-left: 3px solid #38BDF8; padding: 10px 12px; border-radius: 4px; margin-bottom: 12px; font-size: 13.5px; line-height: 1.6;'>
+                            <div style='color: #E2E8F0;'>📌 <b>最新動態：</b><span style='color:#FCD34D;'>{dyn_str}</span></div>
+                            <div style='color: #E2E8F0;'>🏷️ <b>今日上榜：</b><span style='color:#38BDF8;'>{tag_str}</span></div>
+                            <div style='color: #E2E8F0;'>📊 <b>單日△：</b> <span style='color:{delta_color}; font-weight:bold;'>{delta_str}</span></div>
+                        </div>
+                        """, unsafe_allow_html=True)
+                        # --- 👆 新增結束 👆 ---
                         hide_keywords = ['_區塊', '排序', '上榜數量', '原始上榜', '精準單日']
                         clean_cols = [c for c in res_b1.columns if not any(k in c for k in hide_keywords)]
                         st.dataframe(res_b1[clean_cols], use_container_width=True, hide_index=True)
@@ -1071,6 +1094,27 @@ def render_sidebar_war_room(STOCK_DICT, DATA_DIR="data"):
                     if is_all_unranked_down:
                         st.write("⚪ 未進榜")
                     else:
+                        # --- 👇 新增：獨立抓取並美化衰退上榜與單日△ 👇 ---
+                        row_down = res_b1_down.iloc[0]
+                        tag_down_str = str(row_down.get('今日衰退上榜', ''))
+                        if not tag_down_str.strip(): tag_down_str = "未上榜"
+                        
+                        delta_down_val = row_down.get('單日△', 0)
+                        try:
+                            d_down_val = float(str(delta_down_val).replace('%', '').replace('+', ''))
+                            delta_down_str = f"+{d_down_val:.2f}" if d_down_val > 0 else f"{d_down_val:.2f}"
+                            delta_down_color = "#FF4B4B" if d_down_val > 0 else ("#00E676" if d_down_val < 0 else "#94A3B8")
+                        except:
+                            delta_down_str = str(delta_down_val)
+                            delta_down_color = "#94A3B8"
+
+                        st.markdown(f"""
+                        <div style='background-color: rgba(0, 230, 118, 0.05); border-left: 3px solid #00E676; padding: 10px 12px; border-radius: 4px; margin-bottom: 12px; font-size: 13.5px; line-height: 1.6;'>
+                            <div style='color: #E2E8F0;'>🏷️ <b>衰退上榜：</b><span style='color:#00E676;'>{tag_down_str}</span></div>
+                            <div style='color: #E2E8F0;'>📊 <b>單日△：</b> <span style='color:{delta_down_color}; font-weight:bold;'>{delta_down_str}</span></div>
+                        </div>
+                        """, unsafe_allow_html=True)
+                        # --- 👆 新增結束 👆 ---
                         hide_keywords_down = ['_區塊', '排序', '上榜數量', '原始上榜', '精準單日']
                         clean_cols_down = [c for c in res_b1_down.columns if not any(k in c for k in hide_keywords_down)]
                         
