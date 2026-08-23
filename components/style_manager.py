@@ -189,9 +189,13 @@ def set_background(image_path="app/static/沙漠之城.png"):
     elif theme == 'green':
         overlay, block_bg = f"rgba(15, 35, 20, {opacity})", f"rgba(15, 35, 20, {block_opacity})"
         actual_image = "app/static/翡翠林鎮.png"
-    elif theme == 'blue':
+    elif theme == 'purple':
         overlay, block_bg = f"rgba(15, 20, 40, {opacity})", f"rgba(15, 20, 40, {block_opacity})"
-        actual_image = "app/static/天空城.png"
+        actual_image = "app/static/月下城.png"
+    elif theme == 'brown':
+        overlay, block_bg = f"rgba(209, 162, 44, {opacity})", f"rgba(209, 162, 44, {block_opacity})"
+        actual_image = "app/static/沙漠之都.png"
+        
     else: 
         overlay, block_bg = f"rgba(15, 23, 42, {opacity})", f"rgba(15, 23, 42, {block_opacity})"
     
@@ -685,18 +689,18 @@ def render_settings_modal():
             st.markdown('<div class="setting-anchor"></div>', unsafe_allow_html=True)
             col_title, col_x = st.columns([9, 1])
             with col_title:
-                st.markdown("<h3 class='settings-drag-handle' style='color:#00D2FF; margin-top:0;' title='按住此處可拖曳視窗'>⚙️ 設置中心</h3>", unsafe_allow_html=True)
+                st.markdown("<h3 class='settings-drag-handle' style='color:#00D2FF; margin-top:0;' title='按住此處可拖曳視窗'>設置中心</h3>", unsafe_allow_html=True)
             with col_x:
                 if st.button("✕", key="settings_btn_close_top"):
                     st.session_state['show_settings'] = False
                     st.rerun()
 
-            st.markdown("<h4 style='color:#E2E8F0; font-size: 16px;'>🎨 外觀與濾鏡</h4>", unsafe_allow_html=True)
+            st.markdown("<h4 style='color:#E2E8F0; font-size: 16px;'>外觀與濾鏡</h4>", unsafe_allow_html=True)
             current_theme = st.session_state.get('theme', 'dark')
             current_opacity = st.session_state.get('bg_opacity', 88)
             
-            theme_options = ['dark', 'pink', 'green', 'blue']
-            theme_choice = st.radio("選擇背景主題 (將同步切換圖片)：", options=theme_options, format_func=lambda x: {'dark': "🌙 專業暗黑", 'pink': "🌸 櫻花粉", 'green': "🌲 翡翠綠", 'blue': "🌌 天空藍"}[x], index=theme_options.index(current_theme) if current_theme in theme_options else 0, horizontal=True)
+            theme_options = ['dark', 'pink', 'green', 'purple','brown']
+            theme_choice = st.radio("選擇背景主題 (將同步切換圖片)：", options=theme_options, format_func=lambda x: {'dark': "暗黑(預設)", 'pink': "櫻花粉", 'green': "翡翠綠", 'purple': "月影紫", 'brown':"沙漠褐"}[x], index=theme_options.index(current_theme) if current_theme in theme_options else 0, horizontal=True)
             
             opacity_val = st.slider("背景濾鏡透明度 (%)", min_value=0, max_value=100, value=current_opacity)
             
@@ -723,14 +727,14 @@ def render_settings_modal():
             
             col_ok, col_cancel = st.columns(2)
             with col_ok:
-                if st.button("💾 確認", use_container_width=True):
+                if st.button("確認", use_container_width=True):
                     st.session_state['theme'] = theme_choice
                     st.session_state['bg_opacity'] = opacity_val
                     st.session_state['custom_hotkeys'] = {k.strip().lower(): v for v, k in new_hotkeys.items() if k.strip().lower()}
                     st.session_state['show_settings'] = False
                     st.rerun()
             with col_cancel:
-                if st.button("❌ 取消", use_container_width=True):
+                if st.button("取消", use_container_width=True):
                     st.session_state['show_settings'] = False
                     st.rerun()
                     
