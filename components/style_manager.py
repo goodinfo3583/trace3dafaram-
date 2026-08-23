@@ -195,7 +195,7 @@ def set_background(image_path="./image/派對盛宴邀請.png"):
         overlay, block_bg = f"rgba(87, 99, 158, {opacity})", f"rgba(87, 99, 158, {block_opacity})"
         actual_image = "./image/月下綠洲城.png"
     elif theme == 'brown':
-        overlay, block_bg = f"rgba(238, 226, 188, {opacity})", f"rgba(238, 226, 188, {block_opacity})"
+        overlay, block_bg = f"rgba(161, 115, 0, {opacity})", f"rgba(161, 115, 0, {block_opacity})"
         actual_image = "./image/沙漠之都.png"
         
     else: 
