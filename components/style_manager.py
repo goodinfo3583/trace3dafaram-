@@ -518,20 +518,24 @@ def render_b5_top10_glass_card():
             if "⚠️" in s: return "⚠️大減"
             if "🚨" in s: return "🚨劇減"
             return "⚪無字"
+
         def make_resonance_html(df, is_6w):
             if df.empty: return "<p style='font-size:13.5px; text-align:center; color:#94A3B8; margin-top:40px;'>尚無共振標的</p>"
             html = "<ul style='padding-left: 0; margin: 0; list-style-type: none;'>"
             for i, row in enumerate(df.to_dict('records')):
                 if is_6w:
                     v1, v2 = row['6周(千)_val'], row['6周(四)_val']
-                    info_html = f"<div style='display:flex; width:50%; justify-content:flex-end; color:#F59E0B; font-weight:bold; font-size:11px;'><span style='width:45px; text-align:right;'>{v1:.1f}%</span><span style='color:#94A3B8; font-size:12px; margin:0 2px;'>/</span><span style='width:40px; text-align:right;'>{v2:.1f}%</span></div>"
+                    # 💡 修改1：字體加大至 13.5px (對齊B4)，並加入 flex-shrink: 0 確保數值區塊絕對不會被擠壓換行
+                    info_html = f"<div style='display:flex; justify-content:flex-end; align-items:center; color:#F59E0B; font-weight:bold; font-size:13.5px; white-space:nowrap; flex-shrink:0;'><span style='width:48px; text-align:right;'>{v1:.1f}%</span><span style='color:#94A3B8; font-size:13.5px; margin:0 3px;'>/</span><span style='width:48px; text-align:right;'>{v2:.1f}%</span></div>"
                 else:
                     s1, s2 = unify_status_text(row.get('狀態(千)', '')), unify_status_text(row.get('狀態(四)', ''))
-                    info_html = f"<div style='display:flex; width:50%; justify-content:flex-end; color:#F59E0B; font-size:10px;'><span style='width:40px; text-align:right;'>{s1}</span><span style='color:#94A3B8; font-size:12px; margin:0 2px;'>/</span><span style='width:40px; text-align:right;'>{s2}</span></div>"
+                    # 💡 修改2：狀態文字加大至 11px (對齊B4)，同樣設定 flex-shrink: 0
+                    info_html = f"<div style='display:flex; justify-content:flex-end; align-items:center; color:#F59E0B; font-size:11px; white-space:nowrap; flex-shrink:0;'><span style='width:48px; text-align:right;'>{s1}</span><span style='color:#94A3B8; font-size:11px; margin:0 3px;'>/</span><span style='width:48px; text-align:right;'>{s2}</span></div>"
                     
                 html += (
                     f"<li style='display:flex; align-items:center; justify-content:space-between; margin-bottom:6px; font-size:13.5px; line-height:1.4;'>"
-                    f"  <div style='display:flex; align-items:center; width:50%; overflow:hidden;'>"
+                    # 💡 修改3：左側股票區塊捨棄 width:50%，改用 flex:1 自動吃掉剩餘空間，加上 margin-right 稍微拉近數值間距，避免文字跑到下一行
+                    f"  <div style='display:flex; align-items:center; flex:1; overflow:hidden; margin-right:8px;'>"
                     f"      <b style='color:#FFF; width:22px; flex-shrink:0;'>{i+1}.</b>"
                     f"      <span style='white-space:nowrap; overflow:hidden; text-overflow:ellipsis;'>{row['股票代號']}{row['股票名稱']}</span>"
                     f"  </div>{info_html}</li>"
@@ -554,7 +558,6 @@ def render_b5_top10_glass_card():
 #pause-b5-card:checked ~ #b5-top10-card .pause-icon-b5::after {{ content: '▶'; font-size: 11px; color: #FFD700; }}
 #pause-b5-card:not(:checked) ~ #b5-top10-card .pause-icon-b5::after {{ content: '⏸'; font-size: 11px; }}
 @keyframes slideInDownB5 {{ from {{ transform: translateY(-50%); opacity: 0; }} to {{ transform: translateY(0); opacity: 1; }} }}
-/* 💡 將 top: 75px 改為 top: 100px */
 .glass-panel-b5 {{position: fixed; top: 85px; left: 53.5vw; width: 15.5vw; min-width: 220px; background: rgba(30, 25, 10, 0.88); backdrop-filter: blur(12px); -webkit-backdrop-filter: blur(12px); border: 1px solid rgba(245, 158, 11, 0.4); border-right: none; border-radius: 0; padding: 10px 12px; z-index: 999996; color: #E2E8F0; animation: slideInDownB5 0.7s cubic-bezier(0.25, 0.8, 0.25, 1); transition: all 0.3s ease; box-sizing: border-box;}}
 .header-bar-b5 {{ display: flex; justify-content: space-between; align-items: center; border-bottom: 1px solid rgba(255,255,255,0.1); padding-bottom: 6px; margin-bottom: 8px; cursor: default; }}
 .header-title-b5 {{ font-size: 13px; font-weight: bold; color: #FCD34D; white-space:nowrap; }}
