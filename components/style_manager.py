@@ -187,16 +187,16 @@ def set_background(image_path="./image/派對盛宴邀請.png"):
     actual_image = image_path
     if theme == 'pink':
         overlay, block_bg = f"rgba(139, 109, 98, {opacity})", f"rgba(139, 109, 98, {block_opacity})"
-        actual_image = "./static/鐵風堡.png"
+        actual_image = "./image/鐵風堡.png"
     elif theme == 'green':
         overlay, block_bg = f"rgba(75, 159, 113, {opacity})", f"rgba(75, 159, 113, {block_opacity})"
-        actual_image = "./static/翡翠林鎮.png"
+        actual_image = "./image/翡翠林鎮.png"
     elif theme == 'purple':
         overlay, block_bg = f"rgba(87, 99, 158, {opacity})", f"rgba(87, 99, 158, {block_opacity})"
-        actual_image = "./static/月下綠洲城.png"
+        actual_image = "./image/月下綠洲城.png"
     elif theme == 'brown':
         overlay, block_bg = f"rgba(238, 226, 188, {opacity})", f"rgba(238, 226, 188, {block_opacity})"
-        actual_image = "./static/沙漠之都.png"
+        actual_image = "./image/沙漠之都.png"
         
     else: 
         overlay, block_bg = f"rgba(15, 23, 42, {opacity})", f"rgba(15, 23, 42, {block_opacity})"

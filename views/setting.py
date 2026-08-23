@@ -5,7 +5,7 @@ import streamlit.components.v1 as components
 def render():
     # 💡 移除原本的懸浮 CSS (position: fixed, drag-handle)，改為乾淨的全螢幕排版
     st.markdown("<h2 style='color:#00D2FF; margin-top:10px;'>設置中心</h2>", unsafe_allow_html=True)
-    st.markdown("<p style='color:#94A3B8; font-size:14px;'>您在此處的調整將會自動套用至全系統，完成後請點擊下方儲存按鈕返回。</p>", unsafe_allow_html=True)
+    st.markdown("<p style='color:#94A3B8; font-size:14px;'>調整將會自動套用至系統頁面，完成後請點擊下方確認。</p>", unsafe_allow_html=True)
     st.markdown("---")
 
     st.markdown("<h4 style='color:#E2E8F0; font-size: 16px;'>外觀與濾鏡</h4>", unsafe_allow_html=True)
