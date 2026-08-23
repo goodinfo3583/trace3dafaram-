@@ -24,18 +24,7 @@ def load_global_css():
             overflow: auto !important; 
         }
 
-        /* 💡 賦予 icon-card.png 真實按鈕的回饋手感 (發光、縮放) */
-        img[src*="icon-card"], img[alt*="icon-card"] {
-            cursor: pointer !important;
-            transition: all 0.2s ease !important;
-        }
-        img[src*="icon-card"]:hover, img[alt*="icon-card"]:hover {
-            transform: scale(1.08) !important;
-            filter: drop-shadow(0 0 8px rgba(0, 210, 255, 0.6)) !important;
-        }
-        img[src*="icon-card"]:active, img[alt*="icon-card"]:active {
-            transform: scale(0.95) !important;
-        }
+
         </style>
     """
     st.markdown(hide_streamlit_style, unsafe_allow_html=True)
