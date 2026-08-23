@@ -534,7 +534,7 @@ def render_b4_top10_glass_card():
 @media (max-width: 1200px) {{ .glass-panel-b4 {{ position: relative; top: auto; left: auto; width: 90%; max-width: 350px; margin: 10px auto; display: block; }} }}
 </style>
 <div class="glass-panel-b4" id="b4-top10-card">
-<div class="header-bar-b4"><span class="header-title-b4"><img src="app/static/ground.png" style="width:18px; margin-right:6px; vertical-align:-3px;" onerror="this.style.display='none'">資券雷達</span>
+<div class="header-bar-b4"><span class="header-title-b4"><img src="app/static/magicbookground.png" style="width:18px; margin-right:6px; vertical-align:-3px;" onerror="this.style.display='none'">資券雷達</span>
 <div class="action-btns-b4">
 <label for="pause-b4-card" class="action-btn-b4 pause-icon-b4" title="暫停/播放輪播"></label>
 <label for="min-b4-card" class="action-btn-b4 min-icon-b4" title="縮放"></label>
