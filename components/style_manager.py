@@ -988,7 +988,7 @@ setInterval(() => {
     const stBtns = Array.from(doc.querySelectorAll('button'));
     const btnClose = stBtns.find(b => b.textContent.includes('CloseNPC'));
     const btnOpen4 = stBtns.find(b => b.textContent.includes('OpenCourse4'));
-    const btnBack = stBtns.find(b => b.textContent.includes('BackToList'));
+    const btnBack = stBtns.find(b => b.textContent.trim() === 'BackToList');
     // 安全隱藏實體按鈕 (將他們趕出畫面外，保證 React 能捕捉點擊)
     [btnClose, btnOpen4, btnBack].forEach(b => {
         if(b) {
@@ -1005,12 +1005,13 @@ setInterval(() => {
     const bindEvent = (uiId, stBtn) => {
         const uiEl = doc.getElementById(uiId);
         // 若找到該 UI 元素且尚未被綁定過
-        if(uiEl && !uiEl.dataset.hooked) {
+        if(uiEl && stBtn && !uiEl.dataset.hooked) {
             uiEl.dataset.hooked = 'true'; // 標記為已綁定
             uiEl.style.cursor = 'pointer'; 
             uiEl.addEventListener('click', (e) => {
                 e.preventDefault();
-                if(stBtn) stBtn.click(); // 點擊時，觸發被隱藏的 Streamlit 按鈕
+                e.stopPropagation();
+                stBtn.click(); // 點擊時，觸發被隱藏的 Streamlit 按鈕
             });
         }
     };
