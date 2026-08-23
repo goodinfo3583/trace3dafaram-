@@ -644,7 +644,7 @@ def render_b5_top10_glass_card():
 @media (max-width: 1200px) {{ .glass-panel-b5 {{ position: relative; top: auto; left: auto; width: 90%; max-width: 350px; margin: 10px auto; display: block; }} }}
 </style>
 <div class="glass-panel-b5" id="b5-top10-card">
-<div class="header-bar-b5"><span class="header-title-b5">🔥 大腿共振</span>
+<div class="header-bar-b5"><span class="header-title-b5"><img src="app/static/magicbookleaf.png"> 大腿共振</span>
 <div class="action-btns-b5">
 <label for="pause-b5-card" class="action-btn-b5 pause-icon-b5" title="暫停/播放輪播"></label>
 <label for="min-b5-card" class="action-btn-b5 min-icon-b5" title="縮放"></label>
