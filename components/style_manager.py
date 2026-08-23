@@ -8,6 +8,7 @@ import streamlit.components.v1 as components
 def load_global_css():
     """載入全站共用的隱藏設定、縮排與動態主題 (深色濾鏡護眼版) CSS，以及全域拖曳引擎"""
     theme = st.session_state.get('theme', 'dark')
+    opacity = st.session_state.get('bg_opacity', 88) / 100.0
     
     hide_streamlit_style = """
         <style>
@@ -22,14 +23,28 @@ def load_global_css():
             resize: both !important; 
             overflow: auto !important; 
         }
+
+        /* 💡 賦予 icon-card.png 真實按鈕的回饋手感 (發光、縮放) */
+        img[src*="icon-card.png"] {
+            cursor: pointer !important;
+            transition: all 0.2s ease !important;
+        }
+        img[src*="icon-card.png"]:hover {
+            transform: scale(1.08) !important;
+            filter: drop-shadow(0 0 8px rgba(0, 210, 255, 0.6)) !important;
+        }
+        img[src*="icon-card.png"]:active {
+            transform: scale(0.95) !important;
+        }
         </style>
     """
     st.markdown(hide_streamlit_style, unsafe_allow_html=True)
 
-    bg_color = "#0A0D14" 
-    if theme == 'pink': bg_color = "#edb8f2"  
-    elif theme == 'green': bg_color = "#0A140F" 
-    elif theme == 'blue': bg_color = "#b8ecf2"  
+    # 基礎介面顏色定義 (背景色由濾鏡透明度決定)
+    if theme == 'pink': bg_color = f"rgba(237, 184, 242, {opacity})"
+    elif theme == 'green': bg_color = f"rgba(10, 20, 15, {opacity})"
+    elif theme == 'blue': bg_color = f"rgba(184, 236, 242, {opacity})"
+    else: bg_color = f"rgba(10, 13, 20, {opacity})"
 
     theme_css = f"""
         <style>
@@ -55,110 +70,132 @@ def load_global_css():
     """
     st.markdown(theme_css, unsafe_allow_html=True)
 
-    # 💡 升級版全域視窗拖曳引擎：加入解除 transition 延遲的機制，讓玻璃卡片拖曳變絲滑
+    # 🚀 終極版全域拖曳引擎 + icon-card 全局一鍵收合監聽
     drag_engine_js = """
     <script>
     (function() {
-        if (window.parent.window.customDragInitialized) return;
-        window.parent.window.customDragInitialized = true;
+        if (window.parent.window.customDragDelegated) return;
+        window.parent.window.customDragDelegated = true;
         const doc = window.parent.document;
         
-        function makeDraggable(el, handleSelector) {
-            if (!el || el.dataset.dragHooked) return;
-            el.dataset.dragHooked = 'true';
-            
-            let handle = el.querySelector(handleSelector) || el;
-            let isDragging = false, startX, startY, initialX, initialY;
-            
-            const onDown = (e) => {
-                if (e.target.closest('.action-btn') || e.target.closest('.action-btn-b2') || 
-                    e.target.closest('.action-btn-b4') || e.target.closest('.action-btn-b5') ||
-                    e.target.tagName === 'INPUT' || e.target.tagName === 'BUTTON' || e.target.tagName === 'LABEL') return;
-                
-                isDragging = true;
-                let clientX = e.touches ? e.touches[0].clientX : e.clientX;
-                let clientY = e.touches ? e.touches[0].clientY : e.clientY;
-                startX = clientX;
-                startY = clientY;
-                
-                let rect = el.getBoundingClientRect();
-                
-                // 🚀 關鍵修正：拖曳瞬間關閉 CSS 動畫，消除延遲手感
-                el.style.transition = 'none';
-                
-                el.style.left = rect.left + 'px';
-                el.style.top = rect.top + 'px';
-                el.style.right = 'auto';
-                el.style.bottom = 'auto';
-                el.style.transform = 'none';
-                el.style.margin = '0';
-                
-                initialX = rect.left;
-                initialY = rect.top;
-                
-                doc.addEventListener('mousemove', onMove, {passive: false});
-                doc.addEventListener('mouseup', onUp);
-                doc.addEventListener('touchmove', onMove, {passive: false});
-                doc.addEventListener('touchend', onUp);
-                handle.style.cursor = 'grabbing';
-            };
-            
-            const onMove = (e) => {
-                if (!isDragging) return;
-                e.preventDefault(); 
-                let clientX = e.touches ? e.touches[0].clientX : e.clientX;
-                let clientY = e.touches ? e.touches[0].clientY : e.clientY;
-                el.style.left = (initialX + (clientX - startX)) + 'px';
-                el.style.top = (initialY + (clientY - startY)) + 'px';
-            };
-            
-            const onUp = () => {
-                isDragging = false;
-                // 🚀 拖曳結束後恢復漸變動畫
-                el.style.transition = ''; 
-                doc.removeEventListener('mousemove', onMove);
-                doc.removeEventListener('mouseup', onUp);
-                doc.removeEventListener('touchmove', onMove);
-                doc.removeEventListener('touchend', onUp);
-                handle.style.cursor = 'grab';
-            };
-            
-            handle.addEventListener('mousedown', onDown);
-            handle.addEventListener('touchstart', onDown, {passive: false});
-            handle.style.cursor = 'grab';
-            handle.title = '按住此處可拖曳視窗';
-        }
+        // ==========================================
+        // 💡 1. 監聽點擊事件：若點到 icon-card.png，強制收合/展開 4 張玻璃卡片
+        // ==========================================
+        doc.addEventListener('click', (e) => {
+            if (e.target.tagName === 'IMG' && e.target.src.includes('icon-card.png')) {
+                e.preventDefault();
+                let cb2 = doc.getElementById('min-b2-card');
+                let cb3 = doc.getElementById('min-card');
+                let cb4 = doc.getElementById('min-b4-card');
+                let cb5 = doc.getElementById('min-b5-card');
 
-        setInterval(() => {
-            makeDraggable(doc.getElementById('b2-top10-card'), '.header-bar-b2');
-            makeDraggable(doc.getElementById('b3-top10-card'), '.header-bar');
-            makeDraggable(doc.getElementById('b4-top10-card'), '.header-bar-b4');
-            makeDraggable(doc.getElementById('b5-top10-card'), '.header-bar-b5');
+                // 判斷當前狀態：只要有一張沒縮小，按下去就全部縮小；如果全部都縮小了，按下去就全部展開
+                let anyOpen = false;
+                if (cb2 && !cb2.checked) anyOpen = true;
+                if (cb3 && !cb3.checked) anyOpen = true;
+                if (cb4 && !cb4.checked) anyOpen = true;
+                if (cb5 && !cb5.checked) anyOpen = true;
+
+                let targetState = anyOpen; // true = 縮小狀態, false = 展開狀態
+
+                if (cb2) cb2.checked = targetState;
+                if (cb3) cb3.checked = targetState;
+                if (cb4) cb4.checked = targetState;
+                if (cb5) cb5.checked = targetState;
+            }
+        });
+
+        // ==========================================
+        // 💡 2. 全域拖曳引擎
+        // ==========================================
+        let isDragging = false, currentEl = null, startX, startY, initialX, initialY;
+        
+        const onDown = (e) => {
+            let handle = e.target.closest('.header-bar, .header-bar-b2, .header-bar-b4, .header-bar-b5, .npc-drag-handle, .settings-drag-handle');
+            if (!handle) return;
+            if (e.target.closest('button, input, label, .action-btn, .action-btn-b2, .action-btn-b4, .action-btn-b5')) return;
             
-            let npc = doc.querySelector('.npc-wrapper');
-            if (npc) makeDraggable(npc, '.npc-drag-handle');
+            let el = handle.closest('.glass-panel, .glass-panel-b2, .glass-panel-b4, .glass-panel-b5, .npc-wrapper, .settings-modal-active');
+            if (!el) el = handle.closest('div[data-testid="stVerticalBlock"].settings-modal-active');
+            if (!el) return;
             
-            let settingsModal = doc.querySelector('.settings-modal-active');
-            if (settingsModal) makeDraggable(settingsModal, '.settings-drag-handle');
-        }, 500);
+            isDragging = true;
+            currentEl = el;
+            
+            let clientX = e.touches ? e.touches[0].clientX : e.clientX;
+            let clientY = e.touches ? e.touches[0].clientY : e.clientY;
+            startX = clientX;
+            startY = clientY;
+            
+            let rect = el.getBoundingClientRect();
+            el.style.transition = 'none'; // 拖曳時關閉動畫，實現零延遲
+            el.style.left = rect.left + 'px';
+            el.style.top = rect.top + 'px';
+            el.style.right = 'auto';
+            el.style.bottom = 'auto';
+            el.style.transform = 'none';
+            el.style.margin = '0';
+            
+            initialX = rect.left;
+            initialY = rect.top;
+            
+            handle.style.cursor = 'grabbing';
+        };
+        
+        const onMove = (e) => {
+            if (!isDragging || !currentEl) return;
+            e.preventDefault(); 
+            let clientX = e.touches ? e.touches[0].clientX : e.clientX;
+            let clientY = e.touches ? e.touches[0].clientY : e.clientY;
+            currentEl.style.left = (initialX + (clientX - startX)) + 'px';
+            currentEl.style.top = (initialY + (clientY - startY)) + 'px';
+        };
+        
+        const onUp = () => {
+            if (isDragging && currentEl) {
+                currentEl.style.transition = ''; // 放開時恢復動畫
+                let handle = currentEl.querySelector('.header-bar, .header-bar-b2, .header-bar-b4, .header-bar-b5, .npc-drag-handle, .settings-drag-handle');
+                if(handle) handle.style.cursor = 'grab';
+            }
+            isDragging = false;
+            currentEl = null;
+        };
+        
+        doc.addEventListener('mousedown', onDown);
+        doc.addEventListener('touchstart', onDown, {passive: false});
+        doc.addEventListener('mousemove', onMove, {passive: false});
+        doc.addEventListener('touchmove', onMove, {passive: false});
+        doc.addEventListener('mouseup', onUp);
+        doc.addEventListener('touchend', onUp);
     })();
     </script>
     """
     components.html(drag_engine_js, height=0, width=0)
 
-def set_background(image_path):
+def set_background(image_path="app/static/沙漠之城.png"):
+    """網站主視覺背景設定引擎 (支援濾鏡與主題自動連動)"""
     theme = st.session_state.get('theme', 'dark')
+    opacity = st.session_state.get('bg_opacity', 88) / 100.0
+    block_opacity = opacity * 0.7 
+    
+    actual_image = image_path
     if theme == 'pink':
-        overlay, block_bg = "rgba(35, 15, 25, 0.88)", "rgba(35, 15, 25, 0.6)"
+        overlay, block_bg = f"rgba(35, 15, 25, {opacity})", f"rgba(35, 15, 25, {block_opacity})"
+        actual_image = "app/static/櫻花都市.png"
     elif theme == 'green':
-        overlay, block_bg = "rgba(15, 35, 20, 0.88)", "rgba(15, 35, 20, 0.6)"
+        overlay, block_bg = f"rgba(15, 35, 20, {opacity})", f"rgba(15, 35, 20, {block_opacity})"
+        actual_image = "app/static/翡翠林鎮.png"
     elif theme == 'blue':
-        overlay, block_bg = "rgba(15, 20, 40, 0.88)", "rgba(15, 20, 40, 0.6)"
+        overlay, block_bg = f"rgba(15, 20, 40, {opacity})", f"rgba(15, 20, 40, {block_opacity})"
+        actual_image = "app/static/天空城.png"
     else: 
-        overlay, block_bg = "rgba(15, 23, 42, 0.88)", "rgba(15, 23, 42, 0.6)"
+        overlay, block_bg = f"rgba(15, 23, 42, {opacity})", f"rgba(15, 23, 42, {block_opacity})"
+    
+    if not os.path.exists(actual_image):
+        actual_image = image_path
     
     try:
-        with open(image_path, "rb") as file:
+        with open(actual_image, "rb") as file:
             encoded_string = base64.b64encode(file.read()).decode()
 
         css = f"""
@@ -214,7 +251,7 @@ def render_marquee():
 
     st.markdown(f"""
     <style>
-        .slideshow-container {{ position: relative; width: 800px; height: 100px; margin: 0 auto 10px auto; background-color: #0A0D14; display: flex; justify-content: center; align-items: center; overflow: hidden; }}
+        .slideshow-container {{ position: relative; width: 800px; height: 100px; margin: 0 auto 10px auto; background-color: transparent; display: flex; justify-content: center; align-items: center; overflow: hidden; }}
         .slide {{ position: absolute; height: 100%; object-fit: contain; visibility: hidden; opacity: 0; animation: cut {total_time}s infinite; }}
         {delay_css}
         @keyframes cut {{ 0%, {visible_percent - 0.01:.2f}% {{ visibility: visible; opacity: 1; }} {visible_percent:.2f}%, 100% {{ visibility: hidden; opacity: 0; }} }}
@@ -222,7 +259,9 @@ def render_marquee():
     <div class="slideshow-container">{image_tags}</div>
     """, unsafe_allow_html=True)
 
-#B2法人掃貨
+# ==========================================
+# 📊 B2 法人掃貨
+# ==========================================
 def render_b2_top10_glass_card():
     import pandas as pd
     import streamlit as st
@@ -295,8 +334,8 @@ def render_b2_top10_glass_card():
 </style>
 <div class="glass-panel-b2" id="b2-top10-card">
 <div class="header-bar-b2">
-    <!-- 💡 替換 Icon 範例：可將 🚀 改為 img 標籤 -->
-    <span class="header-title-b2"><img src="app/static/icon_b2.png" style="width:16px; margin-right:4px; display:none;" onerror="this.style.display='none'">🚀 法人掃貨</span>
+    <!-- 💡 已替換為您指定的 static/magicbookleaf.png -->
+    <span class="header-title-b2"><img src="app/static/magicbookleaf.png" style="width:18px; margin-right:6px; vertical-align:-3px;" onerror="this.style.display='none'">法人掃貨</span>
 <div class="action-btns-b2">
 <label for="pause-b2-card" class="action-btn-b2 pause-icon-b2" title="暫停/播放輪播"></label>
 <label for="min-b2-card" class="action-btn-b2 min-icon-b2" title="縮放"></label>
@@ -312,7 +351,9 @@ def render_b2_top10_glass_card():
         st.markdown(card_html, unsafe_allow_html=True)
     except Exception as e: pass
 
-#B3法人連買
+# ==========================================
+# 📊 B3 法人連買
+# ==========================================
 def render_top10_glass_card():
     import pandas as pd
     import streamlit as st
@@ -371,7 +412,7 @@ def render_top10_glass_card():
 </style>
 <div class="glass-panel" id="b3-top10-card">
 <div class="header-bar">
-    <span class="header-title"><img src="app/static/icon_b3.png" style="width:16px; margin-right:4px; display:none;" onerror="this.style.display='none'">📊 法人連買</span>
+    <span class="header-title"><img src="app/static/magicbookleaf.png" style="width:18px; margin-right:6px; vertical-align:-3px;" onerror="this.style.display='none'">法人連買</span>
 <div class="action-btns">
 <label for="pause-card" class="action-btn pause-icon" title="暫停/播放輪播"></label><label for="min-card" class="action-btn min-icon" title="縮放"></label><label for="close-card" class="action-btn close-btn" title="關閉">✕</label>
 </div></div>
@@ -385,7 +426,9 @@ def render_top10_glass_card():
         st.markdown(card_html, unsafe_allow_html=True)
     except Exception as e: pass
     
-#b4 資券玻璃卡片
+# ==========================================
+# 📊 B4 資券雷達
+# ==========================================
 def render_b4_top10_glass_card():
     import pandas as pd
     import streamlit as st
@@ -445,7 +488,7 @@ def render_b4_top10_glass_card():
 </style>
 <div class="glass-panel-b4" id="b4-top10-card">
 <div class="header-bar-b4">
-    <span class="header-title-b4"><img src="app/static/icon_b4.png" style="width:16px; margin-right:4px; display:none;" onerror="this.style.display='none'">📡 資券雷達</span>
+    <span class="header-title-b4"><img src="app/static/magicbookleaf.png" style="width:18px; margin-right:6px; vertical-align:-3px;" onerror="this.style.display='none'">資券雷達</span>
 <div class="action-btns-b4">
 <label for="pause-b4-card" class="action-btn-b4 pause-icon-b4" title="暫停/播放輪播"></label><label for="min-b4-card" class="action-btn-b4 min-icon-b4" title="縮放"></label><label for="close-b4-card" class="action-btn-b4" title="關閉">✕</label>
 </div></div>
@@ -459,7 +502,9 @@ def render_b4_top10_glass_card():
         st.markdown(card_html, unsafe_allow_html=True)
     except Exception as e: pass
     
-#B5 大腿動向玻璃卡片
+# ==========================================
+# 📊 B5 大腿動向
+# ==========================================
 def render_b5_top10_glass_card():
     import pandas as pd
     import streamlit as st
@@ -504,7 +549,6 @@ def render_b5_top10_glass_card():
             if df.empty: return "<p style='font-size:13.5px; text-align:center; color:#94A3B8; margin-top:40px;'>尚無共振標的</p>"
             html = "<ul style='padding-left: 0; margin: 0; list-style-type: none;'>"
             for i, row in enumerate(df.to_dict('records')):
-                # 💡 修正 1: 拉近間距！將左側寬度設為 50%，右側 50% 且向左對齊 (flex-start)
                 if is_6w:
                     v1, v2 = row['6周(千)_val'], row['6周(四)_val']
                     info_html = f"<div style='display:flex; width:50%; justify-content:flex-start; color:#F59E0B; font-weight:bold; font-size:13.5px;'><span style='text-align:left;'>{v1:.1f}%</span><span style='color:#94A3B8; font-size:12px; margin:0 4px;'>/</span><span style='text-align:left;'>{v2:.1f}%</span></div>"
@@ -552,7 +596,7 @@ def render_b5_top10_glass_card():
 </style>
 <div class="glass-panel-b5" id="b5-top10-card">
 <div class="header-bar-b5">
-    <span class="header-title-b5"><img src="app/static/icon_b5.png" style="width:16px; margin-right:4px; display:none;" onerror="this.style.display='none'">🔥 大腿共振</span>
+    <span class="header-title-b5"><img src="app/static/magicbookleaf.png" style="width:18px; margin-right:6px; vertical-align:-3px;" onerror="this.style.display='none'">大腿共振</span>
 <div class="action-btns-b5">
 <label for="pause-b5-card" class="action-btn-b5 pause-icon-b5" title="暫停/播放輪播"></label><label for="min-b5-card" class="action-btn-b5 min-icon-b5" title="縮放"></label><label for="close-b5-card" class="action-btn-b5" title="關閉">✕</label>
 </div></div>
@@ -565,14 +609,13 @@ def render_b5_top10_glass_card():
     except Exception as e: pass
 
 # ==========================================
-# ⚙️ 設置中心 懸浮卡片 (與課程視窗結構統一)
+# ⚙️ 設置中心 懸浮卡片 (上方 X，下方確認/取消)
 # ==========================================
 def render_settings_modal():
     import streamlit as st
     if st.session_state.get('show_settings', False):
         settings_css = """
         <style>
-        /* 💡 修正 4：解除鎖死底部首頁，移除全螢幕黑幕，並改為上方彈出視窗 */
         .settings-modal-active {
             position: fixed !important; 
             top: 15% !important; left: 50% !important; transform: translateX(-50%) !important;
@@ -580,7 +623,7 @@ def render_settings_modal():
             border: 2px solid #00D2FF !important; border-radius: 12px !important; 
             padding: 20px 25px !important; z-index: 9999999 !important;
             width: 90% !important; max-width: 650px !important; box-shadow: 0 8px 30px rgba(0, 210, 255, 0.4) !important;
-            max-height: 80vh !important; overflow-y: auto !important;
+            max-height: 85vh !important; overflow-y: auto !important;
         }
         .settings-drag-handle { cursor: grab; }
         .settings-drag-handle:active { cursor: grabbing; }
@@ -588,22 +631,26 @@ def render_settings_modal():
         """
         st.markdown(settings_css, unsafe_allow_html=True)
         
-        # 使用 Streamlit 容器，由 JS 自動加上 class 變為浮動視窗
         with st.container():
             st.markdown('<div class="setting-anchor"></div>', unsafe_allow_html=True)
             
-            # 💡 修正 4：將 儲存 與 關閉 的 Streamlit 原生按鈕與標題並排於頂部！
-            col_title, col_save, col_close = st.columns([6, 2, 2])
+            # 💡 頂部：標題 + 右側 X 按鈕
+            col_title, col_x = st.columns([9, 1])
             with col_title:
                 st.markdown("<h3 class='settings-drag-handle' style='color:#00D2FF; margin-top:0;' title='按住此處可拖曳視窗'>⚙️ 設置中心</h3>", unsafe_allow_html=True)
-            with col_save:
-                save_clicked = st.button("💾 儲存", use_container_width=True)
-            with col_close:
-                close_clicked = st.button("❌ 關閉", use_container_width=True)
+            with col_x:
+                if st.button("✕", key="settings_btn_close_top"):
+                    st.session_state['show_settings'] = False
+                    st.rerun()
 
+            st.markdown("<h4 style='color:#E2E8F0; font-size: 16px;'>🎨 外觀與濾鏡</h4>", unsafe_allow_html=True)
             current_theme = st.session_state.get('theme', 'dark')
+            current_opacity = st.session_state.get('bg_opacity', 88)
+            
             theme_options = ['dark', 'pink', 'green', 'blue']
-            theme_choice = st.radio("🎨 選擇背景濾鏡：", options=theme_options, format_func=lambda x: {'dark': "🌙 專業暗黑", 'pink': "🌸 櫻花粉", 'green': "🌲 翡翠綠", 'blue': "🌌 天空藍"}[x], index=theme_options.index(current_theme) if current_theme in theme_options else 0, horizontal=True)
+            theme_choice = st.radio("選擇背景主題 (將同步切換圖片)：", options=theme_options, format_func=lambda x: {'dark': "🌙 專業暗黑", 'pink': "🌸 櫻花粉", 'green': "🌲 翡翠綠", 'blue': "🌌 天空藍"}[x], index=theme_options.index(current_theme) if current_theme in theme_options else 0, horizontal=True)
+            
+            opacity_val = st.slider("背景濾鏡透明度 (%)", min_value=0, max_value=100, value=current_opacity)
             
             st.markdown("---")
             st.markdown("<h4 style='color:#E2E8F0; font-size: 16px;'>⌨️ 快捷鍵配置 (點擊欄位後直接按下按鍵)</h4>", unsafe_allow_html=True)
@@ -624,15 +671,20 @@ def render_settings_modal():
                 new_hotkeys["NavToWatchlist"] = st.text_input("建立名單", value=reverse_map.get("NavToWatchlist", "alt+l"), key="kb_wl")
                 new_hotkeys["登入"] = st.text_input("登入", value=reverse_map.get("登入", "escape"), key="kb_login")
 
-            # 處理上方按鈕的邏輯
-            if save_clicked:
-                st.session_state['theme'] = theme_choice
-                st.session_state['custom_hotkeys'] = {k.strip().lower(): v for v, k in new_hotkeys.items() if k.strip().lower()}
-                st.session_state['show_settings'] = False
-                st.rerun()
-            if close_clicked:
-                st.session_state['show_settings'] = False
-                st.rerun()
+            st.markdown("<br>", unsafe_allow_html=True)
+            
+            col_ok, col_cancel = st.columns(2)
+            with col_ok:
+                if st.button("💾 確認", use_container_width=True):
+                    st.session_state['theme'] = theme_choice
+                    st.session_state['bg_opacity'] = opacity_val
+                    st.session_state['custom_hotkeys'] = {k.strip().lower(): v for v, k in new_hotkeys.items() if k.strip().lower()}
+                    st.session_state['show_settings'] = False
+                    st.rerun()
+            with col_cancel:
+                if st.button("❌ 取消", use_container_width=True):
+                    st.session_state['show_settings'] = False
+                    st.rerun()
                     
         keybind_js = """
         <script>
@@ -666,62 +718,34 @@ def render_settings_modal():
         components.html(keybind_js, height=0, width=0)
 
 # ==========================================
-# 🎓 課程 NPC 懸浮對話框 (💡 修正 3：徹底改寫為純 HTML/CSS 架構，保證 100% 絕對運作)
+# 🎓 課程 NPC 懸浮對話框
 # ==========================================
 def render_course_npc():
     import streamlit as st
-    
     if st.session_state.get('show_course_npc', False):
-        # 由於已統一為純 CSS 狀態管理 (Radio/Checkbox)，我們不需要再使用 Streamlit 隱藏按鈕與 JS 模擬點擊了。
-        html_code = """
-<input type="checkbox" id="close-npc" style="display:none;">
-<input type="radio" name="course_tabs" id="tab-list" checked style="display:none;">
-<input type="radio" name="course_tabs" id="tab-detail-4" style="display:none;">
-
-<style>
-/* CSS 核取方塊總開關 */
+        html_code = """<input type="checkbox" id="close-npc" style="display:none;"><input type="radio" name="course_tabs" id="tab-list" checked style="display:none;"><input type="radio" name="course_tabs" id="tab-detail-4" style="display:none;"><style>
 #close-npc:checked ~ .npc-wrapper { display: none !important; }
-
-/* CSS 頁籤切換機制 */
 #tab-list:checked ~ .npc-wrapper .view-list { display: flex; }
 #tab-list:not(:checked) ~ .npc-wrapper .view-list { display: none; }
-
 #tab-detail-4:checked ~ .npc-wrapper .view-detail { display: flex; }
 #tab-detail-4:not(:checked) ~ .npc-wrapper .view-detail { display: none; }
-
-/* 視窗共用樣式 */
-.npc-wrapper {
-    position: fixed; bottom: 30px; right: 30px;
-    z-index: 9999999;
-}
-.npc-overlay {
-    width: 650px; height: 75vh; max-height: 800px;
-    background: rgba(15, 23, 42, 0.96); border: 2px solid #00D2FF; border-radius: 12px;
-    display: flex; flex-direction: column; padding: 25px; 
-    box-shadow: 0 8px 30px rgba(0, 210, 255, 0.3); color: white; 
-    animation: slideUpNPC 0.4s cubic-bezier(0.175, 0.885, 0.32, 1.275);
-}
+.npc-wrapper { position: fixed; bottom: 30px; right: 30px; z-index: 9999999; }
+.npc-overlay { width: 650px; height: 75vh; max-height: 800px; background: rgba(15, 23, 42, 0.96); border: 2px solid #00D2FF; border-radius: 12px; display: flex; flex-direction: column; padding: 25px; box-shadow: 0 8px 30px rgba(0, 210, 255, 0.3); color: white; animation: slideUpNPC 0.4s cubic-bezier(0.175, 0.885, 0.32, 1.275); }
 .npc-overlay.wide { width: 800px; height: 85vh; max-height: 900px; }
-
 .npc-drag-handle { display: flex; align-items: flex-end; margin-bottom: 20px; border-bottom: 1px solid rgba(255,255,255,0.1); padding-bottom: 15px; cursor: grab; }
 .npc-drag-handle:active { cursor: grabbing; }
-
 .npc-image { width: 90px; height: 90px; background-image: url('app/static/npcnatzu.png'); background-size: contain; background-repeat: no-repeat; background-position: bottom; margin-right: 20px; filter: drop-shadow(0 0 5px rgba(0,210,255,0.5)); pointer-events: none; }
 .npc-big-image { width: 160px; height: 180px; background-image: url('app/static/npcroxy.png'); background-size: contain; background-repeat: no-repeat; background-position: bottom; filter: drop-shadow(0 0 10px rgba(0,210,255,0.6)); flex-shrink: 0; pointer-events: none; }
-
 .npc-title-box { flex: 1; pointer-events: none; }
 .npc-name { color: #00D2FF; font-weight: bold; font-size: 22px; margin-bottom: 6px; }
 .npc-greet { font-size: 15px; color: #94A3B8; }
-
 .course-list, .table-container { flex: 1; overflow-y: auto; padding-right: 15px; }
 .course-list::-webkit-scrollbar, .table-container::-webkit-scrollbar { width: 8px; }
 .course-list::-webkit-scrollbar-thumb, .table-container::-webkit-scrollbar-thumb { background: rgba(0, 210, 255, 0.4); border-radius: 4px; }
-
 .course-item { margin-bottom: 18px; padding: 15px; background: rgba(255,255,255,0.03); border: 1px solid rgba(255,255,255,0.08); border-radius: 10px; transition: 0.2s; display: block; }
 .course-item.locked { cursor: not-allowed; background: rgba(0,0,0,0.2); }
 .course-item.active { cursor: pointer; border-color: rgba(0, 210, 255, 0.4); }
 .course-item.active:hover { background: rgba(0, 210, 255, 0.1); border-color: #00D2FF; transform: translateY(-2px); box-shadow: 0 4px 15px rgba(0,210,255,0.2); }
-
 .course-icon { width: 24px; height: 24px; object-fit: contain; margin-right: 8px; filter: drop-shadow(0 0 5px rgba(0,210,255,0.8)); transition: 0.3s; vertical-align: middle; }
 .course-item.locked .course-icon { filter: grayscale(100%) opacity(0.4); }
 .course-item.active:hover .course-icon { filter: drop-shadow(0 0 10px #FFD700); transform: scale(1.1); }
@@ -729,20 +753,15 @@ def render_course_npc():
 .course-item.locked .course-title { color: #64748B; }
 .course-item.active .course-title { color: #FFD700; }
 .course-desc { font-size: 14px; color: #CBD5E1; line-height: 1.6; }
-
-/* 絕對純 CSS 右上角按鈕 */
 .close-btn { position: absolute; top: 15px; right: 20px; cursor: pointer; color: #94A3B8; font-size: 24px; transition: 0.2s; z-index: 10; font-weight: bold; }
 .close-btn:hover { color: #FF4C4C; transform: scale(1.1); }
 .top-actions { position: absolute; top: 15px; right: 20px; display: flex; gap: 12px; z-index: 10; }
 .action-btn { cursor: pointer; color: #94A3B8; font-size: 20px; font-weight:bold; transition: 0.2s; display: flex; align-items: center; justify-content: center; background: rgba(0,0,0,0.5); width: 32px; height: 32px; border-radius: 50%; border: 1px solid rgba(255,255,255,0.1); }
 .action-btn:hover { background: rgba(0,210,255,0.3); color: #FFF; transform: scale(1.1); border-color: #00D2FF; }
 .action-btn.close:hover { background: rgba(255,76,76,0.8); border-color: #FF4C4C; }
-
-/* 詳情頁專屬 */
 .dialogue-box { flex: 1; background: rgba(0, 210, 255, 0.08); border: 1px solid rgba(0, 210, 255, 0.3); border-radius: 12px; padding: 18px; position: relative; margin-bottom: 10px; pointer-events: none; }
 .dialogue-box::before { content: ''; position: absolute; left: -14px; bottom: 30px; border-width: 12px 14px 12px 0; border-style: solid; border-color: transparent rgba(0, 210, 255, 0.3) transparent transparent; }
 .npc-text { font-size: 15px; color: #E2E8F0; line-height: 1.6; }
-
 .pv-table { width: 100%; border-collapse: collapse; font-size: 15px; text-align: center; }
 .pv-table th { background: rgba(0, 210, 255, 0.15); color: #00D2FF; padding: 12px; border-bottom: 2px solid #00D2FF; font-weight: bold; }
 .pv-table td { padding: 12px; border-bottom: 1px solid rgba(255,255,255,0.08); color: #CBD5E1; }
@@ -750,80 +769,6 @@ def render_course_npc():
 .trend-up { color: #FF4C4C; font-weight: bold; }
 .trend-down { color: #00E676; font-weight: bold; }
 .trend-flat { color: #FFD700; font-weight: bold; }
-
 @keyframes slideUpNPC { from { transform: translateY(100px) scale(0.8); opacity: 0; } to { transform: translateY(0) scale(1); opacity: 1; } }
-</style>
-
-<div class="npc-wrapper">
-    <!-- =========================
-         📜 視圖 1: 課程列表 
-         ========================= -->
-    <div class="npc-overlay view-list">
-        <label for="close-npc" class="close-btn" title="關閉">✕</label>
-        <div class="npc-drag-handle" title="按住此處可拖曳視窗">
-            <div class="npc-image"></div>
-            <div class="npc-title-box">
-                <div class="npc-name">籌碼導師</div>
-                <div class="npc-greet">「冒險者，選擇你想強化的能力吧！」</div>
-            </div>
-        </div>
-        <div class="course-list">
-            <div class="course-item locked"><div class="course-title"><img src="app/static/icon-course1.png" class="course-icon"> 1. 宏觀經濟與景氣循環 (未開放)</div><div class="course-desc">學習解讀 GDP、CPI、利率與匯率等基本總體經濟指標，判斷目前大盤處於景氣擴張或衰退的哪個階段。</div></div>
-            <div class="course-item locked"><div class="course-title"><img src="app/static/icon-course1.png" class="course-icon"> 2. 股市基本架構與名詞解析 (未開放)</div><div class="course-desc">認識台股交易規則、漲跌幅限制、各類委託單與基本盤面術語，建立進場前的基礎常識。</div></div>
-            <div class="course-item locked"><div class="course-title"><img src="app/static/icon-course1.png" class="course-icon"> 3. 財報與基本面入門 (未開放)</div><div class="course-desc">學習閱讀三大財務報表（綜合損益表、資產負債表、現金流量表），學會挑選具備長期競爭力的公司。</div></div>
-            
-            <!-- 💡 點擊這個標籤，會自動切換 CSS 狀態到詳情頁，100%零延遲 -->
-            <label for="tab-detail-4" class="course-item active">
-                <div class="course-title"><img src="app/static/icon-course1.png" class="course-icon"> 4. 量價關係與盤面解讀 (點擊進入)</div>
-                <div class="course-desc">對照成交量與股價漲跌的互動（如價漲量增、量價背離），判斷多空雙方的企圖心與買賣力道。</div>
-            </label>
-            
-            <div class="course-item locked"><div class="course-title"><img src="app/static/icon-course1.png" class="course-icon"> 5. 技術分析與指標應用 (未開放)</div><div class="course-desc">熟悉常用技術指標（如均線 MA、MACD、RSI、KDJ），掌握支撐壓力與趨勢轉折點。</div></div>
-            <div class="course-item locked"><div class="course-title"><img src="app/static/icon-course1.png" class="course-icon"> 6. 籌碼面追蹤：法人與大戶結構 (未開放)</div><div class="course-desc">分析外資、投信、自營商動向及大戶持股比例，透過資金流向尋找主力默默佈局的標的。</div></div>
-            <div class="course-item locked"><div class="course-title"><img src="app/static/icon-course1.png" class="course-icon"> 7. 券資關係與融資融券分析 (未開放)</div><div class="course-desc">觀察融資餘額、融券張數與券資比變化，評估市場散戶情緒及潛在的「軋空」或「多殺多」力道。</div></div>
-            <div class="course-item locked"><div class="course-title"><img src="app/static/icon-course1.png" class="course-icon"> 8. 產業趨勢與題材選股 (未開放)</div><div class="course-desc">掌握主流產業輪動脈絡（如半導體、AI 供應鏈、綠能等），在對的時間點佈局具備成長爆發力的賽道。</div></div>
-            <div class="course-item locked"><div class="course-title"><img src="app/static/icon-course1.png" class="course-icon"> 9. 資金控管與風險管理 (未開放)</div><div class="course-desc">學習單筆投資部位配置、分批進場策略、停損停利機制，避免因情緒失控而遭受重大虧損。</div></div>
-            <div class="course-item locked"><div class="course-title"><img src="app/static/icon-course1.png" class="course-icon"> 10. 交易心理學與個人策略總結 (未開放)</div><div class="course-desc">克服貪婪與恐懼的心理障礙，並回測、修正並建立專屬於自己的穩定獲利交易系統。</div></div>
-        </div>
-    </div>
-
-    <!-- =========================
-         📖 視圖 2: 第4課詳情 
-         ========================= -->
-    <div class="npc-overlay wide view-detail">
-        <div class="top-actions">
-            <label for="tab-list" class="action-btn" title="返回列表">↩</label>
-            <label for="close-npc" class="action-btn close" title="關閉">✕</label>
-        </div>
-        <div class="npc-drag-handle" style="gap:20px;" title="按住此處可拖曳視窗">
-            <div class="npc-big-image"></div>
-            <div class="dialogue-box">
-                <div class="npc-name">籌碼導師 蘿西</div>
-                <div class="npc-text">「量價關係是市場最真實的足跡！仔細看這張表，當『量』與『價』出現背離時，就是趨勢即將反轉的危險警訊喔！」</div>
-            </div>
-        </div>
-        <div class="table-container">
-            <table class="pv-table">
-            <thead>
-            <tr><th width="15%">趨勢</th><th width="20%">狀態</th><th width="65%">市場含義</th></tr>
-            </thead>
-            <tbody>
-            <tr><td class="trend-up">上漲</td><td>價升量縮</td><td style="text-align: left;">量價背離，下方有承接，短期回調，後續拉高</td></tr>
-            <tr><td class="trend-up">上漲</td><td>放量滯漲</td><td style="text-align: left;">趨勢高位，拋壓增大，即將見頂反轉，減倉清倉</td></tr>
-            <tr><td class="trend-up">上漲</td><td>縮量大漲</td><td style="text-align: left;">趨勢中途，縮量加速，鎖倉高控盤，延續上漲</td></tr>
-            <tr><td class="trend-up">上漲</td><td>放量大漲</td><td style="text-align: left;">價漲量增，量價齊升，多方吸籌，持續看漲</td></tr>
-            <tr><td class="trend-down">下跌</td><td>縮量小跌</td><td style="text-align: left;">主力洗盤，拋壓減弱，止跌位置，擇機進場</td></tr>
-            <tr><td class="trend-down">下跌</td><td>放量小跌</td><td style="text-align: left;">見底信號，買方增強，越跌越買，反轉新倉</td></tr>
-            <tr><td class="trend-down">下跌</td><td>縮量大跌</td><td style="text-align: left;">一致看空，無人接盤，下跌中繼，加速下跌</td></tr>
-            <tr><td class="trend-down">下跌</td><td>放量大跌</td><td style="text-align: left;">跟風砸盤，大量賣出，高位出貨，持續下跌</td></tr>
-            <tr><td class="trend-flat">平量</td><td>平量滯漲</td><td style="text-align: left;">拋壓增大，越漲越難，高位見頂</td></tr>
-            <tr><td class="trend-flat">平量</td><td>平量大漲</td><td style="text-align: left;">一致看漲，沒有拋壓，鎖倉高控盤，加速上漲</td></tr>
-            <tr><td class="trend-flat">平量</td><td>平量價縮</td><td style="text-align: left;">下跌中繼，弱反彈信號，逢高減倉</td></tr>
-            <tr><td class="trend-flat">平量</td><td>平量大跌</td><td style="text-align: left;">一致看空，沒有承接，下跌中繼，加速下跌</td></tr>
-            </tbody>
-            </table>
-        </div>
-    </div>
-</div>
-"""
+</style><div class="npc-wrapper"><div class="npc-overlay view-list"><label for="close-npc" class="close-btn" title="關閉">✕</label><div class="npc-drag-handle" title="按住此處可拖曳視窗"><div class="npc-image"></div><div class="npc-title-box"><div class="npc-name">籌碼導師</div><div class="npc-greet">「冒險者，選擇你想強化的能力吧！」</div></div></div><div class="course-list"><div class="course-item locked"><div class="course-title"><img src="app/static/icon-course1.png" class="course-icon" onerror="this.style.display='none'"> 1. 宏觀經濟與景氣循環 (未開放)</div><div class="course-desc">學習解讀 GDP、CPI、利率與匯率等基本總體經濟指標，判斷目前大盤處於景氣擴張或衰退的哪個階段。</div></div><div class="course-item locked"><div class="course-title"><img src="app/static/icon-course1.png" class="course-icon" onerror="this.style.display='none'"> 2. 股市基本架構與名詞解析 (未開放)</div><div class="course-desc">認識台股交易規則、漲跌幅限制、各類委託單與基本盤面術語，建立進場前的基礎常識。</div></div><div class="course-item locked"><div class="course-title"><img src="app/static/icon-course1.png" class="course-icon" onerror="this.style.display='none'"> 3. 財報與基本面入門 (未開放)</div><div class="course-desc">學習閱讀三大財務報表（綜合損益表、資產負債表、現金流量表），學會挑選具備長期競爭力的公司。</div></div><label for="tab-detail-4" class="course-item active"><div class="course-title"><img src="app/static/icon-course1.png" class="course-icon" onerror="this.style.display='none'"> 4. 量價關係與盤面解讀 (點擊進入)</div><div class="course-desc">對照成交量與股價漲跌的互動（如價漲量增、量價背離），判斷多空雙方的企圖心與買賣力道。</div></label><div class="course-item locked"><div class="course-title"><img src="app/static/icon-course1.png" class="course-icon" onerror="this.style.display='none'"> 5. 技術分析與指標應用 (未開放)</div><div class="course-desc">熟悉常用技術指標（如均線 MA、MACD、RSI、KDJ），掌握支撐壓力與趨勢轉折點。</div></div><div class="course-item locked"><div class="course-title"><img src="app/static/icon-course1.png" class="course-icon" onerror="this.style.display='none'"> 6. 籌碼面追蹤：法人與大戶結構 (未開放)</div><div class="course-desc">分析外資、投信、自營商動向及大戶持股比例，透過資金流向尋找主力默默佈局的標的。</div></div><div class="course-item locked"><div class="course-title"><img src="app/static/icon-course1.png" class="course-icon" onerror="this.style.display='none'"> 7. 券資關係與融資融券分析 (未開放)</div><div class="course-desc">觀察融資餘額、融券張數與券資比變化，評估市場散戶情緒及潛在的「軋空」或「多殺多」力道。</div></div><div class="course-item locked"><div class="course-title"><img src="app/static/icon-course1.png" class="course-icon" onerror="this.style.display='none'"> 8. 產業趨勢與題材選股 (未開放)</div><div class="course-desc">掌握主流產業輪動脈絡（如半導體、AI 供應鏈、綠能等），在對的時間點佈局具備成長爆發力的賽道。</div></div><div class="course-item locked"><div class="course-title"><img src="app/static/icon-course1.png" class="course-icon" onerror="this.style.display='none'"> 9. 資金控管與風險管理 (未開放)</div><div class="course-desc">學習單筆投資部位配置、分批進場策略、停損停利機制，避免因情緒失控而遭受重大虧損。</div></div><div class="course-item locked"><div class="course-title"><img src="app/static/icon-course1.png" class="course-icon" onerror="this.style.display='none'"> 10. 交易心理學與個人策略總結 (未開放)</div><div class="course-desc">克服貪婪與恐懼的心理障礙，並回測、修正並建立專屬於自己的穩定獲利交易系統。</div></div></div></div><div class="npc-overlay wide view-detail"><div class="top-actions"><label for="tab-list" class="action-btn" title="返回列表">↩</label><label for="close-npc" class="action-btn close" title="關閉">✕</label></div><div class="npc-drag-handle" style="gap:20px;" title="按住此處可拖曳視窗"><div class="npc-big-image"></div><div class="dialogue-box"><div class="npc-name">籌碼導師 蘿西</div><div class="npc-text">「量價關係是市場最真實的足跡！仔細看這張表，當『量』與『價』出現背離時，就是趨勢即將反轉的危險警訊喔！」</div></div></div><div class="table-container"><table class="pv-table"><thead><tr><th width="15%">趨勢</th><th width="20%">狀態</th><th width="65%">市場含義</th></tr></thead><tbody><tr><td class="trend-up">上漲</td><td>價升量縮</td><td style="text-align: left;">量價背離，下方有承接，短期回調，後續拉高</td></tr><tr><td class="trend-up">上漲</td><td>放量滯漲</td><td style="text-align: left;">趨勢高位，拋壓增大，即將見頂反轉，減倉清倉</td></tr><tr><td class="trend-up">上漲</td><td>縮量大漲</td><td style="text-align: left;">趨勢中途，縮量加速，鎖倉高控盤，延續上漲</td></tr><tr><td class="trend-up">上漲</td><td>放量大漲</td><td style="text-align: left;">價漲量增，量價齊升，多方吸籌，持續看漲</td></tr><tr><td class="trend-down">下跌</td><td>縮量小跌</td><td style="text-align: left;">主力洗盘，拋壓減弱，止跌位置，擇機進場</td></tr><tr><td class="trend-down">下跌</td><td>放量小跌</td><td style="text-align: left;">見底信號，買方增強，越跌越買，反轉新倉</td></tr><tr><td class="trend-down">下跌</td><td>縮量大跌</td><td style="text-align: left;">一致看空，無人接盤，下跌中繼，加速下跌</td></tr><tr><td class="trend-down">下跌</td><td>放量大跌</td><td style="text-align: left;">跟風砸盤，大量賣出，高位出貨，持續下跌</td></tr><tr><td class="trend-flat">平量</td><td>平量滯漲</td><td style="text-align: left;">拋壓增大，越漲越難，高位見頂</td></tr><tr><td class="trend-flat">平量</td><td>平量大漲</td><td style="text-align: left;">一致看漲，沒有拋壓，鎖倉高控盤，加速上漲</td></tr><tr><td class="trend-flat">平量</td><td>平量價縮</td><td style="text-align: left;">下跌中繼，弱反彈信號，逢高減倉</td></tr><tr><td class="trend-flat">平量</td><td>平量大跌</td><td style="text-align: left;">一致看空，沒有承接，下跌中繼，加速下跌</td></tr></tbody></table></div></div></div>"""
         st.markdown(html_code, unsafe_allow_html=True)
