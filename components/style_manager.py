@@ -597,14 +597,14 @@ def render_b5_top10_glass_card():
             for i, row in enumerate(df.to_dict('records')):
                 if is_6w:
                     v1, v2 = row['6周(千)_val'], row['6周(四)_val']
-                    info_html = f"<div style='display:flex; width:45%; justify-content:flex-end; color:#F59E0B; font-weight:bold; font-size:11px;'><span style='width:45px; text-align:right;'>{v1:.1f}%</span><span style='color:#94A3B8; font-size:9px; margin:0 2px;'>/</span><span style='width:40px; text-align:right;'>{v2:.1f}%</span></div>"
+                    info_html = f"<div style='display:flex; width:50%; justify-content:flex-end; color:#F59E0B; font-weight:bold; font-size:11px;'><span style='width:45px; text-align:right;'>{v1:.1f}%</span><span style='color:#94A3B8; font-size:9px; margin:0 2px;'>/</span><span style='width:40px; text-align:right;'>{v2:.1f}%</span></div>"
                 else:
                     s1, s2 = unify_status_text(row.get('狀態(千)', '')), unify_status_text(row.get('狀態(四)', ''))
-                    info_html = f"<div style='display:flex; width:45%; justify-content:flex-end; color:#F59E0B; font-size:10px;'><span style='width:45%; justify-content:flex-end;'>{s1}</span><span style='color:#94A3B8; font-size:9px; margin:0 2px;'>/</span><span style='width:40px; text-align:right;'>{s2}</span></div>"
+                    info_html = f"<div style='display:flex; width:50%; justify-content:flex-end; color:#F59E0B; font-size:10px;'><span style='width:40px; text-align:right;'>{s1}</span><span style='color:#94A3B8; font-size:9px; margin:0 2px;'>/</span><span style='width:40px; text-align:right;'>{s2}</span></div>"
                     
                 html += (
                     f"<li style='display:flex; align-items:center; justify-content:space-between; margin-bottom:6px; font-size:13.5px; line-height:1.4;'>"
-                    f"  <div style='display:flex; align-items:center; width:55%; overflow:hidden;'>"
+                    f"  <div style='display:flex; align-items:center; width:50%; overflow:hidden;'>"
                     f"      <b style='color:#FFF; width:22px; flex-shrink:0;'>{i+1}.</b>"
                     f"      <span style='white-space:nowrap; overflow:hidden; text-overflow:ellipsis;'>{row['股票代號']}{row['股票名稱']}</span>"
                     f"  </div>{info_html}</li>"
