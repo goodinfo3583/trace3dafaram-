@@ -40,8 +40,8 @@ def load_global_css():
     """
     st.markdown(hide_streamlit_style, unsafe_allow_html=True)
 
-    if theme == 'pink': bg_color = f"rgba(237, 184, 242, {opacity})"
-    elif theme == 'green': bg_color = f"rgba(10, 20, 15, {opacity})"
+    if theme == 'pink': bg_color = f"rgba(139, 109, 98, {opacity})"
+    elif theme == 'green': bg_color = f"rgba(75, 159, 113, {opacity})"
     elif theme == 'purple': bg_color = f"rgba(87, 99, 158, {opacity})"
     elif theme == 'brown': bg_color = f"rgba(238, 226, 188, {opacity})"
     
