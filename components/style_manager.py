@@ -543,8 +543,8 @@ def render_b4_top10_glass_card():
 <div class="carousel-wrapper-b4">
 <div class="carousel-item-b4"><div class="panel-title-b4"><span>🚀 軋空(1-10)</span><span class="date-badge-b4">{date_sq}</span></div>{h_sq_1_10}</div>
 <div class="carousel-item-b4"><div class="panel-title-b4"><span>🚀 軋空(11-20)</span><span class="date-badge-b4">{date_sq}</span></div>{h_sq_11_20}</div>
-<div class="carousel-item-b4"><div class="panel-title-b4 risk"><span>☠️ 套牢(1-10)</span><span class="date-badge-b4">{date_rk}</span></div>{h_rk_1_10}</div>
-<div class="carousel-item-b4"><div class="panel-title-b4 risk"><span>☠️ 套牢(11-20)</span><span class="date-badge-b4">{date_rk}</span></div>{h_rk_11_20}</div>
+<div class="carousel-item-b4"><div class="panel-title-b4 risk"><span>☠ 套牢(1-10)</span><span class="date-badge-b4">{date_rk}</span></div>{h_rk_1_10}</div>
+<div class="carousel-item-b4"><div class="panel-title-b4 risk"><span>☠ 套牢(11-20)</span><span class="date-badge-b4">{date_rk}</span></div>{h_rk_11_20}</div>
 </div></div>
 """
         st.markdown(card_html, unsafe_allow_html=True)
