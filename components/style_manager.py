@@ -5,61 +5,75 @@ import os
 import random
 import streamlit.components.v1 as components
 
-def load_global_css():
-    """載入全站共用的隱藏設定、縮排與動態主題 (深色濾鏡護眼版) CSS，以及全域拖曳引擎"""
-    theme = st.session_state.get('theme', 'dark') #預設背景濾鏡
-    opacity = st.session_state.get('bg_opacity', 88) / 100.0 #預設背透明度
-    #網頁視覺及按鍵特效
-    hide_streamlit_style = """
-        <style>
-        #MainMenu {visibility: hidden;}
-        footer {visibility: hidden;}
-        header {visibility: hidden;}
-        div[data-testid="stToolbar"] {visibility: hidden;}
-        .block-container { padding-top: 0rem; }
-        
-        /* 啟用所有懸浮視窗的縮放功能 (右下角可拉伸) */
-        .glass-panel, .glass-panel-b2, .glass-panel-b4, .glass-panel-b5, .npc-overlay, {
-            resize: both !important; 
-            overflow: auto !important; 
-        }
-
-
-        </style>
-    """
-    st.markdown(hide_streamlit_style, unsafe_allow_html=True)
-
-    if theme == 'pink': bg_color = f"rgba(139, 109, 98, {opacity})"
-    elif theme == 'green': bg_color = f"rgba(0, 54, 16, {opacity})"
-    elif theme == 'purple': bg_color = f"rgba(87, 99, 158, {opacity})"
-    elif theme == 'brown': bg_color = f"rgba(161, 115, 0, {opacity})"
+def apply_global_theme(image_path="./image/派對盛宴邀請.png"):
+    """合併原本的 load_global_css 與 set_background，統一管理所有視覺與拖曳引擎"""
+    theme = st.session_state.get('theme', 'dark')
+    opacity = st.session_state.get('bg_opacity', 88) / 100.0
+    block_opacity = opacity * 0.7 
     
-    else: bg_color = f"rgba(10, 13, 20, {opacity})"
+    # 1. 統一使用字典管理顏色與對應的城市圖片，告別落長的 if-else
+    theme_settings = {
+        'pink':   {'rgb': '139, 109, 98', 'img': './image/鐵風堡.png'},
+        'green':  {'rgb': '0, 54, 16',    'img': './image/翡翠林鎮.png'},
+        'purple': {'rgb': '87, 99, 158',  'img': './image/月下綠洲城.png'},
+        'brown':  {'rgb': '161, 115, 0',  'img': './image/沙漠之都.png'},
+        'dark':   {'rgb': '15, 23, 42',   'img': image_path}
+    }
+    
+    # 獲取當前設定，找不到就用 dark 預設
+    current = theme_settings.get(theme, theme_settings['dark'])
+    base_color = f"rgba({current['rgb']}, {opacity})"
+    block_bg = f"rgba({current['rgb']}, {block_opacity})"
+    actual_image = current['img']
+    
+    # 防呆：圖片不存在就用預設的
+    if not os.path.exists(actual_image):
+        actual_image = image_path
 
-    theme_css = f"""
-        <style>
-        .stApp {{ background-color: {bg_color} !important; }}
-        h1, h2, h3, h4, h5, h6, p, label, .stMarkdown, .stText {{ color: #E2E8F0 !important; }}
-        [data-testid="stAlert"] {{ background-color: transparent !important; border: 1px solid #2D3748 !important; }}
-        [data-testid="stSidebar"] {{ background-color: rgba(17, 22, 34, 0.95) !important; border-right: 1px solid #1E293B; }}
-        .stTextInput>div>div>input {{ background-color: #1A202C !important; color: #FFFFFF !important; border: 1px solid #4A5568 !important; }}
-        div[data-testid="stDataFrame"] {{ background-color: #111622 !important; border: 1px solid #1E293B !important; border-radius: 6px; }}
-        
-        .stButton > button, .stLinkButton > a {{
-            background-color: #1E293B !important; 
-            color: #94A3B8 !important; 
-            border: 1px solid #334155 !important;
-            transition: all 0.2s ease-in-out;
-        }}
-        .stButton > button:hover, .stLinkButton > a:hover {{
-            border-color: #00D2FF !important;
-            color: #00D2FF !important;
-            box-shadow: 0 0 8px rgba(0, 210, 255, 0.2);
-        }}
-        </style>
+    # 2. 處理背景圖片轉換
+    bg_image_css = ""
+    try:
+        with open(actual_image, "rb") as file:
+            encoded_string = base64.b64encode(file.read()).decode()
+        # 成功讀取圖片：使用漸層濾鏡 + 圖片
+        bg_image_css = f"""
+            background-image: linear-gradient({base_color}, {base_color}), url(data:image/png;base64,{encoded_string});
+            background-size: cover; background-position: center center; background-attachment: fixed;
+        """
+    except FileNotFoundError:
+        # 找不到圖片的退路：至少顯示單色背景
+        bg_image_css = f"background-color: {base_color} !important;"
+
+    # 3. 組合所有 CSS (一次性渲染)
+    global_css = f"""
+    <style>
+    /* 隱藏預設 UI */
+    #MainMenu, footer, header, div[data-testid="stToolbar"] {{ visibility: hidden; }}
+    .block-container {{ padding-top: 0rem; }}
+    
+    /* 懸浮視窗縮放與圖示特效 */
+    .glass-panel, .glass-panel-b2, .glass-panel-b4, .glass-panel-b5, .npc-overlay, .settings-modal-active {{ resize: both !important; overflow: auto !important; }}
+    img[src*="icon-card"], img[alt*="icon-card"] {{ cursor: pointer !important; transition: all 0.2s ease !important; }}
+    img[src*="icon-card"]:hover, img[alt*="icon-card"]:hover {{ transform: scale(1.08) !important; filter: drop-shadow(0 0 8px rgba(0, 210, 255, 0.6)) !important; }}
+    img[src*="icon-card"]:active, img[alt*="icon-card"]:active {{ transform: scale(0.95) !important; }}
+
+    /* 應用背景與區塊毛玻璃 */
+    .stApp {{ {bg_image_css} }}
+    div[data-testid="stVerticalBlock"] > div[style*="border"] {{ background-color: {block_bg} !important; backdrop-filter: blur(4px); }}
+    
+    /* 字體、輸入框與按鈕顏色 */
+    h1, h2, h3, h4, h5, h6, p, label, .stMarkdown, .stText {{ color: #E2E8F0 !important; }}
+    [data-testid="stAlert"] {{ background-color: transparent !important; border: 1px solid #2D3748 !important; }}
+    [data-testid="stSidebar"] {{ background-color: rgba(17, 22, 34, 0.95) !important; border-right: 1px solid #1E293B; }}
+    .stTextInput>div>div>input {{ background-color: #1A202C !important; color: #FFFFFF !important; border: 1px solid #4A5568 !important; }}
+    div[data-testid="stDataFrame"] {{ background-color: #111622 !important; border: 1px solid #1E293B !important; border-radius: 6px; }}
+    .stButton > button, .stLinkButton > a {{ background-color: #1E293B !important; color: #94A3B8 !important; border: 1px solid #334155 !important; transition: all 0.2s ease-in-out; }}
+    .stButton > button:hover, .stLinkButton > a:hover {{ border-color: #00D2FF !important; color: #00D2FF !important; box-shadow: 0 0 8px rgba(0, 210, 255, 0.2); }}
+    </style>
     """
-    st.markdown(theme_css, unsafe_allow_html=True)
+    st.markdown(global_css, unsafe_allow_html=True)
 
+    # 4. 載入全域拖曳與點擊監聽引擎 (保留你原本的 JavaScript)
     drag_engine_js = """
     <script>
     (function() {
@@ -67,78 +81,42 @@ def load_global_css():
         window.parent.window.customDragDelegated = true;
         const doc = window.parent.document;
         
-        // ==========================================
-        // 💡 1. 強制監聽點擊事件：一鍵收合 4 張玻璃卡片
-        // ==========================================
+        // --- 1. 一鍵收合邏輯 ---
         doc.addEventListener('click', (e) => {
             let isIconCard = false;
             let t = e.target;
-            
-            // 檢查是否直接點到圖片，且 src 或 alt 包含 icon-card (防止 Streamlit 將檔名 hash 導致找不到)
-            if (t.tagName === 'IMG' && ((t.src && t.src.includes('icon-card')) || (t.alt && t.alt.includes('icon-card')))) {
-                isIconCard = true;
-            } 
-            // 檢查是否點到 Streamlit 包裝的 div 容器
+            if (t.tagName === 'IMG' && ((t.src && t.src.includes('icon-card')) || (t.alt && t.alt.includes('icon-card')))) { isIconCard = true; } 
             else if (t.closest) {
                 let parentImg = t.closest('div[data-testid="stImage"]')?.querySelector('img');
-                if (parentImg && ((parentImg.src && parentImg.src.includes('icon-card')) || (parentImg.alt && parentImg.alt.includes('icon-card')))) {
-                    isIconCard = true;
-                }
+                if (parentImg && ((parentImg.src && parentImg.src.includes('icon-card')) || (parentImg.alt && parentImg.alt.includes('icon-card')))) { isIconCard = true; }
             }
-
             if (isIconCard) {
-                e.preventDefault();   // 攔截預設行為
-                e.stopPropagation();  // 阻止事件冒泡，防止 Streamlit 的燈箱彈出
-                
-                let cb2 = doc.getElementById('min-b2-card');
-                let cb3 = doc.getElementById('min-card');
-                let cb4 = doc.getElementById('min-b4-card');
-                let cb5 = doc.getElementById('min-b5-card');
-
-                // 判斷當前狀態：只要有一張沒縮小，按下去就全部縮小；如果全部都縮小了，按下去就全部展開
-                let anyOpen = false;
-                if (cb2 && !cb2.checked) anyOpen = true;
-                if (cb3 && !cb3.checked) anyOpen = true;
-                if (cb4 && !cb4.checked) anyOpen = true;
-                if (cb5 && !cb5.checked) anyOpen = true;
-
-                if (cb2) cb2.checked = anyOpen;
-                if (cb3) cb3.checked = anyOpen;
-                if (cb4) cb4.checked = anyOpen;
-                if (cb5) cb5.checked = anyOpen;
+                e.preventDefault(); e.stopPropagation();
+                let cb2 = doc.getElementById('min-b2-card'), cb3 = doc.getElementById('min-card'), cb4 = doc.getElementById('min-b4-card'), cb5 = doc.getElementById('min-b5-card');
+                let anyOpen = (cb2 && !cb2.checked) || (cb3 && !cb3.checked) || (cb4 && !cb4.checked) || (cb5 && !cb5.checked);
+                if (cb2) cb2.checked = anyOpen; if (cb3) cb3.checked = anyOpen; if (cb4) cb4.checked = anyOpen; if (cb5) cb5.checked = anyOpen;
             }
-        }, true); // 💡 使用 true 開啟 Capture Phase，搶在 React 之前攔截點擊
+        }, true);
 
-        // ==========================================
-        // 💡 2. 全域拖曳引擎
-        // ==========================================
+        // --- 2. 拖曳引擎 ---
         let isDragging = false, currentEl = null, startX, startY, initialX, initialY;
         const onDown = (e) => {
             let handle = e.target.closest('.header-bar, .header-bar-b2, .header-bar-b4, .header-bar-b5, .npc-drag-handle, .settings-drag-handle');
-            if (!handle) return;
-            if (e.target.closest('button, input, label, .action-btn, .action-btn-b2, .action-btn-b4, .action-btn-b5')) return;
-            
+            if (!handle || e.target.closest('button, input, label, .action-btn, .action-btn-b2, .action-btn-b4, .action-btn-b5')) return;
             let el = handle.closest('.glass-panel, .glass-panel-b2, .glass-panel-b4, .glass-panel-b5, .npc-wrapper, .settings-modal-active');
             if (!el) el = handle.closest('div[data-testid="stVerticalBlock"].settings-modal-active');
             if (!el) return;
             
-            isDragging = true;
-            currentEl = el;
+            isDragging = true; currentEl = el;
             let clientX = e.touches ? e.touches[0].clientX : e.clientX;
             let clientY = e.touches ? e.touches[0].clientY : e.clientY;
             startX = clientX; startY = clientY;
-            
             let rect = el.getBoundingClientRect();
-            el.style.transition = 'none';
-            el.style.left = rect.left + 'px';
-            el.style.top = rect.top + 'px';
-            el.style.right = 'auto';
-            el.style.bottom = 'auto';
-            el.style.transform = 'none';
-            el.style.margin = '0';
             
-            initialX = rect.left; initialY = rect.top;
-            handle.style.cursor = 'grabbing';
+            el.style.transition = 'none';
+            el.style.left = rect.left + 'px'; el.style.top = rect.top + 'px';
+            el.style.right = 'auto'; el.style.bottom = 'auto'; el.style.transform = 'none'; el.style.margin = '0';
+            initialX = rect.left; initialY = rect.top; handle.style.cursor = 'grabbing';
         };
         const onMove = (e) => {
             if (!isDragging || !currentEl) return;
@@ -157,59 +135,13 @@ def load_global_css():
             isDragging = false; currentEl = null;
         };
         
-        doc.addEventListener('mousedown', onDown);
-        doc.addEventListener('touchstart', onDown, {passive: false});
-        doc.addEventListener('mousemove', onMove, {passive: false});
-        doc.addEventListener('touchmove', onMove, {passive: false});
-        doc.addEventListener('mouseup', onUp);
-        doc.addEventListener('touchend', onUp);
+        doc.addEventListener('mousedown', onDown); doc.addEventListener('touchstart', onDown, {passive: false});
+        doc.addEventListener('mousemove', onMove, {passive: false}); doc.addEventListener('touchmove', onMove, {passive: false});
+        doc.addEventListener('mouseup', onUp); doc.addEventListener('touchend', onUp);
     })();
     </script>
     """
     components.html(drag_engine_js, height=0, width=0)
-
-def set_background(image_path="./image/派對盛宴邀請.png"):
-    theme = st.session_state.get('theme', 'dark')
-    opacity = st.session_state.get('bg_opacity', 88) / 100.0
-    block_opacity = opacity * 0.7 
-    
-    actual_image = image_path
-    if theme == 'pink':
-        overlay, block_bg = f"rgba(139, 109, 98, {opacity})", f"rgba(139, 109, 98, {block_opacity})"
-        actual_image = "./image/鐵風堡.png"
-    elif theme == 'green':
-        overlay, block_bg = f"rgba(0, 54, 16, {opacity})", f"rgba(0, 54, 16, {block_opacity})"
-        actual_image = "./image/翡翠林鎮.png"
-    elif theme == 'purple':
-        overlay, block_bg = f"rgba(87, 99, 158, {opacity})", f"rgba(87, 99, 158, {block_opacity})"
-        actual_image = "./image/月下綠洲城.png"
-    elif theme == 'brown':
-        overlay, block_bg = f"rgba(161, 115, 0, {opacity})", f"rgba(161, 115, 0, {block_opacity})"
-        actual_image = "./image/沙漠之都.png"
-        
-    else: 
-        overlay, block_bg = f"rgba(15, 23, 42, {opacity})", f"rgba(15, 23, 42, {block_opacity})"
-    
-    if not os.path.exists(actual_image):
-        actual_image = image_path
-    
-    try:
-        with open(actual_image, "rb") as file:
-            encoded_string = base64.b64encode(file.read()).decode()
-
-        css = f"""
-        <style>
-        .stApp {{
-            background-image: linear-gradient({overlay}, {overlay}), url(data:image/png;base64,{encoded_string});
-            background-size: cover; background-position: center center; background-attachment: fixed;
-        }}
-        div[data-testid="stVerticalBlock"] > div[style*="border"] {{
-            background-color: {block_bg} !important; backdrop-filter: blur(4px); 
-        }}
-        </style>
-        """
-        st.markdown(css, unsafe_allow_html=True)
-    except FileNotFoundError: pass
 
 def render_fireflies():
     num_fireflies = 5 
