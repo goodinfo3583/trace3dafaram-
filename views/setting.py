@@ -21,7 +21,7 @@ def render():
         horizontal=True
     )
     
-    opacity_val = st.slider("背景濾鏡透明度 (%)", min_value=0, max_value=100, value=current_opacity)
+    opacity_val = st.slider("背景濾鏡遮罩 (%)", min_value=0, max_value=100, value=current_opacity)
     
     st.markdown("---")
     st.markdown("<h4 style='color:#E2E8F0; font-size: 16px;'>快捷鍵配置 (點擊欄位後直接按下按鍵)</h4>", unsafe_allow_html=True)
@@ -49,22 +49,22 @@ def render():
     # -----------------------------
     col_ok, col_cancel = st.columns([1, 1])
     with col_ok:
-        if st.button("💾 儲存設定", use_container_width=True):
+        if st.button("確認", use_container_width=True):
             # 寫入 session_state
             st.session_state['theme'] = theme_choice
             st.session_state['bg_opacity'] = opacity_val
             st.session_state['custom_hotkeys'] = {k.strip().lower(): v for v, k in new_hotkeys.items() if k.strip().lower()}
             
             # 使用 toast 顯示右下角輕量提示，不干擾畫面
-            st.toast('✅ 設定已成功儲存！', icon='🎉')
+            st.toast('設定已成功儲存！')
             
             # 重新執行一次以立即套用新主題與濾鏡
             st.rerun()
             
     with col_cancel:
-        if st.button("❌ 復原變更", use_container_width=True):
+        if st.button("取消", use_container_width=True):
             # 什麼都不做，直接 rerun 就會讀取原本存在 session_state 裡的設定值
-            st.toast('已恢復為原本的設定。', icon='🔄')
+            st.toast('已恢復為原本的設定。')
             st.rerun()
             
     # 💡 乾淨的 JS：不再需要尋找 modal 容器，直接綁定頁面上所有的 text input
