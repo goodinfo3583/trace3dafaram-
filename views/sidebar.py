@@ -1116,64 +1116,6 @@ def render_sidebar_war_room(STOCK_DICT, DATA_DIR="data"):
                         </div>
                         """, unsafe_allow_html=True)
                         # --- 👆 新增結束 👆 ---
-                        # ------------------------------------------
-                        # 🌎 新增：外資大腿 20日軌跡 區塊
-                        # ------------------------------------------
-                        st.markdown("<h5 style='color: #38BDF8; margin-top: 15px; margin-bottom: 5px;'>🌎 外資大腿 20日軌跡</h5>", unsafe_allow_html=True)
-                        df_foreign_sb = get_sidebar_df('b1_foreign_df')
-                        df_b1_sb = get_sidebar_df('b1_final_df')
-                        
-                        if not df_foreign_sb.empty and not df_b1_sb.empty:
-                            res_for = robust_search_engine(df_foreign_sb, target_query)
-                            if not res_for.empty:
-                                foreign_dates = {c.replace('外資持股_', '') for c in df_foreign_sb.columns if '外資持股_' in c}
-                                total_dates = {c.replace('持股%', '') for c in df_b1_sb.columns if '持股%' in c}
-                                common_dates = sorted(list(foreign_dates & total_dates), reverse=True)[:20]
-                                
-                                if common_dates:
-                                    for_cols = [f'外資持股_{d}' for d in common_dates if f'外資持股_{d}' in res_for.columns]
-                                    if for_cols:
-                                        row_for = res_for.iloc[0]
-                                        clean_x_for = [d[-4:] for d in common_dates if f'外資持股_{d}' in res_for.columns]
-                                        y_vals_for = []
-                                        for d in common_dates:
-                                            col_name = f'外資持股_{d}'
-                                            if col_name in row_for:
-                                                val = row_for[col_name]
-                                                try: y_vals_for.append(float(str(val).replace('%', '')))
-                                                except: y_vals_for.append(0.0)
-                                            else:
-                                                y_vals_for.append(0.0)
-                                        
-                                        # 建立精簡 DataFrame 顯示
-                                        display_for_dict = {d[-4:]: [row_for[f'外資持股_{d}']] for d in common_dates if f'外資持股_{d}' in row_for}
-                                        if display_for_dict:
-                                            display_for_df = pd.DataFrame(display_for_dict)
-                                            st.dataframe(display_for_df, use_container_width=True, hide_index=True)
-                                        
-                                        # 繪製圖表
-                                        fig_for = go.Figure()
-                                        fig_for.add_trace(go.Bar(
-                                            x=clean_x_for[::-1], y=y_vals_for[::-1],
-                                            marker_color='#38BDF8',
-                                            text=[f"{v}%" if v > 0 else "" for v in y_vals_for[::-1]], textposition='outside'
-                                        ))
-                                        fig_for.update_layout(
-                                            title=dict(text=f"🌎 外資持股 20日軌跡", font=dict(color="#E2E8F0", size=13)),
-                                            height=250, template='plotly_dark', paper_bgcolor='rgba(0,0,0,0)', plot_bgcolor='rgba(0,0,0,0)',
-                                            margin=dict(l=20, r=20, t=30, b=20),
-                                            yaxis=dict(title="外資持股 (%)", showgrid=True, gridcolor='#334155'), xaxis=dict(tickangle=45), dragmode='pan'
-                                        )
-                                        st.plotly_chart(fig_for, use_container_width=True, config={'displayModeBar': False})
-                                    else:
-                                        st.write("⚪ 尚無外資軌跡資料")
-                                else:
-                                    st.write("⚪ 尚無對應日期")
-                            else:
-                                st.write("⚪ 未進榜外資持股資料")
-                        else:
-                            st.info("⚪ 尚未載入外資資料表")
-                        #新增結束
                         
                         hide_keywords_down = ['_區塊', '排序', '上榜數量', '原始上榜', '精準單日']
                         clean_cols_down = [c for c in res_b1_down.columns if not any(k in c for k in hide_keywords_down)]
@@ -1212,10 +1154,66 @@ def render_sidebar_war_room(STOCK_DICT, DATA_DIR="data"):
                             yaxis=dict(title="持股比例 (%)", showgrid=True, gridcolor='#334155'), xaxis=dict(tickangle=45), dragmode='pan'
                         )
                         st.plotly_chart(fig_b1_down, use_container_width=True, config={'displayModeBar': False})
+                else:st.write("⚪ 未進榜")
+            else:st.info("⚪ 尚未載入資料表")
+            # ------------------------------------------
+            # 🌎 新增：外資大腿 20日軌跡 區塊
+            # ------------------------------------------
+            st.markdown("<h5 style='color: #38BDF8; margin-top: 15px; margin-bottom: 5px;'>🌎 外資大腿 20日軌跡</h5>", unsafe_allow_html=True)
+            df_foreign_sb = get_sidebar_df('b1_foreign_df')
+            df_b1_sb = get_sidebar_df('b1_final_df')
+                        
+            if not df_foreign_sb.empty and not df_b1_sb.empty:
+                res_for = robust_search_engine(df_foreign_sb, target_query)
+                if not res_for.empty:
+                    foreign_dates = {c.replace('外資持股_', '') for c in df_foreign_sb.columns if '外資持股_' in c}
+                    total_dates = {c.replace('持股%', '') for c in df_b1_sb.columns if '持股%' in c}
+                    common_dates = sorted(list(foreign_dates & total_dates), reverse=True)[:20]
+                                
+                    if common_dates:
+                        for_cols = [f'外資持股_{d}' for d in common_dates if f'外資持股_{d}' in res_for.columns]
+                        if for_cols:
+                            row_for = res_for.iloc[0]
+                            clean_x_for = [d[-4:] for d in common_dates if f'外資持股_{d}' in res_for.columns]
+                            y_vals_for = []
+                            for d in common_dates:
+                                col_name = f'外資持股_{d}'
+                                if col_name in row_for:
+                                    val = row_for[col_name]
+                                    try: y_vals_for.append(float(str(val).replace('%', '')))
+                                    except: y_vals_for.append(0.0)
+                                else:
+                                    y_vals_for.append(0.0)
+                                        
+                            # 建立精簡 DataFrame 顯示
+                            display_for_dict = {d[-4:]: [row_for[f'外資持股_{d}']] for d in common_dates if f'外資持股_{d}' in row_for}
+                            if display_for_dict:
+                                display_for_df = pd.DataFrame(display_for_dict)
+                                st.dataframe(display_for_df, use_container_width=True, hide_index=True)
+                                        
+                            # 繪製圖表
+                            fig_for = go.Figure()
+                            fig_for.add_trace(go.Bar(
+                                x=clean_x_for[::-1], y=y_vals_for[::-1],
+                                marker_color='#38BDF8',
+                                text=[f"{v}%" if v > 0 else "" for v in y_vals_for[::-1]], textposition='outside'
+                            ))
+                            fig_for.update_layout(
+                                title=dict(text=f"🌎 外資持股 20日軌跡", font=dict(color="#E2E8F0", size=13)),
+                                height=250, template='plotly_dark', paper_bgcolor='rgba(0,0,0,0)', plot_bgcolor='rgba(0,0,0,0)',
+                                margin=dict(l=20, r=20, t=30, b=20),
+                                yaxis=dict(title="外資持股 (%)", showgrid=True, gridcolor='#334155'), xaxis=dict(tickangle=45), dragmode='pan'
+                            )
+                            st.plotly_chart(fig_for, use_container_width=True, config={'displayModeBar': False})
+                        else:
+                            st.write("⚪ 尚無外資軌跡資料")
+                    else:
+                        st.write("⚪ 尚無對應日期")
                 else:
-                    st.write("⚪ 未進榜")
+                    st.write("⚪ 未進榜外資持股資料")
             else:
-                st.info("⚪ 尚未載入資料表")
+                st.info("⚪ 尚未載入外資資料表")
+            #外資持股新增結束
 
             st.markdown("<hr style='border-color: #334155;'>", unsafe_allow_html=True)
             
