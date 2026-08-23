@@ -32,6 +32,7 @@ from views.b5_page import show_b5_page, sync_b5_data
 from views.b6_page import show_b6_page, sync_b6_data
 from views.b7_page import show_b7_page, sync_b7_data
 from views.watchlist_page import show_watchlist_page
+from views.setting import render as show_setting_page
 # ==========================================
 # 1. 網頁基本設定 & 目錄路徑初始化
 # ==========================================
@@ -72,8 +73,7 @@ try:
     style_manager.render_b4_top10_glass_card()
     # 呼叫 B5 大腿雙向共振卡片 (左下方)
     style_manager.render_b5_top10_glass_card()
-    # 呼叫 系統設定 懸浮卡片 (置中全螢幕遮罩)
-    style_manager.render_settings_modal()
+
     # 呼叫 課程NPC 懸浮卡片 (右下方)
     style_manager.render_course_npc()   
 except AttributeError as e:
@@ -151,8 +151,10 @@ elif current_page == "b6":
     show_b6_page(DATA_DIR)
 elif current_page == "b7":
     show_b7_page(DATA_DIR, STOCK_DICT)
-elif current_page == "watchlist":                    # 👈 新增
-    show_watchlist_page(STOCK_DICT, conn, SHEET_URL) # 👈 新增
+elif current_page == "watchlist":                    
+    show_watchlist_page(STOCK_DICT, conn, SHEET_URL) 
+elif current_page == "setting":
+    show_setting_page()
 # 渲染側邊欄
 with st.sidebar:
     render_sidebar_war_room(STOCK_DICT, DATA_DIR)
