@@ -352,7 +352,7 @@ def render_b2_top10_glass_card():
 @media (max-width: 1200px) {{ .glass-panel-b2 {{ position: relative; top: auto; left: auto; width: 90%; max-width: 350px; margin: 10px auto; display: block; }} }}
 </style>
 <div class="glass-panel-b2" id="b2-top10-card">
-<div class="header-bar-b2"><span class="header-title-b2"><span class="header-title-b2"><img src="app/static/magicbookwind.png" style="width:18px; margin-right:6px; vertical-align:-3px;" onerror="this.style.display='none'">法人掃貨</span>
+<div class="header-bar-b2"><span class="header-title-b2"><img src="app/static/magicbookwind.png" style="width:18px; margin-right:6px; vertical-align:-3px;" onerror="this.style.display='none'">法人掃貨</span>
 <div class="action-btns-b2">
 <label for="pause-b2-card" class="action-btn-b2 pause-icon-b2" title="暫停/播放輪播"></label>
 <label for="min-b2-card" class="action-btn-b2 min-icon-b2" title="縮放"></label>
@@ -534,7 +534,7 @@ def render_b4_top10_glass_card():
 @media (max-width: 1200px) {{ .glass-panel-b4 {{ position: relative; top: auto; left: auto; width: 90%; max-width: 350px; margin: 10px auto; display: block; }} }}
 </style>
 <div class="glass-panel-b4" id="b4-top10-card">
-<div class="header-bar-b4"><span class="header-title-b4">📡 資券雷達</span>
+<div class="header-bar-b4"><span class="header-title-b4"><img src="app/static/ground.png" style="width:18px; margin-right:6px; vertical-align:-3px;" onerror="this.style.display='none'">資券雷達</span>
 <div class="action-btns-b4">
 <label for="pause-b4-card" class="action-btn-b4 pause-icon-b4" title="暫停/播放輪播"></label>
 <label for="min-b4-card" class="action-btn-b4 min-icon-b4" title="縮放"></label>
@@ -644,7 +644,7 @@ def render_b5_top10_glass_card():
 @media (max-width: 1200px) {{ .glass-panel-b5 {{ position: relative; top: auto; left: auto; width: 90%; max-width: 350px; margin: 10px auto; display: block; }} }}
 </style>
 <div class="glass-panel-b5" id="b5-top10-card">
-<div class="header-bar-b5"><span class="header-title-b5"><img src="app/static/magicbookleaf.png" style="width:18px; margin-right:6px; vertical-align:-3px;" onerror="this.style.display='none'">大腿共振</span>
+<div class="header-bar-b5"><span class="header-title-b5"><img src="app/static/wirtleg.png" style="width:18px; margin-right:6px; vertical-align:-3px;" onerror="this.style.display='none'">大腿共振</span>
 <div class="action-btns-b5">
 <label for="pause-b5-card" class="action-btn-b5 pause-icon-b5" title="暫停/播放輪播"></label>
 <label for="min-b5-card" class="action-btn-b5 min-icon-b5" title="縮放"></label>
