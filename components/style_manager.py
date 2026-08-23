@@ -42,8 +42,8 @@ def load_global_css():
 
     if theme == 'pink': bg_color = f"rgba(237, 184, 242, {opacity})"
     elif theme == 'green': bg_color = f"rgba(10, 20, 15, {opacity})"
-    elif theme == 'purple': bg_color = f"rgba(184, 236, 242, {opacity})"
-    elif theme == 'brown': bg_color = f"rgba(184, 236, 242, {opacity})"
+    elif theme == 'purple': bg_color = f"rgba(87, 99, 158, {opacity})"
+    elif theme == 'brown': bg_color = f"rgba(238, 226, 188, {opacity})"
     
     else: bg_color = f"rgba(10, 13, 20, {opacity})"
 
@@ -179,7 +179,7 @@ def load_global_css():
     """
     components.html(drag_engine_js, height=0, width=0)
 
-def set_background(image_path="app/image/派對盛宴邀請.png"):
+def set_background(image_path="./image/派對盛宴邀請.png"):
     theme = st.session_state.get('theme', 'dark')
     opacity = st.session_state.get('bg_opacity', 88) / 100.0
     block_opacity = opacity * 0.7 
@@ -187,16 +187,16 @@ def set_background(image_path="app/image/派對盛宴邀請.png"):
     actual_image = image_path
     if theme == 'pink':
         overlay, block_bg = f"rgba(139, 109, 98, {opacity})", f"rgba(139, 109, 98, {block_opacity})"
-        actual_image = "app/static/鐵風堡.png"
+        actual_image = "./static/鐵風堡.png"
     elif theme == 'green':
         overlay, block_bg = f"rgba(75, 159, 113, {opacity})", f"rgba(75, 159, 113, {block_opacity})"
-        actual_image = "app/static/翡翠林鎮.png"
+        actual_image = "./static/翡翠林鎮.png"
     elif theme == 'purple':
         overlay, block_bg = f"rgba(87, 99, 158, {opacity})", f"rgba(87, 99, 158, {block_opacity})"
-        actual_image = "app/static/月下綠洲城.png"
+        actual_image = "./static/月下綠洲城.png"
     elif theme == 'brown':
         overlay, block_bg = f"rgba(238, 226, 188, {opacity})", f"rgba(238, 226, 188, {block_opacity})"
-        actual_image = "app/static/沙漠之都.png"
+        actual_image = "./static/沙漠之都.png"
         
     else: 
         overlay, block_bg = f"rgba(15, 23, 42, {opacity})", f"rgba(15, 23, 42, {block_opacity})"
