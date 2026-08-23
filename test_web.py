@@ -60,7 +60,7 @@ if 'b4_squeeze_radar' not in st.session_state:
 if 'b5_1000' not in st.session_state:
     sync_b5_data(DATA_DIR)
 # 呼叫渲染視覺元件 components
-style_manager..apply_global_theme()
+style_manager.apply_global_theme()
 style_manager.render_fireflies()
 style_manager.render_marquee() # 呼叫頂層圖片跑馬燈與懸浮玻璃卡片
 try:
