@@ -10,7 +10,7 @@ def render():
 
     st.markdown("<h4 style='color:#E2E8F0; font-size: 16px;'>外觀與濾鏡</h4>", unsafe_allow_html=True)
     current_theme = st.session_state.get('theme', 'dark')
-    current_opacity = st.session_state.get('bg_opacity', 88)
+    current_opacity = int(st.session_state.get('bg_opacity', 88))
     
     theme_options = ['dark', 'pink', 'green', 'purple','brown']
     theme_choice = st.radio(
