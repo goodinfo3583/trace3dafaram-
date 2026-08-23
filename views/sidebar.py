@@ -11,10 +11,11 @@ from plotly.subplots import make_subplots
 from utils.data_utils import get_latest_csv, get_prev_csv
 
 # ==========================================
-# 🌟 "側邊雙視窗" 變數雷達與自動載入引擎 
+# 🌟 "側邊雙視窗" 變數雷達與自動載入各區塊引擎 
 # ==========================================
 KEY_MAP = {
     'b1_final_df': ['b1_final_df', 'my_final_df'],
+    'b1_down_final_df': ['b1_down_final_df'],
     'b2_1': ['b2_1', 'df_blk2_1'],
     'b2_2': ['b2_2', 'df_blk2_2'],
     'b2_3': ['b2_3', 'df_blk2_3'],
@@ -1049,6 +1050,68 @@ def render_sidebar_war_room(STOCK_DICT, DATA_DIR="data"):
                         st.plotly_chart(fig_b1, use_container_width=True, config={'displayModeBar': False})
                 else: st.write("⚪ 未進榜")
             else: st.info("⚪ 尚未載入資料表")
+
+            #新載入法人提款
+            # ------------------------------------------
+            # 📉 新增：法人提款機 (衰退追蹤) 區塊
+            # ------------------------------------------
+            st.markdown("<h5 style='color: #00E676; margin-top: 15px; margin-bottom: 5px;'>📉 法人提款機 (衰退追蹤)</h5>", unsafe_allow_html=True)
+            df_b1_down = get_sidebar_df('b1_down_final_df')
+            if not df_b1_down.empty:
+                res_b1_down = robust_search_engine(df_b1_down, target_query)
+                if not res_b1_down.empty:
+                    date_cols_down = [c for c in res_b1_down.columns if '持股%' in c or c.isdigit()]
+                    is_all_unranked_down = True
+                    for c in date_cols_down:
+                        val = str(res_b1_down.iloc[0][c]).strip()
+                        if val != "未進榜" and val not in ['0', '0.0', 'nan', '-']:
+                            is_all_unranked_down = False
+                            break
+
+                    if is_all_unranked_down:
+                        st.write("⚪ 未進榜")
+                    else:
+                        hide_keywords_down = ['_區塊', '排序', '上榜數量', '原始上榜', '精準單日']
+                        clean_cols_down = [c for c in res_b1_down.columns if not any(k in c for k in hide_keywords_down)]
+                        
+                        # 幫衰退表格加上淺綠色警示底色
+                        st.dataframe(
+                            res_b1_down[clean_cols_down].style.apply(lambda x: ['background-color: rgba(0, 230, 118, 0.1)'] * len(x), axis=1), 
+                            use_container_width=True, 
+                            hide_index=True
+                        )
+
+                        # 繪製負向衰退追蹤的波段圖
+                        row_down = res_b1_down.iloc[0]
+                        stock_name_down = row_down.get('股票名稱', display_name)
+                        raw_x_vals_down = date_cols_down[::-1]
+                        clean_x_labels_down = [c.replace('持股%', '')[-4:] for c in raw_x_vals_down]
+
+                        y_vals_down = []
+                        for c in raw_x_vals_down:
+                            val = row_down[c]
+                            if str(val) == "未進榜" or pd.isna(val): y_vals_down.append(0.0)
+                            else:
+                                try: y_vals_down.append(float(val))
+                                except: y_vals_down.append(0.0)
+
+                        fig_b1_down = go.Figure()
+                        fig_b1_down.add_trace(go.Bar(
+                            x=clean_x_labels_down, y=y_vals_down,
+                            marker_color=['#00E676' if i == len(y_vals_down)-1 else '#0284C7' for i in range(len(y_vals_down))],
+                            text=[f"{v}%" if v > 0 else "" for v in y_vals_down], textposition='outside'
+                        ))
+                        fig_b1_down.update_layout(
+                            title=dict(text=f"📉 衰退波段真實軌跡 ({stock_name_down})", font=dict(color="#E2E8F0")),
+                            height=300, template='plotly_dark', paper_bgcolor='rgba(0,0,0,0)', plot_bgcolor='rgba(0,0,0,0)',
+                            margin=dict(l=20, r=20, t=40, b=20),
+                            yaxis=dict(title="持股比例 (%)", showgrid=True, gridcolor='#334155'), xaxis=dict(tickangle=45), dragmode='pan'
+                        )
+                        st.plotly_chart(fig_b1_down, use_container_width=True, config={'displayModeBar': False})
+                else:
+                    st.write("⚪ 未進榜")
+            else:
+                st.info("⚪ 尚未載入資料表")
 
             st.markdown("<hr style='border-color: #334155;'>", unsafe_allow_html=True)
             
