@@ -24,9 +24,9 @@ def render():
     opacity_val = st.slider("背景濾鏡遮罩 (%)", min_value=0, max_value=100, value=current_opacity)
     
     st.markdown("---")
-    st.markdown("<h4 style='color:#E2E8F0; font-size: 16px;'>快捷鍵配置 (點擊欄位後直接按下按鍵)</h4>", unsafe_allow_html=True)
+    st.markdown("<h4 style='color:#E2E8F0; font-size: 16px;'>快捷鍵配置</h4>", unsafe_allow_html=True)
     
-    reverse_map = {v: k for k, v in st.session_state.get('custom_hotkeys', {"f1": "NavToB1", "f2": "NavToB2", "f3": "NavToB3", "f4": "NavToB4", "f5": "NavToB5", "f6": "NavToB6", "f7": "NavToB7", "alt+l": "NavToWatchlist", "escape": "登入"}).items()}
+    reverse_map = {v: k for k, v in st.session_state.get('custom_hotkeys', {"F1": "NavToB1", "F2": "NavToB2", "F3": "NavToB3", "F4": "NavToB4", "F5": "NavToB5", "F6": "NavToB6", "F7": "NavToB7", "Alt+L": "NavToWatchlist", "Escape": "登入", "Alt+P":"設置"}).items()}
     
     col1, col2 = st.columns(2)
     new_hotkeys = {}
@@ -36,12 +36,12 @@ def render():
         new_hotkeys["NavToB3"] = st.text_input("法人連買", value=reverse_map.get("NavToB3", "F3"), key="kb3")
         new_hotkeys["NavToB4"] = st.text_input("資券動向", value=reverse_map.get("NavToB4", "F4"), key="kb4")
         new_hotkeys["NavToB5"] = st.text_input("大腿動向", value=reverse_map.get("NavToB5", "F6"), key="kb5")
-    with col2:
-        
+    with col2:       
         new_hotkeys["NavToB6"] = st.text_input("鉅額交易", value=reverse_map.get("NavToB6", "F7"), key="kb6")
         new_hotkeys["NavToB7"] = st.text_input("董監動向", value=reverse_map.get("NavToB7", "F8"), key="kb7")
-        new_hotkeys["NavToWatchlist"] = st.text_input("建立名單", value=reverse_map.get("NavToWatchlist", "alt+l"), key="kb_wl")
+        new_hotkeys["NavToWatchlist"] = st.text_input("建立名單", value=reverse_map.get("NavToWatchlist", "Alt+L"), key="kb_wl")
         new_hotkeys["登入"] = st.text_input("登入", value=reverse_map.get("登入", "escape"), key="kb_login")
+        new_hotkeys["設置"] = st.text_input("設置", value=reverse_map.get("設置", "F12"), key="kb_set")
 
     st.markdown("<br>", unsafe_allow_html=True)
     
