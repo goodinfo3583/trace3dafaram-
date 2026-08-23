@@ -41,7 +41,7 @@ def load_global_css():
     st.markdown(hide_streamlit_style, unsafe_allow_html=True)
 
     if theme == 'pink': bg_color = f"rgba(139, 109, 98, {opacity})"
-    elif theme == 'green': bg_color = f"rgba(0, 54, 16, {opacity})"
+    elif theme == 'green': bg_color = f"rgba(20, 59, 31, {opacity})"
     elif theme == 'purple': bg_color = f"rgba(87, 99, 158, {opacity})"
     elif theme == 'brown': bg_color = f"rgba(161, 115, 0, {opacity})"
     
@@ -189,7 +189,7 @@ def set_background(image_path="./image/派對盛宴邀請.png"):
         overlay, block_bg = f"rgba(139, 109, 98, {opacity})", f"rgba(139, 109, 98, {block_opacity})"
         actual_image = "./image/鐵風堡.png"
     elif theme == 'green':
-        overlay, block_bg = f"rgba(0, 54, 16, {opacity})", f"rgba(0, 54, 16, {block_opacity})"
+        overlay, block_bg = f"rgba(20, 59, 31 {opacity})", f"rgba(20, 59, 31 {block_opacity})"
         actual_image = "./image/翡翠林鎮.png"
     elif theme == 'purple':
         overlay, block_bg = f"rgba(87, 99, 158, {opacity})", f"rgba(87, 99, 158, {block_opacity})"
