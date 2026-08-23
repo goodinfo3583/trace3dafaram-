@@ -352,7 +352,7 @@ def render_b2_top10_glass_card():
 @media (max-width: 1200px) {{ .glass-panel-b2 {{ position: relative; top: auto; left: auto; width: 90%; max-width: 350px; margin: 10px auto; display: block; }} }}
 </style>
 <div class="glass-panel-b2" id="b2-top10-card">
-<div class="header-bar-b2"><span class="header-title-b2">🚀 法人掃貨</span>
+<div class="header-bar-b2"><span class="header-title-b2"><span class="header-title-b5"><img src="app/static/magicbookwind.png" style="width:18px; margin-right:6px; vertical-align:-3px;" onerror="this.style.display='none'">法人掃貨</span>
 <div class="action-btns-b2">
 <label for="pause-b2-card" class="action-btn-b2 pause-icon-b2" title="暫停/播放輪播"></label>
 <label for="min-b2-card" class="action-btn-b2 min-icon-b2" title="縮放"></label>
