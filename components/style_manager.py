@@ -7,9 +7,9 @@ import streamlit.components.v1 as components
 
 def load_global_css():
     """載入全站共用的隱藏設定、縮排與動態主題 (深色濾鏡護眼版) CSS，以及全域拖曳引擎"""
-    theme = st.session_state.get('theme', 'dark')
-    opacity = st.session_state.get('bg_opacity', 88) / 100.0
-    
+    theme = st.session_state.get('theme', 'dark') #預設背景濾鏡
+    opacity = st.session_state.get('bg_opacity', 88) / 100.0 #預設背透明度
+    #網頁視覺及按鍵特效
     hide_streamlit_style = """
         <style>
         #MainMenu {visibility: hidden;}
@@ -19,7 +19,7 @@ def load_global_css():
         .block-container { padding-top: 0rem; }
         
         /* 啟用所有懸浮視窗的縮放功能 (右下角可拉伸) */
-        .glass-panel, .glass-panel-b2, .glass-panel-b4, .glass-panel-b5, .npc-overlay, .settings-modal-active {
+        .glass-panel, .glass-panel-b2, .glass-panel-b4, .glass-panel-b5, .npc-overlay, {
             resize: both !important; 
             overflow: auto !important; 
         }
@@ -41,7 +41,7 @@ def load_global_css():
     st.markdown(hide_streamlit_style, unsafe_allow_html=True)
 
     if theme == 'pink': bg_color = f"rgba(139, 109, 98, {opacity})"
-    elif theme == 'green': bg_color = f"rgba(20, 59, 31, {opacity})"
+    elif theme == 'green': bg_color = f"rgba(0, 54, 16, {opacity})"
     elif theme == 'purple': bg_color = f"rgba(87, 99, 158, {opacity})"
     elif theme == 'brown': bg_color = f"rgba(161, 115, 0, {opacity})"
     
@@ -189,7 +189,7 @@ def set_background(image_path="./image/派對盛宴邀請.png"):
         overlay, block_bg = f"rgba(139, 109, 98, {opacity})", f"rgba(139, 109, 98, {block_opacity})"
         actual_image = "./image/鐵風堡.png"
     elif theme == 'green':
-        overlay, block_bg = f"rgba(20, 59, 31 {opacity})", f"rgba(20, 59, 31 {block_opacity})"
+        overlay, block_bg = f"rgba(0, 54, 16, {opacity})", f"rgba(0, 54, 16, {block_opacity})"
         actual_image = "./image/翡翠林鎮.png"
     elif theme == 'purple':
         overlay, block_bg = f"rgba(87, 99, 158, {opacity})", f"rgba(87, 99, 158, {block_opacity})"
