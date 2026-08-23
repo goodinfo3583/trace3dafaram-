@@ -413,7 +413,7 @@ def inject_custom_header(is_logged_in=False):
                     if (wrapper) wrapper.style.display = 'none';
                 }
             });
-        }, 100);
+        }, 3600);
     }, 500);
     </script>
     """
