@@ -44,19 +44,27 @@ def render():
 
     st.markdown("<br>", unsafe_allow_html=True)
     
-    col_ok, col_cancel = st.columns(2)
+    # -----------------------------
+    # 底部：儲存與取消按鈕 (保留在當前頁面)
+    # -----------------------------
+    col_ok, col_cancel = st.columns([1, 1])
     with col_ok:
-        if st.button("確認", use_container_width=True):
+        if st.button("💾 儲存設定", use_container_width=True):
+            # 寫入 session_state
             st.session_state['theme'] = theme_choice
             st.session_state['bg_opacity'] = opacity_val
             st.session_state['custom_hotkeys'] = {k.strip().lower(): v for v, k in new_hotkeys.items() if k.strip().lower()}
-            # 💡 設定路由回到主畫面
-            st.session_state['current_view'] = 'Home'
+            
+            # 使用 toast 顯示右下角輕量提示，不干擾畫面
+            st.toast('✅ 設定已成功儲存！', icon='🎉')
+            
+            # 重新執行一次以立即套用新主題與濾鏡
             st.rerun()
+            
     with col_cancel:
-        if st.button("取消", use_container_width=True):
-            # 💡 設定路由回到主畫面
-            st.session_state['current_view'] = 'Home'
+        if st.button("❌ 復原變更", use_container_width=True):
+            # 什麼都不做，直接 rerun 就會讀取原本存在 session_state 裡的設定值
+            st.toast('已恢復為原本的設定。', icon='🔄')
             st.rerun()
             
     # 💡 乾淨的 JS：不再需要尋找 modal 容器，直接綁定頁面上所有的 text input
