@@ -668,28 +668,28 @@ margin-right: 20px; filter: drop-shadow(0 0 5px rgba(0,210,255,0.5));
 <div class="course-title"><img src="app/static/icon-course1.png" class="course-icon">Lv 4. 量價關係與盤面解讀</div>
 <div class="course-desc">對照成交量與股價漲跌的互動（如價漲量增、量價背離），判斷多空雙方的企圖心與買賣力道。</div>
 </div>
-<div class="course-item locked">
-<div class="course-title"><img src="app/static/icon-course1.png" class="course-icon">Lv 5. 技術分析與指標應用 (未開放)</div>
+<div class="course-item active" id="btn-open-course-5">
+<div class="course-title"><img src="app/static/icon-course1.png" class="course-icon">Lv 5. 技術分析與指標應用</div>
 <div class="course-desc">熟悉常用技術指標（如均線 MA、MACD、RSI、KDJ），掌握支撐壓力與趨勢轉折點。</div>
 </div>
-<div class="course-item locked">
-<div class="course-title"><img src="app/static/icon-course1.png" class="course-icon">Lv 6. 籌碼面追蹤：法人與大戶結構 (未開放)</div>
-<div class="course-desc">分析外資、投信、自營商動向及大戶持股比例，透過資金流向尋找主力默默佈局的標的。</div>
+<div class="course-item active" id="btn-open-course-6">
+<div class="course-title"><img src="app/static/icon-course1.png" class="course-icon">Lv 6. 籌碼面追蹤：法人與大戶結構</div>
+<div class="course-desc">認識外資、投信、自營商、大戶持股與分點集中度，透過籌碼變化觀察資金可能正在集中或分散。</div>
 </div>
 <div class="course-item active" id="btn-open-course-7">
 <div class="course-title"><img src="app/static/icon-course1.png" class="course-icon">Lv 7. 券資關係與融資融券分析</div>
 <div class="course-desc">觀察融資餘額、融券張數與券資比變化，評估市場散戶情緒及潛在的「軋空」或「多殺多」力道。</div>
 </div>
-<div class="course-item locked">
-<div class="course-title"><img src="app/static/icon-course1.png" class="course-icon">Lv 8. 產業趨勢與題材選股 (未開放)</div>
+<div class="course-item active" id="btn-open-course-8">
+<div class="course-title"><img src="app/static/icon-course1.png" class="course-icon">Lv 8. 產業趨勢與題材選股</div>
 <div class="course-desc">掌握主流產業輪動脈絡（如半導體、AI 供應鏈、綠能等），在對的時間點佈局具備成長爆發力的賽道。</div>
 </div>
-<div class="course-item locked">
-<div class="course-title"><img src="app/static/icon-course1.png" class="course-icon">Lv 9. 資金控管與風險管理 (未開放)</div>
+<div class="course-item active" id="btn-open-course-9">
+<div class="course-title"><img src="app/static/icon-course1.png" class="course-icon">Lv 9. 資金控管與風險管理</div>
 <div class="course-desc">學習單筆投資部位配置、分批進場策略、停損停利機制，避免因情緒失控而遭受重大虧損。</div>
 </div>
-<div class="course-item locked">
-<div class="course-title"><img src="app/static/icon-course1.png" class="course-icon">Lv 10. 交易心理學與個人策略總結 (未開放)</div>
+<div class="course-item active" id="btn-open-course-10">
+<div class="course-title"><img src="app/static/icon-course1.png" class="course-icon">Lv 10. 交易心理學與個人策略總結</div>
 <div class="course-desc">克服貪婪與恐懼的心理障礙，並回測、修正並建立專屬於自己的穩定獲利交易系統。</div>
 </div>
 </div>
@@ -1033,10 +1033,6 @@ border-width: 12px 14px 12px 0; border-style: solid; border-color: transparent r
 </div>
 </div>"""
 
-
-
-
-
         elif current_view == 'detail_4':
             # =========================
             # 📖 第4課詳情 (Detail View)
@@ -1119,6 +1115,331 @@ border-width: 12px 14px 12px 0; border-style: solid; border-color: transparent r
 </div>
 </div>"""
 
+        elif current_view == 'detail_5':
+            # =========================
+            # 📖 第5課詳情 (技術分析與指標應用)
+            # =========================
+            html_code = """<style>
+.npc-overlay {
+position: fixed; bottom: 30px; right: 30px;
+width: 800px; height: 85vh; max-height: 900px;
+background: rgba(15, 23, 42, 0.98);
+border: 2px solid #00D2FF; border-radius: 12px;
+z-index: 9999999; display: flex; flex-direction: column;
+padding: 25px; box-shadow: 0 8px 30px rgba(0, 210, 255, 0.4);
+color: white; animation: slideUpNPC 0.4s cubic-bezier(0.175, 0.885, 0.32, 1.275);
+}
+.top-actions { position: absolute; top: 15px; right: 20px; display: flex; gap: 12px; z-index: 10; }
+.action-btn { cursor: pointer; color: #94A3B8; font-size: 20px; font-weight:bold; transition: 0.2s; display: flex; align-items: center; justify-content: center; background: rgba(0,0,0,0.5); width: 32px; height: 32px; border-radius: 50%; border: 1px solid rgba(255,255,255,0.1); }
+.action-btn:hover { background: rgba(0,210,255,0.3); color: #FFF; transform: scale(1.1); border-color: #00D2FF; }
+.action-btn.close:hover { background: rgba(255,76,76,0.8); border-color: #FF4C4C; }
+.detail-header { display: flex; align-items: flex-end; margin-bottom: 15px; border-bottom: 1px solid rgba(255,255,255,0.1); padding-bottom: 15px; gap: 20px; }
+.npc-big-image {
+width: 160px; height: 180px;
+background-image: url('app/static/npcroxy.png'); 
+background-size: contain; background-repeat: no-repeat; background-position: bottom;
+filter: drop-shadow(0 0 10px rgba(0,210,255,0.6)); flex-shrink: 0;
+}
+.dialogue-box {
+flex: 1; background: rgba(0, 210, 255, 0.08); border: 1px solid rgba(0, 210, 255, 0.3);
+border-radius: 12px; padding: 18px; position: relative; margin-bottom: 10px;
+}
+.dialogue-box::before {
+content: ''; position: absolute; left: -14px; bottom: 30px;
+border-width: 12px 14px 12px 0; border-style: solid; border-color: transparent rgba(0, 210, 255, 0.3) transparent transparent;
+}
+.npc-name { color: #00D2FF; font-weight: bold; font-size: 20px; margin-bottom: 8px; }
+.npc-text { font-size: 15px; color: #E2E8F0; line-height: 1.6; }
+.table-container { flex: 1; overflow-y: auto; padding-right: 10px; }
+.table-container::-webkit-scrollbar { width: 8px; }
+.table-container::-webkit-scrollbar-thumb { background: rgba(0, 210, 255, 0.4); border-radius: 4px; }
+.pv-table { width: 100%; border-collapse: collapse; font-size: 13.5px; text-align: center; margin-bottom: 15px; }
+.pv-table th { background: rgba(0, 210, 255, 0.15); color: #00D2FF; padding: 10px; border-bottom: 2px solid #00D2FF; font-weight: bold; }
+.pv-table td { padding: 10px; border-bottom: 1px solid rgba(255,255,255,0.08); color: #CBD5E1; }
+.pv-table tr:hover td { background: rgba(255,255,255,0.05); color: #FFF; }
+.section-title { color: #00D2FF; font-size: 16px; font-weight: bold; margin: 20px 0 10px 0; border-left: 4px solid #00D2FF; padding-left: 8px; }
+.info-box { background: rgba(0, 210, 255, 0.05); border: 1px solid rgba(0, 210, 255, 0.2); border-radius: 8px; padding: 12px; margin-bottom: 15px; font-size: 14px; color: #CBD5E1; line-height: 1.6; }
+.info-box span { color: #FFD700; font-weight: bold; }
+@keyframes slideUpNPC { from { transform: translateY(100px) scale(0.8); opacity: 0; } to { transform: translateY(0) scale(1); opacity: 1; } }
+</style>
+<div class="npc-overlay">
+<div class="top-actions">
+<label class="action-btn back" id="btn-back-detail" title="回到籌碼導師選單">←</label>
+<label class="action-btn close" id="btn-close-detail" title="關閉">✕</label>
+</div>
+<div class="detail-header">
+<div class="npc-big-image"></div>
+<div class="dialogue-box">
+<div class="npc-name">籌碼導師 蘿西</div>
+<div class="npc-text">「冒險者！技術指標可不是單純告訴你『買』或『賣』的魔法棒！它就像裝備上的屬性雷達，幫你從不同角度觀察市場的『方向、動能、熱度、節奏與波動』。來看看這張儀表板吧！」</div>
+</div>
+</div>
+<div class="table-container">
+
+<div class="info-box">
+    <b>🧭 指標核心雷達：</b><br>
+    📈 MA 看方向 ｜ ⚡ MACD 看動能 ｜ 🌡️ RSI 看熱度 ｜ 🎢 KDJ 看短線節奏 ｜ 📏 BBW 看波動
+</div>
+
+<div class="section-title">📊 綜合總表 ①：五大指標數值判讀</div>
+<table class="pv-table">
+<thead>
+<tr><th width="15%">指標</th><th width="28%">🟢 偏多／轉強</th><th width="28%">🟡 中性／觀察</th><th width="29%">🔴 偏空／轉弱</th></tr>
+</thead>
+<tbody>
+<tr><td><b>📈 MA</b></td><td style="text-align: left;">股價 > MA<br>均線向上、多頭排列</td><td style="text-align: left;">股價接近 MA<br>均線糾結</td><td style="text-align: left;">股價 < MA<br>均線向下、空頭排列</td></tr>
+<tr><td><b>⚡ MACD</b></td><td style="text-align: left;">DIF > DEA<br>柱體增加、0軸上方較強</td><td style="text-align: left;">DIF 接近 DEA<br>柱體縮小</td><td style="text-align: left;">DIF < DEA<br>柱體減少、0軸下方較弱</td></tr>
+<tr><td><b>🌡️ RSI</b></td><td style="text-align: left;">50～70 偏多<br>70↑ 偏熱</td><td style="text-align: left;">40～50 多空拉鋸</td><td style="text-align: left;">30～40 偏弱<br>30↓ 偏冷</td></tr>
+<tr><td><b>🎢 KDJ</b></td><td style="text-align: left;">K、D > 50<br>低檔黃金交叉可觀察</td><td style="text-align: left;">20～80 一般震盪區</td><td style="text-align: left;">K、D < 50<br>高檔死亡交叉偏弱</td></tr>
+<tr><td><b>📏 BBW</b></td><td style="text-align: left;">帶寬由低檔開始擴張<br>搭配向上突破</td><td style="text-align: left;">歷史 25～75% 百分位</td><td style="text-align: left;">單純收縮不代表偏空<br>0～10% 為極度收縮，需等待方向</td></tr>
+</tbody>
+</table>
+
+<div class="info-box" style="border-color: rgba(255, 215, 0, 0.4); background: rgba(255, 215, 0, 0.05);">
+    <b style="color: #FFD700;">📌 蘿西特別提醒：BBW (布林通道寬度)</b><br>
+    BBW 最適合用「歷史百分位」判斷：<br>
+    🔹 0～10%：極度收縮 ｜ 🔹 10～25%：收縮整理 ｜ 🔹 25～75%：正常波動 ｜ 🔹 75～90%：波動擴張 ｜ 🔹 90～100%：極度擴張<br>
+    <br>
+    它不像 RSI 單純分成多空，而是用來回答你：<b>「市場正在蓄力，還是行情正在爆發？」</b>
+</div>
+
+<div class="section-title">🎯 綜合總表 ②：多指標狀態判讀</div>
+<table class="pv-table">
+<thead>
+<tr>
+    <th width="14%">市場狀態</th>
+    <th width="16%">MA 趨勢</th>
+    <th width="20%">MACD 動能</th>
+    <th width="20%">RSI／KDJ</th>
+    <th width="15%">BBW 波動</th>
+    <th width="15%">綜合解讀</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+    <td style="color:#60A5FA; font-weight:bold;">🔵 蓄力整理</td>
+    <td>均線糾結</td>
+    <td>接近 0 軸</td>
+    <td>RSI 40～60<br>KDJ 震盪</td>
+    <td>↓↓ 極度收縮</td>
+    <td>市場等待突破</td>
+</tr>
+<tr>
+    <td style="color:#4ADE80; font-weight:bold;">🚀 向上突破</td>
+    <td>股價突破均線或壓力</td>
+    <td>DIF > DEA<br>動能↑</td>
+    <td>RSI > 50<br>KDJ 偏多</td>
+    <td>↑ 開始擴張</td>
+    <td>多方可能轉強</td>
+</tr>
+<tr>
+    <td style="color:#4ADE80; font-weight:bold;">🟢 多頭趨勢</td>
+    <td>股價 > MA<br>均線向上</td>
+    <td>0軸上 / 偏多</td>
+    <td>RSI 50～70</td>
+    <td>正常或持續擴張</td>
+    <td>趨勢偏多</td>
+</tr>
+<tr>
+    <td style="color:#FF7676; font-weight:bold;">🔥 強勢加速</td>
+    <td>多頭排列</td>
+    <td>柱體↑↑</td>
+    <td>RSI 70↑<br>KDJ高檔</td>
+    <td>↑↑ 快速擴張</td>
+    <td>強勢但波動風險提高</td>
+</tr>
+<tr>
+    <td style="color:#FACC15; font-weight:bold;">🟡 高檔過熱</td>
+    <td>仍維持多頭</td>
+    <td>動能開始縮小</td>
+    <td>RSI > 70<br>KDJ > 80</td>
+    <td>高檔擴張或開始收斂</td>
+    <td>注意追高與轉弱</td>
+</tr>
+<tr>
+    <td style="color:#FB923C; font-weight:bold;">🟠 趨勢轉弱</td>
+    <td>跌破短均線</td>
+    <td>柱體縮小<br>死亡交叉</td>
+    <td>RSI 跌破 50</td>
+    <td>波動可能收縮或轉向</td>
+    <td>多方力道減弱</td>
+</tr>
+<tr>
+    <td style="color:#F87171; font-weight:bold;">🔴 空頭趨勢</td>
+    <td>股價 < MA<br>均線向下</td>
+    <td>DIF < DEA<br>0軸下</td>
+    <td>RSI < 40<br>KDJ 偏弱</td>
+    <td>向下時可能擴張</td>
+    <td>空方占優</td>
+</tr>
+<tr>
+    <td style="color:#CBD5E1; font-weight:bold;">⚪ 盤整觀望</td>
+    <td>均線糾結</td>
+    <td>接近 0 軸</td>
+    <td>RSI 40～60</td>
+    <td>正常或收縮</td>
+    <td>尚未形成明確方向</td>
+</tr>
+</tbody>
+</table>
+
+</div>
+</div>"""
+
+        elif current_view == 'detail_6':
+            # =========================
+            # 📖 第6課詳情 (籌碼面追蹤：法人與大戶結構)
+            # =========================
+            html_code = """<style>
+.npc-overlay {
+position: fixed; bottom: 30px; right: 30px;
+width: 800px; height: 85vh; max-height: 900px;
+background: rgba(15, 23, 42, 0.98);
+border: 2px solid #00D2FF; border-radius: 12px;
+z-index: 9999999; display: flex; flex-direction: column;
+padding: 25px; box-shadow: 0 8px 30px rgba(0, 210, 255, 0.4);
+color: white; animation: slideUpNPC 0.4s cubic-bezier(0.175, 0.885, 0.32, 1.275);
+}
+.top-actions { position: absolute; top: 15px; right: 20px; display: flex; gap: 12px; z-index: 10; }
+.action-btn { cursor: pointer; color: #94A3B8; font-size: 20px; font-weight:bold; transition: 0.2s; display: flex; align-items: center; justify-content: center; background: rgba(0,0,0,0.5); width: 32px; height: 32px; border-radius: 50%; border: 1px solid rgba(255,255,255,0.1); }
+.action-btn:hover { background: rgba(0,210,255,0.3); color: #FFF; transform: scale(1.1); border-color: #00D2FF; }
+.action-btn.close:hover { background: rgba(255,76,76,0.8); border-color: #FF4C4C; }
+.detail-header { display: flex; align-items: flex-end; margin-bottom: 15px; border-bottom: 1px solid rgba(255,255,255,0.1); padding-bottom: 15px; gap: 20px; }
+.npc-big-image {
+width: 160px; height: 180px;
+background-image: url('app/static/npcroxy.png'); 
+background-size: contain; background-repeat: no-repeat; background-position: bottom;
+filter: drop-shadow(0 0 10px rgba(0,210,255,0.6)); flex-shrink: 0;
+}
+.dialogue-box {
+flex: 1; background: rgba(0, 210, 255, 0.08); border: 1px solid rgba(0, 210, 255, 0.3);
+border-radius: 12px; padding: 18px; position: relative; margin-bottom: 10px;
+}
+.dialogue-box::before {
+content: ''; position: absolute; left: -14px; bottom: 30px;
+border-width: 12px 14px 12px 0; border-style: solid; border-color: transparent rgba(0, 210, 255, 0.3) transparent transparent;
+}
+.npc-name { color: #00D2FF; font-weight: bold; font-size: 20px; margin-bottom: 8px; }
+.npc-text { font-size: 15px; color: #E2E8F0; line-height: 1.6; }
+.table-container { flex: 1; overflow-y: auto; padding-right: 10px; }
+.table-container::-webkit-scrollbar { width: 8px; }
+.table-container::-webkit-scrollbar-thumb { background: rgba(0, 210, 255, 0.4); border-radius: 4px; }
+.pv-table { width: 100%; border-collapse: collapse; font-size: 14px; text-align: center; margin-bottom: 15px; }
+.pv-table th { background: rgba(0, 210, 255, 0.15); color: #00D2FF; padding: 10px; border-bottom: 2px solid #00D2FF; font-weight: bold; }
+.pv-table td { padding: 10px; border-bottom: 1px solid rgba(255,255,255,0.08); color: #CBD5E1; }
+.pv-table tr:hover td { background: rgba(255,255,255,0.05); color: #FFF; }
+.section-title { color: #00D2FF; font-size: 16px; font-weight: bold; margin: 15px 0 8px 0; border-left: 4px solid #00D2FF; padding-left: 8px; }
+@keyframes slideUpNPC { from { transform: translateY(100px) scale(0.8); opacity: 0; } to { transform: translateY(0) scale(1); opacity: 1; } }
+</style>
+<div class="npc-overlay">
+<div class="top-actions">
+<label class="action-btn back" id="btn-back-detail" title="回到籌碼導師選單">←</label>
+<label class="action-btn close" id="btn-close-detail" title="關閉">✕</label>
+</div>
+<div class="detail-header">
+<div class="npc-big-image"></div>
+<div class="dialogue-box">
+<div class="npc-name">籌碼導師 蘿西</div>
+<div class="npc-text">「冒險者！市場上真正能呼風喚雨的，往往是那些掌握龐大資金的『法人』與『大戶』。透過這張籌碼結構表，我們可以看穿『誰在買』、『籌碼是集中還是分散』，進而判斷買盤的延續性喔！」</div>
+</div>
+</div>
+<div class="table-container">
+
+<div class="section-title">📊 綜合總表 ①：法人、大戶與分點怎麼看？</div>
+<table class="pv-table">
+<thead>
+<tr>
+    <th width="18%">觀察對象</th>
+    <th width="28%">主要看什麼</th>
+    <th width="18%">🟢 偏多／集中</th>
+    <th width="18%">🟡 觀察</th>
+    <th width="18%">🔴 偏空／分散</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+    <td><b>🌍 外資</b></td>
+    <td style="text-align: left;">連續買賣超、持股變化</td>
+    <td style="color:#4ADE80; font-weight:bold;">連續買超／持股↑</td>
+    <td style="color:#FACC15;">買賣互有</td>
+    <td style="color:#F87171; font-weight:bold;">連續賣超／持股↓</td>
+</tr>
+<tr>
+    <td><b>🏦 投信</b></td>
+    <td style="text-align: left;">連續買賣超</td>
+    <td style="color:#4ADE80; font-weight:bold;">連續買超</td>
+    <td style="color:#FACC15;">間歇性買超</td>
+    <td style="color:#F87171; font-weight:bold;">連續賣超</td>
+</tr>
+<tr>
+    <td><b>⚙️ 自營商</b></td>
+    <td style="text-align: left;">買賣超方向</td>
+    <td style="color:#4ADE80; font-weight:bold;">持續買超</td>
+    <td style="color:#FACC15;">方向反覆</td>
+    <td style="color:#F87171; font-weight:bold;">持續賣超</td>
+</tr>
+<tr>
+    <td><b>🦈 400 張以上</b></td>
+    <td style="text-align: left;">中大型持有人變化</td>
+    <td style="color:#4ADE80; font-weight:bold;">人數↓／持股↑</td>
+    <td style="color:#FACC15;">變化不明顯</td>
+    <td style="color:#F87171; font-weight:bold;">人數↑／持股↓</td>
+</tr>
+<tr>
+    <td><b>🐋 1,000 張以上</b></td>
+    <td style="text-align: left;">大型持有人集中度</td>
+    <td style="color:#4ADE80; font-weight:bold;">持股↑／集中↑</td>
+    <td style="color:#FACC15;">持平</td>
+    <td style="color:#F87171; font-weight:bold;">持股↓／集中↓</td>
+</tr>
+<tr>
+    <td><b>🔍 單一分點</b></td>
+    <td style="text-align: left;">連續買超與成交占比</td>
+    <td style="color:#4ADE80; font-weight:bold;">連續買超／集中度↑</td>
+    <td style="color:#FACC15;">單日異常</td>
+    <td style="color:#F87171; font-weight:bold;">連續賣超</td>
+</tr>
+<tr>
+    <td><b>🏢 券商群聚</b></td>
+    <td style="text-align: left;">同券商多分點方向</td>
+    <td style="color:#4ADE80; font-weight:bold;">多分點同步買超</td>
+    <td style="color:#FACC15;">分點分歧</td>
+    <td style="color:#F87171; font-weight:bold;">多分點同步賣超</td>
+</tr>
+</tbody>
+</table>
+
+<div class="section-title">🏛️ 延伸觀察：內部人與董監持股</div>
+<table class="pv-table">
+<thead>
+<tr>
+    <th width="35%">項目</th>
+    <th width="65%">觀察重點</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+    <td><b>🏛️ 董監持股比例</b></td>
+    <td style="text-align: left;">公司內部人持股結構</td>
+</tr>
+<tr>
+    <td><b>📈 董監持股變化</b></td>
+    <td style="text-align: left;">是否增加或減少</td>
+</tr>
+<tr>
+    <td><b>🔒 質押比例</b></td>
+    <td style="text-align: left;">持股是否存在較高財務壓力</td>
+</tr>
+<tr>
+    <td><b>👥 主要股東</b></td>
+    <td style="text-align: left;">股權是否過度集中或出現重大變化</td>
+</tr>
+</tbody>
+</table>
+
+</div>
+</div>"""
+
         elif current_view == 'detail_7':
             # =========================
             # 📖 第7課詳情 (券資關係與融資融券)
@@ -1193,6 +1514,539 @@ border-width: 12px 14px 12px 0; border-style: solid; border-color: transparent r
 </div>
 </div>"""
 
+        elif current_view == 'detail_8':
+            # =========================
+            # 📖 第8課詳情 (產業趨勢與題材)
+            # =========================
+            html_code = """<style>
+.npc-overlay {
+position: fixed; bottom: 30px; right: 30px;
+width: 800px; height: 85vh; max-height: 900px;
+background: rgba(15, 23, 42, 0.98);
+border: 2px solid #00D2FF; border-radius: 12px;
+z-index: 9999999; display: flex; flex-direction: column;
+padding: 25px; box-shadow: 0 8px 30px rgba(0, 210, 255, 0.4);
+color: white; animation: slideUpNPC 0.4s cubic-bezier(0.175, 0.885, 0.32, 1.275);
+}
+.top-actions { position: absolute; top: 15px; right: 20px; display: flex; gap: 12px; z-index: 10; }
+.action-btn { cursor: pointer; color: #94A3B8; font-size: 20px; font-weight:bold; transition: 0.2s; display: flex; align-items: center; justify-content: center; background: rgba(0,0,0,0.5); width: 32px; height: 32px; border-radius: 50%; border: 1px solid rgba(255,255,255,0.1); }
+.action-btn:hover { background: rgba(0,210,255,0.3); color: #FFF; transform: scale(1.1); border-color: #00D2FF; }
+.action-btn.close:hover { background: rgba(255,76,76,0.8); border-color: #FF4C4C; }
+.detail-header { display: flex; align-items: flex-end; margin-bottom: 15px; border-bottom: 1px solid rgba(255,255,255,0.1); padding-bottom: 15px; gap: 20px; }
+.npc-big-image {
+width: 160px; height: 180px;
+background-image: url('app/static/npcroxy.png'); 
+background-size: contain; background-repeat: no-repeat; background-position: bottom;
+filter: drop-shadow(0 0 10px rgba(0,210,255,0.6)); flex-shrink: 0;
+}
+.dialogue-box {
+flex: 1; background: rgba(0, 210, 255, 0.08); border: 1px solid rgba(0, 210, 255, 0.3);
+border-radius: 12px; padding: 18px; position: relative; margin-bottom: 10px;
+}
+.dialogue-box::before {
+content: ''; position: absolute; left: -14px; bottom: 30px;
+border-width: 12px 14px 12px 0; border-style: solid; border-color: transparent rgba(0, 210, 255, 0.3) transparent transparent;
+}
+.npc-name { color: #00D2FF; font-weight: bold; font-size: 20px; margin-bottom: 8px; }
+.npc-text { font-size: 15px; color: #E2E8F0; line-height: 1.6; }
+.table-container { flex: 1; overflow-y: auto; padding-right: 10px; }
+.table-container::-webkit-scrollbar { width: 8px; }
+.table-container::-webkit-scrollbar-thumb { background: rgba(0, 210, 255, 0.4); border-radius: 4px; }
+.pv-table { width: 100%; border-collapse: collapse; font-size: 14px; text-align: center; margin-bottom: 15px; }
+.pv-table th { background: rgba(0, 210, 255, 0.15); color: #00D2FF; padding: 10px; border-bottom: 2px solid #00D2FF; font-weight: bold; }
+.pv-table td { padding: 10px; border-bottom: 1px solid rgba(255,255,255,0.08); color: #CBD5E1; }
+.pv-table tr:hover td { background: rgba(255,255,255,0.05); color: #FFF; }
+.section-title { color: #00D2FF; font-size: 16px; font-weight: bold; margin: 20px 0 10px 0; border-left: 4px solid #00D2FF; padding-left: 8px; }
+.info-box { background: rgba(0, 210, 255, 0.05); border: 1px solid rgba(0, 210, 255, 0.2); border-radius: 8px; padding: 15px; margin-bottom: 15px; font-size: 14px; color: #CBD5E1; line-height: 1.6; }
+.info-box ul { margin: 8px 0 0 20px; padding: 0; }
+.tree-container { background: rgba(0,0,0,0.3); border: 1px dashed rgba(0,210,255,0.4); border-radius: 12px; padding: 20px; text-align: center; margin-bottom: 20px; }
+.tree-row { display: flex; justify-content: center; gap: 30px; margin: 10px 0; }
+.tree-node { background: rgba(0, 210, 255, 0.15); border: 1px solid #00D2FF; color: white; padding: 8px 16px; border-radius: 8px; font-weight: bold; box-shadow: 0 0 10px rgba(0,210,255,0.2); }
+.tree-arrow { color: #94A3B8; font-size: 18px; margin: 5px 0; }
+@keyframes slideUpNPC { from { transform: translateY(100px) scale(0.8); opacity: 0; } to { transform: translateY(0) scale(1); opacity: 1; } }
+</style>
+<div class="npc-overlay">
+<div class="top-actions">
+<label class="action-btn back" id="btn-back-detail" title="回到籌碼導師選單">←</label>
+<label class="action-btn close" id="btn-close-detail" title="關閉">✕</label>
+</div>
+<div class="detail-header">
+<div class="npc-big-image"></div>
+<div class="dialogue-box">
+<div class="npc-name">籌碼導師 蘿西</div>
+<div class="npc-text">「冒險者，市場資金就像流水，哪裡有『題材』就往哪裡去！但別只盯著一檔股票，真正的強勢產業會引發『族群共振』。當上下游供應鏈同步轉強，才代表大部隊資金真的進場囉！」</div>
+</div>
+</div>
+<div class="table-container">
+
+<div class="info-box">
+    <b style="color: #FFD700;">🎯 重點不是追逐熱門，而是問自己這四個問題：</b>
+    <ul>
+        <li>「市場現在在炒什麼？」</li>
+        <li>「是單一股票上漲，還是整個族群開始 <b>共振</b>？」</li>
+        <li>「這個題材有沒有實際產業基本面支撐？」</li>
+        <li>「目前是剛起漲、持續發展，還是已經過熱？」</li>
+    </ul>
+</div>
+
+<div class="section-title">🌊 資金輪動與題材階段解讀</div>
+<table class="pv-table">
+<thead>
+<tr>
+    <th width="20%">題材階段</th>
+    <th width="25%">族群共振</th>
+    <th width="55%">初步解讀</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+    <td style="color:#60A5FA; font-weight:bold;">🌱 題材萌芽</td>
+    <td>單點啟動</td>
+    <td style="text-align: left;">少數公司開始受到關注，可能是早期題材，尚未擴散。</td>
+</tr>
+<tr>
+    <td style="color:#4ADE80; font-weight:bold;">🚀 趨勢成長</td>
+    <td>局部共振</td>
+    <td style="text-align: left;">上下游開始陸續轉強，產業趨勢逐漸形成，資金慢慢流入。</td>
+</tr>
+<tr>
+    <td style="color:#FACC15; font-weight:bold;">🧩 族群共振</td>
+    <td>全產業擴散</td>
+    <td style="text-align: left;">多家公司、不同環節同步走強，資金高度集中於該產業。</td>
+</tr>
+<tr>
+    <td style="color:#FF7676; font-weight:bold;">🔥 市場主流</td>
+    <td>強烈共振</td>
+    <td style="text-align: left;">產業討論度極高、族群全面活躍，主流題材確立，但須注意追高風險。</td>
+</tr>
+<tr>
+    <td style="color:#FB923C; font-weight:bold;">⚠️ 高檔過熱</td>
+    <td>共振開始分歧</td>
+    <td style="text-align: left;">多數股票已大幅上漲，強弱開始分明，注意資金輪動與獲利了結賣壓。</td>
+</tr>
+<tr>
+    <td style="color:#94A3B8; font-weight:bold;">🌙 題材退燒</td>
+    <td>共振消失</td>
+    <td style="text-align: left;">強勢股減少、資金明顯撤離，產業可能進入中長期整理或退潮。</td>
+</tr>
+</tbody>
+</table>
+
+<div class="section-title">🧩 供應鏈結構範例 (以 AI 產業為例)</div>
+<div class="tree-container">
+    <div class="tree-row">
+        <div class="tree-node" style="border-color: #FFD700; color: #FFD700;">🧠 AI 晶片</div>
+    </div>
+    <div class="tree-arrow">⬇️</div>
+    <div class="tree-row">
+        <div class="tree-node">🖥️ 伺服器組裝</div>
+        <div class="tree-node">🔌 電源供應器</div>
+    </div>
+    <div class="tree-arrow">⬇️</div>
+    <div class="tree-row">
+        <div class="tree-node">❄️ 散熱模組</div>
+        <div class="tree-node">🟩 伺服器 PCB</div>
+        <div class="tree-node">🌐 網通設備</div>
+    </div>
+    <div style="margin-top: 15px; font-size: 13px; color: #94A3B8;">
+        💡 觀察重點：如果只有晶片廠漲，是「單點啟動」；<br>如果連散熱、PCB、網通都一起大漲，就是強烈的「族群共振」！
+    </div>
+</div>
+
+</div>
+</div>"""
+
+        elif current_view == 'detail_9':
+            # =========================
+            # 📖 第9課詳情 (資金控管與風險管理)
+            # =========================
+            html_code = """<style>
+.npc-overlay {
+position: fixed; bottom: 30px; right: 30px;
+width: 800px; height: 85vh; max-height: 900px;
+background: rgba(15, 23, 42, 0.98);
+border: 2px solid #00D2FF; border-radius: 12px;
+z-index: 9999999; display: flex; flex-direction: column;
+padding: 25px; box-shadow: 0 8px 30px rgba(0, 210, 255, 0.4);
+color: white; animation: slideUpNPC 0.4s cubic-bezier(0.175, 0.885, 0.32, 1.275);
+}
+.top-actions { position: absolute; top: 15px; right: 20px; display: flex; gap: 12px; z-index: 10; }
+.action-btn { cursor: pointer; color: #94A3B8; font-size: 20px; font-weight:bold; transition: 0.2s; display: flex; align-items: center; justify-content: center; background: rgba(0,0,0,0.5); width: 32px; height: 32px; border-radius: 50%; border: 1px solid rgba(255,255,255,0.1); }
+.action-btn:hover { background: rgba(0,210,255,0.3); color: #FFF; transform: scale(1.1); border-color: #00D2FF; }
+.action-btn.close:hover { background: rgba(255,76,76,0.8); border-color: #FF4C4C; }
+.detail-header { display: flex; align-items: flex-end; margin-bottom: 15px; border-bottom: 1px solid rgba(255,255,255,0.1); padding-bottom: 15px; gap: 20px; }
+.npc-big-image {
+width: 160px; height: 180px;
+background-image: url('app/static/npcroxy.png'); 
+background-size: contain; background-repeat: no-repeat; background-position: bottom;
+filter: drop-shadow(0 0 10px rgba(0,210,255,0.6)); flex-shrink: 0;
+}
+.dialogue-box {
+flex: 1; background: rgba(0, 210, 255, 0.08); border: 1px solid rgba(0, 210, 255, 0.3);
+border-radius: 12px; padding: 18px; position: relative; margin-bottom: 10px;
+}
+.dialogue-box::before {
+content: ''; position: absolute; left: -14px; bottom: 30px;
+border-width: 12px 14px 12px 0; border-style: solid; border-color: transparent rgba(0, 210, 255, 0.3) transparent transparent;
+}
+.npc-name { color: #00D2FF; font-weight: bold; font-size: 20px; margin-bottom: 8px; }
+.npc-text { font-size: 15px; color: #E2E8F0; line-height: 1.6; }
+.table-container { flex: 1; overflow-y: auto; padding-right: 10px; }
+.table-container::-webkit-scrollbar { width: 8px; }
+.table-container::-webkit-scrollbar-thumb { background: rgba(0, 210, 255, 0.4); border-radius: 4px; }
+.pv-table { width: 100%; border-collapse: collapse; font-size: 13.5px; text-align: center; margin-bottom: 15px; }
+.pv-table th { background: rgba(0, 210, 255, 0.15); color: #00D2FF; padding: 10px; border-bottom: 2px solid #00D2FF; font-weight: bold; }
+.pv-table td { padding: 10px; border-bottom: 1px solid rgba(255,255,255,0.08); color: #CBD5E1; }
+.pv-table tr:hover td { background: rgba(255,255,255,0.05); color: #FFF; }
+.section-title { color: #00D2FF; font-size: 16px; font-weight: bold; margin: 20px 0 10px 0; border-left: 4px solid #00D2FF; padding-left: 8px; }
+.info-box { background: rgba(0, 210, 255, 0.05); border: 1px solid rgba(0, 210, 255, 0.2); border-radius: 8px; padding: 15px; margin-bottom: 15px; font-size: 14px; color: #CBD5E1; line-height: 1.6; }
+.info-box ul { margin: 8px 0 8px 20px; padding: 0; }
+@keyframes slideUpNPC { from { transform: translateY(100px) scale(0.8); opacity: 0; } to { transform: translateY(0) scale(1); opacity: 1; } }
+</style>
+<div class="npc-overlay">
+<div class="top-actions">
+<label class="action-btn back" id="btn-back-detail" title="回到籌碼導師選單">←</label>
+<label class="action-btn close" id="btn-close-detail" title="關閉">✕</label>
+</div>
+<div class="detail-header">
+<div class="npc-big-image"></div>
+<div class="dialogue-box">
+<div class="npc-name">籌碼導師 蘿西</div>
+<div class="npc-text">「冒險者！在市場裡活下來，比賺多少錢更重要！資金控管就是你的護城河與保命裝備。別總想著『重壓一把』，學會根據大盤環境調整資金比例，才能在股海裡安穩航行喔！」</div>
+</div>
+</div>
+<div class="table-container">
+
+<div class="info-box">
+    <b style="color: #FFD700;">🛡️ 進場前，先問自己這三個靈魂拷問：</b>
+    <ul>
+        <li>「現在的大盤環境適合投入多少？」</li>
+        <li>「我的資金應該保留多少？」</li>
+        <li>「單一股票最多可以承擔多少風險？」</li>
+    </ul>
+    💡 <b>大原則：</b><br>
+    🟢 大盤越明確 → 可以考慮提高配置<br>
+    🟡 大盤越震盪 → 降低單筆部位、增加分批操作<br>
+    🔴 大盤越弱 → 優先提高現金與風險控制
+</div>
+
+<div class="section-title">📉 大盤環境與資金配置思維</div>
+<table class="pv-table">
+<thead>
+<tr>
+    <th width="18%">大盤狀態</th>
+    <th width="35%">市場特徵</th>
+    <th width="32%">資金配置思維</th>
+    <th width="15%">投入部位</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+    <td style="color:#4ADE80; font-weight:bold;">🚀 多頭趨勢</td>
+    <td style="text-align: left;">高低點持續墊高、趨勢明確</td>
+    <td style="text-align: left;">可逐步提高市場參與度</td>
+    <td style="color:#4ADE80; font-weight:bold;">🟢 較高</td>
+</tr>
+<tr>
+    <td style="color:#60A5FA; font-weight:bold;">🟢 偏多震盪</td>
+    <td style="text-align: left;">大方向偏多，但短線來回震盪</td>
+    <td style="text-align: left;">保留部分現金、分批配置</td>
+    <td style="color:#FACC15; font-weight:bold;">🟡 中高</td>
+</tr>
+<tr>
+    <td style="color:#FACC15; font-weight:bold;">🟡 區間震盪</td>
+    <td style="text-align: left;">上下來回、方向不明</td>
+    <td style="text-align: left;">控制總曝險，避免重壓</td>
+    <td style="color:#FACC15; font-weight:bold;">🟡 中低</td>
+</tr>
+<tr>
+    <td style="color:#FB923C; font-weight:bold;">🟠 偏空震盪</td>
+    <td style="text-align: left;">反彈後仍容易出現賣壓</td>
+    <td style="text-align: left;">降低部位、提高現金比例</td>
+    <td style="color:#FB923C; font-weight:bold;">🟠 低</td>
+</tr>
+<tr>
+    <td style="color:#F87171; font-weight:bold;">🔴 空頭趨勢</td>
+    <td style="text-align: left;">高低點持續下降</td>
+    <td style="text-align: left;">優先控制風險</td>
+    <td style="color:#F87171; font-weight:bold;">🔴 很低/觀望</td>
+</tr>
+</tbody>
+</table>
+
+<div class="section-title">⚔️ 實戰策略：投資狀態與風險重點</div>
+<table class="pv-table">
+<thead>
+<tr>
+    <th width="24%">投資狀態</th>
+    <th width="14%">總資金配置</th>
+    <th width="14%">單筆投入</th>
+    <th width="20%">操作方式</th>
+    <th width="28%">風險重點</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+    <td style="color:#4ADE80; font-weight:bold; text-align:left;">🚀 大盤強＋個股強</td>
+    <td>較高</td>
+    <td>中～較高</td>
+    <td>分批進場</td>
+    <td style="text-align:left;">不因看好而一次滿倉</td>
+</tr>
+<tr>
+    <td style="color:#60A5FA; font-weight:bold; text-align:left;">🟢 大盤偏多＋個股強</td>
+    <td>中高</td>
+    <td>中等</td>
+    <td>分批建立部位</td>
+    <td style="text-align:left;">注意市場突然轉弱</td>
+</tr>
+<tr>
+    <td style="color:#FACC15; font-weight:bold; text-align:left;">🟡 大盤震盪＋個股強</td>
+    <td>中低</td>
+    <td>小～中</td>
+    <td>分批或試單</td>
+    <td style="text-align:left;">避免追高與重壓</td>
+</tr>
+<tr>
+    <td style="color:#FB923C; font-weight:bold; text-align:left;">🟠 大盤弱＋個股逆勢強</td>
+    <td>低</td>
+    <td>小</td>
+    <td>嚴格控制風險</td>
+    <td style="text-align:left;">個股可能受大盤拖累</td>
+</tr>
+<tr>
+    <td style="color:#F87171; font-weight:bold; text-align:left;">🔴 大盤弱＋個股弱</td>
+    <td>很低</td>
+    <td>極低或不投入</td>
+    <td>觀望</td>
+    <td style="text-align:left;">避免逆勢攤平</td>
+</tr>
+<tr>
+    <td style="color:#bc13fe; font-weight:bold; text-align:left;">🚨 連續判斷錯誤</td>
+    <td>降低</td>
+    <td>明顯降低</td>
+    <td>暫停或重新檢討</td>
+    <td style="text-align:left;">防止情緒化交易</td>
+</tr>
+</tbody>
+</table>
+
+</div>
+</div>"""
+
+        elif current_view == 'detail_10':
+            # =========================
+            # 📖 第10課詳情 (交易心理學與個人策略)
+            # =========================
+            html_code = """<style>
+.npc-overlay {
+position: fixed; bottom: 30px; right: 30px;
+width: 800px; height: 85vh; max-height: 900px;
+background: rgba(15, 23, 42, 0.98);
+border: 2px solid #00D2FF; border-radius: 12px;
+z-index: 9999999; display: flex; flex-direction: column;
+padding: 25px; box-shadow: 0 8px 30px rgba(0, 210, 255, 0.4);
+color: white; animation: slideUpNPC 0.4s cubic-bezier(0.175, 0.885, 0.32, 1.275);
+}
+.top-actions { position: absolute; top: 15px; right: 20px; display: flex; gap: 12px; z-index: 10; }
+.action-btn { cursor: pointer; color: #94A3B8; font-size: 20px; font-weight:bold; transition: 0.2s; display: flex; align-items: center; justify-content: center; background: rgba(0,0,0,0.5); width: 32px; height: 32px; border-radius: 50%; border: 1px solid rgba(255,255,255,0.1); }
+.action-btn:hover { background: rgba(0,210,255,0.3); color: #FFF; transform: scale(1.1); border-color: #00D2FF; }
+.action-btn.close:hover { background: rgba(255,76,76,0.8); border-color: #FF4C4C; }
+.detail-header { display: flex; align-items: flex-end; margin-bottom: 15px; border-bottom: 1px solid rgba(255,255,255,0.1); padding-bottom: 15px; gap: 20px; }
+.npc-big-image {
+width: 160px; height: 180px;
+background-image: url('app/static/npcroxy.png'); 
+background-size: contain; background-repeat: no-repeat; background-position: bottom;
+filter: drop-shadow(0 0 10px rgba(0,210,255,0.6)); flex-shrink: 0;
+}
+.dialogue-box {
+flex: 1; background: rgba(0, 210, 255, 0.08); border: 1px solid rgba(0, 210, 255, 0.3);
+border-radius: 12px; padding: 18px; position: relative; margin-bottom: 10px;
+}
+.dialogue-box::before {
+content: ''; position: absolute; left: -14px; bottom: 30px;
+border-width: 12px 14px 12px 0; border-style: solid; border-color: transparent rgba(0, 210, 255, 0.3) transparent transparent;
+}
+.npc-name { color: #00D2FF; font-weight: bold; font-size: 20px; margin-bottom: 8px; }
+.npc-text { font-size: 15px; color: #E2E8F0; line-height: 1.6; }
+.table-container { flex: 1; overflow-y: auto; padding-right: 10px; }
+.table-container::-webkit-scrollbar { width: 8px; }
+.table-container::-webkit-scrollbar-thumb { background: rgba(0, 210, 255, 0.4); border-radius: 4px; }
+.pv-table { width: 100%; border-collapse: collapse; font-size: 13.5px; text-align: center; margin-bottom: 15px; }
+.pv-table th { background: rgba(0, 210, 255, 0.15); color: #00D2FF; padding: 10px; border-bottom: 2px solid #00D2FF; font-weight: bold; }
+.pv-table td { padding: 10px; border-bottom: 1px solid rgba(255,255,255,0.08); color: #CBD5E1; }
+.pv-table tr:hover td { background: rgba(255,255,255,0.05); color: #FFF; }
+.section-title { color: #00D2FF; font-size: 16px; font-weight: bold; margin: 20px 0 10px 0; border-left: 4px solid #00D2FF; padding-left: 8px; }
+.info-box { background: rgba(255, 76, 76, 0.05); border: 1px solid rgba(255, 76, 76, 0.3); border-radius: 8px; padding: 15px; margin-bottom: 15px; font-size: 14px; color: #CBD5E1; line-height: 1.6; }
+.path-container { background: rgba(0,0,0,0.3); border: 1px dashed rgba(0,210,255,0.4); border-radius: 12px; padding: 15px; text-align: center; margin-bottom: 15px; line-height: 2.2; }
+.path-step { background: rgba(0, 210, 255, 0.1); padding: 5px 10px; border-radius: 5px; font-weight: bold; color: #FFF; margin: 0 5px; display: inline-block; }
+.tree-node { background: rgba(0, 210, 255, 0.15); border: 1px solid #00D2FF; color: white; padding: 8px 16px; border-radius: 8px; font-weight: bold; box-shadow: 0 0 10px rgba(0,210,255,0.2); }
+@keyframes slideUpNPC { from { transform: translateY(100px) scale(0.8); opacity: 0; } to { transform: translateY(0) scale(1); opacity: 1; } }
+</style>
+<div class="npc-overlay">
+<div class="top-actions">
+<label class="action-btn back" id="btn-back-detail" title="回到籌碼導師選單">←</label>
+<label class="action-btn close" id="btn-close-detail" title="關閉">✕</label>
+</div>
+<div class="detail-header">
+<div class="npc-big-image"></div>
+<div class="dialogue-box">
+<div class="npc-name">籌碼導師 蘿西</div>
+<div class="npc-text">「冒險者，恭喜你來到最後一關！技術再好，如果心態崩了也是白搭。真正成熟的投資者，不代表每天都要交易，而是知道『什麼時候值得出手』、『什麼時候該收手』。讓我們建立屬於你的交易系統吧！」</div>
+</div>
+</div>
+<div class="table-container">
+
+<div class="info-box">
+    <b style="color: #FF4C4C;">⚠️ 致命陷阱：有時候我們不是輸給市場，而是「輸在太想賺」！</b><br>
+    當市場出現 <b>📈趨勢不明 ＋ 📊籌碼混亂 ＋ 📉技術面震盪 ＋ 🌍大盤方向不明</b> 時，一直交易不代表你積極，而是你不願意等待。<br>
+    過度追求高報酬容易導致：頻繁追逐熱門股 ➔ 提高槓桿 ➔ 放大單筆部位 ➔ 不願意承認錯誤 ➔ <b>最終導致大虧損！</b>
+</div>
+
+<div class="section-title">🧭 下單前的靈魂拷問</div>
+<div class="path-container">
+    <span class="path-step">😨 自己恐懼了嗎？</span> ➔ 
+    <span class="path-step">🤑 自己太貪婪了？</span> ➔ 
+    <span class="path-step">🌡️ 市場情緒如何？</span> ➔ 
+    <span class="path-step">🇺🇸 VIX 升高？</span> ➔ 
+    <span class="path-step">🇹🇼 TW VIX 異常？</span> ➔ 
+    <span class="path-step">💰 需調整配置？</span> ➔ 
+    <span class="path-step">🎯 符合交易規則？</span><br><br>
+    <div class="tree-node" style="border-color: #FFD700; color: #FFD700; display: inline-block;">🐢 如果沒有，最好的策略就是「什麼都不做」，耐心等待。</div>
+</div>
+
+<div class="section-title">🌡️ 認識市場情緒指標</div>
+<table class="pv-table">
+<thead>
+<tr>
+    <th width="20%">指標名稱</th>
+    <th width="35%">這是什麼？</th>
+    <th width="45%">如何解讀？</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+    <td style="color:#FFD700; font-weight:bold;">恐懼貪婪指數<br>(Fear & Greed)</td>
+    <td style="text-align: left;">CNN編製的綜合情緒指標，滿分100。</td>
+    <td style="text-align: left;">接近 0 (極度恐懼) 可能是相對低點；<br>接近 100 (極度貪婪) 代表市場過熱，隨時可能反轉。</td>
+</tr>
+<tr>
+    <td style="color:#FF4C4C; font-weight:bold;">VIX 指數<br>(美股恐慌指數)</td>
+    <td style="text-align: left;">標普500選擇權隱含波動率。</td>
+    <td style="text-align: left;">常態在 15 左右。若突然狂飆 (如 >30)，代表市場預期未來將有劇烈波動，美股易見大跌。</td>
+</tr>
+<tr>
+    <td style="color:#60A5FA; font-weight:bold;">TW VIX<br>(台指恐慌指數)</td>
+    <td style="text-align: left;">台指選擇權隱含波動率。</td>
+    <td style="text-align: left;">反映台灣散戶與法人的避險情緒，大盤急殺時會飆高，適合用來判斷短線是否過度恐慌。</td>
+</tr>
+</tbody>
+</table>
+
+<div class="section-title">🧠 常見心理陷阱與對策</div>
+<table class="pv-table">
+<thead>
+<tr>
+    <th width="20%">心理／行為</th>
+    <th width="35%">常見想法</th>
+    <th width="45%">更好的做法</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+    <td style="color:#F87171; font-weight:bold;">😨 恐懼</td>
+    <td>「再跌一點就完了...」</td>
+    <td style="text-align: left;">回到進場前設定的停損規則，該砍就砍。</td>
+</tr>
+<tr>
+    <td style="color:#4ADE80; font-weight:bold;">🤑 貪婪</td>
+    <td>「應該還會再漲，繼續凹！」</td>
+    <td style="text-align: left;">客觀評估趨勢與風險，不憑感覺，嚴守停利。</td>
+</tr>
+<tr>
+    <td style="color:#FACC15; font-weight:bold;">🏃 FOMO</td>
+    <td>「現在不買就錯過了！」</td>
+    <td style="text-align: left;">寧可錯過，也不要做錯。等待符合進場條件。</td>
+</tr>
+<tr>
+    <td style="color:#FB923C; font-weight:bold;">🎲 過度交易</td>
+    <td>「今天一定要做點什麼才行...」</td>
+    <td style="text-align: left;">沒有高勝率機會就不交易，休息也是策略。</td>
+</tr>
+<tr>
+    <td style="color:#bc13fe; font-weight:bold;">🔥 報復性交易</td>
+    <td>「可惡，我要趕快把虧的賺回來！」</td>
+    <td style="text-align: left;">立刻離開螢幕，降低部位、暫停交易並檢討。</td>
+</tr>
+<tr>
+    <td style="color:#94A3B8; font-weight:bold;">🐢 耐心等待</td>
+    <td>「機會還沒出現...」</td>
+    <td style="text-align: left;">保留滿手現金，心如止水，等待高品質的獵物。</td>
+</tr>
+</tbody>
+</table>
+
+<div class="section-title">🏰 建立你的專屬交易系統</div>
+<table class="pv-table">
+<thead>
+<tr>
+    <th width="20%">系統環節</th>
+    <th width="35%">要回答的問題</th>
+    <th width="45%">核心觀念</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+    <td><b>🌍 市場環境</b></td>
+    <td>大盤是多頭、空頭還是震盪？</td>
+    <td style="text-align: left;">不同市場使用不同策略。</td>
+</tr>
+<tr>
+    <td><b>🔎 選股條件</b></td>
+    <td>什麼樣的股票值得觀察？</td>
+    <td style="text-align: left;">專注熟悉的領域，不必什麼股票都做。</td>
+</tr>
+<tr>
+    <td><b>🎯 進場條件</b></td>
+    <td>什麼情況才允許買進？</td>
+    <td style="text-align: left;">耐心等待價格走入你的「打擊區」。</td>
+</tr>
+<tr>
+    <td><b>💰 部位管理</b></td>
+    <td>一次投入多少？</td>
+    <td style="text-align: left;">嚴格控制總曝險與單筆承受風險。</td>
+</tr>
+<tr>
+    <td><b>🛑 停損規則</b></td>
+    <td>判斷錯了怎麼辦？</td>
+    <td style="text-align: left;">小錯可以接受，大錯絕對要避免。</td>
+</tr>
+<tr>
+    <td><b>📈 停利規則</b></td>
+    <td>看對後如何處理？</td>
+    <td style="text-align: left;">讓獲利有機會延續，不輕易被洗掉。</td>
+</tr>
+<tr>
+    <td><b>🧘 等待機制</b></td>
+    <td>沒有機會時怎麼辦？</td>
+    <td style="text-align: left;">不動作本身就是一種最強的防守策略。</td>
+</tr>
+<tr>
+    <td><b>📝 交易紀錄</b></td>
+    <td>為什麼買、為什麼賣？</td>
+    <td style="text-align: left;">讓經驗可以被量化與檢討。</td>
+</tr>
+<tr>
+    <td><b>🔄 回測與修正</b></td>
+    <td>長期結果是否符合預期？</td>
+    <td style="text-align: left;">持續改善，尋找正期望值，而非追求完美。</td>
+</tr>
+</tbody>
+</table>
+
+</div>
+</div>"""
+
         # 渲染畫面
         st.markdown(html_code, unsafe_allow_html=True)     
         
@@ -1219,9 +2073,29 @@ border-width: 12px 14px 12px 0; border-style: solid; border-color: transparent r
         if st.button("OpenCourse4", key="btn_npc_sys_open_4"):
             st.session_state['course_view'] = 'detail_4'
             st.rerun()
+            
+        if st.button("OpenCourse5", key="btn_npc_sys_open_5"):
+            st.session_state['course_view'] = 'detail_5'
+            st.rerun()
 
+        if st.button("OpenCourse6", key="btn_npc_sys_open_6"):
+            st.session_state['course_view'] = 'detail_6'
+            st.rerun()
+            
         if st.button("OpenCourse7", key="btn_npc_sys_open_7"):
             st.session_state['course_view'] = 'detail_7'
+            st.rerun()
+
+        if st.button("OpenCourse8", key="btn_npc_sys_open_8"):
+            st.session_state['course_view'] = 'detail_8'
+            st.rerun()
+
+        if st.button("OpenCourse9", key="btn_npc_sys_open_9"):
+            st.session_state['course_view'] = 'detail_9'
+            st.rerun()
+
+        if st.button("OpenCourse10", key="btn_npc_sys_open_10"):
+            st.session_state['course_view'] = 'detail_10'
             st.rerun()
             
         if st.button("BackToList", key="btn_npc_sys_back"):
@@ -1241,11 +2115,12 @@ const btnOpen1 = stBtns.find(b => b.textContent.includes('OpenCourse1'));
 const btnOpen2 = stBtns.find(b => b.textContent.includes('OpenCourse2'));
 const btnOpen3 = stBtns.find(b => b.textContent.includes('OpenCourse3'));
 const btnOpen4 = stBtns.find(b => b.textContent.includes('OpenCourse4'));
+const btnOpen5 = stBtns.find(b => b.textContent.includes('OpenCourse5'));
 const btnOpen7 = stBtns.find(b => b.textContent.includes('OpenCourse7'));
 const btnBack = stBtns.find(b => b.textContent.trim() === 'BackToList');
 
 // 安全隱藏實體按鈕讓其他按鈕可以順利點選**
-[btnClose, btnOpen1, btnOpen2, btnOpen3, btnOpen4, btnOpen7, btnBack].forEach(b => {
+[btnClose, btnOpen1, btnOpen2, btnOpen3, btnOpen4, btnOpen5, btnOpen6,btnOpen7, btnOpen8, btnOpen9, btnOpen10,btnBack].forEach(b => {
     if(b) {
         const container = b.closest('div[data-testid="stElementContainer"]');
         if(container) {
@@ -1276,7 +2151,12 @@ bindEvent('btn-open-course-1', btnOpen1);
 bindEvent('btn-open-course-2', btnOpen2);
 bindEvent('btn-open-course-3', btnOpen3);
 bindEvent('btn-open-course-4', btnOpen4);
+bindEvent('btn-open-course-5', btnOpen5);
+bindEvent('btn-open-course-6', btnOpen6);
 bindEvent('btn-open-course-7', btnOpen7);
+bindEvent('btn-open-course-8', btnOpen8);
+bindEvent('btn-open-course-9', btnOpen9);
+bindEvent('btn-open-course-10', btnOpen10);
 bindEvent('btn-back-detail', btnBack);
 bindEvent('btn-close-detail', btnClose);
 
