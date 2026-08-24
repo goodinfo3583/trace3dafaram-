@@ -16,7 +16,7 @@ def apply_global_theme(image_path="./image/派對盛宴邀請.png"):
         'pink':   {'rgb': '139, 109, 98', 'img': './image/鐵風堡.png'},
         'green':  {'rgb': '0, 54, 16',    'img': './image/翡翠林鎮.png'},
         'purple': {'rgb': '87, 99, 158',  'img': './image/月下綠洲城.png'},
-        'brown':  {'rgb': '161, 115, 0',  'img': './image/沙漠之都.png'},
+        'brown':  {'rgb': '161, 115, 0',  'img': './image/沙漠衛星都市.png'},
         'dark':   {'rgb': '15, 23, 42',   'img': image_path}
     }
     
@@ -1307,7 +1307,7 @@ color: white; animation: slideUpNPC 0.4s cubic-bezier(0.175, 0.885, 0.32, 1.275)
 .detail-header { display: flex; align-items: flex-end; margin-bottom: 15px; border-bottom: 1px solid rgba(255,255,255,0.1); padding-bottom: 15px; gap: 20px; }
 .npc-big-image {
 width: 160px; height: 180px;
-background-image: url('app/static/npcroxy.png'); 
+background-image: url('app/static/npcroad.png'); 
 background-size: contain; background-repeat: no-repeat; background-position: bottom;
 filter: drop-shadow(0 0 10px rgba(0,210,255,0.6)); flex-shrink: 0;
 }
@@ -1461,7 +1461,7 @@ color: white; animation: slideUpNPC 0.4s cubic-bezier(0.175, 0.885, 0.32, 1.275)
 .detail-header { display: flex; align-items: flex-end; margin-bottom: 15px; border-bottom: 1px solid rgba(255,255,255,0.1); padding-bottom: 15px; gap: 20px; }
 .npc-big-image {
 width: 160px; height: 180px;
-background-image: url('app/static/npcroxy.png'); 
+background-image: url('app/static/npcroad.png'); 
 background-size: contain; background-repeat: no-repeat; background-position: bottom;
 filter: drop-shadow(0 0 10px rgba(0,210,255,0.6)); flex-shrink: 0;
 }
@@ -1535,7 +1535,7 @@ color: white; animation: slideUpNPC 0.4s cubic-bezier(0.175, 0.885, 0.32, 1.275)
 .detail-header { display: flex; align-items: flex-end; margin-bottom: 15px; border-bottom: 1px solid rgba(255,255,255,0.1); padding-bottom: 15px; gap: 20px; }
 .npc-big-image {
 width: 160px; height: 180px;
-background-image: url('app/static/npcroxy.png'); 
+background-image: url('app/static/npcroad.png'); 
 background-size: contain; background-repeat: no-repeat; background-position: bottom;
 filter: drop-shadow(0 0 10px rgba(0,210,255,0.6)); flex-shrink: 0;
 }
@@ -1677,7 +1677,7 @@ color: white; animation: slideUpNPC 0.4s cubic-bezier(0.175, 0.885, 0.32, 1.275)
 .detail-header { display: flex; align-items: flex-end; margin-bottom: 15px; border-bottom: 1px solid rgba(255,255,255,0.1); padding-bottom: 15px; gap: 20px; }
 .npc-big-image {
 width: 160px; height: 180px;
-background-image: url('app/static/npcroxy.png'); 
+background-image: url('app/static/npcroad.png'); 
 background-size: contain; background-repeat: no-repeat; background-position: bottom;
 filter: drop-shadow(0 0 10px rgba(0,210,255,0.6)); flex-shrink: 0;
 }
@@ -1855,7 +1855,7 @@ color: white; animation: slideUpNPC 0.4s cubic-bezier(0.175, 0.885, 0.32, 1.275)
 .detail-header { display: flex; align-items: flex-end; margin-bottom: 15px; border-bottom: 1px solid rgba(255,255,255,0.1); padding-bottom: 15px; gap: 20px; }
 .npc-big-image {
 width: 160px; height: 180px;
-background-image: url('app/static/npcroxy.png'); 
+background-image: url('app/static/npcroad.png'); 
 background-size: contain; background-repeat: no-repeat; background-position: bottom;
 filter: drop-shadow(0 0 10px rgba(0,210,255,0.6)); flex-shrink: 0;
 }
