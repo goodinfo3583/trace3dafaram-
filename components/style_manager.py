@@ -653,8 +653,8 @@ margin-right: 20px; filter: drop-shadow(0 0 5px rgba(0,210,255,0.5));
 </div>
 </div>
 <div class="course-list">
-<div class="course-item locked">
-<div class="course-title"><img src="app/static/icon-course1.png" class="course-icon">Lv 1. 宏觀經濟與景氣循環 (未開放)</div>
+<div class="course-item active" id="btn-open-course-1">
+<div class="course-title"><img src="app/static/icon-course1.png" class="course-icon"> 1. 宏觀經濟與景氣循環 (點擊進入)</div>
 <div class="course-desc">學習解讀 GDP、CPI、利率與匯率等基本總體經濟指標，判斷目前大盤處於景氣擴張或衰退的哪個階段。</div>
 </div>
 <div class="course-item locked">
@@ -697,6 +697,109 @@ margin-right: 20px; filter: drop-shadow(0 0 5px rgba(0,210,255,0.5));
 </div>"""
             
         elif current_view == 'detail_4':
+            elif current_view == 'detail_1':
+            # =========================
+            # 📖 第1課詳情 (宏觀經濟與景氣循環)
+            # =========================
+            html_code = """<style>
+.npc-overlay {
+position: fixed; bottom: 30px; right: 30px;
+width: 800px; height: 85vh; max-height: 900px;
+background: rgba(15, 23, 42, 0.98);
+border: 2px solid #00D2FF; border-radius: 12px;
+z-index: 9999999; display: flex; flex-direction: column;
+padding: 25px; box-shadow: 0 8px 30px rgba(0, 210, 255, 0.4);
+color: white; animation: slideUpNPC 0.4s cubic-bezier(0.175, 0.885, 0.32, 1.275);
+}
+.top-actions { position: absolute; top: 15px; right: 20px; display: flex; gap: 12px; z-index: 10; }
+.action-btn { cursor: pointer; color: #94A3B8; font-size: 20px; font-weight:bold; transition: 0.2s; display: flex; align-items: center; justify-content: center; background: rgba(0,0,0,0.5); width: 32px; height: 32px; border-radius: 50%; border: 1px solid rgba(255,255,255,0.1); }
+.action-btn:hover { background: rgba(0,210,255,0.3); color: #FFF; transform: scale(1.1); border-color: #00D2FF; }
+.action-btn.close:hover { background: rgba(255,76,76,0.8); border-color: #FF4C4C; }
+.detail-header { display: flex; align-items: flex-end; margin-bottom: 15px; border-bottom: 1px solid rgba(255,255,255,0.1); padding-bottom: 15px; gap: 20px; }
+.npc-big-image {
+width: 160px; height: 180px;
+background-image: url('app/static/npcroxy.png'); 
+background-size: contain; background-repeat: no-repeat; background-position: bottom;
+filter: drop-shadow(0 0 10px rgba(0,210,255,0.6)); flex-shrink: 0;
+}
+.dialogue-box {
+flex: 1; background: rgba(0, 210, 255, 0.08); border: 1px solid rgba(0, 210, 255, 0.3);
+border-radius: 12px; padding: 18px; position: relative; margin-bottom: 10px;
+}
+.dialogue-box::before {
+content: ''; position: absolute; left: -14px; bottom: 30px;
+border-width: 12px 14px 12px 0; border-style: solid; border-color: transparent rgba(0, 210, 255, 0.3) transparent transparent;
+}
+.npc-name { color: #00D2FF; font-weight: bold; font-size: 20px; margin-bottom: 8px; }
+.npc-text { font-size: 15px; color: #E2E8F0; line-height: 1.6; }
+.table-container { flex: 1; overflow-y: auto; padding-right: 10px; }
+.table-container::-webkit-scrollbar { width: 8px; }
+.table-container::-webkit-scrollbar-thumb { background: rgba(0, 210, 255, 0.4); border-radius: 4px; }
+.pv-table { width: 100%; border-collapse: collapse; font-size: 14px; text-align: center; margin-bottom: 20px; }
+.pv-table th { background: rgba(0, 210, 255, 0.15); color: #00D2FF; padding: 10px; border-bottom: 2px solid #00D2FF; font-weight: bold; }
+.pv-table td { padding: 10px; border-bottom: 1px solid rgba(255,255,255,0.08); color: #CBD5E1; }
+.pv-table tr:hover td { background: rgba(255,255,255,0.05); color: #FFF; }
+.section-title { color: #00D2FF; font-size: 16px; font-weight: bold; margin: 15px 0 8px 0; border-left: 4px solid #00D2FF; padding-left: 8px; }
+@keyframes slideUpNPC { from { transform: translateY(100px) scale(0.8); opacity: 0; } to { transform: translateY(0) scale(1); opacity: 1; } }
+</style>
+<div class="npc-overlay">
+<div class="top-actions">
+<label class="action-btn back" id="btn-back-detail" title="回到籌碼導師選單">←</label>
+<label class="action-btn close" id="btn-close-detail" title="關閉">✕</label>
+</div>
+<div class="detail-header">
+<div class="npc-big-image"></div>
+<div class="dialogue-box">
+<div class="npc-name">籌碼導師 蘿西</div>
+<div class="npc-text">「冒險者注意！經濟並不是永遠上升，而是不斷『🟢 復甦 → 擴張 → 過熱 → 放緩 → 衰退』的循環。現在的市場環境，究竟該積極、觀望，還是提高風險意識？讓我們從總體經濟數據中找答案吧！」</div>
+</div>
+</div>
+<div class="table-container">
+
+<div class="section-title">📊 總體經濟關鍵指標解析</div>
+<table class="pv-table">
+<thead>
+<tr><th width="15%">指標</th><th width="35%">主要觀察什麼</th><th width="50%">上升通常代表對市場的初步影響</th></tr>
+</thead>
+<tbody>
+<tr><td><b>GDP</b></td><td style="text-align: left;">經濟成長速度</td><td style="text-align: left;">經濟活動增加 🟢 景氣可能擴張</td></tr>
+<tr><td><b>CPI</b></td><td style="text-align: left;">物價與通膨</td><td style="text-align: left;">生活成本上升 🟠 可能增加升息壓力</td></tr>
+<tr><td><b>利率</b></td><td style="text-align: left;">資金成本</td><td style="text-align: left;">借錢成本提高 🔴 股市估值可能承壓</td></tr>
+<tr><td><b>匯率</b></td><td style="text-align: left;">貨幣強弱</td><td style="text-align: left;">資金與出口環境變化 🟡 需搭配產業判讀</td></tr>
+</tbody>
+</table>
+
+<div class="section-title">📈 景氣循環階段與市場情緒</div>
+<table class="pv-table">
+<thead>
+<tr><th width="15%">階段</th><th width="20%">經濟狀況</th><th width="40%">常見現象</th><th width="25%">市場情緒</th></tr>
+</thead>
+<tbody>
+<tr><td style="color:#4ADE80; font-weight:bold;">🟢 復甦</td><td style="text-align: left;">經濟開始回暖</td><td style="text-align: left;">GDP改善、企業活動增加</td><td>信心逐漸恢復</td></tr>
+<tr><td style="color:#4ADE80; font-weight:bold;">🟢 擴張</td><td style="text-align: left;">經濟持續成長</td><td style="text-align: left;">消費增加、企業獲利改善</td><td>市場偏樂觀</td></tr>
+<tr><td style="color:#FB923C; font-weight:bold;">🟠 過熱</td><td style="text-align: left;">成長過快</td><td style="text-align: left;">通膨升高、可能升息</td><td>市場開始出現壓力</td></tr>
+<tr><td style="color:#F87171; font-weight:bold;">🔴 放緩</td><td style="text-align: left;">成長開始下降</td><td style="text-align: left;">消費與企業活動減弱</td><td>市場提高警戒</td></tr>
+<tr><td style="color:#EF4444; font-weight:bold;">🚨 衰退</td><td style="text-align: left;">經濟明顯收縮</td><td style="text-align: left;">GDP下降、失業可能增加</td><td>市場偏悲觀</td></tr>
+</tbody>
+</table>
+
+<div class="section-title">⚡ 景氣循環核心狀態對照</div>
+<table class="pv-table">
+<thead>
+<tr><th width="30%">景氣狀態</th><th width="40%">核心數據表現</th><th width="30%">市場含義</th></tr>
+</thead>
+<tbody>
+<tr><td style="color:#4ADE80; font-weight:bold;">🟢 景氣復甦</td><td>GDP↑ / CPI→ / 利率低</td><td style="text-align: left;">景氣回升，初升段</td></tr>
+<tr><td style="color:#4ADE80; font-weight:bold;">🟢 經濟擴張</td><td>GDP↑↑ / 企業活動↑ / 市場偏多</td><td style="text-align: left;">多頭主升段延續</td></tr>
+<tr><td style="color:#FB923C; font-weight:bold;">🟠 景氣過熱</td><td>GDP↑ / CPI↑↑ / 利率↑</td><td style="text-align: left;">通膨升溫，注意緊縮</td></tr>
+<tr><td style="color:#F87171; font-weight:bold;">🔴 經濟放緩</td><td>GDP↓ / 消費↓ / 企業成長減速</td><td style="text-align: left;">動能減弱，防守為主</td></tr>
+<tr><td style="color:#EF4444; font-weight:bold;">🚨 經濟衰退</td><td>GDP↓↓ / 失業↑ / 市場風險升高</td><td style="text-align: left;">熊市風險，資金避險</td></tr>
+</tbody>
+</table>
+
+</div>
+</div>"""
+            
             # =========================
             # 📖 第4課詳情 (Detail View)
             # =========================
@@ -856,11 +959,15 @@ border-width: 12px 14px 12px 0; border-style: solid; border-color: transparent r
         st.markdown(html_code, unsafe_allow_html=True)     
         
         # =========================
-        # 🔗 核心隱藏按鈕 (真實操控狀態的樞紐)
+        # 🔗 核心隱藏按鈕 (真實操控狀態的樞紐)*
         # =========================
         if st.button("CloseNPC"):
             st.session_state['show_course_npc'] = False
             st.session_state['course_view'] = 'list'
+            st.rerun()
+            
+        if st.button("OpenCourse1"):
+            st.session_state['course_view'] = 'detail_1'
             st.rerun()
             
         if st.button("OpenCourse4"):
@@ -875,7 +982,7 @@ border-width: 12px 14px 12px 0; border-style: solid; border-color: transparent r
             st.session_state['course_view'] = 'list'
             st.rerun()
             
-        # 💡 JS 強制綁定與隱形引擎
+        # 💡 JS 綁定按鈕與隱形引擎避免使其他按鈕無法點以及應該是減少讀取
         bind_js = """<script>
 setInterval(() => {
 const doc = window.parent.document;
@@ -883,11 +990,12 @@ if (!doc) return;
 // 尋找 Streamlit 生成的實體按鈕
 const stBtns = Array.from(doc.querySelectorAll('button'));
 const btnClose = stBtns.find(b => b.textContent.includes('CloseNPC'));
+const btnOpen1 = stBtns.find(b => b.textContent.includes('OpenCourse1'));
 const btnOpen4 = stBtns.find(b => b.textContent.includes('OpenCourse4'));
 const btnOpen7 = stBtns.find(b => b.textContent.includes('OpenCourse7'));
 const btnBack = stBtns.find(b => b.textContent.trim() === 'BackToList');
-// 安全隱藏實體按鈕
-[btnClose, btnOpen4, btnOpen7, btnBack].forEach(b => {
+// 安全隱藏實體按鈕讓其他按鈕可以順利點選
+[btnClose, btnOpen1, btnOpen4, btnOpen7, btnBack].forEach(b => {
 if(b) {
 const container = b.closest('div[data-testid="stElementContainer"]');
 if(container) {
@@ -910,8 +1018,9 @@ stBtn.click();
 });
 }
 };
-// 替自訂 UI 注入對應的點擊事件
+// 替自訂 UI 注入對應的點擊按鈕綁定
 bindEvent('btn-close-list', btnClose);
+bindEvent('btn-open-course-1', btnOpen1);
 bindEvent('btn-open-course-4', btnOpen4);
 bindEvent('btn-open-course-7', btnOpen7);
 bindEvent('btn-back-detail', btnBack);
