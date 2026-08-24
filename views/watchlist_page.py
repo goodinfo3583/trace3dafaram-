@@ -104,6 +104,18 @@ def show_watchlist_page(STOCK_DICT=None, conn=None, SHEET_URL=None):
         return
 
     username = st.session_state.get("username", "guest")
+    # 📌 新增：初始化還原操作的歷史紀錄堆疊
+    history_key = f"wl_history_{username}"
+    if history_key not in st.session_state:
+        st.session_state[history_key] = []
+        
+    def save_history_snapshot():
+        """儲存當前所有筆記的快照供還原使用"""
+        snapshot = {s: st.session_state.get(f"note_{s}", "") for s in watchlist.keys()}
+        st.session_state[history_key].append(snapshot)
+        if len(st.session_state[history_key]) > 10:  # 最多保留最近 10 步
+            st.session_state[history_key].pop(0)
+    #還原按鈕↑
     wl_cache_key = f"wl_cache_{username}"
 
     if wl_cache_key not in st.session_state:
