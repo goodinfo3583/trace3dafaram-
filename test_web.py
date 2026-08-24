@@ -63,6 +63,7 @@ if 'b5_1000' not in st.session_state:
 style_manager.apply_global_theme()
 is_perf_mode = st.session_state.get('performance_mode', False)# 新增：判斷是否開啟效能模式
 # 只有在「未開啟」效能模式時，才渲染這些高負載的動畫與卡片
+
 if not is_perf_mode:
     style_manager.render_fireflies()
     style_manager.render_marquee() # 呼叫頂層圖片跑馬燈與懸浮玻璃卡片
@@ -82,8 +83,7 @@ if not is_perf_mode:
         # 避免尚未存檔完成時當機
         print(f"UI 渲染警告: {e}")
         pass
-style_manager.render_fireflies()
-style_manager.render_marquee() # 呼叫頂層圖片跑馬燈與懸浮玻璃卡片
+
 try:
     # 呼叫 B3 法人連買卡片 (藍色光暈，右上方)
     style_manager.render_top10_glass_card() 
