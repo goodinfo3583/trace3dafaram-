@@ -111,7 +111,7 @@ def show_watchlist_page(STOCK_DICT=None, conn=None, SHEET_URL=None):
             st.session_state[wl_cache_key] = get_user_watchlist(username, conn, SHEET_URL)
             
     watchlist = st.session_state[wl_cache_key]
-    MAX_STOCKS = 60 
+    MAX_STOCKS = 22
 
     for stock in list(watchlist.keys()):
         nk = f"note_{stock}"
@@ -261,9 +261,13 @@ def show_watchlist_page(STOCK_DICT=None, conn=None, SHEET_URL=None):
                     st.session_state[nk] = append_str
                 watchlist[stock_name] = st.session_state[nk]
 
-        def append_dynamic_to_note(stock_name, p_code):#讀取 B1 法人動向與衰退追蹤，並附加到筆記
+        def append_dynamic_to_note(stock_name, p_code):
             """讀取 B1 法人動向與衰退追蹤，並附加到筆記"""
             dyn_msg = "⚪ B1未進榜"
+            
+            # 預設時間，若 B1 沒抓到日期，就退回使用系統時間
+            display_date = market_date[5:] if '/' in market_date else "今日"
+            
             try:
                 # 1. 從背景抓取 B1 的資料表
                 df_b1 = st.session_state.get('b1_final_df')
@@ -271,6 +275,17 @@ def show_watchlist_page(STOCK_DICT=None, conn=None, SHEET_URL=None):
                     df_b1 = st.session_state.get('my_final_df')
 
                 if df_b1 is not None and not df_b1.empty:
+                    # 🔍 智慧抓取 B1 資料表上的「最新日期」
+                    date_cols = [c for c in df_b1.columns if '持股%' in c or str(c).isdigit()]
+                    if date_cols:
+                        # 依照欄位名稱排序 (20260821, 20260820...)，取最新
+                        sorted_dates = sorted(date_cols, reverse=True)
+                        latest_col = sorted_dates[0]
+                        date_match = re.search(r'20\d{6}', str(latest_col))
+                        if date_match:
+                            ds = date_match.group() # 提取出 '20260821'
+                            display_date = f"{ds[4:6]}/{ds[6:8]}" # 轉成 '08/21'
+
                     # 確保股票代號格式正確，並尋找該檔股票
                     col_id = '股票代號' if '股票代號' in df_b1.columns else ('代號' if '代號' in df_b1.columns else None)
                     if col_id:
@@ -279,39 +294,45 @@ def show_watchlist_page(STOCK_DICT=None, conn=None, SHEET_URL=None):
                         
                         if not res.empty:
                             row = res.iloc[0]
-                            
-                            # 🛡️ 防呆抓取工具：用關鍵字找欄位，避免 KeyError
-                            def safe_get(col_keywords, default="無"):
+
+                            # 🛡️ 防呆抓取工具 (過濾掉不需要的字眼，防止抓錯)
+                            def safe_get(col_keywords, exclude_keywords=[], default="無"):
                                 for col in res.columns:
+                                    # 排除不該抓的欄位 (例如找正常動向時，排除'衰退'字眼)
+                                    if any(exc in col for exc in exclude_keywords): continue
+                                    # 命中關鍵字就回傳該欄位的值
                                     if any(k in col for k in col_keywords):
                                         val = str(row[col]).strip()
-                                        return val if val.lower() != 'nan' and val != '' else default
+                                        return val if val.lower() not in ['nan', 'none', ''] else default
                                 return default
 
-                            # 抓取您截圖中的上半部 (法人動向)
-                            status = safe_get(['最新動態', '狀態動態', '動態'])
-                            tags = safe_get(['今日上榜', '原始上榜', '上榜'])
-                            delta = safe_get(['單日△', '精準單日', '單日'], "0.00")
+                            # 🎯 抓取正常法人動向
+                            status = safe_get(['最新動態', '狀態動態', '動態'], exclude_keywords=['衰退'])
+                            tags = safe_get(['今日上榜', '原始上榜', '上榜'], exclude_keywords=['衰退'])
                             
-                            # 抓取您截圖中的下半部 (衰退追蹤)
-                            decay_tags = safe_get(['衰退上榜', '衰退'])
-                            decay_delta = safe_get(['衰退單日', '提款單日', '衰退△'], "0.00")
+                            # 💡 移除自動計算，直接讀取表單中算好的 "單日△" 或 "△" 欄位，若無則填 "-"
+                            delta = safe_get(['單日△', '精準單日', '單日', '△'], exclude_keywords=['衰退'], default="-")
+                            
+                            # 🎯 抓取衰退追蹤
+                            decay_tags = safe_get(['衰退上榜', '提款機', '衰退追蹤', '衰退'])
+                            decay_delta = safe_get(['衰退單日', '提款單日', '衰退△'], default=delta) # 衰退的△通常就等於當日△
 
-                            # 排版組合 (加入換行與縮排，讓筆記更好看)
+                            # 組合文字排版
                             msg_lines = []
                             msg_lines.append(f"📌動態:{status} | 🏷️上榜:{tags} | 📊單日△:{delta}")
                             
-                            if decay_tags != "無":
+                            # 若有衰退資料，則自動新增一行提款機欄位
+                            if decay_tags != "無" and decay_tags != "未進榜":
                                 msg_lines.append(f"📉提款 🏷️衰退:{decay_tags} | 📊單日△:{decay_delta}")
                                 
                             dyn_msg = "\n  ".join(msg_lines)
                 else:
-                    dyn_msg = "⚠️ B1資料未載入(請先用側邊欄搜過一次或點全市場掃描)"
+                    dyn_msg = "⚠️ B1資料未載入(請先點側邊欄搜尋或全市場掃描)"
             except Exception as e:
                 dyn_msg = f"讀取異常: {e}"
 
-            # 加上日期，並合併到原本的筆記中
-            append_str = f"[{market_date[5:]}]\n  {dyn_msg}"
+            # 加上完美校正的表格日期，並合併到原本的筆記中
+            append_str = f"[{display_date}]\n  {dyn_msg}"
             nk = f"note_{stock_name}"
             current_text = st.session_state.get(nk, "").strip()
             
@@ -320,7 +341,6 @@ def show_watchlist_page(STOCK_DICT=None, conn=None, SHEET_URL=None):
             else:
                 st.session_state[nk] = append_str
             
-            # 即時寫入 session_state 與 watchlist
             watchlist[stock_name] = st.session_state[nk]
         #結束
         for stock in list(watchlist.keys()):
