@@ -84,22 +84,6 @@ if not is_perf_mode:
         print(f"UI 渲染警告: {e}")
         pass
 
-try:
-    # 呼叫 B3 法人連買卡片 (藍色光暈，右上方)
-    style_manager.render_top10_glass_card() 
-    # 呼叫 B2 法人掃貨卡片 (紅色光暈，右下方)
-    style_manager.render_b2_top10_glass_card()
-    # 呼叫 B4 軋空/套牢雷達卡片 (左上方)
-    style_manager.render_b4_top10_glass_card()
-    # 呼叫 B5 大腿雙向共振卡片 (左下方)
-    style_manager.render_b5_top10_glass_card()
-
-    # 呼叫 課程NPC 懸浮卡片 (右下方)
-    style_manager.render_course_npc()   
-except AttributeError as e:
-    # 避免尚未存檔完成時當機
-    print(f"UI 渲染警告: {e}")
-    pass
 
 # 注入客製化頂部導覽列
 # nav_manager.inject_custom_header()
