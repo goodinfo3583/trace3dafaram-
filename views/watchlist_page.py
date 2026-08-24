@@ -223,7 +223,7 @@ def show_watchlist_page(STOCK_DICT=None, conn=None, SHEET_URL=None):
             st.markdown(f"<div style='padding-top:8px; color:#38BDF8; font-size:15px; font-weight:bold;'>日期：{market_date}</div>", unsafe_allow_html=True)
 
     st.write("") 
-    
+    #
     if not watchlist:
         st.info("目前還沒有追蹤任何標的，趕快新增一個吧！")
     else:
