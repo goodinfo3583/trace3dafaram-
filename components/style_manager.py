@@ -653,43 +653,43 @@ margin-right: 20px; filter: drop-shadow(0 0 5px rgba(0,210,255,0.5));
 </div>
 <div class="course-list">
 <div class="course-item active" id="btn-open-course-1">
-<div class="course-title"><img src="app/static/icon-course1.png" class="course-icon"> 1. 宏觀經濟與景氣循環 (點擊進入)</div>
+<div class="course-title"><img src="app/static/icon-course1.png" class="course-icon">Lv 1. 宏觀經濟與景氣循環</div>
 <div class="course-desc">學習解讀 GDP、CPI、利率與匯率等基本總體經濟指標，判斷目前大盤處於景氣擴張或衰退的哪個階段。</div>
 </div>
-<div class="course-item locked">
-<div class="course-title"><img src="app/static/icon-course1.png" class="course-icon"> 2. 股市基本架構與名詞解析 (未開放)</div>
+<div class="course-item active" id="btn-open-course-2">
+<div class="course-title"><img src="app/static/icon-course1.png" class="course-icon">Lv 2. 股市基本架構與名詞解析</div>
 <div class="course-desc">認識台股交易規則、漲跌幅限制、各類委託單與基本盤面術語，建立進場前的基礎常識。</div>
 </div>
 <div class="course-item locked">
-<div class="course-title"><img src="app/static/icon-course1.png" class="course-icon"> 3. 財報與基本面入門 (未開放)</div>
+<div class="course-title"><img src="app/static/icon-course1.png" class="course-icon">Lv 3. 財報與基本面入門 (未開放)</div>
 <div class="course-desc">學習閱讀三大財務報表（綜合損益表、資產負債表、現金流量表），學會挑選具備長期競爭力的公司。</div>
 </div>
 <div class="course-item active" id="btn-open-course-4">
-<div class="course-title"><img src="app/static/icon-course1.png" class="course-icon"> 4. 量價關係與盤面解讀 (點擊進入)</div>
+<div class="course-title"><img src="app/static/icon-course1.png" class="course-icon">Lv 4. 量價關係與盤面解讀</div>
 <div class="course-desc">對照成交量與股價漲跌的互動（如價漲量增、量價背離），判斷多空雙方的企圖心與買賣力道。</div>
 </div>
 <div class="course-item locked">
-<div class="course-title"><img src="app/static/icon-course1.png" class="course-icon"> 5. 技術分析與指標應用 (未開放)</div>
+<div class="course-title"><img src="app/static/icon-course1.png" class="course-icon">Lv 5. 技術分析與指標應用 (未開放)</div>
 <div class="course-desc">熟悉常用技術指標（如均線 MA、MACD、RSI、KDJ），掌握支撐壓力與趨勢轉折點。</div>
 </div>
 <div class="course-item locked">
-<div class="course-title"><img src="app/static/icon-course1.png" class="course-icon"> 6. 籌碼面追蹤：法人與大戶結構 (未開放)</div>
+<div class="course-title"><img src="app/static/icon-course1.png" class="course-icon">Lv 6. 籌碼面追蹤：法人與大戶結構 (未開放)</div>
 <div class="course-desc">分析外資、投信、自營商動向及大戶持股比例，透過資金流向尋找主力默默佈局的標的。</div>
 </div>
 <div class="course-item active" id="btn-open-course-7">
-<div class="course-title"><img src="app/static/icon-course1.png" class="course-icon"> 7. 券資關係與融資融券分析 (點擊進入)</div>
+<div class="course-title"><img src="app/static/icon-course1.png" class="course-icon">Lv 7. 券資關係與融資融券分析</div>
 <div class="course-desc">觀察融資餘額、融券張數與券資比變化，評估市場散戶情緒及潛在的「軋空」或「多殺多」力道。</div>
 </div>
 <div class="course-item locked">
-<div class="course-title"><img src="app/static/icon-course1.png" class="course-icon"> 8. 產業趨勢與題材選股 (未開放)</div>
+<div class="course-title"><img src="app/static/icon-course1.png" class="course-icon">Lv 8. 產業趨勢與題材選股 (未開放)</div>
 <div class="course-desc">掌握主流產業輪動脈絡（如半導體、AI 供應鏈、綠能等），在對的時間點佈局具備成長爆發力的賽道。</div>
 </div>
 <div class="course-item locked">
-<div class="course-title"><img src="app/static/icon-course1.png" class="course-icon"> 9. 資金控管與風險管理 (未開放)</div>
+<div class="course-title"><img src="app/static/icon-course1.png" class="course-icon">Lv 9. 資金控管與風險管理 (未開放)</div>
 <div class="course-desc">學習單筆投資部位配置、分批進場策略、停損停利機制，避免因情緒失控而遭受重大虧損。</div>
 </div>
 <div class="course-item locked">
-<div class="course-title"><img src="app/static/icon-course1.png" class="course-icon"> 10. 交易心理學與個人策略總結 (未開放)</div>
+<div class="course-title"><img src="app/static/icon-course1.png" class="course-icon">Lv 10. 交易心理學與個人策略總結 (未開放)</div>
 <div class="course-desc">克服貪婪與恐懼的心理障礙，並回測、修正並建立專屬於自己的穩定獲利交易系統。</div>
 </div>
 </div>
@@ -797,7 +797,127 @@ border-width: 12px 14px 12px 0; border-style: solid; border-color: transparent r
 
 </div>
 </div>"""
-            
+        elif current_view == 'detail_2':
+            # =========================
+            # 📖 第2課詳情 (股市基本架構與名詞解析)
+            # =========================
+            html_code = """<style>
+.npc-overlay {
+position: fixed; bottom: 30px; right: 30px;
+width: 800px; height: 85vh; max-height: 900px;
+background: rgba(15, 23, 42, 0.98);
+border: 2px solid #00D2FF; border-radius: 12px;
+z-index: 9999999; display: flex; flex-direction: column;
+padding: 25px; box-shadow: 0 8px 30px rgba(0, 210, 255, 0.4);
+color: white; animation: slideUpNPC 0.4s cubic-bezier(0.175, 0.885, 0.32, 1.275);
+}
+.top-actions { position: absolute; top: 15px; right: 20px; display: flex; gap: 12px; z-index: 10; }
+.action-btn { cursor: pointer; color: #94A3B8; font-size: 20px; font-weight:bold; transition: 0.2s; display: flex; align-items: center; justify-content: center; background: rgba(0,0,0,0.5); width: 32px; height: 32px; border-radius: 50%; border: 1px solid rgba(255,255,255,0.1); }
+.action-btn:hover { background: rgba(0,210,255,0.3); color: #FFF; transform: scale(1.1); border-color: #00D2FF; }
+.action-btn.close:hover { background: rgba(255,76,76,0.8); border-color: #FF4C4C; }
+.detail-header { display: flex; align-items: flex-end; margin-bottom: 15px; border-bottom: 1px solid rgba(255,255,255,0.1); padding-bottom: 15px; gap: 20px; }
+.npc-big-image {
+width: 160px; height: 180px;
+background-image: url('app/static/npcroxy.png'); 
+background-size: contain; background-repeat: no-repeat; background-position: bottom;
+filter: drop-shadow(0 0 10px rgba(0,210,255,0.6)); flex-shrink: 0;
+}
+.dialogue-box {
+flex: 1; background: rgba(0, 210, 255, 0.08); border: 1px solid rgba(0, 210, 255, 0.3);
+border-radius: 12px; padding: 18px; position: relative; margin-bottom: 10px;
+}
+.dialogue-box::before {
+content: ''; position: absolute; left: -14px; bottom: 30px;
+border-width: 12px 14px 12px 0; border-style: solid; border-color: transparent rgba(0, 210, 255, 0.3) transparent transparent;
+}
+.npc-name { color: #00D2FF; font-weight: bold; font-size: 20px; margin-bottom: 8px; }
+.npc-text { font-size: 15px; color: #E2E8F0; line-height: 1.6; }
+.table-container { flex: 1; overflow-y: auto; padding-right: 10px; }
+.table-container::-webkit-scrollbar { width: 8px; }
+.table-container::-webkit-scrollbar-thumb { background: rgba(0, 210, 255, 0.4); border-radius: 4px; }
+.pv-table { width: 100%; border-collapse: collapse; font-size: 14px; text-align: center; margin-bottom: 15px; }
+.pv-table th { background: rgba(0, 210, 255, 0.15); color: #00D2FF; padding: 10px; border-bottom: 2px solid #00D2FF; font-weight: bold; }
+.pv-table td { padding: 10px; border-bottom: 1px solid rgba(255,255,255,0.08); color: #CBD5E1; }
+.pv-table tr:hover td { background: rgba(255,255,255,0.05); color: #FFF; }
+.section-title { color: #00D2FF; font-size: 16px; font-weight: bold; margin: 15px 0 8px 0; border-left: 4px solid #00D2FF; padding-left: 8px; }
+@keyframes slideUpNPC { from { transform: translateY(100px) scale(0.8); opacity: 0; } to { transform: translateY(0) scale(1); opacity: 1; } }
+</style>
+<div class="npc-overlay">
+<div class="top-actions">
+<label class="action-btn back" id="btn-back-detail" title="回到籌碼導師選單">←</label>
+<label class="action-btn close" id="btn-close-detail" title="關閉">✕</label>
+</div>
+<div class="detail-header">
+<div class="npc-big-image"></div>
+<div class="dialogue-box">
+<div class="npc-name">籌碼導師 蘿西</div>
+<div class="npc-text">「冒險者，歡迎來到基礎訓練營！進入市場前，熟悉『盤面術語』與『市場角色』是最基本的要求。記住，台股是『紅漲綠跌』，搞懂這些名詞，未來的籌碼分析才會事半功倍喔！」</div>
+</div>
+</div>
+<div class="table-container">
+
+<div class="section-title">📖 盤面速讀與狀態判讀</div>
+<table class="pv-table">
+<thead>
+<tr><th width="20%">名詞</th><th width="40%">簡單理解</th><th width="40%">新手要知道什麼</th></tr>
+</thead>
+<tbody>
+<tr><td><b>💰 股價</b></td><td style="text-align: left;">市場目前願意成交的價格</td><td style="text-align: left;">股票價格會隨買賣需求變動</td></tr>
+<tr><td><b>📦 成交量</b></td><td style="text-align: left;">有多少股票正在交易</td><td style="text-align: left;">代表市場參與程度</td></tr>
+<tr><td><b style="color:#FF4C4C;">📈 漲幅</b></td><td style="text-align: left;">今天比昨天上漲多少</td><td style="text-align: left;">觀察市場強弱</td></tr>
+<tr><td><b style="color:#00E676;">📉 跌幅</b></td><td style="text-align: left;">今天比昨天下跌多少</td><td style="text-align: left;">觀察市場賣壓</td></tr>
+<tr><td><b style="color:#FF4C4C;">🔴 買方</b></td><td style="text-align: left;">想用目前價格買股票的人</td><td style="text-align: left;">買盤增加可能推升價格</td></tr>
+<tr><td><b style="color:#00E676;">🟢 賣方</b></td><td style="text-align: left;">想賣出股票的人</td><td style="text-align: left;">賣壓增加可能壓低價格</td></tr>
+</tbody>
+</table>
+
+<table class="pv-table">
+<thead>
+<tr><th width="25%">狀態</th><th width="40%">一眼判讀</th><th width="35%">初步理解</th></tr>
+</thead>
+<tbody>
+<tr><td style="color:#4ADE80; font-weight:bold;">🟢 買盤積極</td><td>股價↑ / 成交量↑</td><td style="text-align: left;">市場買方積極</td></tr>
+<tr><td style="color:#F87171; font-weight:bold;">🔴 賣壓增加</td><td>股價↓ / 成交量↑</td><td style="text-align: left;">市場賣方積極</td></tr>
+<tr><td style="color:#FACC15; font-weight:bold;">🟡 市場觀望</td><td>股價→ / 成交量↓</td><td style="text-align: left;">市場交易意願降低</td></tr>
+<tr><td style="color:#FB923C; font-weight:bold;">🟠 價格波動加劇</td><td>高低價差↑ / 成交量↑</td><td style="text-align: left;">多空雙方競爭激烈</td></tr>
+</tbody>
+</table>
+
+<div class="section-title">🏷️ 盤面常見名詞</div>
+<table class="pv-table">
+<thead>
+<tr><th width="20%">名詞</th><th width="40%">一眼理解</th><th width="40%">代表什麼</th></tr>
+</thead>
+<tbody>
+<tr><td><b>開盤價</b></td><td style="text-align: left;">今天第一筆成交價</td><td style="text-align: left;">市場開盤的第一個價格</td></tr>
+<tr><td><b>最高價</b></td><td style="text-align: left;">今天最高成交價格</td><td style="text-align: left;">多方今天推到哪裡</td></tr>
+<tr><td><b>最低價</b></td><td style="text-align: left;">今天最低成交價格</td><td style="text-align: left;">空方今天壓到哪裡</td></tr>
+<tr><td><b>收盤價</b></td><td style="text-align: left;">最後成交價格</td><td style="text-align: left;">當日市場最後結果</td></tr>
+<tr><td><b>昨收價</b></td><td style="text-align: left;">昨天收盤價格</td><td style="text-align: left;">判斷今日漲跌的基準</td></tr>
+<tr><td><b>成交量</b></td><td style="text-align: left;">今天交易多少張</td><td style="text-align: left;">市場熱度</td></tr>
+<tr><td style="color:#00E676; font-weight:bold;">內盤</td><td style="text-align: left;">主動賣方成交</td><td style="text-align: left;">賣方較積極</td></tr>
+<tr><td style="color:#FF4C4C; font-weight:bold;">外盤</td><td style="text-align: left;">主動買方成交</td><td style="text-align: left;">買方較積極</td></tr>
+</tbody>
+</table>
+
+<div class="section-title">🎭 市場角色 (籌碼追蹤前置)</div>
+<table class="pv-table">
+<thead>
+<tr><th width="30%">市場角色</th><th width="45%">他們是誰</th><th width="25%">深入章節</th></tr>
+</thead>
+<tbody>
+<tr><td>👤 一般投資人</td><td style="text-align: left;">個人買賣股票</td><td>Lv 7</td></tr>
+<tr><td style="color:#FACC15; font-weight:bold;">🌍 外資</td><td style="text-align: left;">海外資金與機構投資人</td><td>Lv 6</td></tr>
+<tr><td style="color:#4ADE80; font-weight:bold;">🏦 投信</td><td style="text-align: left;">國內基金與資產管理資金</td><td>Lv 6</td></tr>
+<tr><td style="color:#60A5FA; font-weight:bold;">⚙️ 自營商</td><td style="text-align: left;">證券商自有資金交易</td><td>Lv 6</td></tr>
+<tr><td style="color:#bc13fe; font-weight:bold;">🦈 大型持有人</td><td style="text-align: left;">持有較大量股票的帳戶</td><td>Lv 6</td></tr>
+<tr><td style="color:#FF4C4C; font-weight:bold;">💰 融資</td><td style="text-align: left;">投資人使用槓桿買股票的人</td><td>Lv 7</td></tr>
+<tr><td style="color:#00e676; font-weight:bold;">📉 融券/借券</td><td style="text-align: left;">交易者進行放空相關交易者</td><td>Lv 7</td></tr>
+</tbody>
+</table>
+
+</div>
+</div>"""            
         elif current_view == 'detail_4':
             # =========================
             # 📖 第4課詳情 (Detail View)
@@ -958,7 +1078,7 @@ border-width: 12px 14px 12px 0; border-style: solid; border-color: transparent r
         st.markdown(html_code, unsafe_allow_html=True)     
         
         # =========================
-        # 🔗 核心隱藏按鈕 (加入 key 避免重複錯誤)
+        # 🔗 核心隱藏按鈕 (加入 key 避免重複錯誤)**
         # =========================
         if st.button("CloseNPC", key="btn_npc_sys_close"):
             st.session_state['show_course_npc'] = False
@@ -967,6 +1087,9 @@ border-width: 12px 14px 12px 0; border-style: solid; border-color: transparent r
             
         if st.button("OpenCourse1", key="btn_npc_sys_open_1"):
             st.session_state['course_view'] = 'detail_1'
+            st.rerun()
+                if st.button("OpenCourse2", key="btn_npc_sys_open_2"):
+            st.session_state['course_view'] = 'detail_2'
             st.rerun()
             
         if st.button("OpenCourse4", key="btn_npc_sys_open_4"):
@@ -987,16 +1110,17 @@ setInterval(() => {
 const doc = window.parent.document;
 if (!doc) return;
 
-// 尋找 Streamlit 生成的實體按鈕
+// 尋找 Streamlit 生成的實體按鈕**
 const stBtns = Array.from(doc.querySelectorAll('button'));
 const btnClose = stBtns.find(b => b.textContent.includes('CloseNPC'));
 const btnOpen1 = stBtns.find(b => b.textContent.includes('OpenCourse1'));
+const btnOpen2 = stBtns.find(b => b.textContent.includes('OpenCourse2'));
 const btnOpen4 = stBtns.find(b => b.textContent.includes('OpenCourse4'));
 const btnOpen7 = stBtns.find(b => b.textContent.includes('OpenCourse7'));
 const btnBack = stBtns.find(b => b.textContent.trim() === 'BackToList');
 
-// 安全隱藏實體按鈕讓其他按鈕可以順利點選
-[btnClose, btnOpen1, btnOpen4, btnOpen7, btnBack].forEach(b => {
+// 安全隱藏實體按鈕讓其他按鈕可以順利點選**
+[btnClose, btnOpen1, btnOpen2, btnOpen4, btnOpen7, btnBack].forEach(b => {
     if(b) {
         const container = b.closest('div[data-testid="stElementContainer"]');
         if(container) {
@@ -1021,9 +1145,10 @@ const bindEvent = (uiId, stBtn) => {
     }
 };
 
-// 進行所有按鈕的綁定
+// 進行所有按鈕的綁定**
 bindEvent('btn-close-list', btnClose);
 bindEvent('btn-open-course-1', btnOpen1);
+bindEvent('btn-open-course-2', btnOpen2);
 bindEvent('btn-open-course-4', btnOpen4);
 bindEvent('btn-open-course-7', btnOpen7);
 bindEvent('btn-back-detail', btnBack);
