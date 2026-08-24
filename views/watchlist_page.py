@@ -104,18 +104,7 @@ def show_watchlist_page(STOCK_DICT=None, conn=None, SHEET_URL=None):
         return
 
     username = st.session_state.get("username", "guest")
-    # 📌 新增：初始化還原操作的歷史紀錄堆疊
-    history_key = f"wl_history_{username}"
-    if history_key not in st.session_state:
-        st.session_state[history_key] = []
-        
-    def save_history_snapshot():
-        """儲存當前所有筆記的快照供還原使用"""
-        snapshot = {s: st.session_state.get(f"note_{s}", "") for s in watchlist.keys()}
-        st.session_state[history_key].append(snapshot)
-        if len(st.session_state[history_key]) > 10:  # 最多保留最近 10 步
-            st.session_state[history_key].pop(0)
-    #還原按鈕↑
+    
     wl_cache_key = f"wl_cache_{username}"
 
     if wl_cache_key not in st.session_state:
@@ -182,7 +171,7 @@ def show_watchlist_page(STOCK_DICT=None, conn=None, SHEET_URL=None):
     # ==========================================
     # 💾 左上角存檔、匯出與日期區塊 
     # ==========================================
-    col_save, col_export, col_undo, col_date, col_space = st.columns([1.5, 1.2, 1.2, 3.0, 3.1])
+    col_save, col_export, col_date, col_space = st.columns([1.5, 1.5, 3.0, 4.0])
     with col_save:
         if st.button("存檔", icon=":material/save:", use_container_width=True, type="primary", help="將目前的變更同步至雲端"):
             with st.spinner("正在上傳至雲端..."):
@@ -196,6 +185,7 @@ def show_watchlist_page(STOCK_DICT=None, conn=None, SHEET_URL=None):
             st.rerun()
             
     with col_export:
+        # 製作匯出專用的 DataFrame
         if watchlist:
             export_data = []
             for stock, note in watchlist.items():
@@ -204,6 +194,7 @@ def show_watchlist_page(STOCK_DICT=None, conn=None, SHEET_URL=None):
                 stock_code_match = re.search(r'\d+', stock)
                 if stock_code_match: pure_code = stock_code_match.group()
                 
+                # 若有抓到即時報價也一併附上
                 price, vol = "", ""
                 if pure_code and pure_code in market_data:
                     price = market_data[pure_code]["price"]
@@ -214,6 +205,7 @@ def show_watchlist_page(STOCK_DICT=None, conn=None, SHEET_URL=None):
             df_export = pd.DataFrame(export_data)
             csv = df_export.to_csv(index=False, encoding='utf-8-sig').encode('utf-8-sig')
             
+            # 使用 Streamlit 內建的下載按鈕
             st.download_button(
                 label="匯出",
                 icon=":material/download:",
@@ -226,25 +218,10 @@ def show_watchlist_page(STOCK_DICT=None, conn=None, SHEET_URL=None):
         else:
             st.button("匯出", icon=":material/download:", use_container_width=True, disabled=True)
 
-    # 📌 新增：「還原到上一步操作」按鈕
-    with col_undo:
-        if st.button("還原", icon=":material/undo:", use_container_width=True, help="還原到上一步操作"):
-            history_stack = st.session_state.get(history_key, [])
-            if history_stack:
-                last_snapshot = history_stack.pop()
-                for stock, note_val in last_snapshot.items():
-                    if stock in watchlist:
-                        st.session_state[f"note_{stock}"] = note_val
-                st.success("已還原到上一步！")
-                time.sleep(0.5)
-                st.rerun()
-            else:
-                st.info("沒有更多歷史紀錄可還原")
-
     with col_date:
         if watchlist and market_data:
             st.markdown(f"<div style='padding-top:8px; color:#38BDF8; font-size:15px; font-weight:bold;'>日期：{market_date}</div>", unsafe_allow_html=True)
-    #表格按鈕↑
+
     st.write("") 
     
     if not watchlist:
@@ -457,3 +434,12 @@ def show_watchlist_page(STOCK_DICT=None, conn=None, SHEET_URL=None):
                         st.session_state["global_search_final"] = ""
                     st.rerun()
                 st.markdown("</div>", unsafe_allow_html=True)
+    # 📌 新增：底部回到頂部按鈕
+    st.markdown("""
+    <div style="text-align: center; margin: 40px 0 20px 0;">
+        <a href="#" onclick="window.scrollTo({top: 0, behavior: 'smooth'}); return false;" 
+           style="background: rgba(56, 189, 248, 0.15); color: #38BDF8; border: 1px solid #38BDF8; padding: 10px 25px; border-radius: 20px; text-decoration: none; font-weight: bold; box-shadow: 0 0 12px rgba(56, 189, 248, 0.3);">
+            ⬆️ 回到頂部
+        </a>
+    </div>
+    """, unsafe_allow_html=True)
