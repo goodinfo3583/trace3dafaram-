@@ -662,35 +662,35 @@ margin-right: 20px; filter: drop-shadow(0 0 5px rgba(0,210,255,0.5));
 <div class="course-desc">認識台股交易規則、漲跌幅限制、各類委託單與基本盤面術語，建立進場前的基礎常識。</div>
 </div>
 <div class="course-item locked">
-<div class="course-title"><img src="app/static/icon-course1.png" class="course-icon">Lv3. 財報與基本面入門 (未開放)</div>
+<div class="course-title"><img src="app/static/icon-course1.png" class="course-icon">Lv 3. 財報與基本面入門 (未開放)</div>
 <div class="course-desc">學習閱讀三大財務報表（綜合損益表、資產負債表、現金流量表），學會挑選具備長期競爭力的公司。</div>
 </div>
 <div class="course-item active" id="btn-open-course-4">
-<div class="course-title"><img src="app/static/icon-course1.png" class="course-icon">Lv4. 量價關係與盤面解讀</div>
+<div class="course-title"><img src="app/static/icon-course1.png" class="course-icon">Lv 4. 量價關係與盤面解讀</div>
 <div class="course-desc">對照成交量與股價漲跌的互動（如價漲量增、量價背離），判斷多空雙方的企圖心與買賣力道。</div>
 </div>
 <div class="course-item locked">
-<div class="course-title"><img src="app/static/icon-course1.png" class="course-icon">Lv5. 技術分析與指標應用 (未開放)</div>
+<div class="course-title"><img src="app/static/icon-course1.png" class="course-icon">Lv 5. 技術分析與指標應用 (未開放)</div>
 <div class="course-desc">熟悉常用技術指標（如均線 MA、MACD、RSI、KDJ），掌握支撐壓力與趨勢轉折點。</div>
 </div>
 <div class="course-item locked">
-<div class="course-title"><img src="app/static/icon-course1.png" class="course-icon">Lv6. 籌碼面追蹤：法人與大戶結構 (未開放)</div>
+<div class="course-title"><img src="app/static/icon-course1.png" class="course-icon">Lv 6. 籌碼面追蹤：法人與大戶結構 (未開放)</div>
 <div class="course-desc">分析外資、投信、自營商動向及大戶持股比例，透過資金流向尋找主力默默佈局的標的。</div>
 </div>
 <div class="course-item active" id="btn-open-course-7">
-<div class="course-title"><img src="app/static/icon-course1.png" class="course-icon">Lv7. 券資關係與融資融券分析</div>
+<div class="course-title"><img src="app/static/icon-course1.png" class="course-icon">Lv 7. 券資關係與融資融券分析</div>
 <div class="course-desc">觀察融資餘額、融券張數與券資比變化，評估市場散戶情緒及潛在的「軋空」或「多殺多」力道。</div>
 </div>
 <div class="course-item locked">
-<div class="course-title"><img src="app/static/icon-course1.png" class="course-icon">Lv8. 產業趨勢與題材選股 (未開放)</div>
+<div class="course-title"><img src="app/static/icon-course1.png" class="course-icon">Lv 8. 產業趨勢與題材選股 (未開放)</div>
 <div class="course-desc">掌握主流產業輪動脈絡（如半導體、AI 供應鏈、綠能等），在對的時間點佈局具備成長爆發力的賽道。</div>
 </div>
 <div class="course-item locked">
-<div class="course-title"><img src="app/static/icon-course1.png" class="course-icon">Lv9. 資金控管與風險管理 (未開放)</div>
+<div class="course-title"><img src="app/static/icon-course1.png" class="course-icon">Lv 9. 資金控管與風險管理 (未開放)</div>
 <div class="course-desc">學習單筆投資部位配置、分批進場策略、停損停利機制，避免因情緒失控而遭受重大虧損。</div>
 </div>
 <div class="course-item locked">
-<div class="course-title"><img src="app/static/icon-course1.png" class="course-icon">Lv10. 交易心理學與個人策略總結 (未開放)</div>
+<div class="course-title"><img src="app/static/icon-course1.png" class="course-icon">Lv 10. 交易心理學與個人策略總結 (未開放)</div>
 <div class="course-desc">克服貪婪與恐懼的心理障礙，並回測、修正並建立專屬於自己的穩定獲利交易系統。</div>
 </div>
 </div>
