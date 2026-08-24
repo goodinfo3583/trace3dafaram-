@@ -320,7 +320,7 @@ def inject_custom_header(is_logged_in=False):
                     <p style="color: #E2E8F0; font-size: 16px; margin: 0; line-height: 1.5;">「你現在把錢塞給我，我可能會不知道放哪裡。」</p>
                 </div>
                 
-                <p style="color: #94A3B8; font-size: 13px; margin-bottom: 24px;">（ 贊助功能正在準備中。下次再來看看 ）</p>
+                <p style="color: #94A3B8; font-size: 13px; margin-bottom: 24px;">（ 功能正在準備中。下次再來看看，謝謝！ ）</p>
                 <button id="close-donate-modal" class="donate-btn-close">我知道了</button>
             </div>
         </div>

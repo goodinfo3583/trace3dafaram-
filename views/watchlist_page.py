@@ -434,16 +434,26 @@ def show_watchlist_page(STOCK_DICT=None, conn=None, SHEET_URL=None):
                         st.session_state["global_search_final"] = ""
                     st.rerun()
                 st.markdown("</div>", unsafe_allow_html=True)
-    # 📌 新增：底部回到頂部按鈕  
+    # 📌 底部回到頂部按鈕  
     # 1. 載入 Google Material Icons 的字型庫
     st.markdown(
         '<link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined" rel="stylesheet" />',
         unsafe_allow_html=True
     )
-    # 2. 渲染回到頂部按鈕
+    
+    # 2. 渲染回到頂部按鈕 (修正 Javascript 滾動對象)
     st.markdown(
         """
-        <a href="#" onclick="const m = window.parent.document.querySelector('.main') || window.parent.document.querySelector('[data-testid=stMain]'); if(m) { m.scrollTo({top: 0, behavior: 'smooth'}); } else { window.parent.scrollTo({top: 0, behavior: 'smooth'}); } return false;" 
+        <a href="#" onclick="
+            /* 精準抓取 Streamlit 的滾動視窗容器，若找不到則退回整個視窗 */
+            const container = document.querySelector('[data-testid=stAppViewContainer]') || document.documentElement;
+            if (container) {
+                container.scrollTo({top: 0, behavior: 'smooth'});
+            } else {
+                window.scrollTo({top: 0, behavior: 'smooth'});
+            }
+            return false;
+        " 
            style="display: flex; justify-content: center; align-items: center; background-color: rgba(14, 165, 233, 0.1); 
                   color: #38bdf8; font-size: 14px; font-weight: bold; padding: 12px; 
                   border-radius: 8px; text-decoration: none; margin-top: 40px; margin-bottom: 20px; 
