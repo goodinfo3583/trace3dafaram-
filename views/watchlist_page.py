@@ -112,7 +112,7 @@ def show_watchlist_page(STOCK_DICT=None, conn=None, SHEET_URL=None):
             st.session_state[wl_cache_key] = get_user_watchlist(username, conn, SHEET_URL)
             
     watchlist = st.session_state[wl_cache_key]
-    MAX_STOCKS = 22
+    MAX_STOCKS = 20
 
     for stock in list(watchlist.keys()):
         nk = f"note_{stock}"
@@ -439,8 +439,9 @@ def show_watchlist_page(STOCK_DICT=None, conn=None, SHEET_URL=None):
             with h4: st.markdown("<div style='padding-top:10px;'><span style='color:#94a3b8; font-size:14px;'>成交量 (張)</span></div>", unsafe_allow_html=True)
             
             with h5:
-                # 將「專屬筆記」與「一鍵清空」分為 8:2 比例，讓清空按鈕變小成正方形
-                hc1, hc2 = st.columns([3.2, 0.7])
+                # 🔥 完美對齊修正：將 3.9 的空間精準拆分為 3.4 與 0.5
+                # 這樣一來，清空按鈕的寬度 (0.5) 就會跟右側所有按鈕 (0.5) 在數學上 100% 完全相同！
+                hc1, hc2 = st.columns([3.4, 0.5])
                 with hc1:
                     st.markdown("<div style='padding-top:10px;'><span style='color:#94a3b8; font-size:14px;'>專屬筆記 (一鍵清空 👉)</span></div>", unsafe_allow_html=True)
                 with hc2:
@@ -454,7 +455,7 @@ def show_watchlist_page(STOCK_DICT=None, conn=None, SHEET_URL=None):
                 st.markdown("<span class='header-btn-blue'></span>", unsafe_allow_html=True)
                 st.button("", icon=":material/psychology:", key="batch_dyn", help="一鍵帶入所有籌碼動態", use_container_width=True, on_click=batch_append_dynamics)
             with h8:
-                st.markdown("") # 診斷按鈕的空位，留白以對齊
+                st.markdown("") # 診斷按鈕的空位，留白以完美對齊下方的個股卡片
             with h9:
                 st.markdown("<span class='header-btn-red'></span>", unsafe_allow_html=True)
                 st.button("", icon=":material/delete:", key="batch_delete", help="一鍵移除所有標的", use_container_width=True, on_click=batch_remove_all)
