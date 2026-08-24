@@ -11,6 +11,9 @@ def render():
     st.markdown("<h4 style='color:#E2E8F0; font-size: 16px;'>外觀與濾鏡</h4>", unsafe_allow_html=True)
     current_theme = st.session_state.get('theme', 'dark')
     current_opacity = int(st.session_state.get('bg_opacity', 88))
+
+    # 🔥 新增讀取效能模式
+    current_perf_mode = st.session_state.get('performance_mode', False)
     
     theme_options = ['dark', 'pink', 'green', 'purple','brown']
     theme_choice = st.radio(
@@ -22,6 +25,9 @@ def render():
     )
     
     opacity_val = st.slider("背景濾鏡遮罩 (%)", min_value=0, max_value=100, value=current_opacity)
+
+    # 🔥 新增效能模式勾選框
+    perf_mode_val = st.checkbox("⚡ 開啟極簡效能模式 (關閉螢火蟲、跑馬燈、懸浮卡片與動畫以提升流暢度)", value=current_perf_mode)
     
     st.markdown("---")
     st.markdown("<h4 style='color:#E2E8F0; font-size: 16px;'>快捷鍵配置</h4>", unsafe_allow_html=True)
@@ -55,12 +61,11 @@ def render():
             st.session_state['theme'] = theme_choice
             st.session_state['bg_opacity'] = opacity_val
             st.session_state['custom_hotkeys'] = {k.strip().lower(): v for v, k in new_hotkeys.items() if k.strip().lower()}
-            
-            # 使用 toast 顯示右下角輕量提示，不干擾畫面
-            st.toast('設定已成功儲存！')
-            
-            # 重新執行一次以立即套用新主題與濾鏡
-            st.rerun()
+        
+            st.session_state['performance_mode'] = perf_mode_val# 新增：將效能模式的設定存入 session_state
+                   
+            st.toast('設定已成功儲存！')# 使用 toast 顯示右下角輕量提示，不干擾畫面                  
+            st.rerun()# 重新執行一次以立即套用新主題與濾鏡
             
     with col_cancel:
         if st.button("取消", use_container_width=True):
