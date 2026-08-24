@@ -27,7 +27,7 @@ def render():
     opacity_val = st.slider("背景濾鏡遮罩 (%)", min_value=0, max_value=100, value=current_opacity)
 
     # 🔥 新增效能模式勾選框
-    perf_mode_val = st.checkbox("⚡ 開啟極簡效能模式 (關閉螢火蟲、跑馬燈、懸浮卡片與動畫以提升流暢度)", value=current_perf_mode)
+    perf_mode_val = st.checkbox("開啟極簡效能模式 (關閉動畫、跑馬燈與基礎動畫提升流暢度)", value=current_perf_mode)
     
     st.markdown("---")
     st.markdown("<h4 style='color:#E2E8F0; font-size: 16px;'>快捷鍵配置</h4>", unsafe_allow_html=True)
