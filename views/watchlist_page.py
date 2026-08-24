@@ -441,11 +441,9 @@ def show_watchlist_page(STOCK_DICT=None, conn=None, SHEET_URL=None):
         unsafe_allow_html=True
     )
     # 2. 渲染回到頂部按鈕
-    # 注意 gap: 6px 是用來讓圖案跟文字中間有點空隙
-    # <span class="material-symbols-outlined"> 裡面包的就是你在 Google 網頁上看到的 Icon 名稱
     st.markdown(
         """
-        <a href="#" onclick="window.scrollTo({top: 0, behavior: 'smooth'}); return false;" 
+        <a href="#" onclick="const m = window.parent.document.querySelector('.main') || window.parent.document.querySelector('[data-testid=stMain]'); if(m) { m.scrollTo({top: 0, behavior: 'smooth'}); } else { window.parent.scrollTo({top: 0, behavior: 'smooth'}); } return false;" 
            style="display: flex; justify-content: center; align-items: center; background-color: rgba(14, 165, 233, 0.1); 
                   color: #38bdf8; font-size: 14px; font-weight: bold; padding: 12px; 
                   border-radius: 8px; text-decoration: none; margin-top: 40px; margin-bottom: 20px; 
