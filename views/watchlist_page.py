@@ -253,35 +253,47 @@ def show_watchlist_page(STOCK_DICT=None, conn=None, SHEET_URL=None):
                 gap: 0px !important;
             }
 
-            /* ==== 🚀 一鍵批次按鈕專屬樣式 (透過 title 精準鎖定) ==== */
-            button[title="一鍵帶入所有今日行情"],
-            button[title="一鍵帶入所有籌碼動態"],
-            button[title="一鍵清空所有筆記"] {
-                background: rgba(56, 189, 248, 0.15) !important; /* 天藍色透底 */
-                border: 1px solid rgba(56, 189, 248, 0.4) !important;
-                color: #38BDF8 !important;
-                transition: all 0.3s ease !important;
+            /* ==== 🛡️ 表頭完美對齊設定 (賦予與卡片相同的 Padding，但隱藏邊框) ==== */
+            div[data-testid="stVerticalBlockBorderWrapper"]:has(.header-row-marker) {
+                border: none !important;
+                background: transparent !important;
+                box-shadow: none !important;
+                margin-bottom: -15px !important; /* 縮小與下方第一張卡片的距離 */
             }
-            button[title="一鍵帶入所有今日行情"]:hover,
-            button[title="一鍵帶入所有籌碼動態"]:hover,
-            button[title="一鍵清空所有筆記"]:hover {
-                background: rgba(56, 189, 248, 0.35) !important;
-                border: 1px solid #38BDF8 !important;
+            div[data-testid="stVerticalBlockBorderWrapper"]:has(.header-row-marker) > div {
+                padding: 10px 15px !important;
+                gap: 0px !important;
+            }
+
+            /* ==== 🚀 一鍵批次按鈕專屬樣式 (透過隱形標記精準鎖定) ==== */
+            
+            /* 批次按鈕: 實心天藍色 (清空、帶入行情、帶入動態) */
+            div[data-testid="stColumn"]:has(.header-btn-blue) button {
+                background-color: #0284C7 !important; /* 實心深藍/天藍 */
+                color: #FFFFFF !important;
+                border: none !important;
+                border-radius: 6px !important;
+                transition: all 0.3s ease !important;
+                margin-top: 0px !important;
+            }
+            div[data-testid="stColumn"]:has(.header-btn-blue) button:hover {
+                background-color: #0EA5E9 !important;
                 transform: translateY(-2px) !important;
-                box-shadow: 0 4px 10px rgba(56, 189, 248, 0.2) !important;
+                box-shadow: 0 4px 10px rgba(14, 165, 233, 0.4) !important;
             }
             
-            button[title="一鍵移除所有標的"] {
-                background: rgba(239, 68, 68, 0.15) !important; /* 紅色透底 */
-                border: 1px solid rgba(239, 68, 68, 0.4) !important;
-                color: #F87171 !important;
+            /* 批次按鈕: 實心紅色 (刪除) */
+            div[data-testid="stColumn"]:has(.header-btn-red) button {
+                background-color: #E11D48 !important; /* 實心深紅 */
+                color: #FFFFFF !important;
+                border: none !important;
+                border-radius: 6px !important;
                 transition: all 0.3s ease !important;
             }
-            button[title="一鍵移除所有標的"]:hover {
-                background: rgba(239, 68, 68, 0.35) !important;
-                border: 1px solid #F87171 !important;
+            div[data-testid="stColumn"]:has(.header-btn-red) button:hover {
+                background-color: #F43F5E !important;
                 transform: translateY(-2px) !important;
-                box-shadow: 0 4px 10px rgba(239, 68, 68, 0.2) !important;
+                box-shadow: 0 4px 10px rgba(225, 29, 72, 0.4) !important;
             }
             </style>
             """,
@@ -416,29 +428,35 @@ def show_watchlist_page(STOCK_DICT=None, conn=None, SHEET_URL=None):
                 st.session_state[nk] = ""
                 watchlist[stock_name] = ""
 
-        # 📋 顯示標題列 (不裝在卡片裡，當作表格的頭)
-        with st.container():
+        # 📋 顯示標題列 (裝在與卡片完全相同的隱形框架中，達成 100% 水平對齊)
+        with st.container(border=True):
+            st.markdown("<span class='header-row-marker'></span>", unsafe_allow_html=True)
             h1, h2, h3, h4, h5, h6, h7, h8, h9 = st.columns(col_ratios)
-            with h1: st.markdown("<div style='padding-top:10px;'><span style='color:#94a3b8; font-size:14px; padding-left:15px;'>標的名稱</span></div>", unsafe_allow_html=True)
+            
+            with h1: st.markdown("<div style='padding-top:10px;'><span style='color:#94a3b8; font-size:14px;'>標的名稱</span></div>", unsafe_allow_html=True)
             with h2: st.markdown("<div style='padding-top:10px;'><span style='color:#94a3b8; font-size:14px;'>產業別</span></div>", unsafe_allow_html=True)
             with h3: st.markdown("<div style='padding-top:10px;'><span style='color:#94a3b8; font-size:14px;'>最新價</span></div>", unsafe_allow_html=True)
             with h4: st.markdown("<div style='padding-top:10px;'><span style='color:#94a3b8; font-size:14px;'>成交量 (張)</span></div>", unsafe_allow_html=True)
             
             with h5:
-                # 將「專屬筆記」與「一鍵清空按鈕」並排
-                hc1, hc2 = st.columns([2.5, 1.5])
+                # 將「專屬筆記」與「一鍵清空」分為 8:2 比例，讓清空按鈕變小成正方形
+                hc1, hc2 = st.columns([3.2, 0.7])
                 with hc1:
                     st.markdown("<div style='padding-top:10px;'><span style='color:#94a3b8; font-size:14px;'>專屬筆記 (一鍵清空 👉)</span></div>", unsafe_allow_html=True)
                 with hc2:
-                    st.button("清空", icon=":material/ink_eraser:", key="batch_clear", help="一鍵清空所有筆記", use_container_width=True, on_click=batch_clear_notes)
+                    st.markdown("<span class='header-btn-blue'></span>", unsafe_allow_html=True)
+                    st.button("", icon=":material/ink_eraser:", key="batch_clear", help="一鍵清空所有筆記", use_container_width=True, on_click=batch_clear_notes)
             
             with h6:
+                st.markdown("<span class='header-btn-blue'></span>", unsafe_allow_html=True)
                 st.button("", icon=":material/input:", key="batch_quote", help="一鍵帶入所有今日行情", use_container_width=True, on_click=batch_append_quotes)
             with h7:
+                st.markdown("<span class='header-btn-blue'></span>", unsafe_allow_html=True)
                 st.button("", icon=":material/psychology:", key="batch_dyn", help="一鍵帶入所有籌碼動態", use_container_width=True, on_click=batch_append_dynamics)
             with h8:
-                st.markdown("") # h8 原本是對應診斷功能，這裡維持空白以對齊版面
+                st.markdown("") # 診斷按鈕的空位，留白以對齊
             with h9:
+                st.markdown("<span class='header-btn-red'></span>", unsafe_allow_html=True)
                 st.button("", icon=":material/delete:", key="batch_delete", help="一鍵移除所有標的", use_container_width=True, on_click=batch_remove_all)
         
         # 📋 開始渲染每一檔股票 (原有的卡片迴圈)
