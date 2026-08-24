@@ -434,12 +434,25 @@ def show_watchlist_page(STOCK_DICT=None, conn=None, SHEET_URL=None):
                         st.session_state["global_search_final"] = ""
                     st.rerun()
                 st.markdown("</div>", unsafe_allow_html=True)
-    # 📌 新增：底部回到頂部按鈕
-    st.markdown("""
-    <div style="text-align: center; margin: 40px 0 20px 0;">
+    # 📌 新增：底部回到頂部按鈕  
+    # 1. 載入 Google Material Icons 的字型庫
+    st.markdown(
+        '<link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined" rel="stylesheet" />',
+        unsafe_allow_html=True
+    )
+    # 2. 渲染回到頂部按鈕
+    # 注意 gap: 6px 是用來讓圖案跟文字中間有點空隙
+    # <span class="material-symbols-outlined"> 裡面包的就是你在 Google 網頁上看到的 Icon 名稱
+    st.markdown(
+        """
         <a href="#" onclick="window.scrollTo({top: 0, behavior: 'smooth'}); return false;" 
-           style="background: rgba(56, 189, 248, 0.15); color: #38BDF8; border: 1px solid #38BDF8; padding: 10px 25px; border-radius: 20px; text-decoration: none; font-weight: bold; box-shadow: 0 0 12px rgba(56, 189, 248, 0.3);">
-            ⬆️ 回到頂部
+           style="display: flex; justify-content: center; align-items: center; background-color: rgba(14, 165, 233, 0.1); 
+                  color: #38bdf8; font-size: 14px; font-weight: bold; padding: 12px; 
+                  border-radius: 8px; text-decoration: none; margin-top: 40px; margin-bottom: 20px; 
+                  border: 1px solid rgba(56, 189, 248, 0.3); box-shadow: 0px 4px 6px rgba(0,0,0,0.3); gap: 6px;">
+            <span class="material-symbols-outlined" style="font-size: 20px;">move_up</span> 
+            回到頂部
         </a>
-    </div>
-    """, unsafe_allow_html=True)
+        """, 
+        unsafe_allow_html=True
+    )
