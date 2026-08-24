@@ -227,20 +227,53 @@ def show_watchlist_page(STOCK_DICT=None, conn=None, SHEET_URL=None):
     if not watchlist:
         st.info("目前還沒有追蹤任何標的，趕快新增一個吧！")
     else:
+        # 🌟 1. 注入玻璃卡片的專屬 CSS 特效
+        st.markdown(
+            """
+            <style>
+            /* 利用 CSS :has() 選擇器，精準抓取我們塞了 stock-card-marker 的卡片 */
+            div[data-testid="stVerticalBlockBorderWrapper"]:has(.stock-card-marker) {
+                background: rgba(30, 41, 59, 0.3) !important; /* 玻璃透明背景 */
+                backdrop-filter: blur(12px) !important;
+                -webkit-backdrop-filter: blur(12px) !important;
+                border-radius: 12px !important;
+                border: 1px solid rgba(255, 255, 255, 0.1) !important;
+                box-shadow: 0 4px 15px rgba(0, 0, 0, 0.2) !important;
+                margin-bottom: 8px !important; 
+                transition: all 0.3s cubic-bezier(0.25, 0.8, 0.25, 1) !important;
+            }
+            /* 滑鼠移過去時的發光浮起特效 */
+            div[data-testid="stVerticalBlockBorderWrapper"]:has(.stock-card-marker):hover {
+                background: rgba(30, 41, 59, 0.6) !important;
+                border: 1px solid rgba(56, 189, 248, 0.4) !important;
+                box-shadow: 0 8px 25px rgba(56, 189, 248, 0.15) !important;
+                transform: translateY(-2px) !important;
+            }
+            /* 微調卡片內部留白，讓他看起來緊湊專業 */
+            div[data-testid="stVerticalBlockBorderWrapper"]:has(.stock-card-marker) > div {
+                padding: 10px 15px !important;
+                gap: 0px !important;
+            }
+            </style>
+            """,
+            unsafe_allow_html=True
+        )
 
-        # 📋 分割為 9 個區域 (新增動態按鈕)
+        # 📋 分割為 9 個區域 (為了與卡片內對齊，稍微調整外層 Header)
         col_ratios = [1.1, 0.9, 1.1, 1.1, 3.9, 0.5, 0.5, 0.5, 0.5]
         
-        h1, h2, h3, h4, h5, h6, h7, h8, h9 = st.columns(col_ratios)
-        h1.markdown("<span style='color:#94a3b8; font-size:14px;'>標的名稱</span>", unsafe_allow_html=True)
-        h2.markdown("<span style='color:#94a3b8; font-size:14px;'>產業別</span>", unsafe_allow_html=True)
-        h3.markdown("<span style='color:#94a3b8; font-size:14px;'>最新價</span>", unsafe_allow_html=True)
-        h4.markdown("<span style='color:#94a3b8; font-size:14px;'>成交量 (張)</span>", unsafe_allow_html=True)
-        h5.markdown("<span style='color:#94a3b8; font-size:14px;'>專屬筆記 (編輯後點擊左上方存檔)</span>", unsafe_allow_html=True)
-        h6.markdown("")
-        h7.markdown("")
-        h8.markdown("")
-        h9.markdown("")
+        # 顯示標題列 (不裝在卡片裡，當作表格的頭)
+        with st.container():
+            h1, h2, h3, h4, h5, h6, h7, h8, h9 = st.columns(col_ratios)
+            h1.markdown("<span style='color:#94a3b8; font-size:14px; padding-left:15px;'>標的名稱</span>", unsafe_allow_html=True)
+            h2.markdown("<span style='color:#94a3b8; font-size:14px;'>產業別</span>", unsafe_allow_html=True)
+            h3.markdown("<span style='color:#94a3b8; font-size:14px;'>最新價</span>", unsafe_allow_html=True)
+            h4.markdown("<span style='color:#94a3b8; font-size:14px;'>成交量 (張)</span>", unsafe_allow_html=True)
+            h5.markdown("<span style='color:#94a3b8; font-size:14px;'>專屬筆記 (編輯後點擊左上方存檔)</span>", unsafe_allow_html=True)
+            h6.markdown("")
+            h7.markdown("")
+            h8.markdown("")
+            h9.markdown("")
         
         def fmt_color(val, is_pct=False, is_vol=False):
             color = "#FF4B4B" if val > 0 else ("#00E272" if val < 0 else "#94A3B8")
@@ -262,7 +295,7 @@ def show_watchlist_page(STOCK_DICT=None, conn=None, SHEET_URL=None):
                     st.session_state[nk] = append_str
                 watchlist[stock_name] = st.session_state[nk]
 
-        def append_dynamic_to_note(stock_name, p_code):#讀取 B1 法人動向與衰退追蹤，並附加到筆記
+        def append_dynamic_to_note(stock_name, p_code):
             """讀取 B1 法人動向與衰退追蹤，並附加到筆記"""
             dyn_msg = "⚪ B1未進榜"
             display_date = market_date[5:] if '/' in market_date else "今日"
@@ -273,7 +306,7 @@ def show_watchlist_page(STOCK_DICT=None, conn=None, SHEET_URL=None):
                 if df_b1 is None or df_b1.empty:
                     df_b1 = st.session_state.get('my_final_df')
                     
-                df_b1_down = st.session_state.get('b1_down_final_df') # 👈 關鍵新增：讀取衰退表
+                df_b1_down = st.session_state.get('b1_down_final_df')
 
                 if df_b1 is not None and not df_b1.empty:
                     # 🔍 抓取最新日期
@@ -293,14 +326,12 @@ def show_watchlist_page(STOCK_DICT=None, conn=None, SHEET_URL=None):
                         if not res.empty:
                             row = res.iloc[0]
 
-                            # 🛡️ 升級版防呆抓取：自動處理小數點與不同表單
                             def safe_get(target_row, target_cols, col_keywords, exclude_keywords=[], default="-"):
                                 for col in target_cols:
                                     if any(exc in col for exc in exclude_keywords): continue
                                     if any(k in col for k in col_keywords):
                                         val = str(target_row[col]).strip()
                                         if val.lower() in ['nan', 'none', '']: return default
-                                        # 🎯 解決浮點數問題：嘗試轉為數字並限制小數點2位
                                         try:
                                             f_val = float(val)
                                             return f"{f_val:.2f}"
@@ -308,14 +339,12 @@ def show_watchlist_page(STOCK_DICT=None, conn=None, SHEET_URL=None):
                                             return val
                                 return default
 
-                            # 🎯 抓取正常法人動向 (從 res 抓取)
                             status = safe_get(row, res.columns, ['最新動態', '狀態動態', '動態'], exclude_keywords=['衰退'])
                             tags = safe_get(row, res.columns, ['今日上榜', '原始上榜', '上榜'], exclude_keywords=['衰退'])
                             delta = safe_get(row, res.columns, ['單日△', '精準單日', '單日', '△'], exclude_keywords=['衰退'])
                             
                             msg_lines = [f"📌動態:{status} | 🏷️上榜:{tags} | 📊單日△:{delta}"]
                             
-                            # 🎯 抓取衰退追蹤 (從 df_b1_down 抓取！)
                             decay_tags = "無"
                             decay_delta = "-"
                             if df_b1_down is not None and not df_b1_down.empty:
@@ -325,7 +354,6 @@ def show_watchlist_page(STOCK_DICT=None, conn=None, SHEET_URL=None):
                                     res_down = df_b1_down[df_b1_down[col_id_down] == str(p_code)]
                                     if not res_down.empty:
                                         row_down = res_down.iloc[0]
-                                        # 從衰退表提取資訊
                                         decay_tags = safe_get(row_down, res_down.columns, ['衰退上榜', '提款機', '衰退追蹤', '衰退'])
                                         decay_delta = safe_get(row_down, res_down.columns, ['衰退單日', '提款單日', '衰退△', '單日△', '精準單日', '△'])
 
@@ -333,12 +361,11 @@ def show_watchlist_page(STOCK_DICT=None, conn=None, SHEET_URL=None):
                                 msg_lines.append(f"📉提款 🏷️衰退:{decay_tags} | 📊單日△:{decay_delta}")
                                 
                             dyn_msg = "\n  ".join(msg_lines)
-                else:
-                    dyn_msg = "⚠️ B1資料未載入(請先點側邊欄搜尋或全市場掃描)"
+            else:
+                dyn_msg = "⚠️ B1資料未載入(請先點側邊欄搜尋或全市場掃描)"
             except Exception as e:
                 dyn_msg = f"讀取異常: {e}"
 
-            # 加上完美校正的表格日期，並合併到原本的筆記中
             append_str = f"[{display_date}]\n  {dyn_msg}"
             nk = f"note_{stock_name}"
             current_text = st.session_state.get(nk, "").strip()
@@ -349,7 +376,8 @@ def show_watchlist_page(STOCK_DICT=None, conn=None, SHEET_URL=None):
                 st.session_state[nk] = append_str
             
             watchlist[stock_name] = st.session_state[nk]
-        #結束
+
+        # 開始渲染每一檔股票
         for stock in list(watchlist.keys()):
             nk = f"note_{stock}"
             pure_code = None
@@ -365,75 +393,81 @@ def show_watchlist_page(STOCK_DICT=None, conn=None, SHEET_URL=None):
                 d = market_data[pure_code]
                 p_str = f"<span style='font-size:16px;'>{d['price']:.2f}</span><br>{fmt_color(d['price_pct'], True)}"
                 v_str = f"<span style='font-size:15px;'>{d['vol']:,}</span><br>{fmt_color(d['vol_pct'], False, True)}"
-            #筆記欄位按鈕
-            c1, c2, c3, c4, c5, c6, c7, c8, c9 = st.columns(col_ratios)
             
-            with c1:
-                st.markdown(f"<div style='padding-top:8px; font-weight:bold; font-size:15px;'>{stock}</div>", unsafe_allow_html=True)
-            with c2:
-                st.markdown(f"<div style='padding-top:10px; font-size:12px; color:#38BDF8;'><span style='background-color:#1E293B; padding:2px 5px; border-radius:4px; border: 1px solid #0369a1;'>{industry_label}</span></div>", unsafe_allow_html=True)
-            with c3:
-                st.markdown(f"<div style='padding-top:4px;'>{p_str}</div>", unsafe_allow_html=True)
-            with c4:
-                st.markdown(f"<div style='padding-top:4px;'>{v_str}</div>", unsafe_allow_html=True)
-            with c5:
-                st.markdown("<div style='padding-top:2px;'>", unsafe_allow_html=True)
-                st.text_area(
-                    "筆記", 
-                    key=nk, 
-                    label_visibility="collapsed", 
-                    placeholder="點此輸入筆記...", 
-                    height=68 
-                )
-                st.markdown("</div>", unsafe_allow_html=True)
-            with c6:
-                st.markdown("<div style='padding-top:15px;'>", unsafe_allow_html=True)
-                st.button(
-                    "", 
-                    icon=":material/input:", # 帶入行情圖示
-                    key=f"import_{stock}", 
-                    use_container_width=True, 
-                    help="將今日行情寫入筆記",
-                    on_click=append_quote_to_note,
-                    args=(stock, pure_code)
-                )
-                st.markdown("</div>", unsafe_allow_html=True)
-            with c7:
-                st.markdown("<div style='padding-top:15px;'>", unsafe_allow_html=True)
-                st.button(
-                    "", 
-                    icon=":material/psychology:", # 帶入動態 (腦袋/AI 圖示)
-                    key=f"dyn_{stock}", 
-                    use_container_width=True, 
-                    help="將籌碼動態寫入筆記",
-                    on_click=append_dynamic_to_note,
-                    args=(stock, pure_code)
-                )
-                st.markdown("</div>", unsafe_allow_html=True)
-            with c8:
-                st.markdown("<div style='padding-top:15px;'>", unsafe_allow_html=True)
-                if st.button("", icon=":material/monitoring:", key=f"view_{stock}", use_container_width=True, help="顯示籌碼診斷"):
-                    standard_format = stock
-                    if pure_code and STOCK_DICT and pure_code in STOCK_DICT:
-                        v = STOCK_DICT[pure_code]
-                        standard_format = f"{v['id']} {v['name']}"
-                        
-                    st.session_state["selected_watch_stock"] = standard_format
-                    st.session_state["global_search_final"] = standard_format
-                    st.rerun()
-                st.markdown("</div>", unsafe_allow_html=True)
+            # 🌟 2. 魔法所在：把這檔股票的所有欄位包進 container 裡面！
+            with st.container(border=True):
+                # 放入我們專屬的隱形標記，讓上面的 CSS 知道這是一個股票卡片
+                st.markdown("<span class='stock-card-marker'></span>", unsafe_allow_html=True)
+                
+                # 筆記欄位按鈕
+                c1, c2, c3, c4, c5, c6, c7, c8, c9 = st.columns(col_ratios)
+                
+                with c1:
+                    st.markdown(f"<div style='padding-top:8px; font-weight:bold; font-size:15px;'>{stock}</div>", unsafe_allow_html=True)
+                with c2:
+                    st.markdown(f"<div style='padding-top:10px; font-size:12px; color:#38BDF8;'><span style='background-color:#1E293B; padding:2px 5px; border-radius:4px; border: 1px solid #0369a1;'>{industry_label}</span></div>", unsafe_allow_html=True)
+                with c3:
+                    st.markdown(f"<div style='padding-top:4px;'>{p_str}</div>", unsafe_allow_html=True)
+                with c4:
+                    st.markdown(f"<div style='padding-top:4px;'>{v_str}</div>", unsafe_allow_html=True)
+                with c5:
+                    st.markdown("<div style='padding-top:2px;'>", unsafe_allow_html=True)
+                    st.text_area(
+                        "筆記", 
+                        key=nk, 
+                        label_visibility="collapsed", 
+                        placeholder="點此輸入筆記...", 
+                        height=68 
+                    )
+                    st.markdown("</div>", unsafe_allow_html=True)
+                with c6:
+                    st.markdown("<div style='padding-top:15px;'>", unsafe_allow_html=True)
+                    st.button(
+                        "", 
+                        icon=":material/input:", 
+                        key=f"import_{stock}", 
+                        use_container_width=True, 
+                        help="將今日行情寫入筆記",
+                        on_click=append_quote_to_note,
+                        args=(stock, pure_code)
+                    )
+                    st.markdown("</div>", unsafe_allow_html=True)
+                with c7:
+                    st.markdown("<div style='padding-top:15px;'>", unsafe_allow_html=True)
+                    st.button(
+                        "", 
+                        icon=":material/psychology:", 
+                        key=f"dyn_{stock}", 
+                        use_container_width=True, 
+                        help="將籌碼動態寫入筆記",
+                        on_click=append_dynamic_to_note,
+                        args=(stock, pure_code)
+                    )
+                    st.markdown("</div>", unsafe_allow_html=True)
+                with c8:
+                    st.markdown("<div style='padding-top:15px;'>", unsafe_allow_html=True)
+                    if st.button("", icon=":material/monitoring:", key=f"view_{stock}", use_container_width=True, help="顯示籌碼診斷"):
+                        standard_format = stock
+                        if pure_code and STOCK_DICT and pure_code in STOCK_DICT:
+                            v = STOCK_DICT[pure_code]
+                            standard_format = f"{v['id']} {v['name']}"
+                            
+                        st.session_state["selected_watch_stock"] = standard_format
+                        st.session_state["global_search_final"] = standard_format
+                        st.rerun()
+                    st.markdown("</div>", unsafe_allow_html=True)
 
-            with c9:
-                st.markdown("<div style='padding-top:15px;'>", unsafe_allow_html=True)
-                if st.button("", icon=":material/delete:", key=f"remove_{stock}", use_container_width=True, help="移除此標的"):
-                    del watchlist[stock]
-                    if nk in st.session_state:
-                        del st.session_state[nk]
-                    if st.session_state.get("selected_watch_stock") == stock:
-                        st.session_state["selected_watch_stock"] = None
-                        st.session_state["global_search_final"] = ""
-                    st.rerun()
-                st.markdown("</div>", unsafe_allow_html=True)
+                with c9:
+                    st.markdown("<div style='padding-top:15px;'>", unsafe_allow_html=True)
+                    if st.button("", icon=":material/delete:", key=f"remove_{stock}", use_container_width=True, help="移除此標的"):
+                        del watchlist[stock]
+                        if nk in st.session_state:
+                            del st.session_state[nk]
+                        if st.session_state.get("selected_watch_stock") == stock:
+                            st.session_state["selected_watch_stock"] = None
+                            st.session_state["global_search_final"] = ""
+                        st.rerun()
+                    st.markdown("</div>", unsafe_allow_html=True)
     # 📌 新增：底部回到頂部按鈕  
     # 1. 載入 Google Material Icons 的字型庫
     st.markdown(
