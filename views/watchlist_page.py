@@ -227,13 +227,13 @@ def show_watchlist_page(STOCK_DICT=None, conn=None, SHEET_URL=None):
     if not watchlist:
         st.info("目前還沒有追蹤任何標的，趕快新增一個吧！")
     else:
-        # 🌟 1. 注入玻璃卡片的專屬 CSS 特效
+        # 🌟 1. 注入玻璃卡片的專屬 CSS 特效 & 批次按鈕色彩特效
         st.markdown(
             """
             <style>
-            /* 利用 CSS :has() 選擇器，精準抓取我們塞了 stock-card-marker 的卡片 */
+            /* ==== 玻璃卡片外框設定 ==== */
             div[data-testid="stVerticalBlockBorderWrapper"]:has(.stock-card-marker) {
-                background: rgba(30, 41, 59, 0.3) !important; /* 玻璃透明背景 */
+                background: rgba(30, 41, 59, 0.3) !important;
                 backdrop-filter: blur(12px) !important;
                 -webkit-backdrop-filter: blur(12px) !important;
                 border-radius: 12px !important;
@@ -242,38 +242,53 @@ def show_watchlist_page(STOCK_DICT=None, conn=None, SHEET_URL=None):
                 margin-bottom: 8px !important; 
                 transition: all 0.3s cubic-bezier(0.25, 0.8, 0.25, 1) !important;
             }
-            /* 滑鼠移過去時的發光浮起特效 */
             div[data-testid="stVerticalBlockBorderWrapper"]:has(.stock-card-marker):hover {
                 background: rgba(30, 41, 59, 0.6) !important;
                 border: 1px solid rgba(56, 189, 248, 0.4) !important;
                 box-shadow: 0 8px 25px rgba(56, 189, 248, 0.15) !important;
                 transform: translateY(-2px) !important;
             }
-            /* 微調卡片內部留白，讓他看起來緊湊專業 */
             div[data-testid="stVerticalBlockBorderWrapper"]:has(.stock-card-marker) > div {
                 padding: 10px 15px !important;
                 gap: 0px !important;
+            }
+
+            /* ==== 🚀 一鍵批次按鈕專屬樣式 (透過 title 精準鎖定) ==== */
+            button[title="一鍵帶入所有今日行情"],
+            button[title="一鍵帶入所有籌碼動態"],
+            button[title="一鍵清空所有筆記"] {
+                background: rgba(56, 189, 248, 0.15) !important; /* 天藍色透底 */
+                border: 1px solid rgba(56, 189, 248, 0.4) !important;
+                color: #38BDF8 !important;
+                transition: all 0.3s ease !important;
+            }
+            button[title="一鍵帶入所有今日行情"]:hover,
+            button[title="一鍵帶入所有籌碼動態"]:hover,
+            button[title="一鍵清空所有筆記"]:hover {
+                background: rgba(56, 189, 248, 0.35) !important;
+                border: 1px solid #38BDF8 !important;
+                transform: translateY(-2px) !important;
+                box-shadow: 0 4px 10px rgba(56, 189, 248, 0.2) !important;
+            }
+            
+            button[title="一鍵移除所有標的"] {
+                background: rgba(239, 68, 68, 0.15) !important; /* 紅色透底 */
+                border: 1px solid rgba(239, 68, 68, 0.4) !important;
+                color: #F87171 !important;
+                transition: all 0.3s ease !important;
+            }
+            button[title="一鍵移除所有標的"]:hover {
+                background: rgba(239, 68, 68, 0.35) !important;
+                border: 1px solid #F87171 !important;
+                transform: translateY(-2px) !important;
+                box-shadow: 0 4px 10px rgba(239, 68, 68, 0.2) !important;
             }
             </style>
             """,
             unsafe_allow_html=True
         )
 
-        # 📋 分割為 9 個區域 (為了與卡片內對齊，稍微調整外層 Header)
         col_ratios = [1.1, 0.9, 1.1, 1.1, 3.9, 0.5, 0.5, 0.5, 0.5]
-        
-        # 顯示標題列 (不裝在卡片裡，當作表格的頭)
-        with st.container():
-            h1, h2, h3, h4, h5, h6, h7, h8, h9 = st.columns(col_ratios)
-            h1.markdown("<span style='color:#94a3b8; font-size:14px; padding-left:15px;'>標的名稱</span>", unsafe_allow_html=True)
-            h2.markdown("<span style='color:#94a3b8; font-size:14px;'>產業別</span>", unsafe_allow_html=True)
-            h3.markdown("<span style='color:#94a3b8; font-size:14px;'>最新價</span>", unsafe_allow_html=True)
-            h4.markdown("<span style='color:#94a3b8; font-size:14px;'>成交量 (張)</span>", unsafe_allow_html=True)
-            h5.markdown("<span style='color:#94a3b8; font-size:14px;'>專屬筆記 (編輯後點擊左上方存檔)</span>", unsafe_allow_html=True)
-            h6.markdown("")
-            h7.markdown("")
-            h8.markdown("")
-            h9.markdown("")
         
         def fmt_color(val, is_pct=False, is_vol=False):
             color = "#FF4B4B" if val > 0 else ("#00E272" if val < 0 else "#94A3B8")
@@ -288,7 +303,6 @@ def show_watchlist_page(STOCK_DICT=None, conn=None, SHEET_URL=None):
                 append_str = f"[{d['date'][5:]}] 收:{d['price']:.2f} 量:{d['vol']:,}張"
                 nk = f"note_{stock_name}"
                 current_text = st.session_state.get(nk, "").strip()
-                
                 if current_text:
                     st.session_state[nk] = current_text + f"\n{append_str}"
                 else:
@@ -299,17 +313,13 @@ def show_watchlist_page(STOCK_DICT=None, conn=None, SHEET_URL=None):
             """讀取 B1 法人動向與衰退追蹤，並附加到筆記"""
             dyn_msg = "⚪ B1未進榜"
             display_date = market_date[5:] if '/' in market_date else "今日"
-            
             try:
-                # 1. 抓取正向與衰退資料表
                 df_b1 = st.session_state.get('b1_final_df')
                 if df_b1 is None or df_b1.empty:
                     df_b1 = st.session_state.get('my_final_df')
-                    
                 df_b1_down = st.session_state.get('b1_down_final_df')
 
                 if df_b1 is not None and not df_b1.empty:
-                    # 🔍 抓取最新日期
                     date_cols = [c for c in df_b1.columns if '持股%' in c or str(c).isdigit()]
                     if date_cols:
                         sorted_dates = sorted(date_cols, reverse=True)
@@ -322,7 +332,6 @@ def show_watchlist_page(STOCK_DICT=None, conn=None, SHEET_URL=None):
                     if col_id:
                         df_b1[col_id] = df_b1[col_id].astype(str).str.strip()
                         res = df_b1[df_b1[col_id] == str(p_code)]
-                        
                         if not res.empty:
                             row = res.iloc[0]
 
@@ -361,23 +370,78 @@ def show_watchlist_page(STOCK_DICT=None, conn=None, SHEET_URL=None):
                                 msg_lines.append(f"📉提款 🏷️衰退:{decay_tags} | 📊單日△:{decay_delta}")
                                 
                             dyn_msg = "\n  ".join(msg_lines)
-                else: # 👈 這裡的縮排已校正，完美對齊上方的 if
+                else:
                     dyn_msg = "⚠️ B1資料未載入(請先點側邊欄搜尋或全市場掃描)"
-            except Exception as e: # 👈 這裡的縮排已校正，完美對齊上方的 try
+            except Exception as e:
                 dyn_msg = f"讀取異常: {e}"
 
             append_str = f"[{display_date}]\n  {dyn_msg}"
             nk = f"note_{stock_name}"
             current_text = st.session_state.get(nk, "").strip()
-            
             if current_text:
                 st.session_state[nk] = current_text + f"\n{append_str}"
             else:
                 st.session_state[nk] = append_str
-            
             watchlist[stock_name] = st.session_state[nk]
 
-        # 開始渲染每一檔股票
+        # ==========================================
+        # 🚀 一鍵批次功能引擎 (Callback)
+        # ==========================================
+        def batch_append_quotes():
+            for stock_name in list(watchlist.keys()):
+                stock_code_match = re.search(r'\d+', stock_name)
+                pure_code = stock_code_match.group() if stock_code_match else None
+                append_quote_to_note(stock_name, pure_code)
+
+        def batch_append_dynamics():
+            for stock_name in list(watchlist.keys()):
+                stock_code_match = re.search(r'\d+', stock_name)
+                pure_code = stock_code_match.group() if stock_code_match else None
+                append_dynamic_to_note(stock_name, pure_code)
+
+        def batch_remove_all():
+            for stock_name in list(watchlist.keys()):
+                nk = f"note_{stock_name}"
+                if nk in st.session_state:
+                    del st.session_state[nk]
+            watchlist.clear()
+            if "selected_watch_stock" in st.session_state:
+                st.session_state["selected_watch_stock"] = None
+            if "global_search_final" in st.session_state:
+                st.session_state["global_search_final"] = ""
+
+        def batch_clear_notes():
+            for stock_name in list(watchlist.keys()):
+                nk = f"note_{stock_name}"
+                st.session_state[nk] = ""
+                watchlist[stock_name] = ""
+
+        # 📋 顯示標題列 (不裝在卡片裡，當作表格的頭)
+        with st.container():
+            h1, h2, h3, h4, h5, h6, h7, h8, h9 = st.columns(col_ratios)
+            with h1: st.markdown("<div style='padding-top:10px;'><span style='color:#94a3b8; font-size:14px; padding-left:15px;'>標的名稱</span></div>", unsafe_allow_html=True)
+            with h2: st.markdown("<div style='padding-top:10px;'><span style='color:#94a3b8; font-size:14px;'>產業別</span></div>", unsafe_allow_html=True)
+            with h3: st.markdown("<div style='padding-top:10px;'><span style='color:#94a3b8; font-size:14px;'>最新價</span></div>", unsafe_allow_html=True)
+            with h4: st.markdown("<div style='padding-top:10px;'><span style='color:#94a3b8; font-size:14px;'>成交量 (張)</span></div>", unsafe_allow_html=True)
+            
+            with h5:
+                # 將「專屬筆記」與「一鍵清空按鈕」並排
+                hc1, hc2 = st.columns([2.5, 1.5])
+                with hc1:
+                    st.markdown("<div style='padding-top:10px;'><span style='color:#94a3b8; font-size:14px;'>專屬筆記 (一鍵清空 👉)</span></div>", unsafe_allow_html=True)
+                with hc2:
+                    st.button("清空", icon=":material/ink_eraser:", key="batch_clear", help="一鍵清空所有筆記", use_container_width=True, on_click=batch_clear_notes)
+            
+            with h6:
+                st.button("", icon=":material/input:", key="batch_quote", help="一鍵帶入所有今日行情", use_container_width=True, on_click=batch_append_quotes)
+            with h7:
+                st.button("", icon=":material/psychology:", key="batch_dyn", help="一鍵帶入所有籌碼動態", use_container_width=True, on_click=batch_append_dynamics)
+            with h8:
+                st.markdown("") # h8 原本是對應診斷功能，這裡維持空白以對齊版面
+            with h9:
+                st.button("", icon=":material/delete:", key="batch_delete", help="一鍵移除所有標的", use_container_width=True, on_click=batch_remove_all)
+        
+        # 📋 開始渲染每一檔股票 (原有的卡片迴圈)
         for stock in list(watchlist.keys()):
             nk = f"note_{stock}"
             pure_code = None
@@ -468,6 +532,7 @@ def show_watchlist_page(STOCK_DICT=None, conn=None, SHEET_URL=None):
                             st.session_state["global_search_final"] = ""
                         st.rerun()
                     st.markdown("</div>", unsafe_allow_html=True)
+                #
     # 📌 新增：底部回到頂部按鈕  
     # 1. 載入 Google Material Icons 的字型庫
     st.markdown(
