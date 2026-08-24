@@ -261,19 +261,57 @@ def show_watchlist_page(STOCK_DICT=None, conn=None, SHEET_URL=None):
                     st.session_state[nk] = append_str
                 watchlist[stock_name] = st.session_state[nk]
 
-        def append_dynamic_to_note(stock_name, p_code):#讀取側邊欄的籌碼診斷動態，並附加到筆記
-            """"""
-            dyn_msg = ""
+        def append_dynamic_to_note(stock_name, p_code):#讀取 B1 法人動向與衰退追蹤，並附加到筆記
+            """讀取 B1 法人動向與衰退追蹤，並附加到筆記"""
+            dyn_msg = "⚪ B1未進榜"
             try:
-                # 呼叫您在 sidebar.py 寫好的綜合 AI 籌碼診斷函式
-                from views.sidebar import generate_stock_commentary
-                dyn_msg = generate_stock_commentary(p_code)
-                if not dyn_msg:
-                    dyn_msg = "目前無特殊籌碼動態。"
-            except Exception as e:
-                dyn_msg = "無法讀取動態，請先確認籌碼資料已載入。"
+                # 1. 從背景抓取 B1 的資料表
+                df_b1 = st.session_state.get('b1_final_df')
+                if df_b1 is None or df_b1.empty:
+                    df_b1 = st.session_state.get('my_final_df')
 
-            append_str = f"[{market_date[5:]}] {dyn_msg}"
+                if df_b1 is not None and not df_b1.empty:
+                    # 確保股票代號格式正確，並尋找該檔股票
+                    col_id = '股票代號' if '股票代號' in df_b1.columns else ('代號' if '代號' in df_b1.columns else None)
+                    if col_id:
+                        df_b1[col_id] = df_b1[col_id].astype(str).str.strip()
+                        res = df_b1[df_b1[col_id] == str(p_code)]
+                        
+                        if not res.empty:
+                            row = res.iloc[0]
+                            
+                            # 🛡️ 防呆抓取工具：用關鍵字找欄位，避免 KeyError
+                            def safe_get(col_keywords, default="無"):
+                                for col in res.columns:
+                                    if any(k in col for k in col_keywords):
+                                        val = str(row[col]).strip()
+                                        return val if val.lower() != 'nan' and val != '' else default
+                                return default
+
+                            # 抓取您截圖中的上半部 (法人動向)
+                            status = safe_get(['最新動態', '狀態動態', '動態'])
+                            tags = safe_get(['今日上榜', '原始上榜', '上榜'])
+                            delta = safe_get(['單日△', '精準單日', '單日'], "0.00")
+                            
+                            # 抓取您截圖中的下半部 (衰退追蹤)
+                            decay_tags = safe_get(['衰退上榜', '衰退'])
+                            decay_delta = safe_get(['衰退單日', '提款單日', '衰退△'], "0.00")
+
+                            # 排版組合 (加入換行與縮排，讓筆記更好看)
+                            msg_lines = []
+                            msg_lines.append(f"📌動態:{status} | 🏷️上榜:{tags} | 📊單日△:{delta}")
+                            
+                            if decay_tags != "無":
+                                msg_lines.append(f"📉提款 🏷️衰退:{decay_tags} | 📊單日△:{decay_delta}")
+                                
+                            dyn_msg = "\n  ".join(msg_lines)
+                else:
+                    dyn_msg = "⚠️ B1資料未載入(請先用側邊欄搜過一次或點全市場掃描)"
+            except Exception as e:
+                dyn_msg = f"讀取異常: {e}"
+
+            # 加上日期，並合併到原本的筆記中
+            append_str = f"[{market_date[5:]}]\n  {dyn_msg}"
             nk = f"note_{stock_name}"
             current_text = st.session_state.get(nk, "").strip()
             
@@ -281,8 +319,10 @@ def show_watchlist_page(STOCK_DICT=None, conn=None, SHEET_URL=None):
                 st.session_state[nk] = current_text + f"\n{append_str}"
             else:
                 st.session_state[nk] = append_str
+            
+            # 即時寫入 session_state 與 watchlist
             watchlist[stock_name] = st.session_state[nk]
-
+        #結束
         for stock in list(watchlist.keys()):
             nk = f"note_{stock}"
             pure_code = None
