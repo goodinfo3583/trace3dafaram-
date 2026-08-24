@@ -182,7 +182,7 @@ def show_watchlist_page(STOCK_DICT=None, conn=None, SHEET_URL=None):
     # ==========================================
     # 💾 左上角存檔、匯出與日期區塊 
     # ==========================================
-    col_save, col_export, col_date, col_space = st.columns([1.5, 1.5, 3.0, 4.0])
+    col_save, col_export, col_undo, col_date, col_space = st.columns([1.5, 1.2, 1.2, 3.0, 3.1])
     with col_save:
         if st.button("存檔", icon=":material/save:", use_container_width=True, type="primary", help="將目前的變更同步至雲端"):
             with st.spinner("正在上傳至雲端..."):
@@ -196,7 +196,6 @@ def show_watchlist_page(STOCK_DICT=None, conn=None, SHEET_URL=None):
             st.rerun()
             
     with col_export:
-        # 製作匯出專用的 DataFrame
         if watchlist:
             export_data = []
             for stock, note in watchlist.items():
@@ -205,7 +204,6 @@ def show_watchlist_page(STOCK_DICT=None, conn=None, SHEET_URL=None):
                 stock_code_match = re.search(r'\d+', stock)
                 if stock_code_match: pure_code = stock_code_match.group()
                 
-                # 若有抓到即時報價也一併附上
                 price, vol = "", ""
                 if pure_code and pure_code in market_data:
                     price = market_data[pure_code]["price"]
@@ -216,7 +214,6 @@ def show_watchlist_page(STOCK_DICT=None, conn=None, SHEET_URL=None):
             df_export = pd.DataFrame(export_data)
             csv = df_export.to_csv(index=False, encoding='utf-8-sig').encode('utf-8-sig')
             
-            # 使用 Streamlit 內建的下載按鈕
             st.download_button(
                 label="匯出",
                 icon=":material/download:",
@@ -229,10 +226,25 @@ def show_watchlist_page(STOCK_DICT=None, conn=None, SHEET_URL=None):
         else:
             st.button("匯出", icon=":material/download:", use_container_width=True, disabled=True)
 
+    # 📌 新增：「還原到上一步操作」按鈕
+    with col_undo:
+        if st.button("還原", icon=":material/undo:", use_container_width=True, help="還原到上一步操作"):
+            history_stack = st.session_state.get(history_key, [])
+            if history_stack:
+                last_snapshot = history_stack.pop()
+                for stock, note_val in last_snapshot.items():
+                    if stock in watchlist:
+                        st.session_state[f"note_{stock}"] = note_val
+                st.success("已還原到上一步！")
+                time.sleep(0.5)
+                st.rerun()
+            else:
+                st.info("沒有更多歷史紀錄可還原")
+
     with col_date:
         if watchlist and market_data:
             st.markdown(f"<div style='padding-top:8px; color:#38BDF8; font-size:15px; font-weight:bold;'>日期：{market_date}</div>", unsafe_allow_html=True)
-
+    #表格按鈕↑
     st.write("") 
     
     if not watchlist:
