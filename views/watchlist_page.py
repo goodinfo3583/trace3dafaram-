@@ -226,10 +226,11 @@ def show_watchlist_page(STOCK_DICT=None, conn=None, SHEET_URL=None):
     if not watchlist:
         st.info("目前還沒有追蹤任何標的，趕快新增一個吧！")
     else:
-        # 📋 分割為 8 個區域 (將按鈕欄位縮小，因為只剩 Icon)
-        col_ratios = [1.1, 0.9, 1.1, 1.1, 4.4, 0.5, 0.5, 0.5]
+
+        # 📋 分割為 9 個區域 (新增動態按鈕)
+        col_ratios = [1.1, 0.9, 1.1, 1.1, 3.9, 0.5, 0.5, 0.5, 0.5]
         
-        h1, h2, h3, h4, h5, h6, h7, h8 = st.columns(col_ratios)
+        h1, h2, h3, h4, h5, h6, h7, h8, h9 = st.columns(col_ratios)
         h1.markdown("<span style='color:#94a3b8; font-size:14px;'>標的名稱</span>", unsafe_allow_html=True)
         h2.markdown("<span style='color:#94a3b8; font-size:14px;'>產業別</span>", unsafe_allow_html=True)
         h3.markdown("<span style='color:#94a3b8; font-size:14px;'>最新價</span>", unsafe_allow_html=True)
@@ -238,7 +239,8 @@ def show_watchlist_page(STOCK_DICT=None, conn=None, SHEET_URL=None):
         h6.markdown("")
         h7.markdown("")
         h8.markdown("")
-
+        h9.markdown("")
+        
         def fmt_color(val, is_pct=False, is_vol=False):
             color = "#FF4B4B" if val > 0 else ("#00E272" if val < 0 else "#94A3B8")
             sign = "+" if val > 0 else ""
@@ -259,6 +261,28 @@ def show_watchlist_page(STOCK_DICT=None, conn=None, SHEET_URL=None):
                     st.session_state[nk] = append_str
                 watchlist[stock_name] = st.session_state[nk]
 
+        def append_dynamic_to_note(stock_name, p_code):#讀取側邊欄的籌碼診斷動態，並附加到筆記
+            """"""
+            dyn_msg = ""
+            try:
+                # 呼叫您在 sidebar.py 寫好的綜合 AI 籌碼診斷函式
+                from views.sidebar import generate_stock_commentary
+                dyn_msg = generate_stock_commentary(p_code)
+                if not dyn_msg:
+                    dyn_msg = "目前無特殊籌碼動態。"
+            except Exception as e:
+                dyn_msg = "無法讀取動態，請先確認籌碼資料已載入。"
+
+            append_str = f"[{market_date[5:]}] {dyn_msg}"
+            nk = f"note_{stock_name}"
+            current_text = st.session_state.get(nk, "").strip()
+            
+            if current_text:
+                st.session_state[nk] = current_text + f"\n{append_str}"
+            else:
+                st.session_state[nk] = append_str
+            watchlist[stock_name] = st.session_state[nk]
+
         for stock in list(watchlist.keys()):
             nk = f"note_{stock}"
             pure_code = None
@@ -274,8 +298,8 @@ def show_watchlist_page(STOCK_DICT=None, conn=None, SHEET_URL=None):
                 d = market_data[pure_code]
                 p_str = f"<span style='font-size:16px;'>{d['price']:.2f}</span><br>{fmt_color(d['price_pct'], True)}"
                 v_str = f"<span style='font-size:15px;'>{d['vol']:,}</span><br>{fmt_color(d['vol_pct'], False, True)}"
-
-            c1, c2, c3, c4, c5, c6, c7, c8 = st.columns(col_ratios)
+            #筆記欄位按鈕
+            c1, c2, c3, c4, c5, c6, c7, c8, c9 = st.columns(col_ratios)
             
             with c1:
                 st.markdown(f"<div style='padding-top:8px; font-weight:bold; font-size:15px;'>{stock}</div>", unsafe_allow_html=True)
@@ -299,7 +323,7 @@ def show_watchlist_page(STOCK_DICT=None, conn=None, SHEET_URL=None):
                 st.markdown("<div style='padding-top:15px;'>", unsafe_allow_html=True)
                 st.button(
                     "", 
-                    icon=":material/input:", # 帶入
+                    icon=":material/input:", # 帶入行情圖示
                     key=f"import_{stock}", 
                     use_container_width=True, 
                     help="將今日行情寫入筆記",
@@ -309,8 +333,19 @@ def show_watchlist_page(STOCK_DICT=None, conn=None, SHEET_URL=None):
                 st.markdown("</div>", unsafe_allow_html=True)
             with c7:
                 st.markdown("<div style='padding-top:15px;'>", unsafe_allow_html=True)
+                st.button(
+                    "", 
+                    icon=":material/psychology:", # 帶入動態 (腦袋/AI 圖示)
+                    key=f"dyn_{stock}", 
+                    use_container_width=True, 
+                    help="將籌碼動態寫入筆記",
+                    on_click=append_dynamic_to_note,
+                    args=(stock, pure_code)
+                )
+                st.markdown("</div>", unsafe_allow_html=True)
+            with c8:
+                st.markdown("<div style='padding-top:15px;'>", unsafe_allow_html=True)
                 if st.button("", icon=":material/monitoring:", key=f"view_{stock}", use_container_width=True, help="顯示籌碼診斷"):
-                    # 🚀 強制轉為標準格式，才能與下拉選單的選項完美吻合！
                     standard_format = stock
                     if pure_code and STOCK_DICT and pure_code in STOCK_DICT:
                         v = STOCK_DICT[pure_code]
@@ -321,7 +356,7 @@ def show_watchlist_page(STOCK_DICT=None, conn=None, SHEET_URL=None):
                     st.rerun()
                 st.markdown("</div>", unsafe_allow_html=True)
 
-            with c8:
+            with c9:
                 st.markdown("<div style='padding-top:15px;'>", unsafe_allow_html=True)
                 if st.button("", icon=":material/delete:", key=f"remove_{stock}", use_container_width=True, help="移除此標的"):
                     del watchlist[stock]
@@ -332,5 +367,3 @@ def show_watchlist_page(STOCK_DICT=None, conn=None, SHEET_URL=None):
                         st.session_state["global_search_final"] = ""
                     st.rerun()
                 st.markdown("</div>", unsafe_allow_html=True)
-            
-            st.markdown("<hr style='border-color: #1E293B; margin: 5px 0;'>", unsafe_allow_html=True)
