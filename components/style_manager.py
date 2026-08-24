@@ -658,39 +658,39 @@ margin-right: 20px; filter: drop-shadow(0 0 5px rgba(0,210,255,0.5));
 <div class="course-desc">學習解讀 GDP、CPI、利率與匯率等基本總體經濟指標，判斷目前大盤處於景氣擴張或衰退的哪個階段。</div>
 </div>
 <div class="course-item locked">
-<div class="course-title"><img src="app/static/icon-course1.png" class="course-icon"> 2. 股市基本架構與名詞解析 (未開放)</div>
+<div class="course-title"><img src="app/static/icon-course1.png" class="course-icon">Lv 2. 股市基本架構與名詞解析 (未開放)</div>
 <div class="course-desc">認識台股交易規則、漲跌幅限制、各類委託單與基本盤面術語，建立進場前的基礎常識。</div>
 </div>
 <div class="course-item locked">
-<div class="course-title"><img src="app/static/icon-course1.png" class="course-icon"> 3. 財報與基本面入門 (未開放)</div>
+<div class="course-title"><img src="app/static/icon-course1.png" class="course-icon">Lv 3. 財報與基本面入門 (未開放)</div>
 <div class="course-desc">學習閱讀三大財務報表（綜合損益表、資產負債表、現金流量表），學會挑選具備長期競爭力的公司。</div>
 </div>
 <div class="course-item active" id="btn-open-course-4">
-<div class="course-title"><img src="app/static/icon-course1.png" class="course-icon"> 4. 量價關係與盤面解讀 (點擊進入)</div>
+<div class="course-title"><img src="app/static/icon-course1.png" class="course-icon">Lv 4. 量價關係與盤面解讀</div>
 <div class="course-desc">對照成交量與股價漲跌的互動（如價漲量增、量價背離），判斷多空雙方的企圖心與買賣力道。</div>
 </div>
 <div class="course-item locked">
-<div class="course-title"><img src="app/static/icon-course1.png" class="course-icon"> 5. 技術分析與指標應用 (未開放)</div>
+<div class="course-title"><img src="app/static/icon-course1.png" class="course-icon">Lv 5. 技術分析與指標應用 (未開放)</div>
 <div class="course-desc">熟悉常用技術指標（如均線 MA、MACD、RSI、KDJ），掌握支撐壓力與趨勢轉折點。</div>
 </div>
 <div class="course-item locked">
-<div class="course-title"><img src="app/static/icon-course1.png" class="course-icon"> 6. 籌碼面追蹤：法人與大戶結構 (未開放)</div>
+<div class="course-title"><img src="app/static/icon-course1.png" class="course-icon">Lv 6. 籌碼面追蹤：法人與大戶結構 (未開放)</div>
 <div class="course-desc">分析外資、投信、自營商動向及大戶持股比例，透過資金流向尋找主力默默佈局的標的。</div>
 </div>
 <div class="course-item active" id="btn-open-course-7">
-<div class="course-title"><img src="app/static/icon-course1.png" class="course-icon"> 7. 券資關係與融資融券分析 (點擊進入)</div>
+<div class="course-title"><img src="app/static/icon-course1.png" class="course-icon">Lv 7. 券資關係與融資融券分析</div>
 <div class="course-desc">觀察融資餘額、融券張數與券資比變化，評估市場散戶情緒及潛在的「軋空」或「多殺多」力道。</div>
 </div>
 <div class="course-item locked">
-<div class="course-title"><img src="app/static/icon-course1.png" class="course-icon"> 8. 產業趨勢與題材選股 (未開放)</div>
+<div class="course-title"><img src="app/static/icon-course1.png" class="course-icon">Lv 8. 產業趨勢與題材選股 (未開放)</div>
 <div class="course-desc">掌握主流產業輪動脈絡（如半導體、AI 供應鏈、綠能等），在對的時間點佈局具備成長爆發力的賽道。</div>
 </div>
 <div class="course-item locked">
-<div class="course-title"><img src="app/static/icon-course1.png" class="course-icon"> 9. 資金控管與風險管理 (未開放)</div>
+<div class="course-title"><img src="app/static/icon-course1.png" class="course-icon">Lv 9. 資金控管與風險管理 (未開放)</div>
 <div class="course-desc">學習單筆投資部位配置、分批進場策略、停損停利機制，避免因情緒失控而遭受重大虧損。</div>
 </div>
 <div class="course-item locked">
-<div class="course-title"><img src="app/static/icon-course1.png" class="course-icon"> 10. 交易心理學與個人策略總結 (未開放)</div>
+<div class="course-title"><img src="app/static/icon-course1.png" class="course-icon">Lv 10. 交易心理學與個人策略總結 (未開放)</div>
 <div class="course-desc">克服貪婪與恐懼的心理障礙，並回測、修正並建立專屬於自己的穩定獲利交易系統。</div>
 </div>
 </div>
@@ -798,8 +798,7 @@ border-width: 12px 14px 12px 0; border-style: solid; border-color: transparent r
 
 </div>
 </div>"""
-            
-        elif current_view == 'detail_4':
+        elif current_view == 'detail_4': 
             # =========================
             # 📖 第4課詳情 (Detail View)
             # =========================
@@ -959,35 +958,34 @@ border-width: 12px 14px 12px 0; border-style: solid; border-color: transparent r
         st.markdown(html_code, unsafe_allow_html=True)     
         
         # =========================
-        # 🔗 核心隱藏按鈕 (加入 key 避免重複錯誤)
+        # 🔗 核心隱藏按鈕 (真實操控狀態的樞紐)*
         # =========================
-        if st.button("CloseNPC", key="btn_npc_sys_close"):
+        if st.button("CloseNPC"):
             st.session_state['show_course_npc'] = False
             st.session_state['course_view'] = 'list'
             st.rerun()
             
-        if st.button("OpenCourse1", key="btn_npc_sys_open_1"):
+        if st.button("OpenCourse1"):
             st.session_state['course_view'] = 'detail_1'
             st.rerun()
             
-        if st.button("OpenCourse4", key="btn_npc_sys_open_4"):
+        if st.button("OpenCourse4"):
             st.session_state['course_view'] = 'detail_4'
             st.rerun()
 
-        if st.button("OpenCourse7", key="btn_npc_sys_open_7"):
+        if st.button("OpenCourse7"):
             st.session_state['course_view'] = 'detail_7'
             st.rerun()
             
-        if st.button("BackToList", key="btn_npc_sys_back"):
+        if st.button("BackToList"):
             st.session_state['course_view'] = 'list'
             st.rerun()
             
-        # 💡 JS 綁定按鈕與隱形引擎
+        # 💡 JS 綁定按鈕與隱形引擎避免使其他按鈕無法點以及應該是減少讀取
         bind_js = """<script>
 setInterval(() => {
 const doc = window.parent.document;
 if (!doc) return;
-
 // 尋找 Streamlit 生成的實體按鈕
 const stBtns = Array.from(doc.querySelectorAll('button'));
 const btnClose = stBtns.find(b => b.textContent.includes('CloseNPC'));
@@ -995,42 +993,38 @@ const btnOpen1 = stBtns.find(b => b.textContent.includes('OpenCourse1'));
 const btnOpen4 = stBtns.find(b => b.textContent.includes('OpenCourse4'));
 const btnOpen7 = stBtns.find(b => b.textContent.includes('OpenCourse7'));
 const btnBack = stBtns.find(b => b.textContent.trim() === 'BackToList');
-
 // 安全隱藏實體按鈕讓其他按鈕可以順利點選
 [btnClose, btnOpen1, btnOpen4, btnOpen7, btnBack].forEach(b => {
-    if(b) {
-        const container = b.closest('div[data-testid="stElementContainer"]');
-        if(container) {
-            container.style.position = 'fixed';
-            container.style.top = '-9999px';
-            container.style.left = '-9999px';
-        }
-    }
+if(b) {
+const container = b.closest('div[data-testid="stElementContainer"]');
+if(container) {
+container.style.position = 'fixed';
+container.style.top = '-9999px';
+container.style.left = '-9999px';
+}
+}
 });
-
 // 建立事件綁定工廠
 const bindEvent = (uiId, stBtn) => {
-    const uiEl = doc.getElementById(uiId);
-    if(uiEl && stBtn && !uiEl.dataset.hooked) {
-        uiEl.dataset.hooked = 'true'; 
-        uiEl.style.cursor = 'pointer'; 
-        uiEl.addEventListener('click', (e) => {
-            e.preventDefault();
-            e.stopPropagation();
-            stBtn.click(); 
-        });
-    }
+const uiEl = doc.getElementById(uiId);
+if(uiEl && stBtn && !uiEl.dataset.hooked) {
+uiEl.dataset.hooked = 'true'; 
+uiEl.style.cursor = 'pointer'; 
+uiEl.addEventListener('click', (e) => {
+e.preventDefault();
+e.stopPropagation();
+stBtn.click(); 
+});
+}
 };
-
-// 進行所有按鈕的綁定
+// 替自訂 UI 注入對應的點擊按鈕綁定
 bindEvent('btn-close-list', btnClose);
 bindEvent('btn-open-course-1', btnOpen1);
 bindEvent('btn-open-course-4', btnOpen4);
 bindEvent('btn-open-course-7', btnOpen7);
 bindEvent('btn-back-detail', btnBack);
 bindEvent('btn-close-detail', btnClose);
-
-}, 300);
+}, 300); // 每 300 毫秒掃描一次，保證絕對綁定成功
 </script>"""
-
+        
         components.html(bind_js, height=0, width=0)
