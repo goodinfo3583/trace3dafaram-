@@ -1088,7 +1088,8 @@ border-width: 12px 14px 12px 0; border-style: solid; border-color: transparent r
         if st.button("OpenCourse1", key="btn_npc_sys_open_1"):
             st.session_state['course_view'] = 'detail_1'
             st.rerun()
-                if st.button("OpenCourse2", key="btn_npc_sys_open_2"):
+            
+        if st.button("OpenCourse2", key="btn_npc_sys_open_2"):
             st.session_state['course_view'] = 'detail_2'
             st.rerun()
             
