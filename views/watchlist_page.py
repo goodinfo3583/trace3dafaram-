@@ -361,9 +361,9 @@ def show_watchlist_page(STOCK_DICT=None, conn=None, SHEET_URL=None):
                                 msg_lines.append(f"📉提款 🏷️衰退:{decay_tags} | 📊單日△:{decay_delta}")
                                 
                             dyn_msg = "\n  ".join(msg_lines)
-            else:
-                dyn_msg = "⚠️ B1資料未載入(請先點側邊欄搜尋或全市場掃描)"
-            except Exception as e:
+                else: # 👈 這裡的縮排已校正，完美對齊上方的 if
+                    dyn_msg = "⚠️ B1資料未載入(請先點側邊欄搜尋或全市場掃描)"
+            except Exception as e: # 👈 這裡的縮排已校正，完美對齊上方的 try
                 dyn_msg = f"讀取異常: {e}"
 
             append_str = f"[{display_date}]\n  {dyn_msg}"
