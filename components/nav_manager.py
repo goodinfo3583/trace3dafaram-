@@ -145,9 +145,29 @@ def inject_custom_header(is_logged_in=False):
             } 
             .nav-text-link:active { transform: scale(0.95); background: rgba(255,215,0,0.1); }
             .nav-icon { margin: 0 0 8px 0; width: 28px; height: 28px; }
-            .global-radar-toggle { display: flex; } 
+            .global-radar-toggle { display: flex; margin-right: 5px; } 
         }
         .stApp { margin-top: 50px !important; }
+        
+        /* 贊助彈窗樣式 */
+        .donate-modal-overlay {
+            display: none; position: fixed; top: 0; left: 0; width: 100vw; height: 100vh;
+            background: rgba(0, 0, 0, 0.7); z-index: 1000050; justify-content: center; align-items: center;
+            backdrop-filter: blur(5px); pointer-events: auto; opacity: 0; transition: opacity 0.3s ease;
+        }
+        .donate-modal-overlay.show { display: flex; opacity: 1; }
+        .donate-modal-content {
+            background: rgba(17, 22, 34, 0.95); border: 1px solid rgba(255, 215, 0, 0.4); border-radius: 12px;
+            padding: 30px; text-align: center; max-width: 380px; width: 90%;
+            box-shadow: 0 10px 40px rgba(0,0,0,0.8), 0 0 20px rgba(255,215,0,0.15);
+            transform: translateY(20px); transition: transform 0.3s cubic-bezier(0.175, 0.885, 0.32, 1.275);
+        }
+        .donate-modal-overlay.show .donate-modal-content { transform: translateY(0); }
+        .donate-btn-close {
+            background: rgba(255, 215, 0, 0.1); border: 1px solid #FFD700; color: #FFD700; 
+            padding: 8px 24px; border-radius: 6px; font-size: 14px; font-weight: bold; cursor: pointer; transition: 0.3s;
+        }
+        .donate-btn-close:hover { background: rgba(255, 215, 0, 0.3); box-shadow: 0 0 10px rgba(255,215,0,0.4); }
     `;
     parentDoc.head.appendChild(style);
 
@@ -264,6 +284,12 @@ def inject_custom_header(is_logged_in=False):
 
             <div style="flex-grow: 1;"></div>
             
+            <!-- 💰 贊助收銀箱 (開發中) -->
+            <div id="donate-btn" class="global-radar-toggle" style="margin-right: 5px;" title="支持開發 (建置中)">
+                <img src="app/static/icon-donatebox.png" alt="支持開發">
+            </div>
+
+            <!-- 📡 雷達總控 -->
             <div id="global-radar-btn" class="global-radar-toggle" title="開關排行卡片">
                 <img src="app/static/icon-card.png" alt="雷達總控" id="global-radar-img">
             </div>
@@ -271,7 +297,7 @@ def inject_custom_header(is_logged_in=False):
             <div class="disclaimer-item" id="mobile-nav-toggle" title="收起選單" style="cursor: pointer; padding-right: 5px;"><span id="nav-toggle-icon" style="font-size: 18px; color: #38BDF8;">📜</span></div>
         </div>
         
-        <!-- 💡 核心導覽列：加回 B6 鉅額交易 -->
+        <!-- 💡 核心導覽列 -->
         <div class="nav-btn-container" id="nav-btn-container">
             <a href="#" data-target="NavToPool" class="nav-text-link internal-nav"><img src="app/static/magicbookfire2.png" class="nav-icon" alt="icon">觀察名單</a><span class="nav-divider">|</span>
             <a href="#" data-target="NavToB1" class="nav-text-link internal-nav"><img src="app/static/magicbookleaf.png" class="nav-icon" alt="icon">法人動向</a><span class="nav-divider">|</span>
@@ -281,6 +307,22 @@ def inject_custom_header(is_logged_in=False):
             <a href="#" data-target="NavToB5" class="nav-text-link internal-nav"><img src="app/static/wirtleg.png" class="nav-icon" alt="icon">大腿動向</a><span class="nav-divider">|</span>
             <a href="#" data-target="NavToB6" class="nav-text-link internal-nav"><img src="app/static/magicbookfire.png" class="nav-icon" alt="icon">鉅額交易</a><span class="nav-divider">|</span>
             <a href="#" data-target="NavToB7" class="nav-text-link internal-nav"><img src="app/static/magicbookboss.png" class="nav-icon" alt="icon">董監動向</a>
+        </div>
+        
+        <!-- 💰 贊助彈窗 HTML -->
+        <div id="donate-modal-container" class="donate-modal-overlay">
+            <div class="donate-modal-content">
+                <img src="app/static/icon-donatebox.png" style="width: 70px; height: 70px; object-fit: contain; margin-bottom: 10px; filter: drop-shadow(0 0 15px rgba(255,215,0,0.6));">
+                <h3 style="color: #FFD700; margin: 0 0 15px 0; font-size: 22px; font-weight: 800; text-shadow: 0 2px 4px rgba(0,0,0,0.8);">「等等！等等！」</h3>
+                
+                <div style="background: rgba(0, 0, 0, 0.4); border: 1px solid rgba(255,255,255,0.1); border-radius: 8px; padding: 16px; margin-bottom: 20px; text-align: left;">
+                    <p style="color: #E2E8F0; font-size: 16px; margin: 0 0 8px 0; line-height: 1.5;">「我還沒準備好收銀箱！」</p>
+                    <p style="color: #E2E8F0; font-size: 16px; margin: 0; line-height: 1.5;">「你現在把錢塞給我，我可能會不知道放哪裡。」</p>
+                </div>
+                
+                <p style="color: #94A3B8; font-size: 13px; margin-bottom: 24px;">（ 贊助功能正在準備中。下次再來看看 ）</p>
+                <button id="close-donate-modal" class="donate-btn-close">我知道了</button>
+            </div>
         </div>
     `;
     parentDoc.body.insertBefore(headerDiv, parentDoc.body.firstChild);
@@ -404,6 +446,30 @@ def inject_custom_header(is_logged_in=False):
             };
         }
 
+        // 💰 贊助箱彈窗邏輯
+        const donateBtn = parentDoc.getElementById('donate-btn');
+        const donateModal = parentDoc.getElementById('donate-modal-container');
+        const closeDonateBtn = parentDoc.getElementById('close-donate-modal');
+
+        if (donateBtn && donateModal && closeDonateBtn) {
+            donateBtn.onclick = (e) => {
+                e.preventDefault();
+                donateModal.classList.add('show');
+            };
+            
+            closeDonateBtn.onclick = (e) => {
+                e.preventDefault();
+                donateModal.classList.remove('show');
+            };
+            
+            // 點擊背景黑色區域也可關閉
+            donateModal.onclick = (e) => {
+                if(e.target === donateModal) {
+                    donateModal.classList.remove('show');
+                }
+            };
+        }
+
         setInterval(() => {
             const allBtns = Array.from(parentDoc.querySelectorAll('button'));
             allBtns.forEach(b => {
@@ -422,6 +488,7 @@ def inject_custom_header(is_logged_in=False):
     inject_js = inject_js.replace("__HOTKEYS_JSON__", hotkeys_json)
     components.html(inject_js, height=0, width=0)
 
+
 def render_proxy_buttons():
     def change_page(page_name):
         st.query_params["page"] = page_name 
@@ -437,7 +504,6 @@ def render_proxy_buttons():
         
 
     with st.container():
-        # 這裡的按鈕全部保持你原本的寫法即可
         st.button("NavToSettings", on_click=change_page, args=("setting",))
         
         st.button("NavToContact", on_click=change_page, args=("contact",))
