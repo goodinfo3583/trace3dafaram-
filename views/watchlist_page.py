@@ -434,26 +434,17 @@ def show_watchlist_page(STOCK_DICT=None, conn=None, SHEET_URL=None):
                         st.session_state["global_search_final"] = ""
                     st.rerun()
                 st.markdown("</div>", unsafe_allow_html=True)
-    # 📌 底部回到頂部按鈕  
+    # 📌 新增：底部回到頂部按鈕  
     # 1. 載入 Google Material Icons 的字型庫
     st.markdown(
         '<link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined" rel="stylesheet" />',
         unsafe_allow_html=True
     )
     
-    # 2. 渲染回到頂部按鈕 (修正 Javascript 滾動對象)
+    # 2. 渲染回到頂部按鈕外觀 (💡 拿掉 onclick，並賦予專屬 ID: custom-b2t-btn)
     st.markdown(
         """
-        <a href="#" onclick="
-            /* 精準抓取 Streamlit 的滾動視窗容器，若找不到則退回整個視窗 */
-            const container = document.querySelector('[data-testid=stAppViewContainer]') || document.documentElement;
-            if (container) {
-                container.scrollTo({top: 0, behavior: 'smooth'});
-            } else {
-                window.scrollTo({top: 0, behavior: 'smooth'});
-            }
-            return false;
-        " 
+        <a href="#" id="custom-b2t-btn"
            style="display: flex; justify-content: center; align-items: center; background-color: rgba(14, 165, 233, 0.1); 
                   color: #38bdf8; font-size: 14px; font-weight: bold; padding: 12px; 
                   border-radius: 8px; text-decoration: none; margin-top: 40px; margin-bottom: 20px; 
@@ -463,4 +454,42 @@ def show_watchlist_page(STOCK_DICT=None, conn=None, SHEET_URL=None):
         </a>
         """, 
         unsafe_allow_html=True
+    )
+
+    # 3. 透過 components.html 綁定點擊事件 (💡 完美繞過 Streamlit 過濾機制)
+    import streamlit.components.v1 as components
+    components.html(
+        """
+        <script>
+        // 從 iframe 網上找回 Streamlit 的主文檔 (與你的 nav_manager.py 邏輯相同)
+        const parentDoc = window.parent.document;
+        const parentWin = window.parent;
+        
+        // 抓取剛才渲染的按鈕
+        const b2tBtn = parentDoc.getElementById('custom-b2t-btn');
+        
+        if (b2tBtn) {
+            b2tBtn.onclick = function(e) {
+                e.preventDefault(); // 阻止 href="#" 讓畫面亂跳
+                
+                // 🔫 散彈槍打鳥法：把 Streamlit 可能的卷軸容器全部滾動一次，確保絕對成功！
+                const containers = [
+                    parentDoc.querySelector('[data-testid="stAppViewContainer"]'),
+                    parentDoc.querySelector('[data-testid="stMain"]'),
+                    parentDoc.documentElement,
+                    parentWin
+                ];
+                
+                containers.forEach(container => {
+                    if (container) {
+                        try {
+                            container.scrollTo({top: 0, behavior: 'smooth'});
+                        } catch(err) {}
+                    }
+                });
+            };
+        }
+        </script>
+        """,
+        height=0, width=0
     )
