@@ -187,7 +187,8 @@ def show_weight_backtest_page(STOCK_DICT, DATA_DIR="data"):
     st.caption("為各項籌碼動向設定加權分數 (設定為 0 代表不計分，負數代表扣分)")
     
     with st.expander("展開設定各區塊權重", expanded=True):
-        c1, c2, c3, c4 = st.columns(4)
+        # 將原本的 4 欄改為 6 欄 (因為您總共有 6 個權重需要設定)
+        c1, c2, c3, c4, c5, c6 = st.columns(6)
         
         with c1:
             st.markdown("**法人動向**")
@@ -210,9 +211,9 @@ def show_weight_backtest_page(STOCK_DICT, DATA_DIR="data"):
             st.markdown("**大腿動向**")
             w_b5 = st.number_input("千張大戶持股增加", value=3.0, step=0.5)
             
-        with c7:
-            st.markdown("**董監動向**")           
-            w_b7 = st.number_input("董監增持/質押降", value=0.0, step=0.5)
+        with c6: # 將原本未定義的 c7 改為 c6
+            st.markdown("**董監動向**")            
+            w_b7 = st.number_input("董監增持/質押降", value=0.0, step=0.5) # 逗號已補上
 
     # ==========================================
     # 4. 執行計分運算 (Scoring Engine)
