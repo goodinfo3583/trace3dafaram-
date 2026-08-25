@@ -212,7 +212,7 @@ def show_weight_backtest_page(STOCK_DICT, DATA_DIR="data"):
             
         with c7:
             st.markdown("**董監動向**")           
-            w_b7 = st.number_input("董監增持/質押降", value=0.0 step=0.5)
+            w_b7 = st.number_input("董監增持/質押降", value=0.0, step=0.5)
 
     # ==========================================
     # 4. 執行計分運算 (Scoring Engine)
