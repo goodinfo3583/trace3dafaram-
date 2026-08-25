@@ -55,6 +55,7 @@ def show_weight_backtest_page(STOCK_DICT):
     # ==========================================
     # 1. 基底選擇 (Base Universe)
     # ==========================================
+
     st.markdown("#### 1️⃣ 選擇選股池基底 (Base)")
     st.caption("基底是策略的「第一道濾網」。決定了有哪些標的具備被計分的資格。")
     
@@ -77,7 +78,12 @@ def show_weight_backtest_page(STOCK_DICT):
     
     if base_option == "🌍 全市場掃描 (上市櫃全納入)":
         if STOCK_DICT:
-            base_df = pd.DataFrame([{"統一代號": str(v["id"]), "股票名稱": v["name"], "產業別": v.get("industry", "未分類")} for v in STOCK_DICT.values() if len(str(v["id"])) <= 4])
+            # 修正後的精準全市場抓取邏輯 (只抓純數字代碼，且排除 ETF 等雜訊)
+            base_df = pd.DataFrame([
+                {"統一代號": str(v["id"]), "股票名稱": v["name"], "產業別": v.get("industry", "未分類")} 
+                for v in STOCK_DICT.values() 
+                if len(str(v["id"])) == 4 and str(v["id"]).isdigit() and "ETF" not in v.get("industry", "")
+            ])
             
     elif base_option == "📈 法人動向：單日 △ 增加 (極短線強勢)":
         df = clean_stock_id(get_df('b1_final_df'))
