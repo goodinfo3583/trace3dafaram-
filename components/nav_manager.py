@@ -488,24 +488,34 @@ def inject_custom_header(is_logged_in=False):
     inject_js = inject_js.replace("__HOTKEYS_JSON__", hotkeys_json)
     components.html(inject_js, height=0, width=0)
 
-
+#所有的隱藏按鈕魔法斗篷
 def render_proxy_buttons():
     def change_page(page_name):
         st.query_params["page"] = page_name 
         
-        
     def toggle_course_npc():
         st.session_state['show_course_npc'] = not st.session_state.get('show_course_npc', False)
         
-
     def handle_logout():
         st.session_state.clear()
         st.query_params["page"] = "b1" # 登出後預設回首頁
         
-
     with st.container():
-        st.button("NavToSettings", on_click=change_page, args=("setting",))
+        # ==========================================
+        # 🚀 CSS 隱形斗篷魔法 (終結 0.5 秒閃爍問題)
+        # 只要放在這個 container 裡，並且排在 anchor 後面的元素，出生瞬間就會隱形！
+        # ==========================================
+        st.markdown("""
+            <style>
+            div[data-testid="stElementContainer"]:has(#hidden-nav-anchor) ~ div[data-testid="stElementContainer"] {
+                display: none !important;
+            }
+            </style>
+            <div id="hidden-nav-anchor"></div>
+        """, unsafe_allow_html=True)
         
+        # 下方的按鈕功能完全保留你的設定，但畫面再也不會閃爍了！
+        st.button("NavToSettings", on_click=change_page, args=("setting",))
         st.button("NavToContact", on_click=change_page, args=("contact",))
         st.button("NavToNews", on_click=change_page, args=("news",))
         st.button("NavToPool", on_click=change_page, args=("pool",))
