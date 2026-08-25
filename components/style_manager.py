@@ -2047,124 +2047,111 @@ border-width: 12px 14px 12px 0; border-style: solid; border-color: transparent r
 </div>
 </div>"""
 
-        # 渲染畫面
+        # 渲染畫面 (這行保留原本的)
         st.markdown(html_code, unsafe_allow_html=True)     
         
-        # =========================
-        # 🔗 核心隱藏按鈕 (加入 key 避免重複錯誤)**
-        # =========================
-        if st.button("CloseNPC", key="btn_npc_sys_close"):
+        # ==========================================
+        # 🚀 終極效能升級版：使用 Callback (回呼) 完全移除 st.rerun()
+        # ==========================================
+        
+        # 1. 定義狀態切換動作 (這會在按鈕被點擊的瞬間優先執行，不會產生閃爍)
+        def close_npc_action():
             st.session_state['show_course_npc'] = False
             st.session_state['course_view'] = 'list'
-            st.rerun()
             
-        if st.button("OpenCourse1", key="btn_npc_sys_open_1"):
-            st.session_state['course_view'] = 'detail_1'
-            st.rerun()
-            
-        if st.button("OpenCourse2", key="btn_npc_sys_open_2"):
-            st.session_state['course_view'] = 'detail_2'
-            st.rerun()
+        def switch_view_action(view_name):
+            st.session_state['course_view'] = view_name
 
-        if st.button("OpenCourse3", key="btn_npc_sys_open_3"):
-            st.session_state['course_view'] = 'detail_3'
-            st.rerun()
+        # 2. 建立實體按鈕，並綁定對應的 Callback 動作
+        cols = st.columns(12)
+        with cols[0]:
+            st.button("CloseNPC", key="npc_btn_close", on_click=close_npc_action)
+        with cols[1]:
+            st.button("OpenCourse1", key="npc_btn_c1", on_click=switch_view_action, args=('detail_1',))
+        with cols[2]:
+            st.button("OpenCourse2", key="npc_btn_c2", on_click=switch_view_action, args=('detail_2',))
+        with cols[3]:
+            st.button("OpenCourse3", key="npc_btn_c3", on_click=switch_view_action, args=('detail_3',))
+        with cols[4]:
+            st.button("OpenCourse4", key="npc_btn_c4", on_click=switch_view_action, args=('detail_4',))
+        with cols[5]:
+            st.button("OpenCourse5", key="npc_btn_c5", on_click=switch_view_action, args=('detail_5',))
+        with cols[6]:
+            st.button("OpenCourse6", key="npc_btn_c6", on_click=switch_view_action, args=('detail_6',))
+        with cols[7]:
+            st.button("OpenCourse7", key="npc_btn_c7", on_click=switch_view_action, args=('detail_7',))
+        with cols[8]:
+            st.button("OpenCourse8", key="npc_btn_c8", on_click=switch_view_action, args=('detail_8',))
+        with cols[9]:
+            st.button("OpenCourse9", key="npc_btn_c9", on_click=switch_view_action, args=('detail_9',))
+        with cols[10]:
+            st.button("OpenCourse10", key="npc_btn_c10", on_click=switch_view_action, args=('detail_10',))
+        with cols[11]:
+            st.button("BackToList", key="npc_btn_back", on_click=switch_view_action, args=('list',))
             
-        if st.button("OpenCourse4", key="btn_npc_sys_open_4"):
-            st.session_state['course_view'] = 'detail_4'
-            st.rerun()
-            
-        if st.button("OpenCourse5", key="btn_npc_sys_open_5"):
-            st.session_state['course_view'] = 'detail_5'
-            st.rerun()
-
-        if st.button("OpenCourse6", key="btn_npc_sys_open_6"):
-            st.session_state['course_view'] = 'detail_6'
-            st.rerun()
-            
-        if st.button("OpenCourse7", key="btn_npc_sys_open_7"):
-            st.session_state['course_view'] = 'detail_7'
-            st.rerun()
-
-        if st.button("OpenCourse8", key="btn_npc_sys_open_8"):
-            st.session_state['course_view'] = 'detail_8'
-            st.rerun()
-
-        if st.button("OpenCourse9", key="btn_npc_sys_open_9"):
-            st.session_state['course_view'] = 'detail_9'
-            st.rerun()
-
-        if st.button("OpenCourse10", key="btn_npc_sys_open_10"):
-            st.session_state['course_view'] = 'detail_10'
-            st.rerun()
-            
-        if st.button("BackToList", key="btn_npc_sys_back"):
-            st.session_state['course_view'] = 'list'
-            st.rerun()
-            
-        # 💡 JS 綁定按鈕與隱形引擎
+        # 3. 🎯 修正版的 JavaScript：精準對應英文名稱，確保完美隱藏與觸發
         bind_js = """<script>
-setInterval(() => {
-const doc = window.parent.document;
-if (!doc) return;
+        setInterval(() => {
+            const doc = window.parent.document;
+            if (!doc) return;
 
-// 尋找 Streamlit 生成的實體按鈕**
-const stBtns = Array.from(doc.querySelectorAll('button'));
-const btnClose = stBtns.find(b => b.textContent.includes('CloseNPC'));
-const btnOpen1 = stBtns.find(b => b.textContent.includes('OpenCourse1'));
-const btnOpen2 = stBtns.find(b => b.textContent.includes('OpenCourse2'));
-const btnOpen3 = stBtns.find(b => b.textContent.includes('OpenCourse3'));
-const btnOpen4 = stBtns.find(b => b.textContent.includes('OpenCourse4'));
-const btnOpen5 = stBtns.find(b => b.textContent.includes('OpenCourse5'));
-const btnOpen5 = stBtns.find(b => b.textContent.includes('OpenCourse6'));
-const btnOpen7 = stBtns.find(b => b.textContent.includes('OpenCourse7'));
-const btnOpen5 = stBtns.find(b => b.textContent.includes('OpenCourse8'));
-const btnOpen5 = stBtns.find(b => b.textContent.includes('OpenCourse9'));
-const btnOpen5 = stBtns.find(b => b.textContent.includes('OpenCourse10'));
-const btnBack = stBtns.find(b => b.textContent.trim() === 'BackToList');
+            // 尋找 Streamlit 生成的實體按鈕 (這裡已修正為對應你截圖中的英文名稱)
+            const stBtns = Array.from(doc.querySelectorAll('button'));
+            const btnClose = stBtns.find(b => b.textContent.includes('CloseNPC'));
+            const btnOpen1 = stBtns.find(b => b.textContent.includes('OpenCourse1'));
+            const btnOpen2 = stBtns.find(b => b.textContent.includes('OpenCourse2'));
+            const btnOpen3 = stBtns.find(b => b.textContent.includes('OpenCourse3'));
+            const btnOpen4 = stBtns.find(b => b.textContent.includes('OpenCourse4'));
+            const btnOpen5 = stBtns.find(b => b.textContent.includes('OpenCourse5'));
+            const btnOpen6 = stBtns.find(b => b.textContent.includes('OpenCourse6'));
+            const btnOpen7 = stBtns.find(b => b.textContent.includes('OpenCourse7'));
+            const btnOpen8 = stBtns.find(b => b.textContent.includes('OpenCourse8'));
+            const btnOpen9 = stBtns.find(b => b.textContent.includes('OpenCourse9'));
+            const btnOpen10 = stBtns.find(b => b.textContent.includes('OpenCourse10'));
+            const btnBack = stBtns.find(b => b.textContent.includes('BackToList'));
 
-// 安全隱藏實體按鈕讓其他按鈕可以順利點選**
-[btnClose, btnOpen1, btnOpen2, btnOpen3, btnOpen4, btnOpen5, btnOpen6, btnOpen7, btnOpen8, btnOpen9, btnOpen10, btnBack].forEach(b => {
-    if(b) {
-        const container = b.closest('div[data-testid="stElementContainer"]');
-        if(container) {
-            container.style.position = 'fixed';
-            container.style.top = '-9999px';
-            container.style.left = '-9999px';
-        }
-    }
-});
+            // 安全隱藏實體按鈕容器 (讓畫面上不再出現那一排醜醜的按鈕)
+            [btnClose, btnOpen1, btnOpen2, btnOpen3, btnOpen4, btnOpen5, btnOpen6, btnOpen7, btnOpen8, btnOpen9, btnOpen10, btnBack].forEach(b => {
+                if(b) {
+                    const container = b.closest('div[data-testid="stElementContainer"]');
+                    if(container) {
+                        container.style.position = 'fixed';
+                        container.style.top = '-9999px';
+                        container.style.left = '-9999px';
+                    }
+                }
+            });
 
-// 建立事件綁定工廠
-const bindEvent = (uiId, stBtn) => {
-    const uiEl = doc.getElementById(uiId);
-    if(uiEl && stBtn && !uiEl.dataset.hooked) {
-        uiEl.dataset.hooked = 'true'; 
-        uiEl.style.cursor = 'pointer'; 
-        uiEl.addEventListener('click', (e) => {
-            e.preventDefault();
-            e.stopPropagation();
-            stBtn.click(); 
-        });
-    }
-};
+            // 建立事件綁定工廠
+            const bindEvent = (uiId, stBtn) => {
+                const uiEl = doc.getElementById(uiId);
+                if(uiEl && stBtn && !uiEl.dataset.hooked) {
+                    uiEl.dataset.hooked = 'true'; 
+                    uiEl.style.cursor = 'pointer'; 
+                    uiEl.addEventListener('click', (e) => {
+                        e.preventDefault();
+                        e.stopPropagation();
+                        stBtn.click(); 
+                    });
+                }
+            };
 
-// 進行所有按鈕的綁定**
-bindEvent('btn-close-list', btnClose);
-bindEvent('btn-open-course-1', btnOpen1);
-bindEvent('btn-open-course-2', btnOpen2);
-bindEvent('btn-open-course-3', btnOpen3);
-bindEvent('btn-open-course-4', btnOpen4);
-bindEvent('btn-open-course-5', btnOpen5);
-bindEvent('btn-open-course-6', btnOpen6);
-bindEvent('btn-open-course-7', btnOpen7);
-bindEvent('btn-open-course-8', btnOpen8);
-bindEvent('btn-open-course-9', btnOpen9);
-bindEvent('btn-open-course-10', btnOpen10);
-bindEvent('btn-back-detail', btnBack);
-bindEvent('btn-close-detail', btnClose);
+            // 進行所有按鈕的綁定 (對應 HTML 中的 id)
+            bindEvent('btn-close-list', btnClose);
+            bindEvent('btn-close-detail', btnClose);
+            bindEvent('btn-back-detail', btnBack);
+            bindEvent('btn-open-course-1', btnOpen1);
+            bindEvent('btn-open-course-2', btnOpen2);
+            bindEvent('btn-open-course-3', btnOpen3);
+            bindEvent('btn-open-course-4', btnOpen4);
+            bindEvent('btn-open-course-5', btnOpen5);
+            bindEvent('btn-open-course-6', btnOpen6);
+            bindEvent('btn-open-course-7', btnOpen7);
+            bindEvent('btn-open-course-8', btnOpen8);
+            bindEvent('btn-open-course-9', btnOpen9);
+            bindEvent('btn-open-course-10', btnOpen10);
 
-}, 300);
-</script>"""
+        }, 300);
+        </script>"""
 
         components.html(bind_js, height=0, width=0)
