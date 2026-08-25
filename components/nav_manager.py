@@ -226,6 +226,13 @@ def inject_custom_header(is_logged_in=False):
                         </a>
                         <p class="dropdown-text">自訂與管理您的專屬觀察清單。</p>
                     </div>
+
+                <div class="dropdown-item actionable">
+                        <a href="#" data-target="NavToWeightBacktest" class="dropdown-title internal-nav">
+                            <img src="app/static/icon-podiumaward.png" class="menu-icon" alt="weight"> 權重與回測
+                        </a>
+                        <p class="dropdown-text">自訂計分籌碼權重與未來勝率回測模擬。</p>
+                    </div>
                     
                     <div class="dropdown-item actionable">
                         <a href="#" data-target="NavToNews" class="dropdown-title internal-nav">
@@ -260,14 +267,7 @@ def inject_custom_header(is_logged_in=False):
                             <img src="app/static/icon-podiumaward.png" class="menu-icon" alt="lock"> 主力追蹤 (開發中)
                         </span>
                         <p class="dropdown-text">深度解析主力籌碼囤積路徑。</p>
-                    </div>
-                    
-                    <div class="dropdown-item locked-item">
-                        <span class="dropdown-title">
-                            <img src="app/static/icon-podiumaward.png" class="menu-icon" alt="lock"> 權重與回測 (未解鎖)
-                        </span>
-                        <p class="dropdown-text">自訂計分籌碼權重與未來勝率回測模擬。</p>
-                    </div>
+                    </div>      
                     
                     <div class="dropdown-item locked-item" style="border-bottom: none;">
                         <span class="dropdown-title">
@@ -515,21 +515,21 @@ def render_proxy_buttons():
         """, unsafe_allow_html=True)
         
         # 下方的按鈕功能完全保留你的設定，但畫面再也不會閃爍了！
-        st.button("NavToSettings", on_click=change_page, args=("setting",))
+        st.button("登入", on_click=change_page, args=("login",))
+        st.button("登出", on_click=handle_logout)
         st.button("NavToContact", on_click=change_page, args=("contact",))
-        st.button("NavToNews", on_click=change_page, args=("news",))
-        st.button("NavToPool", on_click=change_page, args=("pool",))
-        st.button("NavToWatchlist", on_click=change_page, args=("watchlist",)) 
-        
         st.button("NavToCourses", on_click=toggle_course_npc) 
-        
+        st.button("NavToNews", on_click=change_page, args=("news",))
+        st.button("NavToPool", on_click=change_page, args=("pool",))          
         st.button("NavToB1", on_click=change_page, args=("b1",))
         st.button("NavToB2", on_click=change_page, args=("b2",))
         st.button("NavToB3", on_click=change_page, args=("b3",))
         st.button("NavToB4", on_click=change_page, args=("b4",))
         st.button("NavToB5", on_click=change_page, args=("b5",))
         st.button("NavToB6", on_click=change_page, args=("b6",))
-        st.button("NavToB7", on_click=change_page, args=("b7",))
-        
-        st.button("登入", on_click=change_page, args=("login",))
-        st.button("登出", on_click=handle_logout)
+        st.button("NavToB7", on_click=change_page, args=("b7",))    
+        st.button("NavToSettings", on_click=change_page, args=("setting",))
+        st.button("NavToWatchlist", on_click=change_page, args=("watchlist",))
+        st.button("NavToWeightBacktest", on_click=change_page, args=("weight_backtest",)) 
+    
+

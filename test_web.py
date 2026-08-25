@@ -20,10 +20,9 @@ from utils.data_utils import (
 )
 # 頁面模組或新增其他頁面模組
 from views.login_page import show_login_page
-from views.news_page import show_news_page
 from views.contact_page import show_contact_page
+from views.news_page import show_news_page
 from views.pool_page import show_pool_page
-from views.sidebar import render_sidebar_war_room
 from views.b1_page import show_b1_page, sync_b1_data
 from views.b2_page import show_b2_page, sync_b2_data
 from views.b3_page import show_b3_page, sync_b3_data
@@ -31,8 +30,10 @@ from views.b4_page import show_b4_page, sync_b4_data
 from views.b5_page import show_b5_page, sync_b5_data
 from views.b6_page import show_b6_page, sync_b6_data
 from views.b7_page import show_b7_page, sync_b7_data
-from views.watchlist_page import show_watchlist_page
+from views.sidebar import render_sidebar_war_room
 from views.setting import render as show_setting_page
+from views.watchlist_page import show_watchlist_page
+from views.weight_backtest_page import show_weight_backtest_page
 # ==========================================
 # 1. 網頁基本設定 & 目錄路徑初始化
 # ==========================================
@@ -159,6 +160,8 @@ elif current_page == "watchlist":
     show_watchlist_page(STOCK_DICT, conn, SHEET_URL) 
 elif current_page == "setting":
     show_setting_page()
+elif current_page == "weight_backtest":
+    show_weight_backtest_page(STOCK_DICT)
 # 渲染側邊欄
 with st.sidebar:
     render_sidebar_war_room(STOCK_DICT, DATA_DIR)
