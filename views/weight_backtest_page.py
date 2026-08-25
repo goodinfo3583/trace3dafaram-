@@ -2,6 +2,66 @@
 import streamlit as st
 import pandas as pd
 import re
+from utils.data_utils import get_latest_csv  # 直接從工具箱拿原始資料，不依賴 KEY_MAP
+def show_advanced_backtest_page():
+    st.markdown("### 🎯 第一關：自訂多重過濾條件 (交集篩選)")
+    st.caption("勾選您要的條件，系統將直接讀取底層大數據進行精準過濾。")
+
+    # 建立三個分頁來分類篩選器
+    tab_b1, tab_b5, tab_b4 = st.tabs(["📈 法人動向", "🐳 大戶動向", "📉 資券動向"])
+
+    # 儲存使用者的勾選狀態
+    filters = {}
+
+    with tab_b1:
+        st.markdown("##### 選擇法人進榜天數")
+        col1, col2, col3, col4 = st.columns(4)
+        filters['b1_5d'] = col1.checkbox("5日上榜")
+        filters['b1_20d'] = col2.checkbox("20日上榜")
+        filters['b1_60d'] = col3.checkbox("60日上榜")
+        filters['b1_120d'] = col4.checkbox("120日上榜")
+        
+        st.markdown("##### 選擇特殊型態")
+        c1, c2 = st.columns(2)
+        filters['b1_delta_pos'] = c1.checkbox("單日 △ 上升 (>0)")
+        filters['b1_dynamic_up'] = c2.checkbox("動態階梯吸籌 (趨勢向上)")
+
+    with tab_b5:
+        st.markdown("##### 大戶共振訊號")
+        filters['b5_1000_up'] = st.checkbox("千張大戶持股增加")
+        filters['b5_resonance'] = st.checkbox("長短線共振 (400張與1000張同增)")
+        filters['b5_double'] = st.checkbox("雙向共振 (大戶增 + 散戶減)")
+
+    # ==========================================
+    # 核心引擎：直接讀取原始 CSV 進行交集過濾
+    # ==========================================
+    if st.button("🔍 執行條件篩選"):
+        # 1. 取得乾淨的上市櫃名單 (如前面第1點所述)
+        candidate_pool = get_pure_stock_list() 
+        
+        # 2. 如果勾選了 B1 相關條件，直接讀取原始 CSV
+        if any([filters['b1_5d'], filters['b1_20d'], filters['b1_delta_pos']]):
+            # 直接讀取 data/ 下的原始檔，不依賴 session_state
+            raw_b1_df, _ = get_latest_csv("法人動向_原始數據") 
+            
+            if filters['b1_5d']:
+                # 在原始數據中尋找 5 日有進榜的邏輯
+                hit_stocks = raw_b1_df[raw_b1_df['5日進榜次數'] > 0]['股票代號'].tolist()
+                candidate_pool = candidate_pool[candidate_pool['統一代號'].isin(hit_stocks)]
+                
+            if filters['b1_delta_pos']:
+                hit_stocks = raw_b1_df[raw_b1_df['單日△'] > 0]['股票代號'].tolist()
+                candidate_pool = candidate_pool[candidate_pool['統一代號'].isin(hit_stocks)]
+                
+        # 3. 如果勾選了 B5 相關條件
+        if filters['b5_resonance']:
+            raw_b5_df, _ = get_latest_csv("大戶動向_原始數據")
+            hit_stocks = raw_b5_df[raw_b5_df['長短線共振'] == '是']['股票代號'].tolist()
+            candidate_pool = candidate_pool[candidate_pool['統一代號'].isin(hit_stocks)]
+
+        st.success(f"篩選完成！共有 {len(candidate_pool)} 檔股票符合所有勾選條件。")
+        # 接下來再把這包 candidate_pool 送去給「權重計分系統」算分
+
 
 # ==========================================
 # 🌟 萬能鑰匙：對接全站暫存變數 (隱藏開發代號)
