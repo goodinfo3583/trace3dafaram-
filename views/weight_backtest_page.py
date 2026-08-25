@@ -58,7 +58,7 @@ def show_weight_backtest_page(STOCK_DICT, DATA_DIR="data"):
     # 背景自動載入原始資料，確保資料庫充實
     ensure_b1_to_b5_loaded(DATA_DIR)
 
-    st.markdown("<h2 style='color: #38BDF8;'>⚖️ 策略實驗室：自訂權重與勝率回測</h2>", unsafe_allow_html=True)
+    st.markdown("<h2 style='color: #38BDF8;'>⚖️ 策略實驗室：自訂權重與勝率回測(維護中)</h2>", unsafe_allow_html=True)
     st.caption("打造專屬於您的選股邏輯，透過多重條件交集與大數據計分，找出最具爆發力的潛力股與 ETF。")
     st.write("---")
 
@@ -66,7 +66,7 @@ def show_weight_backtest_page(STOCK_DICT, DATA_DIR="data"):
     # 1. 建立候選池 (新增 ETF 納入開關)
     # ==========================================
     st.markdown("#### 0️⃣ 候選池範圍設定")
-    include_etf = st.checkbox("🎯 同時納入 ETF 標的 (如 0050、0056、00878 等)", value=True)
+    include_etf = st.checkbox("同時納入 ETF 標的 (如 0050、0056、00878 等)", value=True)
     st.write("")
 
     pool = []
@@ -83,7 +83,7 @@ def show_weight_backtest_page(STOCK_DICT, DATA_DIR="data"):
     
     base_df = pd.DataFrame(pool)
     if base_df.empty:
-        st.warning("⚠️ 無法載入股票字典檔，請確認系統資料。")
+        st.warning("無法載入股票字典檔，請確認系統資料。")
         return
 
     # ==========================================
@@ -177,7 +177,7 @@ def show_weight_backtest_page(STOCK_DICT, DATA_DIR="data"):
         if not combined.empty:
             filtered_df = filtered_df[filtered_df['統一代號'].isin(combined['統一代號'].unique())]
 
-    st.success(f"✅ 過濾完成！共有 **{len(filtered_df)}** 檔標的 (含個股與勾選的ETF) 符合您的條件，準備進入計分。")
+    st.success(f"過濾完成！共有 **{len(filtered_df)}** 檔標的 (含個股與勾選的ETF) 符合您的條件，準備進入計分。")
     st.write("---")
 
     # ==========================================
@@ -186,33 +186,39 @@ def show_weight_backtest_page(STOCK_DICT, DATA_DIR="data"):
     st.markdown("#### 2️⃣ 設定計分權重 (Weights)")
     st.caption("為各項籌碼動向設定加權分數 (設定為 0 代表不計分，負數代表扣分)")
     
-    with st.expander("⚙️ 展開設定各區塊權重", expanded=True):
+    with st.expander("展開設定各區塊權重", expanded=True):
         c1, c2, c3, c4 = st.columns(4)
         
         with c1:
-            st.markdown("**法人持股動向**")
+            st.markdown("**法人動向**")
             w_b1_up = st.number_input("法人正向進榜 (次)", value=1.0, step=0.5)
             w_b1_down = st.number_input("法人衰退進榜 (次)", value=-1.0, step=0.5)
             
         with c2:
-            st.markdown("**突擊掃貨與連買**")
+            st.markdown("**法人掃貨**")
             w_b2 = st.number_input("法人單日突擊掃貨", value=1.5, step=0.5)
+
+        with c3:
+            st.markdown("**法人連買**")
             w_b3 = st.number_input("法人連續買超", value=2.0, step=0.5)
             
-        with c3:
-            st.markdown("**資券籌碼變化**")
+        with c4:
+            st.markdown("**資券動向**")
             w_b4_good = st.number_input("融資減/借券減", value=1.0, step=0.5)
             
-        with c4:
-            st.markdown("**大戶與董監防線**")
+        with c5:
+            st.markdown("**大腿動向**")
             w_b5 = st.number_input("千張大戶持股增加", value=3.0, step=0.5)
-            w_b7 = st.number_input("董監增持/質押降", value=1.5, step=0.5)
+            
+        with c7:
+            st.markdown("**董監動向**")           
+            w_b7 = st.number_input("董監增持/質押降", value=0.0 step=0.5)
 
     # ==========================================
     # 4. 執行計分運算 (Scoring Engine)
     # ==========================================
-    if st.button("🚀 開始計算籌碼火力分數", type="primary", use_container_width=True):
-        with st.spinner("🧠 籌碼大數據融合計算中..."):
+    if st.button("開始計算籌碼火力分數", type="primary", use_container_width=True):
+        with st.spinner("籌碼大數據融合計算中..."):
             
             score_df = filtered_df.copy()
             score_df['總分'] = 0.0
