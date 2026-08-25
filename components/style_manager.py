@@ -1088,7 +1088,7 @@ border-width: 12px 14px 12px 0; border-style: solid; border-color: transparent r
 <div class="detail-header">
 <div class="npc-big-image"></div>
 <div class="dialogue-box">
-<div class="npc-name">籌碼導師 蘿西</div>
+<div class="npc-name">籌碼導師 羅德</div>
 <div class="npc-text">「量價關係是市場最真實的足跡！仔細看這張表，當『量』與『價』出現背離時，就是趨勢即將反轉的危險警訊喔！」</div>
 </div>
 </div>
@@ -1170,7 +1170,7 @@ border-width: 12px 14px 12px 0; border-style: solid; border-color: transparent r
 <div class="detail-header">
 <div class="npc-big-image"></div>
 <div class="dialogue-box">
-<div class="npc-name">籌碼導師 蘿西</div>
+<div class="npc-name">籌碼導師 羅德</div>
 <div class="npc-text">「冒險者！技術指標可不是單純告訴你『買』或『賣』的魔法棒！它就像裝備上的屬性雷達，幫你從不同角度觀察市場的『方向、動能、熱度、節奏與波動』。來看看這張儀表板吧！」</div>
 </div>
 </div>
@@ -1339,7 +1339,7 @@ border-width: 12px 14px 12px 0; border-style: solid; border-color: transparent r
 <div class="detail-header">
 <div class="npc-big-image"></div>
 <div class="dialogue-box">
-<div class="npc-name">籌碼導師 蘿西</div>
+<div class="npc-name">籌碼導師 羅德</div>
 <div class="npc-text">「冒險者！市場上真正能呼風喚雨的，往往是那些掌握龐大資金的『法人』與『大戶』。透過這張籌碼結構表，我們可以看穿『誰在買』、『籌碼是集中還是分散』，進而判斷買盤的延續性喔！」</div>
 </div>
 </div>
