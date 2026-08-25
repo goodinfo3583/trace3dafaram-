@@ -184,7 +184,7 @@ def show_weight_backtest_page(STOCK_DICT):
                 # 調整欄位顯示名稱
                 display_df = result_df[['統一代號', '股票名稱', '總分', '得分明細']].rename(columns={'統一代號': '股票代號'})
                 st.dataframe(
-                    display_df.style.applymap(highlight_score, subset=['總分']), 
+                    display_df.style.map(highlight_score, subset=['總分']), 
                     use_container_width=True,
                     hide_index=True
                 )
