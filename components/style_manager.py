@@ -2116,11 +2116,15 @@ const btnOpen2 = stBtns.find(b => b.textContent.includes('OpenCourse2'));
 const btnOpen3 = stBtns.find(b => b.textContent.includes('OpenCourse3'));
 const btnOpen4 = stBtns.find(b => b.textContent.includes('OpenCourse4'));
 const btnOpen5 = stBtns.find(b => b.textContent.includes('OpenCourse5'));
+const btnOpen5 = stBtns.find(b => b.textContent.includes('OpenCourse6'));
 const btnOpen7 = stBtns.find(b => b.textContent.includes('OpenCourse7'));
+const btnOpen5 = stBtns.find(b => b.textContent.includes('OpenCourse8'));
+const btnOpen5 = stBtns.find(b => b.textContent.includes('OpenCourse9'));
+const btnOpen5 = stBtns.find(b => b.textContent.includes('OpenCourse10'));
 const btnBack = stBtns.find(b => b.textContent.trim() === 'BackToList');
 
 // 安全隱藏實體按鈕讓其他按鈕可以順利點選**
-[btnClose, btnOpen1, btnOpen2, btnOpen3, btnOpen4, btnOpen5, btnOpen6,btnOpen7, btnOpen8, btnOpen9, btnOpen10,btnBack].forEach(b => {
+[btnClose, btnOpen1, btnOpen2, btnOpen3, btnOpen4, btnOpen5, btnOpen6, btnOpen7, btnOpen8, btnOpen9, btnOpen10, btnBack].forEach(b => {
     if(b) {
         const container = b.closest('div[data-testid="stElementContainer"]');
         if(container) {
