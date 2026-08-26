@@ -62,7 +62,7 @@ def show_weight_backtest_page(STOCK_DICT, DATA_DIR="data"):
     st.write("---")
 
     # ==========================================
-    # 0. 建立全市場候選池
+    # 0. 建立全市場候選池 (修復 ETF 與分身 Bug)
     # ==========================================
     st.markdown("#### 0️⃣ 候選池範圍設定")
     include_etf = st.checkbox("🎯 同時納入 ETF 標的 (如 0050、0056 等)", value=True)
@@ -71,16 +71,20 @@ def show_weight_backtest_page(STOCK_DICT, DATA_DIR="data"):
     pool = []
     if STOCK_DICT:
         for v in STOCK_DICT.values():
-            sid = str(v["id"])
-            ind = v.get("industry", "")
+            sid = str(v.get("id", ""))
+            ind = str(v.get("industry", ""))
             if len(sid) == 4 and sid.isdigit():
-                is_etf = "ETF" in ind or "ETN" in ind or "指數" in ind
+                # 🛠️ 修復 ETF 空殼判定：加入 sid.startswith('00') 捕捉台股 ETF
+                is_etf = "ETF" in ind.upper() or "ETN" in ind.upper() or "指數" in ind or sid.startswith("00")
                 if is_etf and not include_etf:
                     continue
-                pool.append({"統一代號": sid, "股票名稱": v["name"], "產業別": ind if ind else "ETF/其他"})
+                pool.append({"統一代號": sid, "股票名稱": v.get("name", ""), "產業別": ind if ind else "ETF/其他"})
     
     base_df = pd.DataFrame(pool)
-    if base_df.empty:
+    if not base_df.empty:
+        # 🛠️ 修復數量暴增 Bug：強制剃除因 .TW 造成的重複代號
+        base_df = base_df.drop_duplicates(subset=['統一代號']).reset_index(drop=True)
+    else:
         st.warning("⚠️ 無法載入股票字典檔，請確認系統資料。")
         return
 
@@ -89,11 +93,18 @@ def show_weight_backtest_page(STOCK_DICT, DATA_DIR="data"):
     # ==========================================
     st.markdown(f"#### 1️⃣ 選擇選股池基底 (目前候選池共 {len(base_df)} 檔)")
     
+    # 取得 B1 資料的最新日期並格式化
+    b1_sorted_dates = st.session_state.get('b1_sorted_dates', [])
+    b1_latest_date_str = "未知日期"
+    if b1_sorted_dates and len(str(b1_sorted_dates[0])) == 8:
+        d_str = str(b1_sorted_dates[0])
+        b1_latest_date_str = f"{d_str[:4]}/{d_str[4:6]}/{d_str[6:]}"
+
     base_category = st.selectbox(
         "請選擇第一關過濾的籌碼模組：",
         [
             "🌍 全市場掃描 (不做額外過濾)",
-            "📈 B1 法人持股動向",
+            f"📈 B1 法人持股動向 (資料基準日: {b1_latest_date_str})",
             "🚀 B2 法人突擊掃貨 (建置中)",
             "🔥 B3 法人連續買超 (建置中)",
             "📉 B4 資券籌碼變化 (建置中)",
@@ -107,7 +118,7 @@ def show_weight_backtest_page(STOCK_DICT, DATA_DIR="data"):
     # ------------------------------------------
     # 🎯 模組 B1：法人持股動向 (細緻化過濾)
     # ------------------------------------------
-    if base_category == "📈 B1 法人持股動向":
+    if "B1 法人持股動向" in base_category:
         st.markdown("**🔹 請勾選要交集過濾的條件 (若勾選多個，標的必須「同時符合」)：**")
         
         c1, c2, c3, c4, c5 = st.columns(5)
@@ -130,24 +141,32 @@ def show_weight_backtest_page(STOCK_DICT, DATA_DIR="data"):
                 
             if b1_5d:
                 any_checked = True
-                hit_mask &= df_b1['今日上榜'].astype(str).str.contains('5日')
+                hit_mask &= df_b1['今日上榜'].astype(str).str.contains('🔴5日')
                 
             if b1_20d:
                 any_checked = True
-                hit_mask &= df_b1['今日上榜'].astype(str).str.contains('20日')
+                hit_mask &= df_b1['今日上榜'].astype(str).str.contains('🟡20日')
                 
             if b1_60d:
                 any_checked = True
-                hit_mask &= df_b1['今日上榜'].astype(str).str.contains('60日')
+                hit_mask &= df_b1['今日上榜'].astype(str).str.contains('🟢60日')
                 
             if b1_120d:
                 any_checked = True
-                hit_mask &= df_b1['今日上榜'].astype(str).str.contains('120日')
+                hit_mask &= df_b1['今日上榜'].astype(str).str.contains('🔵120日')
 
             if any_checked:
                 hit_codes = df_b1[hit_mask]['統一代號'].unique()
                 filtered_df = filtered_df[filtered_df['統一代號'].isin(hit_codes)]
                 st.success(f"✅ B1 過濾完成！共有 **{len(filtered_df)}** 檔標的符合條件。")
+                
+                # 🔬 除錯透視鏡：讓您隨時檢查被挑出的名單是不是真的符合！
+                debug_mode = st.checkbox("🔬 開啟除錯透視鏡 (檢核名單與數據)")
+                if debug_mode:
+                    debug_df = pd.merge(filtered_df, df_b1[['統一代號', '今日上榜', '△']], on='統一代號', how='left')
+                    st.write(f"🔍 檢核明細 (共 {len(debug_df)} 筆)：")
+                    st.dataframe(debug_df, use_container_width=True, hide_index=True)
+
             else:
                 st.info("👆 請在上方至少勾選一項條件，目前預設顯示全市場標的。")
         else:
@@ -157,12 +176,12 @@ def show_weight_backtest_page(STOCK_DICT, DATA_DIR="data"):
     # 佔位符：其他模組建置中
     # ------------------------------------------
     elif "建置中" in base_category:
-        st.info(f"🚧 {base_category.split(' ')[1]} 模組的精細過濾器建置中，請先測試 B1 模組。")
+        st.info(f"🚧 此模組的精細過濾器建置中，請先測試 B1 模組。")
 
     st.write("---")
 
     # ==========================================
-    # 2. 第二關：自訂權重計分面板 (暫時保留原狀，確保系統可運作)
+    # 2. 第二關：自訂權重計分面板 (暫時保留原狀)
     # ==========================================
     st.markdown("#### 2️⃣ 設定計分權重 (Weights)")
     st.caption("為各項籌碼動向設定加權分數 (設定為 0 代表不計分，負數代表扣分)")
