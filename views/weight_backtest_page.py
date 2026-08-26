@@ -62,27 +62,20 @@ def show_weight_backtest_page(STOCK_DICT, DATA_DIR="data"):
     st.write("---")
 
     # ==========================================
-    # 0. 建立全市場候選池 (修復 ETF 與分身 Bug)
+    # 0. 建立全市場候選池 (大解放：不再做任何刪減)
     # ==========================================
-    st.markdown("#### 0️⃣ 候選池範圍設定")
-    include_etf = st.checkbox("🎯 同時納入 ETF 標的 (如 0050、0056 等)", value=True)
-    st.write("")
-
     pool = []
     if STOCK_DICT:
         for v in STOCK_DICT.values():
-            sid = str(v.get("id", ""))
+            sid = str(v.get("id", "")).strip()
             ind = str(v.get("industry", ""))
-            if len(sid) == 4 and sid.isdigit():
-                # 🛠️ 修復 ETF 空殼判定：加入 sid.startswith('00') 捕捉台股 ETF
-                is_etf = "ETF" in ind.upper() or "ETN" in ind.upper() or "指數" in ind or sid.startswith("00")
-                if is_etf and not include_etf:
-                    continue
-                pool.append({"統一代號": sid, "股票名稱": v.get("name", ""), "產業別": ind if ind else "ETF/其他"})
+            # 只要有代碼，不管長度是 4 碼、5 碼還是包含英文字母的 ETF，一律納入候選池！
+            if sid:
+                pool.append({"統一代號": sid, "股票名稱": v.get("name", ""), "產業別": ind if ind else "未分類"})
     
     base_df = pd.DataFrame(pool)
     if not base_df.empty:
-        # 🛠️ 修復數量暴增 Bug：強制剃除因 .TW 造成的重複代號
+        # 強制剃除重複代號 (防呆)
         base_df = base_df.drop_duplicates(subset=['統一代號']).reset_index(drop=True)
     else:
         st.warning("⚠️ 無法載入股票字典檔，請確認系統資料。")
@@ -91,7 +84,7 @@ def show_weight_backtest_page(STOCK_DICT, DATA_DIR="data"):
     # ==========================================
     # 1. 第一關：嚴格過濾器 (依據 B1~B7 分類)
     # ==========================================
-    st.markdown(f"#### 1️⃣ 選擇選股池基底 (目前候選池共 {len(base_df)} 檔)")
+    st.markdown(f"#### 1️⃣ 選擇選股池基底 (目前全市場總候選池共 {len(base_df)} 檔)")
     
     # 取得 B1 資料的最新日期並格式化
     b1_sorted_dates = st.session_state.get('b1_sorted_dates', [])
@@ -123,10 +116,10 @@ def show_weight_backtest_page(STOCK_DICT, DATA_DIR="data"):
         
         c1, c2, c3, c4, c5 = st.columns(5)
         b1_delta = c1.checkbox("當日△上升 (>0)")
-        b1_5d = c2.checkbox("5日上榜")
-        b1_20d = c3.checkbox("20日上榜")
-        b1_60d = c4.checkbox("60日上榜")
-        b1_120d = c5.checkbox("120日上榜")
+        b1_5d = c2.checkbox("🔴 5日上榜")
+        b1_20d = c3.checkbox("🟡 20日上榜")
+        b1_60d = c4.checkbox("🟢 60日上榜")
+        b1_120d = c5.checkbox("🔵 120日上榜")
 
         df_b1 = clean_stock_id(get_df('b1_final_df'))
         
