@@ -85,7 +85,84 @@ def get_diff_ui(today_val, prev_val):
         color = "#FF4B4B" if diff > 0 else "#00E272" 
         return f"<br><span style='color:{color}; font-size:11px;'>({sign}{diff:,})</span>"
     except: return ""
+
+
+def calculate_chip_concentration(csv_path: str, target_stock: str) -> pd.DataFrame:
+    """
+    計算指定股票的每日籌碼集中度
     
+    Args:
+        csv_path: 你的 broker_history.csv 檔案路徑 (或 GitHub 遠端 Raw 網址)
+        target_stock: 股票代碼，例如 "1709"
+        
+    Returns:
+        DataFrame 包含每日的：日期、買超張數、賣超張數、淨買超張數、集中度(%)
+    """
+    # 1. 讀取資料庫 (支援 GitHub Raw 網址)
+    try:
+        df = pd.read_csv(csv_path)
+    except Exception as e:
+        print(f"[警告] 讀取籌碼 CSV 失敗: {e}")
+        return pd.DataFrame()
+    
+    # 2. 確保股票代碼是字串格式，並過濾出我們要的標的 (例如 1709)
+    df['stock_code'] = df['stock_code'].astype(str)
+    stock_df = df[df['stock_code'] == target_stock].copy()
+    
+    if stock_df.empty:
+        return pd.DataFrame() # 如果沒資料就回傳空表
+        
+    # 3. 準備一個列表來裝每天的計算結果
+    results = []
+    
+    # 4. 依照「交易日期」進行分組運算
+    for date, group in stock_df.groupby('trade_date'):
+        # 分別抓出買方與賣方的資料
+        buy_side = group[group['side'] == 'buy']
+        sell_side = group[group['side'] == 'sell']
+        
+        # 計算前 15 大總買超與總賣超張數 (把 net_vol 加總)
+        # 注意：賣方的 net_vol 已經是負數，所以我們直接相加即可看出淨流向
+        top15_buy_vol = buy_side['net_vol'].sum()
+        top15_sell_vol = sell_side['net_vol'].sum() 
+        daily_net_vol = top15_buy_vol + top15_sell_vol
+        
+        # 計算集中度 (買方佔比總和 - 賣方佔比總和)
+        concentration_pct = round(buy_side['pct'].sum() - sell_side['pct'].sum(), 2)
+        
+        results.append({
+            'trade_date': date,
+            'top15_buy': top15_buy_vol,
+            'top15_sell': abs(top15_sell_vol),
+            'net_buy': daily_net_vol,
+            'concentration_%': concentration_pct
+        })
+        
+    # 5. 轉成 DataFrame 並依照日期排序
+    result_df = pd.DataFrame(results).sort_values('trade_date')
+    return result_df
+
+# ==========================================
+# 測試區塊 (你可以直接執行這支檔案看看結果)
+# ==========================================
+if __name__ == "__main__":
+    # 使用你剛建立的 GitHub 遠端資料庫 Raw 網址
+    # 注意：如果你的 Repo 設定為 Private (私密)，這裡會讀不到，必須設為 Public
+    remote_csv_url = "https://raw.githubusercontent.com/goodinfo3583/tw-broker-data/main/data/broker/broker_history.csv"
+    
+    print("開始透過遠端資料庫計算 1709 和益 的籌碼集中度...")
+    try:
+        # 直接把網址餵給我們的函式
+        df_1709 = calculate_chip_concentration(remote_csv_url, "1709")
+        if not df_1709.empty:
+            print("\n計算成功！以下是每日集中度：")
+            print(df_1709)
+        else:
+            print("計算完成，但找不到 1709 的資料。(可能是 HOT_STOCKS 沒抓到，或遠端還沒更新)")
+    except Exception as e:
+        print(f"讀取遠端檔案發生錯誤：{e}")
+#
+
 #台股代號與名稱產業類別 萬用字典引擎 (後台靜默運作)
 @st.cache_data(ttl=3600)
 def get_stock_dictionary():
