@@ -58,11 +58,11 @@ def show_weight_backtest_page(STOCK_DICT, DATA_DIR="data"):
     ensure_b1_to_b5_loaded(DATA_DIR)
 
     st.markdown("<h2 style='color: #38BDF8;'>⚖️ 策略實驗室：自訂權重與勝率回測</h2>", unsafe_allow_html=True)
-    st.caption("打造專屬於您的選股邏輯，透過多重條件交集與大數據計分，找出最具爆發力的潛力股與 ETF。")
+    st.caption("打造專屬於您的選股邏輯，透過多重條件交集與大數據計分，找出最具爆發力的潛力股。")
     st.write("---")
 
     # ==========================================
-    # 0. 建立全市場候選池 (含 ETF 開關)
+    # 0. 建立全市場候選池
     # ==========================================
     st.markdown("#### 0️⃣ 候選池範圍設定")
     include_etf = st.checkbox("🎯 同時納入 ETF 標的 (如 0050、0056 等)", value=True)
@@ -85,29 +85,30 @@ def show_weight_backtest_page(STOCK_DICT, DATA_DIR="data"):
         return
 
     # ==========================================
-    # 1. 第一關：嚴格過濾器 (下拉選單 + 動態勾選)
+    # 1. 第一關：嚴格過濾器 (依據 B1~B7 分類)
     # ==========================================
     st.markdown(f"#### 1️⃣ 選擇選股池基底 (目前候選池共 {len(base_df)} 檔)")
     
-    # 使用下拉選單選擇主要分類
     base_category = st.selectbox(
-        "請選擇第一關過濾的主題類別：",
+        "請選擇第一關過濾的籌碼模組：",
         [
             "🌍 全市場掃描 (不做額外過濾)",
-            "📈 法人持股動向",
-            "🔥 法人連續買超",
-            "🐳 大戶與董監動向",
-            "📉 突擊掃貨與資券"
+            "📈 B1 法人持股動向",
+            "🚀 B2 法人突擊掃貨 (建置中)",
+            "🔥 B3 法人連續買超 (建置中)",
+            "📉 B4 資券籌碼變化 (建置中)",
+            "🐳 B5 大戶籌碼動向 (建置中)",
+            "🛡️ B7 董監內部防線 (建置中)"
         ]
     )
 
     filtered_df = base_df.copy()
 
     # ------------------------------------------
-    # 💡 針對「法人持股動向」實作細緻的複選選單
+    # 🎯 模組 B1：法人持股動向 (細緻化過濾)
     # ------------------------------------------
-    if base_category == "📈 法人持股動向":
-        st.markdown("**🔹 請勾選要交集過濾的條件 (若勾選多個，標的必須「同時符合」所有條件)：**")
+    if base_category == "📈 B1 法人持股動向":
+        st.markdown("**🔹 請勾選要交集過濾的條件 (若勾選多個，標的必須「同時符合」)：**")
         
         c1, c2, c3, c4, c5 = st.columns(5)
         b1_delta = c1.checkbox("當日△上升 (>0)")
@@ -119,13 +120,11 @@ def show_weight_backtest_page(STOCK_DICT, DATA_DIR="data"):
         df_b1 = clean_stock_id(get_df('b1_final_df'))
         
         if not df_b1.empty:
-            # 建立一個全 True 的 Mask，用來進行交集 (AND) 運算
             hit_mask = pd.Series(True, index=df_b1.index)
             any_checked = False
 
             if b1_delta:
                 any_checked = True
-                # 安全轉換 △，容錯字串與浮點數
                 df_b1['num_delta'] = pd.to_numeric(df_b1['△'].astype(str).str.replace('%', '', regex=False).str.replace('+', '', regex=False), errors='coerce').fillna(0)
                 hit_mask &= (df_b1['num_delta'] > 0)
                 
@@ -145,77 +144,42 @@ def show_weight_backtest_page(STOCK_DICT, DATA_DIR="data"):
                 any_checked = True
                 hit_mask &= df_b1['今日上榜'].astype(str).str.contains('120日')
 
-            # 只有在使用者有勾選條件時，才進行過濾
             if any_checked:
                 hit_codes = df_b1[hit_mask]['統一代號'].unique()
                 filtered_df = filtered_df[filtered_df['統一代號'].isin(hit_codes)]
+                st.success(f"✅ B1 過濾完成！共有 **{len(filtered_df)}** 檔標的符合條件。")
             else:
                 st.info("👆 請在上方至少勾選一項條件，目前預設顯示全市場標的。")
         else:
-            st.warning("⚠️ 找不到法人持股動向數據，請確認資料是否已讀取。")
+            st.warning("⚠️ 找不到 B1 法人持股動向數據，請確認資料是否已讀取。")
 
     # ------------------------------------------
-    # (保留其他選單的基本過濾功能，未來可依樣畫葫蘆細緻化)
+    # 佔位符：其他模組建置中
     # ------------------------------------------
-    elif base_category == "🔥 法人連續買超":
-        c1, c2 = st.columns(2)
-        b3_foreign = c1.checkbox("外資連續買超 (>0天)")
-        b3_trust = c2.checkbox("投信連續買超 (>0天)")
-        df_b3 = clean_stock_id(get_df('b3_main'))
-        if not df_b3.empty and (b3_foreign or b3_trust):
-            hit_codes = set()
-            if b3_foreign:
-                cols = [c for c in df_b3.columns if '外資' in str(c) and '買' in str(c)]
-                if cols:
-                    df_b3['n_f'] = pd.to_numeric(df_b3[cols[0]].astype(str).str.extract(r'(\d+)')[0], errors='coerce').fillna(0)
-                    hit_codes.update(df_b3[df_b3['n_f'] > 0]['統一代號'].tolist())
-            if b3_trust:
-                cols = [c for c in df_b3.columns if '投信' in str(c) and '買' in str(c)]
-                if cols:
-                    df_b3['n_t'] = pd.to_numeric(df_b3[cols[0]].astype(str).str.extract(r'(\d+)')[0], errors='coerce').fillna(0)
-                    hit_codes.update(df_b3[df_b3['n_t'] > 0]['統一代號'].tolist())
-            filtered_df = filtered_df[filtered_df['統一代號'].isin(hit_codes)]
-        elif not (b3_foreign or b3_trust):
-            st.info("👆 請勾選過濾條件。")
+    elif "建置中" in base_category:
+        st.info(f"🚧 {base_category.split(' ')[1]} 模組的精細過濾器建置中，請先測試 B1 模組。")
 
-    elif base_category == "🐳 大戶與董監動向":
-        b5_1000 = st.checkbox("千張大戶持股增加")
-        if b5_1000:
-            df = clean_stock_id(get_df('b5_1000'))
-            if not df.empty: filtered_df = filtered_df[filtered_df['統一代號'].isin(df['統一代號'])]
-
-    elif base_category == "📉 突擊掃貨與資券":
-        b4_short = st.checkbox("借券餘額減少 (潛在軋空動能)")
-        if b4_short:
-            combined = pd.concat([clean_stock_id(get_df('b4_short_pct')), clean_stock_id(get_df('b4_short_vol'))])
-            if not combined.empty: filtered_df = filtered_df[filtered_df['統一代號'].isin(combined['統一代號'].unique())]
-
-    st.success(f"✅ 基底過濾完成！共有 **{len(filtered_df)}** 檔標的符合您的條件，準備進入計分。")
     st.write("---")
 
     # ==========================================
-    # 2. 第二關：自訂權重計分面板
+    # 2. 第二關：自訂權重計分面板 (暫時保留原狀，確保系統可運作)
     # ==========================================
     st.markdown("#### 2️⃣ 設定計分權重 (Weights)")
     st.caption("為各項籌碼動向設定加權分數 (設定為 0 代表不計分，負數代表扣分)")
     
     with st.expander("⚙️ 展開設定各區塊權重", expanded=True):
         c1, c2, c3, c4 = st.columns(4)
-        
         with c1:
             st.markdown("**法人持股動向**")
             w_b1_up = st.number_input("法人正向進榜 (次)", value=1.0, step=0.5)
             w_b1_down = st.number_input("法人衰退進榜 (次)", value=-1.0, step=0.5)
-            
         with c2:
             st.markdown("**突擊掃貨與連買**")
             w_b2 = st.number_input("法人單日突擊掃貨", value=1.5, step=0.5)
             w_b3 = st.number_input("法人連續買超", value=2.0, step=0.5)
-            
         with c3:
             st.markdown("**資券籌碼變化**")
             w_b4_good = st.number_input("融資減/借券減", value=1.0, step=0.5)
-            
         with c4:
             st.markdown("**大戶與董監防線**")
             w_b5 = st.number_input("千張大戶持股增加", value=3.0, step=0.5)
@@ -234,15 +198,12 @@ def show_weight_backtest_page(STOCK_DICT, DATA_DIR="data"):
             def apply_score(target_df_key, weight, rule_name):
                 df = clean_stock_id(get_df(target_df_key))
                 if df.empty or weight == 0: return
-                
                 hit_codes = df['統一代號'].unique()
                 mask = score_df['統一代號'].isin(hit_codes)
-                
                 score_df.loc[mask, '總分'] += weight
                 sign = "+" if weight > 0 else ""
                 score_df.loc[mask, '得分明細'] += f"[{rule_name} {sign}{weight}] "
 
-            # --- 套用計分 ---
             b1_df = clean_stock_id(get_df('b1_final_df'))
             if not b1_df.empty and w_b1_up != 0 and '上榜數量' in b1_df.columns:
                 for _, row in b1_df.iterrows():
@@ -253,7 +214,6 @@ def show_weight_backtest_page(STOCK_DICT, DATA_DIR="data"):
                         score_df.loc[mask, '得分明細'] += f"[法人正向{cnt}次 +{w_b1_up * cnt}] "
 
             apply_score('b1_down_final_df', w_b1_down, "法人衰退")
-            
             for k in ['b2_1', 'b2_2', 'b2_3', 'b2_4']: apply_score(k, w_b2, "法人掃貨")
             apply_score('b3_main', w_b3, "法人連買")
             for k in ['b4_margin_pct', 'b4_short_pct', 'b4_margin_plus_pct', 'b4_margin_vol', 'b4_short_vol', 'b4_margin_plus_vol']:
