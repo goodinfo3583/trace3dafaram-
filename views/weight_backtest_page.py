@@ -236,8 +236,11 @@ def show_weight_backtest_page(STOCK_DICT, DATA_DIR="data"):
         st.success(f"✅ 過濾完成！共有 **{len(filtered_df)}** 檔標的符合您的跨模組條件。")
         debug_mode = st.checkbox("🔬 開啟除錯透視鏡 (核對名單與過濾數值)")
         if debug_mode:
-            # 撈出需要檢核的核心欄位
-            check_cols = ['統一代號', '今日上榜', '△', '法人持股', '最新動態']
+            # 撈出需要檢核的核心欄位 (加入 ΔChange 欄位，證明系統沒有混淆)
+            check_cols = [
+                '統一代號', '今日上榜', '△', '法人持股', '最新動態',
+                '5日ΔChange', '20日ΔChange', '60日ΔChange', '120日ΔChange'
+            ]
             debug_df = pd.merge(filtered_df, df_b1_raw[[c for c in check_cols if c in df_b1_raw.columns]], on='統一代號', how='left')
             st.write(f"🔍 檢核明細 (共 {len(debug_df)} 筆)：")
             st.dataframe(debug_df, use_container_width=True, hide_index=True)
