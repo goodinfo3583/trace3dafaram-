@@ -123,11 +123,12 @@ def show_weight_backtest_page(STOCK_DICT, DATA_DIR="data"):
         )
 
         st.markdown("**🔹 3. 最新動態特徵**")
+        b1_trend_logic = st.radio("特徵篩選邏輯：", ["交集 (必須同時符合勾選的所有特徵)", "聯集 (符合其中任一特徵即可)"], horizontal=True)
         trend_options = [
             "📈 上升", "📉 下降", "🪜 階梯吸籌", "🛡️ 穩健吸籌", "⚠️ 趨緩", 
             "🚀 衝進🔴5日榜單", "🚀 衝進🟡20日榜單", "🚀 衝進🟢60日榜單", "🚀 衝進🔵120日榜單"
         ]
-        b1_trends = st.multiselect("可複選 (只要標的符合其中任一動態，即會被保留)：", trend_options)
+        b1_trends = st.multiselect("請選擇要過濾的動態特徵：", trend_options)
 
     # --- 模組 B2~B7 展開面板 (預留) ---
     with st.expander("🐳 B5 大戶籌碼動向 (建置中)", expanded=False):
