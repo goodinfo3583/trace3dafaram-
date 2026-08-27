@@ -91,7 +91,7 @@ def render(STOCK_DICT=None):
                         
                         col1, col2 = st.columns(2)
                         
-                        # 🎨 幫 DataFrame 加上顏色的魔法函式
+                        # 🎨 幫 DataFrame 整理欄位的函式 (暫時移除漸層色，避開 matplotlib 報錯)
                         def format_table(df, is_buy):
                             if df.empty: return None
                             df = df.copy()
@@ -113,15 +113,7 @@ def render(STOCK_DICT=None):
                             new_names.extend(['張數', '佔總量(%)'])
                             df.columns = new_names
                             
-                            # ✨ Pandas 熱力圖漸層渲染 (買方紅色系，賣方綠色系)
-                            cmap = "Reds" if is_buy else "Greens"
-                            format_dict = {'均價': "{:.2f}", '張數': "{:,.0f}", '佔總量(%)': "{:.2f}%"} if price_col else {'張數': "{:,.0f}", '佔總量(%)': "{:.2f}%"}
-                            
-                            styled_df = df.style.background_gradient(
-                                subset=['佔總量(%)'], cmap=cmap, vmin=0, vmax=df['佔總量(%)'].max() * 1.2
-                            ).format(format_dict)
-                            
-                            return styled_df
+                            return df
 
                         with col1:
                             st.markdown("##### 🔴 買超前 15 大券商")
