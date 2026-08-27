@@ -121,6 +121,19 @@ def show_weight_backtest_page(STOCK_DICT, DATA_DIR="data"):
             st.session_state['filter_b2_4'] = False
             st.session_state['filter_b2_radio'] = "交集 (必須同時符合勾選特徵)"
             st.session_state['filter_b2_multi'] = []
+            
+            # 清空 B3 篩選器
+            st.session_state['filter_b3_fo_day'] = False
+            st.session_state['filter_b3_fo_day_n'] = 1
+            st.session_state['filter_b3_it_day'] = False
+            st.session_state['filter_b3_it_day_n'] = 1
+            st.session_state['filter_b3_fo_wk'] = False
+            st.session_state['filter_b3_fo_wk_n'] = 1
+            st.session_state['filter_b3_it_wk'] = False
+            st.session_state['filter_b3_it_wk_n'] = 1
+            st.session_state['filter_b3_radio'] = "交集 (必須同時符合勾選特徵)"
+            st.session_state['filter_b3_multi'] = []
+
             st.session_state['filter_b5_1000'] = False
             
             if 'filter_debug' in st.session_state:
@@ -217,6 +230,45 @@ def show_weight_backtest_page(STOCK_DICT, DATA_DIR="data"):
         
         # 將 UI 選擇的長字串，還原回原始的短字串供後台過濾使用
         b2_trends = [raw_trend for d_trend in selected_display_trends for raw_trend, desc in b2_trend_display_map.items() if d_trend == desc]
+    #
+    # 取得 B3 最新資料日期 (取四個表的最新一天作為代表)
+    b3_latest_date_str = "未知日期"
+    df_b3_tmp = get_df('b3_main')
+    if not df_b3_tmp.empty and 'b3_data' in st.session_state:
+        # 從 b3_data tuple 中取日期
+        dates = [d for _, d in st.session_state['b3_data'].values() if d and d != "00000000"]
+        if dates:
+            b3_latest_date_str = f"2026/{max(dates)[4:6]}/{max(dates)[6:]}"
+
+    # --- 模組 B3 展開面板 ---
+    with st.expander(f"🔥 B3 法人連續買超 (資料基準日: {b3_latest_date_str})", expanded=False):
+        st.markdown("**🔹 1. 連買榜單 (勾選多個代表必須「同時進榜」)**")
+        
+        # 使用欄位來並排 Checkbox 和 Slider，節省空間
+        col_b3_1, col_b3_1_s, col_b3_2, col_b3_2_s = st.columns([1.2, 1, 1.2, 1])
+        with col_b3_1: b3_fo_day_chk = st.checkbox("🌐 外資日連買", key="filter_b3_fo_day")
+        with col_b3_1_s: b3_fo_day_n = st.number_input("連買大於(天)", min_value=1, value=1, step=1, key="filter_b3_fo_day_n", label_visibility="collapsed")
+        
+        with col_b3_2: b3_it_day_chk = st.checkbox("🏦 投信日連買", key="filter_b3_it_day")
+        with col_b3_2_s: b3_it_day_n = st.number_input("連買大於(天)", min_value=1, value=1, step=1, key="filter_b3_it_day_n", label_visibility="collapsed")
+
+        col_b3_3, col_b3_3_s, col_b3_4, col_b3_4_s = st.columns([1.2, 1, 1.2, 1])
+        with col_b3_3: b3_fo_wk_chk = st.checkbox("🌐 外資週連買", key="filter_b3_fo_wk")
+        with col_b3_3_s: b3_fo_wk_n = st.number_input("連買大於(週)", min_value=1, value=1, step=1, key="filter_b3_fo_wk_n", label_visibility="collapsed")
+        
+        with col_b3_4: b3_it_wk_chk = st.checkbox("🏦 投信週連買", key="filter_b3_it_wk")
+        with col_b3_4_s: b3_it_wk_n = st.number_input("連買大於(週)", min_value=1, value=1, step=1, key="filter_b3_it_wk_n", label_visibility="collapsed")
+
+        st.markdown("**🔹 2. 連買動態特徵**")
+        b3_trend_logic = st.radio("B3 特徵篩選邏輯：", ["交集 (必須同時符合勾選特徵)", "聯集 (符合任一即可)"], horizontal=True, key="filter_b3_radio")
+        
+        b3_trend_options = [
+            "🔥 波段認養 (日連買10天以上)", "⚡ 買盤點火 (日連買5~9天)", "🆕 試單觀察 (日連買1~4天)",
+            "👑 長線主控 (週連買10週以上)", "🚀 趨勢加溫 (週連買5~9週)", "🌱 週線發動 (週連買1~4週)"
+        ]
+        selected_b3_trends = st.multiselect("可複選連買動態：", b3_trend_options, key="filter_b3_multi")
+        # 還原短字串供過濾使用
+        b3_trends = [t.split(" (")[0] for t in selected_b3_trends]
 
     # --- 展開面板 (預留) ---
     with st.expander("🐳 B5 大戶籌碼動向 (建置中)", expanded=False):
@@ -343,8 +395,50 @@ def show_weight_backtest_page(STOCK_DICT, DATA_DIR="data"):
         else:
             st.warning("⚠️ 找不到任何 B2 動態數據。")
             filtered_df = filtered_df.iloc[0:0]
+
+    # 處理 B3 過濾
+    df_b3_main = get_df('b3_main')
+    if not df_b3_main.empty:
+        b3_checks = {
+            '🌐 外資日連買': (b3_fo_day_chk, b3_fo_day_n),
+            '🏦 投信日連買': (b3_it_day_chk, b3_it_day_n),
+            '🌐 外資週連買': (b3_fo_wk_chk, b3_fo_wk_n),
+            '🏦 投信週連買': (b3_it_wk_chk, b3_it_wk_n)
+        }
+        
+        for type_name, (is_checked, min_n) in b3_checks.items():
+            if is_checked:
+                any_filter_applied = True
+                # 取出符合類型，且連買週期數 >= 設定值的標的
+                df_b3_tmp = df_b3_main[(df_b3_main['連買類型'] == type_name) & (df_b3_main['連買週期數'] >= min_n)]
+                
+                if not df_b3_tmp.empty:
+                    df_b3_tmp = clean_stock_id(df_b3_tmp)
+                    filtered_df = filtered_df[filtered_df['統一代號'].isin(df_b3_tmp['統一代號'])]
+                else:
+                    st.warning(f"⚠️ 找不到大於 {min_n} 的 {type_name} 數據，過濾結果為空。")
+                    filtered_df = filtered_df.iloc[0:0]
+
+        if b3_trends:
+            any_filter_applied = True
+            is_and_logic_b3 = "交集" in b3_trend_logic
             
+            # 把每檔股票的所有 B3 狀態 (日/週) 組合起來
+            b3_dynamics = df_b3_main.groupby('股票代號')['狀態動態'].apply(lambda x: " | ".join(x.dropna().astype(str))).reset_index()
+            b3_dynamics = clean_stock_id(b3_dynamics)
+            
+            trend_mask_b3 = pd.Series(True, index=b3_dynamics.index) if is_and_logic_b3 else pd.Series(False, index=b3_dynamics.index)
+            
+            for trend in b3_trends:
+                curr_cond = b3_dynamics['狀態動態'].str.contains(trend, regex=False, na=False)
+                if is_and_logic_b3: trend_mask_b3 &= curr_cond
+                else: trend_mask_b3 |= curr_cond
+            
+            valid_b3_codes = b3_dynamics[trend_mask_b3]['統一代號'].unique()
+            filtered_df = filtered_df[filtered_df['統一代號'].isin(valid_b3_codes)]
+
     # 處理 B5 過濾 (測試用)
+    if b5_1000:
     if b5_1000:
         any_filter_applied = True
         df_b5 = clean_stock_id(get_df('b5_1000'))
@@ -372,7 +466,16 @@ def show_weight_backtest_page(STOCK_DICT, DATA_DIR="data"):
                 df_b2_tmp = clean_stock_id(get_df(b2_key))
                 if not df_b2_tmp.empty and '今日短動態' in df_b2_tmp.columns:
                     debug_df = pd.merge(debug_df, df_b2_tmp[['統一代號', '今日短動態']].rename(columns={'今日短動態': f'B2_{col_name}'}), on='統一代號', how='left')
-            #
+
+            # 加入 B3 狀態供核對
+            df_b3_main = get_df('b3_main')
+            if not df_b3_main.empty:
+                df_b3_main = clean_stock_id(df_b3_main)
+                # 將「連買週期數」與「狀態動態」合併成好讀的字串
+                df_b3_main['B3_組合狀態'] = df_b3_main['連買類型'] + "(" + df_b3_main['連買週期數'].astype(str) + ")-" + df_b3_main['狀態動態']
+                b3_summary = df_b3_main.groupby('統一代號')['B3_組合狀態'].apply(lambda x: " | ".join(x)).reset_index()
+                debug_df = pd.merge(debug_df, b3_summary.rename(columns={'B3_組合狀態': 'B3_連買狀態'}), on='統一代號', how='left')
+
             st.write(f"🔍 檢核明細 (共 {len(debug_df)} 筆)：")
             st.dataframe(debug_df, use_container_width=True, hide_index=True)
     else:
