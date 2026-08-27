@@ -92,7 +92,7 @@ def show_weight_backtest_page(STOCK_DICT, DATA_DIR="data"):
         return
 
     # ==========================================
-    # 1. 第一關：嚴格過濾器 (支援跨模組展開與交集)
+    # 1. 第一關：過濾器面版 (支援跨模組展開與交集)
     # ==========================================
     st.markdown(f"#### 1️⃣ 設定嚴格過濾條件 (目前全市場總候選池共 {len(base_df)} 檔)")
     st.caption("💡 **跨模組複選功能**：不同模組間的勾選會進行「交集 (嚴格篩選)」。動態特徵內的多選則為「聯集 (符合其一即可)」。")
@@ -140,7 +140,25 @@ def show_weight_backtest_page(STOCK_DICT, DATA_DIR="data"):
         ]
         b1_trends = st.multiselect("請選擇要過濾的動態特徵：", trend_options)
 
-    # --- 模組 B2~B7 展開面板 (預留) ---
+    # --- 模組 B2 展開面板 ---
+    with st.expander("🚀 B2 法人突擊掃貨 (買超佔成交與發行量)", expanded=False):
+        st.markdown("**🔹 1. 掃貨榜單 (勾選多個代表必須「同時進榜」)**")
+        c_b2_1, c_b2_2 = st.columns(2)
+        b2_1_chk = c_b2_1.checkbox("外資買超佔【成交量】進榜 (前50名)")
+        b2_2_chk = c_b2_2.checkbox("投信買超佔【成交量】進榜 (前50名)")
+        b2_3_chk = c_b2_1.checkbox("外資買超佔【發行數】進榜 (前50名)")
+        b2_4_chk = c_b2_2.checkbox("投信買超佔【發行數】進榜 (前50名)")
+
+        st.markdown("**🔹 2. 突擊動態特徵 (今日短動態)**")
+        b2_trend_logic = st.radio("B2 特徵篩選邏輯：", ["交集 (必須同時符合勾選特徵)", "聯集 (符合任一即可)"], horizontal=True, key="b2_radio")
+        b2_trend_options = [
+            "🔥 強延續", "🔥 持續加碼", "🆕 今日突擊卡位", 
+            "⚠️ 趨緩", "🔄 持平", "🔄 今日量縮持平", 
+            "📉 調節洗盤", "💤 籌碼沉澱中", "🚨 轉賣反轉", "🚨 劇烈倒貨", "⚪ 觀望"
+        ]
+        b2_trends = st.multiselect("可複選突擊動態：", b2_trend_options, key="b2_multi")
+
+    # --- 展開面板 (預留) ---
     with st.expander("🐳 B5 大戶籌碼動向 (建置中)", expanded=False):
         b5_1000 = st.checkbox("千張大戶持股增加 (測試鈕)")
 
@@ -221,7 +239,41 @@ def show_weight_backtest_page(STOCK_DICT, DATA_DIR="data"):
             any_filter_applied = True
             hit_codes = df_b1_raw[hit_mask]['統一代號'].unique()
             filtered_df = filtered_df[filtered_df['統一代號'].isin(hit_codes)]
+            
+    # 處理 B2 過濾
+    b2_checks = {'b2_1': b2_1_chk, 'b2_2': b2_2_chk, 'b2_3': b2_3_chk, 'b2_4': b2_4_chk}
+    for b2_key, is_checked in b2_checks.items():
+        if is_checked:
+            any_filter_applied = True
+            df_b2_tmp = clean_stock_id(get_df(b2_key))
+            if not df_b2_tmp.empty:
+                filtered_df = filtered_df[filtered_df['統一代號'].isin(df_b2_tmp['統一代號'])]
+            else:
+                st.warning(f"⚠️ 找不到 B2 相關數據，過濾結果為空。")
+                filtered_df = filtered_df.iloc[0:0]
 
+    if b2_trends:
+        any_filter_applied = True
+        is_and_logic_b2 = "交集" in b2_trend_logic
+        b2_dfs = [clean_stock_id(get_df(k)) for k in ['b2_1', 'b2_2', 'b2_3', 'b2_4']]
+        b2_combined = pd.concat([df[['統一代號', '今日短動態']] for df in b2_dfs if not df.empty and '今日短動態' in df.columns])
+        
+        if not b2_combined.empty:
+            # 彙整每檔股票跨 4 個表的所有 B2 動態
+            b2_dynamics = b2_combined.groupby('統一代號')['今日短動態'].apply(lambda x: " | ".join(x.dropna().astype(str))).reset_index()
+            trend_mask_b2 = pd.Series(True, index=b2_dynamics.index) if is_and_logic_b2 else pd.Series(False, index=b2_dynamics.index)
+            
+            for trend in b2_trends:
+                curr_cond = b2_dynamics['今日短動態'].str.contains(trend, regex=False, na=False)
+                if is_and_logic_b2: trend_mask_b2 &= curr_cond
+                else: trend_mask_b2 |= curr_cond
+            
+            valid_b2_codes = b2_dynamics[trend_mask_b2]['統一代號'].unique()
+            filtered_df = filtered_df[filtered_df['統一代號'].isin(valid_b2_codes)]
+        else:
+            st.warning("⚠️ 找不到任何 B2 動態數據。")
+            filtered_df = filtered_df.iloc[0:0]
+            
     # 處理 B5 過濾 (測試用)
     if b5_1000:
         any_filter_applied = True
@@ -230,8 +282,9 @@ def show_weight_backtest_page(STOCK_DICT, DATA_DIR="data"):
             filtered_df = filtered_df[filtered_df['統一代號'].isin(df_b5['統一代號'])]
         else:
             filtered_df = filtered_df.iloc[0:0] 
-
+    # ==========================================
     # 過濾結果結算與除錯檢核
+    # ==========================================
     if any_filter_applied:
         st.success(f"✅ 過濾完成！共有 **{len(filtered_df)}** 檔標的符合您的跨模組條件。")
         debug_mode = st.checkbox("🔬 開啟除錯透視鏡 (核對名單與過濾數值)")
@@ -242,6 +295,14 @@ def show_weight_backtest_page(STOCK_DICT, DATA_DIR="data"):
                 '5日ΔChange', '20日ΔChange', '60日ΔChange', '120日ΔChange'
             ]
             debug_df = pd.merge(filtered_df, df_b1_raw[[c for c in check_cols if c in df_b1_raw.columns]], on='統一代號', how='left')
+            
+            # 加入 B2 四大表的動態，供核對
+            b2_labels = zip(['b2_1', 'b2_2', 'b2_3', 'b2_4'], ['外資成交動態', '投信成交動態', '外資發行動態', '投信發行動態'])
+            for b2_key, col_name in b2_labels:
+                df_b2_tmp = clean_stock_id(get_df(b2_key))
+                if not df_b2_tmp.empty and '今日短動態' in df_b2_tmp.columns:
+                    debug_df = pd.merge(debug_df, df_b2_tmp[['統一代號', '今日短動態']].rename(columns={'今日短動態': f'B2_{col_name}'}), on='統一代號', how='left')
+            #
             st.write(f"🔍 檢核明細 (共 {len(debug_df)} 筆)：")
             st.dataframe(debug_df, use_container_width=True, hide_index=True)
     else:
