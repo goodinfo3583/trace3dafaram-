@@ -262,12 +262,12 @@ def inject_custom_header(is_logged_in=False):
                         <p class="dropdown-text">追蹤特定券商分點進出動向。</p>
                     </div>
                     
-                    <div class="dropdown-item locked-item">
-                        <span class="dropdown-title">
-                            <img src="app/static/icon-podiumaward.png" class="menu-icon" alt="lock"> 主力追蹤 (開發中)
-                        </span>
+                    <div class="dropdown-item actionable">
+                        <a href="#" data-target="NavToBroker" class="dropdown-title internal-nav">
+                            <img src="app/static/icon-podiumaward.png" class="menu-icon" alt="broker"> 主力追蹤 
+                        </a>
                         <p class="dropdown-text">深度解析主力籌碼囤積路徑。</p>
-                    </div>      
+                    </div>  
                     
                     <div class="dropdown-item locked-item" style="border-bottom: none;">
                         <span class="dropdown-title">
@@ -518,7 +518,7 @@ def render_proxy_buttons():
         st.button("登入", on_click=change_page, args=("login",))
         st.button("登出", on_click=handle_logout)
         st.button("NavToContact", on_click=change_page, args=("contact",))
-        st.button("NavToCourses", on_click=toggle_course_npc) 
+        st.button("NavToCourses", on_click=toggle_course_npc)
         st.button("NavToNews", on_click=change_page, args=("news",))
         st.button("NavToPool", on_click=change_page, args=("pool",))          
         st.button("NavToB1", on_click=change_page, args=("b1",))
@@ -527,7 +527,8 @@ def render_proxy_buttons():
         st.button("NavToB4", on_click=change_page, args=("b4",))
         st.button("NavToB5", on_click=change_page, args=("b5",))
         st.button("NavToB6", on_click=change_page, args=("b6",))
-        st.button("NavToB7", on_click=change_page, args=("b7",))    
+        st.button("NavToB7", on_click=change_page, args=("b7",))
+        st.button("NavToBroker", on_click=change_page, args=("broker",))
         st.button("NavToSettings", on_click=change_page, args=("setting",))
         st.button("NavToWatchlist", on_click=change_page, args=("watchlist",))
         st.button("NavToWeightBacktest", on_click=change_page, args=("weight_backtest",)) 
