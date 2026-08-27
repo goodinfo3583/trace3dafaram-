@@ -181,11 +181,11 @@ def show_weight_backtest_page(STOCK_DICT, DATA_DIR="data"):
             if min_val > -100.0 or max_val < 100.0:
                 b1_checked = True
                 if col_name in df_b1_raw.columns:
-                    # 容錯處理：將字串 "+1.5" 或 "-0.2" 清洗為純浮點數
+                    # 容錯處理：拿掉 fillna(0.0)，讓無資料的股票保持 NaN，從而完美被 between 阻擋！
                     df_b1_raw[f'num_{col_name}'] = pd.to_numeric(
                         df_b1_raw[col_name].astype(str).str.replace('%', '', regex=False).str.replace('+', '', regex=False), 
                         errors='coerce'
-                    ).fillna(0.0)
+                    )
                     hit_mask &= df_b1_raw[f'num_{col_name}'].between(min_val, max_val)
 
         # 4. 最新動態特徵檢查 (支援 交集 AND / 聯集 OR)
