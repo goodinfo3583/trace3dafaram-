@@ -94,9 +94,17 @@ def show_weight_backtest_page(STOCK_DICT, DATA_DIR="data"):
     # ==========================================
     # 1. 第一關：過濾器面版 (支援跨模組展開與交集)
     # ==========================================
-    st.markdown(f"#### 1️⃣ 設定嚴格過濾條件 (目前全市場總候選池共 {len(base_df)} 檔)")
-    st.caption("💡 **跨模組複選功能**：不同模組間的勾選會進行「交集 (嚴格篩選)」。動態特徵內的多選則為「聯集 (符合其一即可)」。")
-    
+    col_title, col_reset = st.columns([3, 1])
+    with col_title:
+        st.markdown(f"#### 1️⃣ 設定嚴格過濾條件 (目前全市場總候選池共 {len(base_df)} 檔)")
+        st.caption("💡 跨模組複選為「交集 (嚴格篩選)」。動態特徵內的多選可切換交集或聯集。")
+    with col_reset:
+        def reset_filters():
+            for key in list(st.session_state.keys()):
+                if key.startswith('filter_'):
+                    del st.session_state[key]
+        st.button("🧹 清空所有篩選條件", on_click=reset_filters, use_container_width=True)
+
     filtered_df = base_df.copy()
     any_filter_applied = False
 
@@ -107,14 +115,14 @@ def show_weight_backtest_page(STOCK_DICT, DATA_DIR="data"):
         b1_latest_date_str = f"{d_str[:4]}/{d_str[4:6]}/{d_str[6:]}"
 
     # --- 模組 B1 展開面板 ---
-    with st.expander(f"📈 B1 法人持股動向 (資料基準日: {b1_latest_date_str})", expanded=True):
+    with st.expander(f"📈 B1 法人持股動向 (資料基準日: {b1_latest_date_str})", expanded=False):
         st.markdown("**🔹 1. 近期進榜天數與變化**")
         c1, c2, c3, c4, c5 = st.columns(5)
         b1_delta = c1.checkbox("當日△上升 (>0)")
-        b1_5d = c2.checkbox("🔴 5日上榜")
-        b1_20d = c3.checkbox("🟡 20日上榜")
-        b1_60d = c4.checkbox("🟢 60日上榜")
-        b1_120d = c5.checkbox("🔵 120日上榜")
+        b1_5d = c2.checkbox("🔴 5日上榜", key="filter_b1_5d")
+        b1_20d = c3.checkbox("🟡 20日上榜", key="filter_b1_20d")
+        b1_60d = c4.checkbox("🟢 60日上榜", key="filter_b1_60d")
+        b1_120d = c5.checkbox("🔵 120日上榜", key="filter_b1_120d")
 
         st.markdown("**🔹 2. 法人持股比例區間 (%)**")
         b1_ratio_min, b1_ratio_max = st.slider(
@@ -156,21 +164,40 @@ def show_weight_backtest_page(STOCK_DICT, DATA_DIR="data"):
     # --- 模組 B2 展開面板 ---
     with st.expander(f"🚀 B2 法人突擊掃貨 (資料基準日: {b2_latest_date_str})", expanded=False):
         st.markdown("**🔹 1. 掃貨榜單 (勾選多個代表必須「同時進榜」)**")
-        b2_top_n = st.slider("👑 排名過濾：設定最新進榜的擷取範圍 (名次)", min_value=10, max_value=300, value=50, step=10)
+        b2_top_n = st.slider("👑 排名過濾：設定最新進榜的擷取範圍 (名次)", min_value=10, max_value=300, value=50, step=10, key="filter_b2_top_n")
         c_b2_1, c_b2_2 = st.columns(2)
-        b2_1_chk = c_b2_1.checkbox(f"外資買超佔【成交量】(前 {b2_top_n} 名)")
-        b2_2_chk = c_b2_2.checkbox(f"投信買超佔【成交量】(前 {b2_top_n} 名)")
-        b2_3_chk = c_b2_1.checkbox(f"外資買超佔【發行數】(前 {b2_top_n} 名)")
-        b2_4_chk = c_b2_2.checkbox(f"投信買超佔【發行數】(前 {b2_top_n} 名)")
+        b2_1_chk = c_b2_1.checkbox(f"外資買超佔【5日成交量】(前 {b2_top_n} 名)", key="filter_b2_1")
+        b2_2_chk = c_b2_2.checkbox(f"投信買超佔【5日成交量】(前 {b2_top_n} 名)", key="filter_b2_2")
+        b2_3_chk = c_b2_1.checkbox(f"外資買超佔【5日發行數】(前 {b2_top_n} 名)", key="filter_b2_3")
+        b2_4_chk = c_b2_2.checkbox(f"投信買超佔【5日發行數】(前 {b2_top_n} 名)", key="filter_b2_4")
 
         st.markdown("**🔹 2. 突擊動態特徵 (今日短動態)**")
-        b2_trend_logic = st.radio("B2 特徵篩選邏輯：", ["交集 (必須同時符合勾選特徵)", "聯集 (符合任一即可)"], horizontal=True, key="b2_radio")
-        b2_trend_options = [
-            "🔥 強延續", "🔥 持續加碼", "🆕 今日突擊卡位", 
-            "⚠️ 趨緩", "🔄 持平", "🔄 今日量縮持平", 
-            "📉 調節洗盤", "💤 籌碼沉澱中", "🚨 轉賣反轉", "🚨 劇烈倒貨", "⚪ 觀望"
-        ]
-        b2_trends = st.multiselect("可複選突擊動態：", b2_trend_options, key="b2_multi")
+        b2_trend_logic = st.radio("B2 特徵篩選邏輯：", ["交集 (必須同時符合勾選特徵)", "聯集 (符合任一即可)"], horizontal=True, key="filter_b2_radio")
+        
+        # 加上詳細定義說明的選項 (只顯示，不影響背後字串比對)
+        b2_trend_display_map = {
+            "🔥 強延續": "🔥 強延續 (當日買盤加速 > 5日基準)",
+            "🔥 持續加碼": "🔥 持續加碼 (當日買佔發行 > 0%)",
+            "🆕 今日突擊卡位": "🆕 今日突擊卡位 (近5日未進榜，今日首度買超)",
+            "⚠️ 趨緩": "⚠️ 趨緩 (當日續買，但力道 < 5日基準)",
+            "🔄 持平": "🔄 持平 (當日成交比 = 0%)",
+            "🔄 今日量縮持平": "🔄 今日量縮持平 (當日發行比 = 0%)",
+            "📉 調節洗盤": "📉 調節洗盤 (當日微幅賣超調節)",
+            "💤 籌碼沉澱中": "💤 籌碼沉澱中 (近5日未進榜且當日無買超)",
+            "🚨 轉賣反轉": "🚨 轉賣反轉 (當日賣超 < 0%)",
+            "🚨 劇烈倒貨": "🚨 劇烈倒貨 (當日強烈賣出)",
+            "⚪ 觀望": "⚪ 觀望 (當日無資料)"
+        }
+        
+        # 讓 UI 顯示完整的說明文字
+        selected_display_trends = st.multiselect("可複選突擊動態：", list(b2_trend_display_map.values()), key="filter_b2_multi")
+        
+        # 將 UI 選擇的長字串，還原回原始的短字串供後台過濾使用
+        b2_trends = []
+        for d_trend in selected_display_trends:
+            for raw_trend, desc in b2_trend_display_map.items():
+                if d_trend == desc:
+                    b2_trends.append(raw_trend)
 
     # --- 展開面板 (預留) ---
     with st.expander("🐳 B5 大戶籌碼動向 (建置中)", expanded=False):
