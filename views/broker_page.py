@@ -19,7 +19,7 @@ def render(STOCK_DICT=None):
     st.markdown("透過每日全市場券商進出明細，追蹤大戶籌碼集中度與背後分點。")
     
     # ==========================================
-    # 🌟 升級：統一的華麗下拉搜尋選單 (從 watchlist_page 移植)
+    # 🌟 統一的華麗下拉搜尋選單
     # ==========================================
     stock_options = []
     if STOCK_DICT:
@@ -31,7 +31,7 @@ def render(STOCK_DICT=None):
     default_index = 0
     for idx, opt in enumerate(stock_options):
         if opt.startswith("1709"):
-            default_index = idx + 1 # +1 是因為第一個選項是空白
+            default_index = idx + 1
             break
 
     col1, col2 = st.columns([3, 1])
@@ -44,86 +44,106 @@ def render(STOCK_DICT=None):
         )
     
     if selected_stock_str:
-        # 從選擇的字串 "1709 和益" 中萃取出代號 "1709"
         target_stock = selected_stock_str.split(" ")[0].strip()
         display_name = selected_stock_str
         
         st.info(f"正在從遠端資料庫撈取 **{display_name}** 的籌碼明細，請稍候...")
-        
-        # ⚠️ 注意：這裡必須指向存放「所有分點明細」的原始檔，而不是只存算好結果的檔案
         remote_csv_url = "https://raw.githubusercontent.com/goodinfo3583/tw-broker-data/main/data/broker/broker_history.csv"
         
         try:
-            # 1. 下載整個大帳本
             df_raw_all = load_raw_broker_history(remote_csv_url)
             
             if not df_raw_all.empty:
-                # ==========================================
                 # 區塊 A：大局觀 (籌碼集中度走勢圖)
-                # ==========================================
-                # 利用我們在 utils 寫好的函式，直接把原始大帳本丟進去算集中度
                 df_trend = calculate_chip_concentration(remote_csv_url, target_stock)
                 
                 if not df_trend.empty:
                     st.success("✅ 數據載入成功！")
-                    
-                    # 顯示最新一天的數據卡片
                     latest_data = df_trend.iloc[-1]
                     st.metric(
                         label=f"{latest_data['trade_date']} 最新籌碼集中度", 
                         value=f"{latest_data['concentration_%']}%",
                         delta=f"淨買超 {latest_data['net_buy']:,} 張"
                     )
-                    
                     st.subheader(f"📊 {display_name} 近期籌碼集中度走勢")
                     st.bar_chart(df_trend, x="trade_date", y="concentration_%")
                 
-                # ==========================================
                 # 區塊 B：每日主力現形表 (分點買賣清單)
-                # ==========================================
                 st.markdown("---")
                 st.subheader(f"🔍 {display_name} 每日主力分點進出明細")
                 
-                # 從總表過濾出這檔股票的明細
                 stock_raw = df_raw_all[df_raw_all['stock_code'] == target_stock].copy()
                 
-                if not stock_raw.empty and 'price' in stock_raw.columns:
-                    # 抓出有資料的日期，由新排到舊
-                    available_dates = sorted(stock_raw['trade_date'].unique(), reverse=True)
+                if not stock_raw.empty:
+                    # ==========================================
+                    # 🌟 智慧探測儀：自動尋找券商與均價欄位
+                    # ==========================================
+                    broker_col = next((c for c in ['broker', 'broker_name', '券商名稱', '券商', 'name'] if c in stock_raw.columns), None)
+                    price_col = next((c for c in ['price', 'avg_price', '均價', '買進均價', '賣出均價'] if c in stock_raw.columns), None)
                     
-                    # 下拉選單選擇要看哪一天的分點
-                    selected_date = st.selectbox("請選擇要查看的交易日期：", available_dates)
-                    
-                    # 過濾出該日期的明細
-                    daily_raw = stock_raw[stock_raw['trade_date'] == selected_date]
-                    
-                    # 將畫面切成左右兩半
-                    col1, col2 = st.columns(2)
-                    
-                    with col1:
-                        st.markdown("##### 🔴 買超前 15 大券商")
-                        buy_df = daily_raw[daily_raw['side'] == 'buy'].copy()
-                        if not buy_df.empty:
-                            buy_df = buy_df[['broker_name', 'price', 'net_vol', 'pct']].sort_values('net_vol', ascending=False)
-                            buy_df.columns = ['券商名稱', '買均價', '買超張數', '佔總量(%)']
-                            st.dataframe(buy_df, use_container_width=True, hide_index=True)
-                        else:
-                            st.write("當日無買超資料")
+                    if broker_col is None:
+                        # 如果真的連券商代號都找不到，就把所有的欄位印出來給你看！
+                        st.error(f"⚠️ 無法在資料庫中找到「券商名稱」欄位！目前資料庫實際擁有的欄位有：\n{', '.join(stock_raw.columns)}")
+                    else:
+                        available_dates = sorted(stock_raw['trade_date'].unique(), reverse=True)
+                        selected_date = st.selectbox("請選擇要查看的交易日期：", available_dates)
+                        daily_raw = stock_raw[stock_raw['trade_date'] == selected_date]
+                        
+                        col1, col2 = st.columns(2)
+                        
+                        # 🎨 幫 DataFrame 加上顏色的魔法函式
+                        def format_table(df, is_buy):
+                            if df.empty: return None
+                            df = df.copy()
                             
-                    with col2:
-                        st.markdown("##### 🟢 賣超前 15 大券商")
-                        sell_df = daily_raw[daily_raw['side'] == 'sell'].copy()
-                        if not sell_df.empty:
-                            sell_df['net_vol'] = sell_df['net_vol'].abs() # 將賣超轉為正數方便閱讀
-                            sell_df = sell_df[['broker_name', 'price', 'net_vol', 'pct']].sort_values('net_vol', ascending=False)
-                            sell_df.columns = ['券商名稱', '賣均價', '賣超張數', '佔總量(%)']
-                            st.dataframe(sell_df, use_container_width=True, hide_index=True)
-                        else:
-                            st.write("當日無賣超資料")
+                            # 賣超轉正數
+                            if not is_buy: df['net_vol'] = df['net_vol'].abs()
+                                
+                            df = df.sort_values('net_vol', ascending=False).head(15)
+                            
+                            # 動態組合要顯示的欄位
+                            display_cols = [broker_col]
+                            if price_col: display_cols.append(price_col)
+                            display_cols.extend(['net_vol', 'pct'])
+                            df = df[display_cols]
+                            
+                            # 重新命名欄位為中文
+                            new_names = ['券商名稱']
+                            if price_col: new_names.append('均價')
+                            new_names.extend(['張數', '佔總量(%)'])
+                            df.columns = new_names
+                            
+                            # ✨ Pandas 熱力圖漸層渲染 (買方紅色系，賣方綠色系)
+                            cmap = "Reds" if is_buy else "Greens"
+                            format_dict = {'均價': "{:.2f}", '張數': "{:,.0f}", '佔總量(%)': "{:.2f}%"} if price_col else {'張數': "{:,.0f}", '佔總量(%)': "{:.2f}%"}
+                            
+                            styled_df = df.style.background_gradient(
+                                subset=['佔總量(%)'], cmap=cmap, vmin=0, vmax=df['佔總量(%)'].max() * 1.2
+                            ).format(format_dict)
+                            
+                            return styled_df
+
+                        with col1:
+                            st.markdown("##### 🔴 買超前 15 大券商")
+                            buy_df = daily_raw[daily_raw['side'] == 'buy']
+                            styled_buy = format_table(buy_df, is_buy=True)
+                            if styled_buy is not None:
+                                st.dataframe(styled_buy, use_container_width=True, hide_index=True)
+                            else:
+                                st.write("當日無買超資料")
+                                
+                        with col2:
+                            st.markdown("##### 🟢 賣超前 15 大券商")
+                            sell_df = daily_raw[daily_raw['side'] == 'sell']
+                            styled_sell = format_table(sell_df, is_buy=False)
+                            if styled_sell is not None:
+                                st.dataframe(styled_sell, use_container_width=True, hide_index=True)
+                            else:
+                                st.write("當日無賣超資料")
                 else:
-                    st.warning("原始資料庫中缺少分點明細資料 (如：broker_name 或 price)。請確認遠端資料庫格式。")
+                    st.warning(f"在歷史總帳本中，找不到 **{display_name}** 的紀錄。")
             else:
-                st.warning(f"⚠️ 找不到資料。遠端資料庫可能是空的。")
+                st.warning("⚠️ 找不到資料。遠端資料庫可能是空的。")
                 
         except Exception as e:
             st.error(f"讀取資料失敗：{e}")
