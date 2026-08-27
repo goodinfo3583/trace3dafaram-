@@ -439,7 +439,6 @@ def show_weight_backtest_page(STOCK_DICT, DATA_DIR="data"):
 
     # 處理 B5 過濾 (測試用)
     if b5_1000:
-    if b5_1000:
         any_filter_applied = True
         df_b5 = clean_stock_id(get_df('b5_1000'))
         if not df_b5.empty:
