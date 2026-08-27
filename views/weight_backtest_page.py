@@ -61,31 +61,31 @@ def show_weight_backtest_page(STOCK_DICT, DATA_DIR="data"):
     st.write("---")
 
     # ==========================================
-    # 0. 建立完美全市場候選池 (聯集字典檔與大數據庫)
+    # 0. 建立完美全市場候選池
     # ==========================================
     pool_dict = {}
-    
     if STOCK_DICT:
         for v in STOCK_DICT.values():
             sid = str(v.get("id", "")).strip()
-            if sid:
-                pool_dict[sid] = {
-                    "統一代號": sid, 
-                    "股票名稱": v.get("name", ""), 
-                    "產業別": v.get("industry", "未分類")
-                }
+            if sid: pool_dict[sid] = {"統一代號": sid, "股票名稱": v.get("name", ""), "產業別": v.get("industry", "未分類")}
                 
+    # 補上 B1 的遺漏標的 (常見 ETF)
     df_b1_raw = clean_stock_id(get_df('b1_final_df'))
     if not df_b1_raw.empty:
         for _, row in df_b1_raw.iterrows():
             sid = str(row['統一代號']).strip()
             if sid and sid not in pool_dict:
-                pool_dict[sid] = {
-                    "統一代號": sid,
-                    "股票名稱": str(row.get('股票名稱', '')),
-                    "產業別": "ETF/基金/其他" 
-                }
+                pool_dict[sid] = {"統一代號": sid, "股票名稱": str(row.get('股票名稱', '')), "產業別": "ETF/基金/其他"}
                 
+    # 補上 B2 的遺漏標的 (特定債券、DR 等)
+    for b2_key in ['b2_1', 'b2_2', 'b2_3', 'b2_4']:
+        df_b2_tmp = clean_stock_id(get_df(b2_key))
+        if not df_b2_tmp.empty:
+            for _, row in df_b2_tmp.iterrows():
+                sid = str(row['統一代號']).strip()
+                if sid and sid not in pool_dict:
+                    pool_dict[sid] = {"統一代號": sid, "股票名稱": str(row.get('股票名稱', '')), "產業別": "ETF/基金/其他"}
+
     base_df = pd.DataFrame(list(pool_dict.values()))
     if base_df.empty:
         st.warning("⚠️ 無法建立候選池，請確認資料庫狀態。")
