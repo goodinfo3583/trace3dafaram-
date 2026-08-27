@@ -472,7 +472,7 @@ def show_weight_backtest_page(STOCK_DICT, DATA_DIR="data"):
                 if is_and_logic_b3: trend_mask_b3 &= curr_cond
                 else: trend_mask_b3 |= curr_cond
             
-valid_b3_codes = b3_dynamics[trend_mask_b3]['統一代號'].unique()
+            valid_b3_codes = b3_dynamics[trend_mask_b3]['統一代號'].unique()
             filtered_df = filtered_df[filtered_df['統一代號'].isin(valid_b3_codes)]
 
     # 處理 B4 過濾
