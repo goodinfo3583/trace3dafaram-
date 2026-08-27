@@ -264,7 +264,7 @@ def inject_custom_header(is_logged_in=False):
                     
                     <div class="dropdown-item actionable">
                         <a href="#" data-target="NavToBroker" class="dropdown-title internal-nav">
-                            <img src="app/static/icon-podiumaward.png" class="menu-icon" alt="broker"> 主力追蹤 
+                            <img src="app/static/icon-podiumaward.png" class="menu-icon" alt="broker"> 主力追蹤(開發中) 
                         </a>
                         <p class="dropdown-text">深度解析主力籌碼囤積路徑。</p>
                     </div>  
