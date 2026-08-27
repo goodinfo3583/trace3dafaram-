@@ -158,7 +158,7 @@ elif current_page == "b6":
 elif current_page == "b7":
     show_b7_page(DATA_DIR, STOCK_DICT)
 elif current_page == "broker":
-    show_broker_page()
+    show_broker_page(STOCK_DICT)
 elif current_page == "watchlist":                    
     show_watchlist_page(STOCK_DICT, conn, SHEET_URL) 
 elif current_page == "setting":

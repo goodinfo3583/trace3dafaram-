@@ -134,6 +134,13 @@ def show_weight_backtest_page(STOCK_DICT, DATA_DIR="data"):
             st.session_state['filter_b3_radio'] = "交集 (必須同時符合勾選特徵)"
             st.session_state['filter_b3_multi'] = []
 
+            # 清空 B4 篩選器
+            st.session_state['filter_b4_top_n'] = 50
+            for k in ['pct_41', 'vol_41', 'pct_42', 'vol_42', 'pct_43', 'vol_43']:
+                st.session_state[f'filter_b4_{k}'] = False
+            st.session_state['filter_b4_radio'] = "交集 (必須同時符合勾選特徵)"
+            st.session_state['filter_b4_multi'] = []
+
             st.session_state['filter_b5_1000'] = False
             
             if 'filter_debug' in st.session_state:
@@ -269,6 +276,37 @@ def show_weight_backtest_page(STOCK_DICT, DATA_DIR="data"):
         selected_b3_trends = st.multiselect("可複選連買動態：", b3_trend_options, key="filter_b3_multi")
         # 還原短字串供過濾使用
         b3_trends = [t.split(" (")[0] for t in selected_b3_trends]
+
+    # 取得 B4 最新資料日期 (取雷達日期作為代表)
+    b4_latest_date_str = "未知日期"
+    if 'b4_squeeze_radar' in st.session_state and st.session_state['b4_squeeze_radar']['date']:
+        b4_latest_date_str = st.session_state['b4_squeeze_radar']['date']
+
+    # --- 模組 B4 展開面板 ---
+    with st.expander(f"⚔️ B4 資券動向與雷達 (資料基準日: {b4_latest_date_str})", expanded=False):
+        st.markdown("**🔹 1. 資券榜單 (勾選多個代表必須「同時進榜」)**")
+        b4_top_n = st.slider("👑 排名過濾：設定最新進榜的擷取範圍 (名次)", min_value=10, max_value=300, value=50, step=10, key="filter_b4_top_n")
+        
+        c_b4_1, c_b4_2, c_b4_3 = st.columns(3)
+        b4_41_pct = c_b4_1.checkbox(f"融資減少幅度【累計比】(前 {b4_top_n} 名)", key="filter_b4_pct_41")
+        b4_41_vol = c_b4_1.checkbox(f"融資減少張數【累計張】(前 {b4_top_n} 名)", key="filter_b4_vol_41")
+        
+        b4_42_pct = c_b4_2.checkbox(f"借券賣出減少幅度【累計比】(前 {b4_top_n} 名)", key="filter_b4_pct_42")
+        b4_42_vol = c_b4_2.checkbox(f"借券賣出減少張數【累計張】(前 {b4_top_n} 名)", key="filter_b4_vol_42")
+        
+        b4_43_pct = c_b4_3.checkbox(f"融券增加幅度【累計比】(前 {b4_top_n} 名)", key="filter_b4_pct_43")
+        b4_43_vol = c_b4_3.checkbox(f"融券增加張數【累計張】(前 {b4_top_n} 名)", key="filter_b4_vol_43")
+
+        st.markdown("**🔹 2. 雷達動態特徵 (軋空與套牢訊號)**")
+        b4_trend_logic = st.radio("B4 特徵篩選邏輯：", ["交集 (必須同時符合勾選特徵)", "聯集 (符合任一即可)"], horizontal=True, key="filter_b4_radio")
+        
+        b4_trend_options = [
+            "💥 終極軋空 (雷達4分)", "🚀 強軋空 (雷達3分)", "🔥 點火軋空 (雷達2分)", "🔼 進駐 (雷達1分)",
+            "☠️ 極危套牢 (雷達3分)", "🚨 高危套牢 (雷達2分)", "⚠️ 初危套牢 (雷達1分)"
+        ]
+        selected_b4_trends = st.multiselect("可複選雷達特徵：", b4_trend_options, key="filter_b4_multi")
+        # 還原短字串供過濾使用 (例如將 "💥 終極軋空 (雷達4分)" 轉為 "💥 終極")
+        b4_trends = [t.split(" ")[0] + " " + t.split(" ")[1][:2] for t in selected_b4_trends] 
 
     # --- 展開面板 (預留) ---
     with st.expander("🐳 B5 大戶籌碼動向 (建置中)", expanded=False):
@@ -434,8 +472,55 @@ def show_weight_backtest_page(STOCK_DICT, DATA_DIR="data"):
                 if is_and_logic_b3: trend_mask_b3 &= curr_cond
                 else: trend_mask_b3 |= curr_cond
             
-            valid_b3_codes = b3_dynamics[trend_mask_b3]['統一代號'].unique()
+valid_b3_codes = b3_dynamics[trend_mask_b3]['統一代號'].unique()
             filtered_df = filtered_df[filtered_df['統一代號'].isin(valid_b3_codes)]
+
+    # 處理 B4 過濾
+    b4_checks = {
+        'b4_margin_pct': b4_41_pct, 'b4_margin_vol': b4_41_vol,
+        'b4_short_pct': b4_42_pct, 'b4_short_vol': b4_42_vol,
+        'b4_margin_plus_pct': b4_43_pct, 'b4_margin_plus_vol': b4_43_vol
+    }
+    for b4_key, is_checked in b4_checks.items():
+        if is_checked:
+            any_filter_applied = True
+            df_b4_tmp = clean_stock_id(get_df(b4_key))
+            if not df_b4_tmp.empty:
+                # 取得前 N 名 (B4原始資料已依據漲跌幅或特定條件排好序)
+                df_b4_tmp = df_b4_tmp.head(b4_top_n)
+                filtered_df = filtered_df[filtered_df['統一代號'].isin(df_b4_tmp['統一代號'])]
+            else:
+                st.warning(f"⚠️ 找不到 {b4_key} 相關數據，過濾結果為空。")
+                filtered_df = filtered_df.iloc[0:0]
+
+    # 處理 B4 雷達特徵過濾
+    if b4_trends:
+        any_filter_applied = True
+        is_and_logic_b4 = "交集" in b4_trend_logic
+        
+        sq_df = clean_stock_id(st.session_state.get('b4_squeeze_radar', {}).get('df', pd.DataFrame()))
+        rk_df = clean_stock_id(st.session_state.get('b4_risk_radar', {}).get('df', pd.DataFrame()))
+        
+        b4_radar_combined = pd.DataFrame()
+        if not sq_df.empty and '軋空評估' in sq_df.columns:
+            b4_radar_combined = pd.concat([b4_radar_combined, sq_df[['統一代號', '軋空評估']].rename(columns={'軋空評估': '雷達動態'})])
+        if not rk_df.empty and '套牢評估' in rk_df.columns:
+            b4_radar_combined = pd.concat([b4_radar_combined, rk_df[['統一代號', '套牢評估']].rename(columns={'套牢評估': '雷達動態'})])
+
+        if not b4_radar_combined.empty:
+            b4_dynamics = b4_radar_combined.groupby('統一代號')['雷達動態'].apply(lambda x: " | ".join(x.dropna().astype(str))).reset_index()
+            trend_mask_b4 = pd.Series(True, index=b4_dynamics.index) if is_and_logic_b4 else pd.Series(False, index=b4_dynamics.index)
+            
+            for trend in b4_trends:
+                curr_cond = b4_dynamics['雷達動態'].str.contains(trend, regex=False, na=False)
+                if is_and_logic_b4: trend_mask_b4 &= curr_cond
+                else: trend_mask_b4 |= curr_cond
+                
+            valid_b4_codes = b4_dynamics[trend_mask_b4]['統一代號'].unique()
+            filtered_df = filtered_df[filtered_df['統一代號'].isin(valid_b4_codes)]
+        else:
+            st.warning("⚠️ 找不到任何 B4 雷達數據。")
+            filtered_df = filtered_df.iloc[0:0]
 
     # 處理 B5 過濾 (測試用)
     if b5_1000:
@@ -474,6 +559,15 @@ def show_weight_backtest_page(STOCK_DICT, DATA_DIR="data"):
                 df_b3_main['B3_組合狀態'] = df_b3_main['連買類型'] + "(" + df_b3_main['連買週期數'].astype(str) + ")-" + df_b3_main['狀態動態']
                 b3_summary = df_b3_main.groupby('統一代號')['B3_組合狀態'].apply(lambda x: " | ".join(x)).reset_index()
                 debug_df = pd.merge(debug_df, b3_summary.rename(columns={'B3_組合狀態': 'B3_連買狀態'}), on='統一代號', how='left')
+
+            # 加入 B4 雷達狀態供核對
+            sq_df_debug = clean_stock_id(st.session_state.get('b4_squeeze_radar', {}).get('df', pd.DataFrame()))
+            rk_df_debug = clean_stock_id(st.session_state.get('b4_risk_radar', {}).get('df', pd.DataFrame()))
+            
+            if not sq_df_debug.empty:
+                debug_df = pd.merge(debug_df, sq_df_debug[['統一代號', '軋空評估']], on='統一代號', how='left')
+            if not rk_df_debug.empty:
+                debug_df = pd.merge(debug_df, rk_df_debug[['統一代號', '套牢評估']], on='統一代號', how='left')
 
             st.write(f"🔍 檢核明細 (共 {len(debug_df)} 筆)：")
             st.dataframe(debug_df, use_container_width=True, hide_index=True)
