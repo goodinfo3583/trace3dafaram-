@@ -165,8 +165,18 @@ def show_weight_backtest_page(STOCK_DICT, DATA_DIR="data"):
             b1_checked = True
             trend_mask = pd.Series(False, index=df_b1_raw.index)
             for trend in b1_trends:
-                # 只要原始字串中包含該選項字眼即判定符合
-                trend_mask |= df_b1_raw['最新動態'].astype(str).str.contains(trend, regex=False, na=False)
+                if "衝進" in trend:
+                    # 擷取專屬色球與天數 (例如把 "🚀 衝進🔴5日榜單" 變成 "🔴5日")
+                    core_tag = trend.replace("🚀 衝進", "").replace("榜單", "")
+                    
+                    # 雙重確認：必須同時包含 "衝進" 與 "專屬色球天數"，完美避開 20/120 混淆與合併字串問題
+                    trend_mask |= (
+                        df_b1_raw['最新動態'].astype(str).str.contains("衝進", regex=False, na=False) & 
+                        df_b1_raw['最新動態'].astype(str).str.contains(core_tag, regex=False, na=False)
+                    )
+                else:
+                    # 一般動態 (如 📈 上升、🪜 階梯吸籌) 維持完全比對
+                    trend_mask |= df_b1_raw['最新動態'].astype(str).str.contains(trend, regex=False, na=False)
             hit_mask &= trend_mask
 
         # 應用 B1 過濾結果
