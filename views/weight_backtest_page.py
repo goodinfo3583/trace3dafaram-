@@ -140,14 +140,28 @@ def show_weight_backtest_page(STOCK_DICT, DATA_DIR="data"):
         ]
         b1_trends = st.multiselect("請選擇要過濾的動態特徵：", trend_options)
 
+    # 取得 B2 最新資料日期
+    b2_latest_date_str = "未知日期"
+    df_b2_1_tmp = get_df('b2_1')
+    if not df_b2_1_tmp.empty:
+        for c in df_b2_1_tmp.columns:
+            if "成交比%" in c:
+                raw_date = c.replace("成交比%", "")
+                if len(raw_date) == 4:
+                    b2_latest_date_str = f"2026/{raw_date[:2]}/{raw_date[2:]}"
+                else:
+                    b2_latest_date_str = raw_date
+                break
+
     # --- 模組 B2 展開面板 ---
-    with st.expander("🚀 B2 法人突擊掃貨 (買超佔成交與發行量)", expanded=False):
+    with st.expander(f"🚀 B2 法人突擊掃貨 (資料基準日: {b2_latest_date_str})", expanded=False):
         st.markdown("**🔹 1. 掃貨榜單 (勾選多個代表必須「同時進榜」)**")
+        b2_top_n = st.slider("👑 排名過濾：設定最新進榜的擷取範圍 (名次)", min_value=10, max_value=300, value=50, step=10)
         c_b2_1, c_b2_2 = st.columns(2)
-        b2_1_chk = c_b2_1.checkbox("外資買超佔【成交量】進榜 (前50名)")
-        b2_2_chk = c_b2_2.checkbox("投信買超佔【成交量】進榜 (前50名)")
-        b2_3_chk = c_b2_1.checkbox("外資買超佔【發行數】進榜 (前50名)")
-        b2_4_chk = c_b2_2.checkbox("投信買超佔【發行數】進榜 (前50名)")
+        b2_1_chk = c_b2_1.checkbox(f"外資買超佔【成交量】(前 {b2_top_n} 名)")
+        b2_2_chk = c_b2_2.checkbox(f"投信買超佔【成交量】(前 {b2_top_n} 名)")
+        b2_3_chk = c_b2_1.checkbox(f"外資買超佔【發行數】(前 {b2_top_n} 名)")
+        b2_4_chk = c_b2_2.checkbox(f"投信買超佔【發行數】(前 {b2_top_n} 名)")
 
         st.markdown("**🔹 2. 突擊動態特徵 (今日短動態)**")
         b2_trend_logic = st.radio("B2 特徵篩選邏輯：", ["交集 (必須同時符合勾選特徵)", "聯集 (符合任一即可)"], horizontal=True, key="b2_radio")
@@ -247,9 +261,18 @@ def show_weight_backtest_page(STOCK_DICT, DATA_DIR="data"):
             any_filter_applied = True
             df_b2_tmp = clean_stock_id(get_df(b2_key))
             if not df_b2_tmp.empty:
+                # 找出最新一日的欄位 (通常是包含 % 的那欄)
+                latest_col = next((c for c in df_b2_tmp.columns if '%' in c), None)
+                if latest_col:
+                    # 強制轉型，剔除數值為 0 或未進榜的標的
+                    df_b2_tmp['num_latest'] = pd.to_numeric(df_b2_tmp[latest_col].astype(str).replace("未進榜", 0), errors='coerce').fillna(0)
+                    df_b2_tmp = df_b2_tmp[df_b2_tmp['num_latest'] > 0]
+                    # 因為 B2 原始資料已經依據 latest_col 遞減排序，直接 head(N) 即可精準取得前 N 名
+                    df_b2_tmp = df_b2_tmp.head(b2_top_n)
+                
                 filtered_df = filtered_df[filtered_df['統一代號'].isin(df_b2_tmp['統一代號'])]
             else:
-                st.warning(f"⚠️ 找不到 B2 相關數據，過濾結果為空。")
+                st.warning(f"⚠️ 找不到 {b2_key} 相關數據，過濾結果為空。")
                 filtered_df = filtered_df.iloc[0:0]
 
     if b2_trends:
