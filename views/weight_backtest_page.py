@@ -122,7 +122,17 @@ def show_weight_backtest_page(STOCK_DICT, DATA_DIR="data"):
             min_value=0.0, max_value=100.0, value=(0.0, 100.0), step=0.5
         )
 
-        st.markdown("**🔹 3. 最新動態特徵**")
+        st.markdown("**🔹 3. 區間累計持股增減 (ΔChange %)**")
+        st.caption("設定特定區間內的持股增減幅度 (預設 -100~100 代表不限制，拉動至 0~100 即可尋找純增加的標的)")
+        c_chg1, c_chg2 = st.columns(2)
+        with c_chg1:
+            b1_5d_chg = st.slider("5日 ΔChange", -100.0, 100.0, (-100.0, 100.0), 0.5)
+            b1_60d_chg = st.slider("60日 ΔChange", -100.0, 100.0, (-100.0, 100.0), 0.5)
+        with c_chg2:
+            b1_20d_chg = st.slider("20日 ΔChange", -100.0, 100.0, (-100.0, 100.0), 0.5)
+            b1_120d_chg = st.slider("120日 ΔChange", -100.0, 100.0, (-100.0, 100.0), 0.5)
+
+        st.markdown("**🔹 4. 最新動態特徵**")
         b1_trend_logic = st.radio("特徵篩選邏輯：", ["交集 (必須同時符合勾選的所有特徵)", "聯集 (符合其中任一特徵即可)"], horizontal=True)
         trend_options = [
             "📈 上升", "📉 下降", "🪜 階梯吸籌", "🛡️ 穩健吸籌", "⚠️ 趨緩", 
@@ -161,7 +171,24 @@ def show_weight_backtest_page(STOCK_DICT, DATA_DIR="data"):
             df_b1_raw['num_ratio'] = pd.to_numeric(df_b1_raw['法人持股'].astype(str).str.replace('%', '', regex=False).replace('未進榜', '0'), errors='coerce').fillna(0)
             hit_mask &= df_b1_raw['num_ratio'].between(b1_ratio_min, b1_ratio_max)
 
-        # 3. 最新動態特徵檢查 (支援 交集 AND / 聯集 OR)
+        # 3. 區間累計持股增減 (ΔChange) 檢查
+        change_configs = {
+            '5日ΔChange': b1_5d_chg, '20日ΔChange': b1_20d_chg,
+            '60日ΔChange': b1_60d_chg, '120日ΔChange': b1_120d_chg
+        }
+        for col_name, (min_val, max_val) in change_configs.items():
+            # 只要滑桿被拉動過，就啟動過濾機制
+            if min_val > -100.0 or max_val < 100.0:
+                b1_checked = True
+                if col_name in df_b1_raw.columns:
+                    # 容錯處理：將字串 "+1.5" 或 "-0.2" 清洗為純浮點數
+                    df_b1_raw[f'num_{col_name}'] = pd.to_numeric(
+                        df_b1_raw[col_name].astype(str).str.replace('%', '', regex=False).str.replace('+', '', regex=False), 
+                        errors='coerce'
+                    ).fillna(0.0)
+                    hit_mask &= df_b1_raw[f'num_{col_name}'].between(min_val, max_val)
+
+        # 4. 最新動態特徵檢查 (支援 交集 AND / 聯集 OR)
         if b1_trends:
             b1_checked = True
             is_and_logic = "交集" in b1_trend_logic
