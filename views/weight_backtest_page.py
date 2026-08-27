@@ -161,23 +161,32 @@ def show_weight_backtest_page(STOCK_DICT, DATA_DIR="data"):
             df_b1_raw['num_ratio'] = pd.to_numeric(df_b1_raw['法人持股'].astype(str).str.replace('%', '', regex=False).replace('未進榜', '0'), errors='coerce').fillna(0)
             hit_mask &= df_b1_raw['num_ratio'].between(b1_ratio_min, b1_ratio_max)
 
-        # 3. 最新動態特徵檢查 (聯集 OR)
+        # 3. 最新動態特徵檢查 (支援 交集 AND / 聯集 OR)
         if b1_trends:
             b1_checked = True
-            trend_mask = pd.Series(False, index=df_b1_raw.index)
+            is_and_logic = "交集" in b1_trend_logic
+            
+            # 若為交集(AND)，預設為 True (往下扣除)；若為聯集(OR)，預設為 False (往上疊加)
+            trend_mask = pd.Series(True, index=df_b1_raw.index) if is_and_logic else pd.Series(False, index=df_b1_raw.index)
+            
             for trend in b1_trends:
+                # 處理 "衝進" 的雙重防呆比對
                 if "衝進" in trend:
-                    # 擷取專屬色球與天數 (例如把 "🚀 衝進🔴5日榜單" 變成 "🔴5日")
                     core_tag = trend.replace("🚀 衝進", "").replace("榜單", "")
-                    
-                    # 雙重確認：必須同時包含 "衝進" 與 "專屬色球天數"，完美避開 20/120 混淆與合併字串問題
-                    trend_mask |= (
+                    current_cond = (
                         df_b1_raw['最新動態'].astype(str).str.contains("衝進", regex=False, na=False) & 
                         df_b1_raw['最新動態'].astype(str).str.contains(core_tag, regex=False, na=False)
                     )
                 else:
-                    # 一般動態 (如 📈 上升、🪜 階梯吸籌) 維持完全比對
-                    trend_mask |= df_b1_raw['最新動態'].astype(str).str.contains(trend, regex=False, na=False)
+                    # 一般特徵比對
+                    current_cond = df_b1_raw['最新動態'].astype(str).str.contains(trend, regex=False, na=False)
+                
+                # 依照使用者選擇的邏輯進行合併
+                if is_and_logic:
+                    trend_mask &= current_cond
+                else:
+                    trend_mask |= current_cond
+                    
             hit_mask &= trend_mask
 
         # 應用 B1 過濾結果
