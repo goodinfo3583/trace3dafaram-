@@ -100,9 +100,32 @@ def show_weight_backtest_page(STOCK_DICT, DATA_DIR="data"):
         st.caption("💡 跨模組複選為「交集 (嚴格篩選)」。動態特徵內的多選可切換交集或聯集。")
     with col_reset:
         def reset_filters():
-            for key in list(st.session_state.keys()):
-                if key.startswith('filter_'):
-                    del st.session_state[key]
+            # 強制將所有篩選器設回預設值 (最安全穩定的清空法)
+            st.session_state['filter_b1_delta'] = False
+            st.session_state['filter_b1_5d'] = False
+            st.session_state['filter_b1_20d'] = False
+            st.session_state['filter_b1_60d'] = False
+            st.session_state['filter_b1_120d'] = False
+            st.session_state['filter_b1_ratio'] = (0.0, 100.0)
+            st.session_state['filter_b1_5d_chg'] = (-100.0, 100.0)
+            st.session_state['filter_b1_60d_chg'] = (-100.0, 100.0)
+            st.session_state['filter_b1_20d_chg'] = (-100.0, 100.0)
+            st.session_state['filter_b1_120d_chg'] = (-100.0, 100.0)
+            st.session_state['filter_b1_radio'] = "交集 (必須同時符合勾選的所有特徵)"
+            st.session_state['filter_b1_multi'] = []
+            
+            st.session_state['filter_b2_top_n'] = 50
+            st.session_state['filter_b2_1'] = False
+            st.session_state['filter_b2_2'] = False
+            st.session_state['filter_b2_3'] = False
+            st.session_state['filter_b2_4'] = False
+            st.session_state['filter_b2_radio'] = "交集 (必須同時符合勾選特徵)"
+            st.session_state['filter_b2_multi'] = []
+            st.session_state['filter_b5_1000'] = False
+            
+            if 'filter_debug' in st.session_state:
+                st.session_state['filter_debug'] = False
+
         st.button("🧹 清空所有篩選條件", on_click=reset_filters, use_container_width=True)
 
     filtered_df = base_df.copy()
@@ -118,7 +141,7 @@ def show_weight_backtest_page(STOCK_DICT, DATA_DIR="data"):
     with st.expander(f"📈 B1 法人持股動向 (資料基準日: {b1_latest_date_str})", expanded=False):
         st.markdown("**🔹 1. 近期進榜天數與變化**")
         c1, c2, c3, c4, c5 = st.columns(5)
-        b1_delta = c1.checkbox("當日△上升 (>0)")
+        b1_delta = c1.checkbox("當日△上升 (>0)", key="filter_b1_delta")
         b1_5d = c2.checkbox("🔴 5日上榜", key="filter_b1_5d")
         b1_20d = c3.checkbox("🟡 20日上榜", key="filter_b1_20d")
         b1_60d = c4.checkbox("🟢 60日上榜", key="filter_b1_60d")
@@ -127,26 +150,26 @@ def show_weight_backtest_page(STOCK_DICT, DATA_DIR="data"):
         st.markdown("**🔹 2. 法人持股比例區間 (%)**")
         b1_ratio_min, b1_ratio_max = st.slider(
             "拉動滑桿設定過濾範圍 (設定為 0~100 代表不作限制)：", 
-            min_value=0.0, max_value=100.0, value=(0.0, 100.0), step=0.5
+            min_value=0.0, max_value=100.0, value=(0.0, 100.0), step=0.5, key="filter_b1_ratio"
         )
 
         st.markdown("**🔹 3. 區間累計持股增減 (ΔChange %)**")
         st.caption("設定特定區間內的持股增減幅度 (預設 -100~100 代表不限制，拉動至 0~100 即可尋找純增加的標的)")
         c_chg1, c_chg2 = st.columns(2)
         with c_chg1:
-            b1_5d_chg = st.slider("5日 ΔChange", -100.0, 100.0, (-100.0, 100.0), 0.5)
-            b1_60d_chg = st.slider("60日 ΔChange", -100.0, 100.0, (-100.0, 100.0), 0.5)
+            b1_5d_chg = st.slider("5日 ΔChange", -100.0, 100.0, (-100.0, 100.0), 0.5, key="filter_b1_5d_chg")
+            b1_60d_chg = st.slider("60日 ΔChange", -100.0, 100.0, (-100.0, 100.0), 0.5, key="filter_b1_60d_chg")
         with c_chg2:
-            b1_20d_chg = st.slider("20日 ΔChange", -100.0, 100.0, (-100.0, 100.0), 0.5)
-            b1_120d_chg = st.slider("120日 ΔChange", -100.0, 100.0, (-100.0, 100.0), 0.5)
+            b1_20d_chg = st.slider("20日 ΔChange", -100.0, 100.0, (-100.0, 100.0), 0.5, key="filter_b1_20d_chg")
+            b1_120d_chg = st.slider("120日 ΔChange", -100.0, 100.0, (-100.0, 100.0), 0.5, key="filter_b1_120d_chg")
 
         st.markdown("**🔹 4. 最新動態特徵**")
-        b1_trend_logic = st.radio("特徵篩選邏輯：", ["交集 (必須同時符合勾選的所有特徵)", "聯集 (符合其中任一特徵即可)"], horizontal=True)
+        b1_trend_logic = st.radio("特徵篩選邏輯：", ["交集 (必須同時符合勾選的所有特徵)", "聯集 (符合其中任一特徵即可)"], horizontal=True, key="filter_b1_radio")
         trend_options = [
             "📈 上升", "📉 下降", "🪜 階梯吸籌", "🛡️ 穩健吸籌", "⚠️ 趨緩", 
             "🚀 衝進🔴5日榜單", "🚀 衝進🟡20日榜單", "🚀 衝進🟢60日榜單", "🚀 衝進🔵120日榜單"
         ]
-        b1_trends = st.multiselect("請選擇要過濾的動態特徵：", trend_options)
+        b1_trends = st.multiselect("請選擇要過濾的動態特徵：", trend_options, key="filter_b1_multi")
 
     # 取得 B2 最新資料日期
     b2_latest_date_str = "未知日期"
@@ -174,7 +197,7 @@ def show_weight_backtest_page(STOCK_DICT, DATA_DIR="data"):
         st.markdown("**🔹 2. 突擊動態特徵 (今日短動態)**")
         b2_trend_logic = st.radio("B2 特徵篩選邏輯：", ["交集 (必須同時符合勾選特徵)", "聯集 (符合任一即可)"], horizontal=True, key="filter_b2_radio")
         
-        # 加上詳細定義說明的選項 (只顯示，不影響背後字串比對)
+        # 加上詳細定義說明的選項 (只顯示在前端，不影響背後字串比對)
         b2_trend_display_map = {
             "🔥 強延續": "🔥 強延續 (當日買盤加速 > 5日基準)",
             "🔥 持續加碼": "🔥 持續加碼 (當日買佔發行 > 0%)",
@@ -193,18 +216,15 @@ def show_weight_backtest_page(STOCK_DICT, DATA_DIR="data"):
         selected_display_trends = st.multiselect("可複選突擊動態：", list(b2_trend_display_map.values()), key="filter_b2_multi")
         
         # 將 UI 選擇的長字串，還原回原始的短字串供後台過濾使用
-        b2_trends = []
-        for d_trend in selected_display_trends:
-            for raw_trend, desc in b2_trend_display_map.items():
-                if d_trend == desc:
-                    b2_trends.append(raw_trend)
+        b2_trends = [raw_trend for d_trend in selected_display_trends for raw_trend, desc in b2_trend_display_map.items() if d_trend == desc]
 
     # --- 展開面板 (預留) ---
     with st.expander("🐳 B5 大戶籌碼動向 (建置中)", expanded=False):
-        b5_1000 = st.checkbox("千張大戶持股增加 (測試鈕)")
+        b5_1000 = st.checkbox("千張大戶持股增加 (測試鈕)", key="filter_b5_1000")
 
     with st.expander("📉 其他籌碼動向模組 (建置中)", expanded=False):
         st.info("包含法人突擊掃貨、連買、資券動向等模組，將於後續開放。")
+        
 
     # ==========================================
     # 執行過濾邏輯
