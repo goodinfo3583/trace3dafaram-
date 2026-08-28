@@ -940,16 +940,29 @@ def show_weight_backtest_page(STOCK_DICT, DATA_DIR="data"):
             st.write(f"🔍 檢核明細 (共 {len(debug_df)} 筆)：")
             st.dataframe(debug_df, use_container_width=True, hide_index=True)
 
-            # ==========================================
-            # 🌟 加入 B6 鉅額交易供核對
-            # ==========================================
+            # 加入 B6 鉅額交易供核對
             df_b6_debug = clean_stock_id(get_df('b6_today')).drop_duplicates(subset=['統一代號'])
             if not df_b6_debug.empty:
                 b6_cols = ['統一代號', '總額(億)']
                 dynamic_col = st.session_state.get('b6_dynamic_price_col')
-                if dynamic_col and dynamic_col in df_b6_debug.columns:
+                
+                # 若同時有成交均價與收盤價，就自動幫您算出防守狀態
+                if dynamic_col and dynamic_col in df_b6_debug.columns and '▼收盤價' in df_b6_debug.columns:
+                    def get_debug_b6_status(row):
+                        try:
+                            prices = [float(p) for p in str(row[dynamic_col]).split(' / ')]
+                            avg_p = sum(prices) / len(prices)
+                            c_p = float(str(row['▼收盤價']).replace(',', ''))
+                            return "🛡️ 防守成功" if c_p >= avg_p else "🚨 跌破防線"
+                        except: return "未知"
+                    
+                    df_b6_debug['B6_防守狀態'] = df_b6_debug.apply(get_debug_b6_status, axis=1)
+                    b6_cols.extend([dynamic_col, '▼收盤價', 'B6_防守狀態'])
+                    
+                # 容錯處理：如果只有其中一個欄位
+                elif dynamic_col and dynamic_col in df_b6_debug.columns:
                     b6_cols.append(dynamic_col)
-                if '▼收盤價' in df_b6_debug.columns:
+                elif '▼收盤價' in df_b6_debug.columns:
                     b6_cols.append('▼收盤價')
                 
                 debug_df = pd.merge(debug_df, df_b6_debug[b6_cols].rename(columns={
@@ -957,6 +970,7 @@ def show_weight_backtest_page(STOCK_DICT, DATA_DIR="data"):
                     dynamic_col: 'B6_成交均價' if dynamic_col else 'B6_成交均價',
                     '▼收盤價': 'B6_收盤價'
                 }), on='統一代號', how='left')
+            #####
             #####
 
             
