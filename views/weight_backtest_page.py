@@ -167,7 +167,7 @@ def show_weight_backtest_page(STOCK_DICT, DATA_DIR="data"):
             st.session_state['filter_b4_multi'] = []
 
             # 清空 B5 篩選器
-            for k in ['long_short', 'double']:
+            for k in ['long_short', 'double', '6w_1000', '6w_800', '6w_600', '6w_400']:
                 st.session_state[f'filter_b5_{k}'] = False
             for k in ['1000', '800', '600', '400']:
                 st.session_state[f'filter_b5_trend_{k}'] = []
@@ -371,8 +371,16 @@ def show_weight_backtest_page(STOCK_DICT, DATA_DIR="data"):
         b5_long_short = c_b5_1.checkbox("🎯 長短線共振 (1000張與400張波段+本週皆同步加碼)", key="filter_b5_long_short")
         b5_double = c_b5_2.checkbox("🎯 雙引擎共振 (1000張與400張本週同步增加)", key="filter_b5_double")
 
-        st.markdown("**🔹 2. 各級距大戶週動態過濾**")
-        st.caption("支援多選，可精準挑選籌碼『劇增』或『大增』的飆股防線。如果該級距尚未爬取資料，過濾將會為空。")
+        st.markdown("**🔹 2. 波段吸籌過濾 (6周增減 > 0)**")
+        st.caption("挑選近一個半月內，大戶籌碼持續呈現「淨流入」的波段保護傘標的。")
+        c_b5_6w1, c_b5_6w2, c_b5_6w3, c_b5_6w4 = st.columns(4)
+        b5_6w_1000 = c_b5_6w1.checkbox("👑 1000張 6周增加", key="filter_b5_6w_1000")
+        b5_6w_800 = c_b5_6w2.checkbox("🦅 800張 6周增加", key="filter_b5_6w_800")
+        b5_6w_600 = c_b5_6w3.checkbox("🦉 600張 6周增加", key="filter_b5_6w_600")
+        b5_6w_400 = c_b5_6w4.checkbox("🐺 400張 6周增加", key="filter_b5_6w_400")
+
+        st.markdown("**🔹 3. 各級距大戶週動態過濾**")
+        st.caption("支援多選，可精準挑選籌碼『劇增』或『大增』的飆股防線。")
         
         trend_options_b5 = ["🚀 劇增", "🔥 大增", "📈 小增", "↗️ 微增", "🔄 持平", "↘️ 微減", "📉 小減", "⚠️ 大減", "🚨 劇減"]
         
@@ -383,7 +391,6 @@ def show_weight_backtest_page(STOCK_DICT, DATA_DIR="data"):
         c_b5_lvl3, c_b5_lvl4 = st.columns(2)
         b5_trend_600 = c_b5_lvl3.multiselect("🦉 600張大戶週動態：", trend_options_b5, key="filter_b5_trend_600")
         b5_trend_400 = c_b5_lvl4.multiselect("🐺 400張大戶週動態：", trend_options_b5, key="filter_b5_trend_400")
-
     with st.expander("📉 其他籌碼動向模組 (建置中)", expanded=False):
         st.info("包含法人突擊掃貨、連買、資券動向等模組，將於後續開放。")
         
@@ -706,7 +713,23 @@ def show_weight_backtest_page(STOCK_DICT, DATA_DIR="data"):
                 
             filtered_df = filtered_df[filtered_df['統一代號'].isin(list(valid_resonance_codes))]
 
-    # 2. 處理各級距動態過濾 (交集邏輯)
+    # 2. 處理波段吸籌過濾 (6周增減 > 0)
+    b5_6w_configs = [
+        (b5_6w_1000, df_1k, "1000張"), (b5_6w_800, df_800, "800張"),
+        (b5_6w_600, df_600, "600張"), (b5_6w_400, df_400, "400張")
+    ]
+    for is_checked, df_lvl, lvl_name in b5_6w_configs:
+        if is_checked:
+            any_filter_applied = True
+            if not df_lvl.empty and '▼6周增減' in df_lvl.columns:
+                cond = pd.to_numeric(df_lvl['▼6周增減'], errors='coerce').fillna(0) > 0
+                valid_codes = df_lvl[cond]['統一代號'].unique()
+                filtered_df = filtered_df[filtered_df['統一代號'].isin(valid_codes)]
+            else:
+                st.warning(f"⚠️ {lvl_name} 資料庫缺乏 6周增減欄位，過濾為空。")
+                filtered_df = filtered_df.iloc[0:0]
+
+    # 3. 處理各級距動態過濾 (交集邏輯)
     b5_trend_configs = [
         (b5_trend_1000, df_1k, "1000張"), (b5_trend_800, df_800, "800張"),
         (b5_trend_600, df_600, "600張"), (b5_trend_400, df_400, "400張")
@@ -727,38 +750,38 @@ def show_weight_backtest_page(STOCK_DICT, DATA_DIR="data"):
         st.success(f"✅ 過濾完成！共有 **{len(filtered_df)}** 檔標的符合您的跨模組條件。")
         debug_mode = st.checkbox("🔬 開啟除錯透視鏡 (核對名單與過濾數值)")
         if debug_mode:
-            # 撈出需要檢核的核心欄位 (加入 ΔChange 欄位，證明系統沒有混淆)
             check_cols = [
                 '統一代號', '今日上榜', '△', '法人持股', '最新動態',
                 '5日ΔChange', '20日ΔChange', '60日ΔChange', '120日ΔChange'
             ]
-            debug_df = pd.merge(filtered_df, df_b1_raw[[c for c in check_cols if c in df_b1_raw.columns]], on='統一代號', how='left')
+            # 🛡️ 斬斷笛卡爾積：合併前一律強制去重
+            df_b1_debug = df_b1_raw[[c for c in check_cols if c in df_b1_raw.columns]].drop_duplicates(subset=['統一代號'])
+            debug_df = pd.merge(filtered_df, df_b1_debug, on='統一代號', how='left')
             
             # 加入 B2 四大表的動態，供核對
             b2_labels = zip(['b2_1', 'b2_2', 'b2_3', 'b2_4'], ['外資成交動態', '投信成交動態', '外資發行動態', '投信發行動態'])
             for b2_key, col_name in b2_labels:
-                df_b2_tmp = clean_stock_id(get_df(b2_key))
+                df_b2_tmp = clean_stock_id(get_df(b2_key)).drop_duplicates(subset=['統一代號'])
                 if not df_b2_tmp.empty and '今日短動態' in df_b2_tmp.columns:
                     debug_df = pd.merge(debug_df, df_b2_tmp[['統一代號', '今日短動態']].rename(columns={'今日短動態': f'B2_{col_name}'}), on='統一代號', how='left')
 
             # 加入 B3 狀態供核對
             df_b3_main = get_df('b3_main')
             if not df_b3_main.empty:
-                df_b3_main = clean_stock_id(df_b3_main)
-                # 將「連買週期數」與「狀態動態」合併成好讀的字串
+                df_b3_main = clean_stock_id(df_b3_main).drop_duplicates(subset=['統一代號', '連買類型']) 
                 df_b3_main['B3_組合狀態'] = df_b3_main['連買類型'] + "(" + df_b3_main['連買週期數'].astype(str) + ")-" + df_b3_main['狀態動態']
                 b3_summary = df_b3_main.groupby('統一代號')['B3_組合狀態'].apply(lambda x: " | ".join(x)).reset_index()
                 debug_df = pd.merge(debug_df, b3_summary.rename(columns={'B3_組合狀態': 'B3_連買狀態'}), on='統一代號', how='left')
 
             # 加入 B4 雷達狀態供核對
-            sq_df_debug = clean_stock_id(st.session_state.get('b4_squeeze_radar', {}).get('df', pd.DataFrame()))
-            rk_df_debug = clean_stock_id(st.session_state.get('b4_risk_radar', {}).get('df', pd.DataFrame()))
+            sq_df_debug = clean_stock_id(st.session_state.get('b4_squeeze_radar', {}).get('df', pd.DataFrame())).drop_duplicates(subset=['統一代號'])
+            rk_df_debug = clean_stock_id(st.session_state.get('b4_risk_radar', {}).get('df', pd.DataFrame())).drop_duplicates(subset=['統一代號'])
             
             if not sq_df_debug.empty:
                 debug_df = pd.merge(debug_df, sq_df_debug[['統一代號', '軋空評估']], on='統一代號', how='left')
             if not rk_df_debug.empty:
                 debug_df = pd.merge(debug_df, rk_df_debug[['統一代號', '套牢評估']], on='統一代號', how='left')
-            #########
+                
             # 加入 B4 12大資券動態供核對 (包含實際金額)
             b4_debug_keys = {
                 'b4_margin_pct': '融資減幅', 'b4_margin_vol': '融資減張',
@@ -769,9 +792,8 @@ def show_weight_backtest_page(STOCK_DICT, DATA_DIR="data"):
                 'b4_short_dec_amt': '借券實際減額', 'b4_short_inc_amt': '借券實際增額'
             }
             for k, label in b4_debug_keys.items():
-                df_tmp = clean_stock_id(get_df(k))
+                df_tmp = clean_stock_id(get_df(k)).drop_duplicates(subset=['統一代號'])
                 if not df_tmp.empty:
-                    # 智慧搜尋當日與5日欄位 (相容各種資料庫命名)
                     col_today = next((c for c in df_tmp.columns if '當日' in c and ('%' in c or '張' in c)), next((c for c in df_tmp.columns if '當日' in c), None))
                     col_5d = next((c for c in df_tmp.columns if '5日' in c and ('%' in c or '張' in c)), next((c for c in df_tmp.columns if '5日' in c), None))
                     
@@ -784,7 +806,6 @@ def show_weight_backtest_page(STOCK_DICT, DATA_DIR="data"):
                         extract_cols.append(col_5d)
                         rename_dict[col_5d] = f"B4_{label}_5日"
                         
-                    # 💡 如果是張數表，自動幫使用者算出「估算當日資金(萬)」，方便直接核對 1,000 萬門檻！
                     if '張' in label and '成交' in df_tmp.columns and col_today:
                         df_tmp['num_today_calc'] = pd.to_numeric(df_tmp[col_today].astype(str).str.replace(',', '', regex=False), errors='coerce').fillna(0)
                         df_tmp['price_calc'] = pd.to_numeric(df_tmp['成交'].astype(str).str.replace(',', '', regex=False), errors='coerce').fillna(0)
@@ -792,7 +813,6 @@ def show_weight_backtest_page(STOCK_DICT, DATA_DIR="data"):
                         extract_cols.append(f"B4_{label}_當日估算(萬)")
                         
                     if len(extract_cols) > 1:
-                        # 將抽出的欄位與 debug_df 合併
                         debug_df = pd.merge(debug_df, df_tmp[extract_cols].rename(columns=rename_dict), on='統一代號', how='left')
 
             # ==========================================
@@ -806,9 +826,8 @@ def show_weight_backtest_page(STOCK_DICT, DATA_DIR="data"):
             }
             
             for df_key, label in b5_debug_keys.items():
-                df_b5_tmp = clean_stock_id(get_df(df_key))
+                df_b5_tmp = clean_stock_id(get_df(df_key)).drop_duplicates(subset=['統一代號'])
                 if not df_b5_tmp.empty:
-                    # 抓取該級距的「週動態」、「最新週增減」與「6周增減」
                     latest_col = next((c for c in df_b5_tmp.columns if c.startswith('▼') and '6周' not in c), None)
                     extract_cols = ['統一代號']
                     rename_dict = {}
@@ -826,17 +845,15 @@ def show_weight_backtest_page(STOCK_DICT, DATA_DIR="data"):
                     if len(extract_cols) > 1:
                         debug_df = pd.merge(debug_df, df_b5_tmp[extract_cols].rename(columns=rename_dict), on='統一代號', how='left')
             
-            # 加入 B5 共振狀態判定 (供 UI 核對)
+            # 加入 B5 共振狀態判定
             if 'B5_1000張_週動態' in debug_df.columns and 'B5_400張_週動態' in debug_df.columns:
                 def check_resonance(row):
                     res = []
-                    # 雙引擎共振：1000 與 400 最新週皆為「增」
                     inc_1k = "增" in str(row.get('B5_1000張_週動態', ''))
                     inc_400 = "增" in str(row.get('B5_400張_週動態', ''))
                     if inc_1k and inc_400:
                         res.append("雙引擎")
                     
-                    # 長短線共振：1000 與 400 最新週與 6周 皆大於 0
                     try:
                         v1k_wk = float(str(row.get('B5_1000張_最新週', '0')).replace('%','').replace('+',''))
                         v1k_6wk = float(str(row.get('B5_1000張_6周', '0')).replace('%','').replace('+',''))
@@ -846,7 +863,6 @@ def show_weight_backtest_page(STOCK_DICT, DATA_DIR="data"):
                         if v1k_wk > 0 and v1k_6wk > 0 and v400_wk > 0 and v400_6wk > 0:
                             res.append("長短線")
                     except: pass
-                    
                     return " | ".join(res) if res else ""
                 
                 debug_df['B5_共振狀態'] = debug_df.apply(check_resonance, axis=1)
