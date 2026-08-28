@@ -591,8 +591,8 @@ def show_weight_backtest_page(STOCK_DICT, DATA_DIR="data"):
                     df_acc['num_today'] = pd.to_numeric(df_acc[col_today], errors='coerce').fillna(0)
                     df_acc['num_5d'] = pd.to_numeric(df_acc[col_5d], errors='coerce').fillna(0)
                     
-                    # 💡 設立防呆濾網：當日變動量必須超過 100 張，才具備「加速」的分析價值
-                    volume_threshold = 100 
+                    # 💡 設立防呆濾網：當日變動量必須超過 1張，才具備「加速」的分析價值
+                    volume_threshold = 1 
                     
                     if direction == 'inc':
                         # 【加速套牢/放空】：當日張數為正且大於門檻，且大於 5日均量
