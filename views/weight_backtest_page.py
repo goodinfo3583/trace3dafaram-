@@ -721,7 +721,7 @@ def show_weight_backtest_page(STOCK_DICT, DATA_DIR="data"):
                 st.warning(f"⚠️ {lvl_name} 資料庫尚未建立或缺乏動態欄位，過濾為空。")
                 filtered_df = filtered_df.iloc[0:0]
     # ==========================================
-    # 過濾結果結算與除錯檢核
+    # 過濾結果結算與除錯透視鏡檢核
     # ==========================================
     if any_filter_applied:
         st.success(f"✅ 過濾完成！共有 **{len(filtered_df)}** 檔標的符合您的跨模組條件。")
@@ -795,8 +795,63 @@ def show_weight_backtest_page(STOCK_DICT, DATA_DIR="data"):
                         # 將抽出的欄位與 debug_df 合併
                         debug_df = pd.merge(debug_df, df_tmp[extract_cols].rename(columns=rename_dict), on='統一代號', how='left')
 
+            # ==========================================
+            # 🌟 加入 B5 大腿動向供核對
+            # ==========================================
+            b5_debug_keys = {
+                'b5_1000': 'B5_1000張',
+                'b5_800': 'B5_800張',
+                'b5_600': 'B5_600張',
+                'b5_400': 'B5_400張'
+            }
+            
+            for df_key, label in b5_debug_keys.items():
+                df_b5_tmp = clean_stock_id(get_df(df_key))
+                if not df_b5_tmp.empty:
+                    # 抓取該級距的「週動態」、「最新週增減」與「6周增減」
+                    latest_col = next((c for c in df_b5_tmp.columns if c.startswith('▼') and '6周' not in c), None)
+                    extract_cols = ['統一代號']
+                    rename_dict = {}
+                    
+                    if '週動態' in df_b5_tmp.columns:
+                        extract_cols.append('週動態')
+                        rename_dict['週動態'] = f"{label}_週動態"
+                    if latest_col:
+                        extract_cols.append(latest_col)
+                        rename_dict[latest_col] = f"{label}_最新週"
+                    if '▼6周增減' in df_b5_tmp.columns:
+                        extract_cols.append('▼6周增減')
+                        rename_dict['▼6周增減'] = f"{label}_6周"
+                        
+                    if len(extract_cols) > 1:
+                        debug_df = pd.merge(debug_df, df_b5_tmp[extract_cols].rename(columns=rename_dict), on='統一代號', how='left')
+            
+            # 加入 B5 共振狀態判定 (供 UI 核對)
+            if 'B5_1000張_週動態' in debug_df.columns and 'B5_400張_週動態' in debug_df.columns:
+                def check_resonance(row):
+                    res = []
+                    # 雙引擎共振：1000 與 400 最新週皆為「增」
+                    inc_1k = "增" in str(row.get('B5_1000張_週動態', ''))
+                    inc_400 = "增" in str(row.get('B5_400張_週動態', ''))
+                    if inc_1k and inc_400:
+                        res.append("雙引擎")
+                    
+                    # 長短線共振：1000 與 400 最新週與 6周 皆大於 0
+                    try:
+                        v1k_wk = float(str(row.get('B5_1000張_最新週', '0')).replace('%','').replace('+',''))
+                        v1k_6wk = float(str(row.get('B5_1000張_6周', '0')).replace('%','').replace('+',''))
+                        v400_wk = float(str(row.get('B5_400張_最新週', '0')).replace('%','').replace('+',''))
+                        v400_6wk = float(str(row.get('B5_400張_6周', '0')).replace('%','').replace('+',''))
+                        
+                        if v1k_wk > 0 and v1k_6wk > 0 and v400_wk > 0 and v400_6wk > 0:
+                            res.append("長短線")
+                    except: pass
+                    
+                    return " | ".join(res) if res else ""
+                
+                debug_df['B5_共振狀態'] = debug_df.apply(check_resonance, axis=1)
+
             st.write(f"🔍 檢核明細 (共 {len(debug_df)} 筆)：")
-            #####
             st.dataframe(debug_df, use_container_width=True, hide_index=True)
             #####
     else:
