@@ -11,6 +11,11 @@ try:
 except ImportError:
     def ensure_b1_to_b5_loaded(DATA_DIR): pass
 
+try:
+    from views.b6_page import sync_b6_data
+except ImportError:
+    def sync_b6_data(DATA_DIR): pass
+
 # ==========================================
 # 🌟 萬能鑰匙：對接全站暫存變數
 # ==========================================
@@ -66,6 +71,10 @@ def clean_stock_id(df):
 def show_weight_backtest_page(STOCK_DICT, DATA_DIR="data"):
     # 背景自動載入原始資料
     ensure_b1_to_b5_loaded(DATA_DIR)
+    
+    # 🌟 自動喚醒 B6 鉅額資料
+    if 'b6_today_df' not in st.session_state:
+        sync_b6_data(DATA_DIR)
 
     st.markdown("<h2 style='color: #38BDF8;'>⚖️ 策略實驗室：自訂權重與勝率回測</h2>", unsafe_allow_html=True)
     st.caption("打造專屬於您的選股邏輯，透過多重條件交集與大數據計分，找出最具爆發力的潛力股。")
@@ -978,7 +987,7 @@ def show_weight_backtest_page(STOCK_DICT, DATA_DIR="data"):
         with c4:
             st.markdown("**大戶與董監防線**")
             w_b5 = st.number_input("千張大戶持股增加", value=3.0, step=0.5)
-            w_b6 = st.number_input("鉅額防守成功", value=1.5, step=0)  # <-- 新增這行
+            w_b6 = st.number_input("鉅額防守成功", value=1.5, step=0.5)  # <-- 新增這行
             w_b7 = st.number_input("董監增持/質押降", value=1.5, step=0.5)
 
     # ==========================================
