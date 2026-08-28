@@ -88,6 +88,15 @@ def show_weight_backtest_page(STOCK_DICT, DATA_DIR="data"):
                 if sid and sid not in pool_dict:
                     pool_dict[sid] = {"統一代號": sid, "股票名稱": str(row.get('股票名稱', '')), "產業別": "ETF/基金/其他"}
 
+    # 補上 B4 的遺漏標的 (特定新發行 ETF 或純資券標的)
+    for b4_key in ['b4_margin_pct', 'b4_short_pct', 'b4_margin_plus_pct', 'b4_margin_inc_pct', 'b4_short_inc_pct']:
+        df_b4_tmp = clean_stock_id(get_df(b4_key))
+        if not df_b4_tmp.empty:
+            for _, row in df_b4_tmp.iterrows():
+                sid = str(row['統一代號']).strip()
+                if sid and sid not in pool_dict:
+                    pool_dict[sid] = {"統一代號": sid, "股票名稱": str(row.get('股票名稱', '')), "產業別": "ETF/基金/其他"}
+
     base_df = pd.DataFrame(list(pool_dict.values()))
     if base_df.empty:
         st.warning("⚠️ 無法建立候選池，請確認資料庫狀態。")
@@ -302,15 +311,15 @@ def show_weight_backtest_page(STOCK_DICT, DATA_DIR="data"):
         st.markdown("**🔹 2. 雷達動態特徵 (軋空與套牢訊號)**")
         b4_trend_logic = st.radio("B4 特徵篩選邏輯：", ["交集 (必須同時符合勾選特徵)", "聯集 (符合任一即可)"], horizontal=True, key="filter_b4_radio")
         
-        # 採用字典映射，徹底拿掉「幾分」，改為「幾項特徵」
+        # 改為直白描述狀態 (強調法人買賣+漲跌幅的核心價值)
         b4_trend_display_map = {
-            "💥 終極": "💥 終極 (符合 4 項軋空特徵)",
-            "🚀 強軋": "🚀 強軋 (符合 3 項軋空特徵)",
-            "🔥 點火": "🔥 點火 (符合 2 項軋空特徵)",
-            "🔼 進駐": "🔼 進駐 (符合 1 項軋空特徵)",
-            "☠️ 極危": "☠️ 極危 (符合 3 項套牢惡化)",
-            "🚨 高危": "🚨 高危 (符合 2 項套牢惡化)",
-            "⚠️ 初危": "⚠️ 初危 (符合 1 項套牢惡化)"
+            "💥 終極": "💥 終極 (法人買超+收紅+融資減.借券減.融券增 3項全中)",
+            "🚀 強軋": "🚀 強軋 (法人買超+收紅+前述資券特徵 3中2)",
+            "🔥 點火": "🔥 點火 (法人買超+收紅+前述資券特徵 3中1)",
+            "🔼 進駐": "🔼 進駐 (僅法人買超+收紅，籌碼尚未發動軋空)",
+            "☠️ 極危": "☠️ 極危 (法人賣超+收黑+融資增.借券增 2項全中)",
+            "🚨 高危": "🚨 高危 (法人賣超+收黑+前述資券特徵 2中1)",
+            "⚠️ 初危": "⚠️ 初危 (僅法人賣超+收黑，籌碼尚未發動套牢)"
         }
         
         selected_b4_trends_display = st.multiselect("可複選雷達特徵：", list(b4_trend_display_map.values()), key="filter_b4_multi")
@@ -580,8 +589,36 @@ def show_weight_backtest_page(STOCK_DICT, DATA_DIR="data"):
             if not rk_df_debug.empty:
                 debug_df = pd.merge(debug_df, rk_df_debug[['統一代號', '套牢評估']], on='統一代號', how='left')
 
+            # 加入 B4 8大資券的 5日與當日動態供核對
+            b4_debug_keys = {
+                'b4_margin_pct': '融資減幅', 'b4_margin_vol': '融資減張',
+                'b4_short_pct': '借券減幅', 'b4_short_vol': '借券減張',
+                'b4_margin_plus_pct': '融券增幅', 'b4_margin_plus_vol': '融券增張',
+                'b4_margin_inc_pct': '融資增幅', 'b4_short_inc_pct': '借券增幅'
+            }
+            for k, label in b4_debug_keys.items():
+                df_tmp = clean_stock_id(get_df(k))
+                if not df_tmp.empty:
+                    # 智慧搜尋當日與5日欄位 (相容各種資料庫命名)
+                    col_today = next((c for c in df_tmp.columns if '當日' in c and '%' in c), next((c for c in df_tmp.columns if '當日' in c), None))
+                    col_5d = next((c for c in df_tmp.columns if '5日' in c and '%' in c), next((c for c in df_tmp.columns if '5日' in c), None))
+                    
+                    extract_cols = ['統一代號']
+                    rename_dict = {}
+                    if col_today:
+                        extract_cols.append(col_today)
+                        rename_dict[col_today] = f"B4_{label}_當日"
+                    if col_5d:
+                        extract_cols.append(col_5d)
+                        rename_dict[col_5d] = f"B4_{label}_5日"
+                        
+                    if len(extract_cols) > 1:
+                        # 將抽出的欄位與 debug_df 合併
+                        debug_df = pd.merge(debug_df, df_tmp[extract_cols].rename(columns=rename_dict), on='統一代號', how='left')
+
             st.write(f"🔍 檢核明細 (共 {len(debug_df)} 筆)：")
             st.dataframe(debug_df, use_container_width=True, hide_index=True)
+            #
     else:
         st.info("👆 請在上方展開模組中至少設定一項條件，目前預設顯示全市場標的。")
 
