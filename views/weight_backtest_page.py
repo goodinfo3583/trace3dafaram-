@@ -29,6 +29,8 @@ KEY_MAP = {
     'b4_margin_vol': ['b4_margin_vol', 'df_margin_vol'],
     'b4_short_vol': ['b4_short_vol', 'df_short_vol'],
     'b4_margin_plus_vol': ['b4_margin_plus_vol', 'df_margin_plus_vol'],
+    'b4_margin_inc_pct': ['b4_margin_inc_pct', 'df_margin_inc_pct'],
+    'b4_short_inc_pct': ['b4_short_inc_pct', 'df_short_inc_pct'],
     'b5_400': ['b5_400', 'df_blk5'],
     'b5_1000': ['b5_1000', 'df_blk5_1000'],
     'b5_resonance': ['b5_resonance', 'df_b5_resonance', 'df_resonance', 'df_長短線共振'],
@@ -136,15 +138,12 @@ def show_weight_backtest_page(STOCK_DICT, DATA_DIR="data"):
 
             # 清空 B4 篩選器
             st.session_state['filter_b4_top_n'] = 50
-            for k in ['pct_41', 'vol_41', 'pct_42', 'vol_42', 'pct_43', 'vol_43']:
+            for k in ['pct_41', 'vol_41', 'pct_42', 'vol_42', 'pct_43', 'vol_43', 'pct_inc_margin', 'pct_inc_short']:
                 st.session_state[f'filter_b4_{k}'] = False
             st.session_state['filter_b4_radio'] = "交集 (必須同時符合勾選特徵)"
             st.session_state['filter_b4_multi'] = []
 
             st.session_state['filter_b5_1000'] = False
-            
-            if 'filter_debug' in st.session_state:
-                st.session_state['filter_debug'] = False
 
         st.button("🧹 清空所有篩選條件", on_click=reset_filters, use_container_width=True)
 
@@ -287,26 +286,36 @@ def show_weight_backtest_page(STOCK_DICT, DATA_DIR="data"):
         st.markdown("**🔹 1. 資券榜單 (勾選多個代表必須「同時進榜」)**")
         b4_top_n = st.slider("👑 排名過濾：設定最新進榜的擷取範圍 (名次)", min_value=10, max_value=300, value=50, step=10, key="filter_b4_top_n")
         
-        c_b4_1, c_b4_2, c_b4_3 = st.columns(3)
-        b4_41_pct = c_b4_1.checkbox(f"融資減少幅度【累計比】(前 {b4_top_n} 名)", key="filter_b4_pct_41")
-        b4_41_vol = c_b4_1.checkbox(f"融資減少張數【累計張】(前 {b4_top_n} 名)", key="filter_b4_vol_41")
-        
-        b4_42_pct = c_b4_2.checkbox(f"借券賣出減少幅度【累計比】(前 {b4_top_n} 名)", key="filter_b4_pct_42")
-        b4_42_vol = c_b4_2.checkbox(f"借券賣出減少張數【累計張】(前 {b4_top_n} 名)", key="filter_b4_vol_42")
-        
-        b4_43_pct = c_b4_3.checkbox(f"融券增加幅度【累計比】(前 {b4_top_n} 名)", key="filter_b4_pct_43")
-        b4_43_vol = c_b4_3.checkbox(f"融券增加張數【累計張】(前 {b4_top_n} 名)", key="filter_b4_vol_43")
+        # 改為 2 個 columns 並排，顯示 8 個選項
+        c_b4_1, c_b4_2 = st.columns(2)
+        with c_b4_1:
+            b4_41_pct = st.checkbox(f"融資減少幅度【累計比】(前 {b4_top_n} 名)", key="filter_b4_pct_41")
+            b4_42_pct = st.checkbox(f"借券賣出減少幅度【累計比】(前 {b4_top_n} 名)", key="filter_b4_pct_42")
+            b4_43_pct = st.checkbox(f"融券增加幅度【累計比】(前 {b4_top_n} 名)", key="filter_b4_pct_43")
+            b4_inc_margin_pct = st.checkbox(f"融資增加幅度【累計比】(前 {b4_top_n} 名)", key="filter_b4_pct_inc_margin")
+        with c_b4_2:
+            b4_41_vol = st.checkbox(f"融資減少張數【累計張】(前 {b4_top_n} 名)", key="filter_b4_vol_41")
+            b4_42_vol = st.checkbox(f"借券賣出減少張數【累計張】(前 {b4_top_n} 名)", key="filter_b4_vol_42")
+            b4_43_vol = st.checkbox(f"融券增加張數【累計張】(前 {b4_top_n} 名)", key="filter_b4_vol_43")
+            b4_inc_short_pct = st.checkbox(f"借券賣出增加幅度【累計比】(前 {b4_top_n} 名)", key="filter_b4_pct_inc_short")
 
         st.markdown("**🔹 2. 雷達動態特徵 (軋空與套牢訊號)**")
         b4_trend_logic = st.radio("B4 特徵篩選邏輯：", ["交集 (必須同時符合勾選特徵)", "聯集 (符合任一即可)"], horizontal=True, key="filter_b4_radio")
         
-        b4_trend_options = [
-            "💥 終極軋空 (雷達4分)", "🚀 強軋空 (雷達3分)", "🔥 點火軋空 (雷達2分)", "🔼 進駐 (雷達1分)",
-            "☠️ 極危套牢 (雷達3分)", "🚨 高危套牢 (雷達2分)", "⚠️ 初危套牢 (雷達1分)"
-        ]
-        selected_b4_trends = st.multiselect("可複選雷達特徵：", b4_trend_options, key="filter_b4_multi")
-        # 還原短字串供過濾使用 (例如將 "💥 終極軋空 (雷達4分)" 轉為 "💥 終極")
-        b4_trends = [t.split(" ")[0] + " " + t.split(" ")[1][:2] for t in selected_b4_trends] 
+        # 採用字典映射，徹底拿掉「幾分」，改為「幾項特徵」
+        b4_trend_display_map = {
+            "💥 終極": "💥 終極 (符合 4 項軋空特徵)",
+            "🚀 強軋": "🚀 強軋 (符合 3 項軋空特徵)",
+            "🔥 點火": "🔥 點火 (符合 2 項軋空特徵)",
+            "🔼 進駐": "🔼 進駐 (符合 1 項軋空特徵)",
+            "☠️ 極危": "☠️ 極危 (符合 3 項套牢惡化)",
+            "🚨 高危": "🚨 高危 (符合 2 項套牢惡化)",
+            "⚠️ 初危": "⚠️ 初危 (符合 1 項套牢惡化)"
+        }
+        
+        selected_b4_trends_display = st.multiselect("可複選雷達特徵：", list(b4_trend_display_map.values()), key="filter_b4_multi")
+        # 還原短字串供後台過濾使用
+        b4_trends = [raw for d in selected_b4_trends_display for raw, desc in b4_trend_display_map.items() if d == desc]
 
     # --- 展開面板 (預留) ---
     with st.expander("🐳 B5 大戶籌碼動向 (建置中)", expanded=False):
@@ -479,7 +488,9 @@ def show_weight_backtest_page(STOCK_DICT, DATA_DIR="data"):
     b4_checks = {
         'b4_margin_pct': b4_41_pct, 'b4_margin_vol': b4_41_vol,
         'b4_short_pct': b4_42_pct, 'b4_short_vol': b4_42_vol,
-        'b4_margin_plus_pct': b4_43_pct, 'b4_margin_plus_vol': b4_43_vol
+        'b4_margin_plus_pct': b4_43_pct, 'b4_margin_plus_vol': b4_43_vol,
+        'b4_margin_inc_pct': b4_inc_margin_pct,
+        'b4_short_inc_pct': b4_inc_short_pct
     }
     for b4_key, is_checked in b4_checks.items():
         if is_checked:
