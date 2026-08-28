@@ -31,6 +31,8 @@ KEY_MAP = {
     'b4_margin_plus_vol': ['b4_margin_plus_vol', 'df_margin_plus_vol'],
     'b4_margin_inc_pct': ['b4_margin_inc_pct', 'df_margin_inc_pct'],
     'b4_short_inc_pct': ['b4_short_inc_pct', 'df_short_inc_pct'],
+    'b4_margin_inc_vol': ['b4_margin_inc_vol', 'df_margin_inc_vol'],
+    'b4_short_inc_vol': ['b4_short_inc_vol', 'df_short_inc_vol'],
     'b5_400': ['b5_400', 'df_blk5'],
     'b5_1000': ['b5_1000', 'df_blk5_1000'],
     'b5_resonance': ['b5_resonance', 'df_b5_resonance', 'df_resonance', 'df_長短線共振'],
@@ -571,30 +573,39 @@ def show_weight_backtest_page(STOCK_DICT, DATA_DIR="data"):
             valid_price_codes = combined_price_df[(combined_price_df['漲跌幅%'] >= b4_price_chg[0]) & (combined_price_df['漲跌幅%'] <= b4_price_chg[1])]['統一代號'].unique()
             filtered_df = filtered_df[filtered_df['統一代號'].isin(valid_price_codes)]
 
-    # 處理 B4 短線籌碼加速特徵過濾 (嚴格方向性與均值運算)
+    # 處理 B4 短線籌碼加速特徵過濾 (改採「張數」運算，杜絕低基期 % 數雜訊)
     acc_configs = [
-        (b4_acc_margin_dec, 'b4_margin_pct', 'dec'), (b4_acc_sbl_dec, 'b4_short_pct', 'dec'),
-        (b4_acc_margin_inc, 'b4_margin_inc_pct', 'inc'), (b4_acc_sbl_inc, 'b4_short_inc_pct', 'inc')
+        # 全部改為對接 _vol (張數) 的資料表
+        (b4_acc_margin_dec, 'b4_margin_vol', 'dec'), (b4_acc_sbl_dec, 'b4_short_vol', 'dec'),
+        (b4_acc_margin_inc, 'b4_margin_inc_vol', 'inc'), (b4_acc_sbl_inc, 'b4_short_inc_vol', 'inc')
     ]
     for is_checked, df_key, direction in acc_configs:
         if is_checked:
             any_filter_applied = True
             df_acc = clean_stock_id(get_df(df_key))
             if not df_acc.empty:
-                col_today = next((c for c in df_acc.columns if '當日' in c and '%' in c), next((c for c in df_acc.columns if '當日' in c), None))
-                col_5d = next((c for c in df_acc.columns if '5日' in c and '%' in c), next((c for c in df_acc.columns if '5日' in c), None))
+                col_today = next((c for c in df_acc.columns if '當日' in c and '張' in c), next((c for c in df_acc.columns if '當日' in c), None))
+                col_5d = next((c for c in df_acc.columns if '5日' in c and '張' in c), next((c for c in df_acc.columns if '5日' in c), None))
                 
                 if col_today and col_5d:
-                    # 保留原始正負號，才能正確判斷是增加還是減少
                     df_acc['num_today'] = pd.to_numeric(df_acc[col_today], errors='coerce').fillna(0)
                     df_acc['num_5d'] = pd.to_numeric(df_acc[col_5d], errors='coerce').fillna(0)
                     
+                    # 💡 設立防呆濾網：當日變動量必須超過 100 張，才具備「加速」的分析價值
+                    volume_threshold = 100 
+                    
                     if direction == 'inc':
-                        # 【加速套牢/放空】：當日必須是正值(有增加)，且當日的增幅 > 5日平均增幅
-                        valid_acc_codes = df_acc[(df_acc['num_today'] > 0) & (df_acc['num_today'] > (df_acc['num_5d'] / 5.0))]['統一代號'].unique()
+                        # 【加速套牢/放空】：當日張數為正且大於門檻，且大於 5日均量
+                        valid_acc_codes = df_acc[
+                            (df_acc['num_today'] >= volume_threshold) & 
+                            (df_acc['num_today'] > (df_acc['num_5d'] / 5.0))
+                        ]['統一代號'].unique()
                     else:
-                        # 【加速退場/回補】：當日必須是負值(有減少)，且當日的減幅(負得更多) < 5日平均減幅
-                        valid_acc_codes = df_acc[(df_acc['num_today'] < 0) & (df_acc['num_today'] < (df_acc['num_5d'] / 5.0))]['統一代號'].unique()
+                        # 【加速退場/回補】：當日張數為負且低於-門檻，且負得比 5日均量還多
+                        valid_acc_codes = df_acc[
+                            (df_acc['num_today'] <= -volume_threshold) & 
+                            (df_acc['num_today'] < (df_acc['num_5d'] / 5.0))
+                        ]['統一代號'].unique()
                         
                     filtered_df = filtered_df[filtered_df['統一代號'].isin(valid_acc_codes)]
                 else:
