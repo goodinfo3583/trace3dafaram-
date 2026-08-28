@@ -23,7 +23,7 @@ def get_b5_latest_date(DATA_DIR):
     return global_latest
 
 def process_major_shareholders(DATA_DIR, target_level):
-    """通用大戶資料產生器 (純後台版) - 統一處理 1000/800/600/400 張
+    """通用大戶資料產生器 (純後台版) - 統一處理 1000/800/600/400/200/100 張
        特色：自動將下載的「X張以下」轉換為「X張以上」的大戶視角"""
     files = []
     for ext in ('*.csv', '*.CSV'):
@@ -38,7 +38,6 @@ def process_major_shareholders(DATA_DIR, target_level):
     
     merged, all_dates_4 = [], []
     
-    # 統一化目標文字 (處理 1千、1000 的格式問題)
     target_num = target_level.replace('1千', '1000').replace('千', '000')
 
     for prefix, fs in sorted(groups.items(), reverse=True):
@@ -55,24 +54,23 @@ def process_major_shareholders(DATA_DIR, target_level):
             
             if df is None or df.empty: continue
             
-            # 清理欄位名稱空白
             df.columns = [re.sub(r'\s+', '', str(c)).replace('\ufeff', '') for c in df.columns]
             c_code = next((c for c in df.columns if '代號' in c or '代碼' in c), None)
             c_name = next((c for c in df.columns if '名稱' in c), None)
             c_date = next((c for c in df.columns if '日期' in c), None)
             
-            # 優先找「超過」或「以上」的現成大戶欄位
+            # 優先找「超過」或「以上」
             c_abs = next((c for c in df.columns if (target_level in c or target_num in c) and ('%' in c or '比例' in c) and '增減' not in c and '差' not in c and ('超過' in c or '以上' in c)), None)
             c_delta = next((c for c in df.columns if (target_level in c or target_num in c) and ('增減' in c or '差' in c) and ('超過' in c or '以上' in c)), None)
             
             is_inverted = False
             
-            # 🎯 如果找不到「超過/以上」，就抓「以下」的欄位來進行數學反轉
+            # 若找不到「超過/以上」，改抓「以下」來反轉計算
             if not c_abs or not c_delta:
                 c_abs = next((c for c in df.columns if (target_level in c or target_num in c) and ('%' in c or '比例' in c) and '增減' not in c and '差' not in c and '以下' in c), None)
                 c_delta = next((c for c in df.columns if (target_level in c or target_num in c) and ('增減' in c or '差' in c) and '以下' in c), None)
                 if c_abs and c_delta:
-                    is_inverted = True # 標記需要反轉計算
+                    is_inverted = True 
             
             if not all([c_code, c_name, c_abs, c_delta]): continue
             
@@ -80,11 +78,9 @@ def process_major_shareholders(DATA_DIR, target_level):
                 df['股票代號'] = df[c_code].astype(str).str.extract(r'(\d+)', expand=False)
                 df['股票名稱'] = df[c_name].astype(str).str.replace(r'^\d+', '', regex=True).str.strip()
                 
-                # 讀取數值
                 raw_abs = pd.to_numeric(df[c_abs].astype(str).str.replace('%', '', regex=False), errors='coerce')
                 raw_delta = pd.to_numeric(df[c_delta].astype(str).str.replace('+', '', regex=False).str.replace('%', '', regex=False), errors='coerce')
                 
-                # 🎯 核心反轉邏輯：如果是「以下」，轉換為「以上大戶」
                 if is_inverted:
                     df['持股%'] = 100.0 - raw_abs.fillna(100.0)
                     df['增減%'] = -1.0 * raw_delta.fillna(0.0)
@@ -99,7 +95,6 @@ def process_major_shareholders(DATA_DIR, target_level):
                 chunks.append(df[['股票代號', '股票名稱', '持股%', '增減%']].dropna(subset=['股票代號']))
             except: continue
         
-        # 合併同週資料並去重
         if chunks:
             comb = pd.concat(chunks, ignore_index=True)
             comb = comb.drop_duplicates(subset=['股票代號', '股票名稱'], keep='first').reset_index(drop=True)
@@ -116,7 +111,6 @@ def process_major_shareholders(DATA_DIR, target_level):
 
     if merged:
         master = merged[0]
-        # 外連結合併歷史週次
         for m in merged[1:]: master = pd.merge(master, m, on=['股票代號', '股票名稱'], how='outer')
         sorted_dates_4 = sorted(all_dates_4, reverse=True)
         latest_date_4 = sorted_dates_4[0]
@@ -135,7 +129,6 @@ def process_major_shareholders(DATA_DIR, target_level):
             
         master['週動態'] = master[f"DELTA_{latest_date_4}"].apply(get_trend)
         
-        # 🎯 修復 ▼6周增減 邏輯：明確抓取最近 6 個週期的 DELTA 欄位做加總
         calc_cols = [f"DELTA_{d}" for d in sorted_dates_4[:6] if f"DELTA_{d}" in master.columns]
         master['▼6周增減'] = master[calc_cols].sum(axis=1, min_count=1)
         
@@ -160,12 +153,13 @@ def process_major_shareholders(DATA_DIR, target_level):
 # ⚙️ 後台資料引擎 (Data Engine)
 # ==========================================
 def sync_b5_data(DATA_DIR):
-    """計算所有級距資料 (統一使用單一引擎處理所有大戶區間)"""
+    """計算所有級距資料"""
     st.session_state['b5_1000'] = process_major_shareholders(DATA_DIR, '1千')
     st.session_state['b5_800'] = process_major_shareholders(DATA_DIR, '800')
     st.session_state['b5_600'] = process_major_shareholders(DATA_DIR, '600')
-    # 400張改用統一引擎！
     st.session_state['b5_400'] = process_major_shareholders(DATA_DIR, '400')
+    st.session_state['b5_200'] = process_major_shareholders(DATA_DIR, '200') # 新增
+    st.session_state['b5_100'] = process_major_shareholders(DATA_DIR, '100') # 新增
 
 # ==========================================
 # 🖼️ 前台畫面渲染 (Views)
@@ -212,14 +206,19 @@ def show_b5_page(DATA_DIR, STOCK_DICT):
     filtered_800_df = apply_b5_market_filters(st.session_state.get('b5_800', pd.DataFrame()), show_etf, show_bond)
     filtered_600_df = apply_b5_market_filters(st.session_state.get('b5_600', pd.DataFrame()), show_etf, show_bond)
     filtered_400_df = apply_b5_market_filters(st.session_state.get('b5_400', pd.DataFrame()), show_etf, show_bond)
+    filtered_200_df = apply_b5_market_filters(st.session_state.get('b5_200', pd.DataFrame()), show_etf, show_bond)
+    filtered_100_df = apply_b5_market_filters(st.session_state.get('b5_100', pd.DataFrame()), show_etf, show_bond)
 
-    tab_long_short, tab_1000, tab_800, tab_600, tab_400, tab_resonance = st.tabs([
+    # 修改 Tabs 順序，並加入 200 與 100
+    tab_long_short, tab_resonance, tab_1000, tab_800, tab_600, tab_400, tab_200, tab_100 = st.tabs([
         "🔹 長短線共振",  
+        "🔹 雙引擎共振",
         "🔹 1000張大戶", 
         "🔹 800張大戶", 
         "🔹 600張大戶", 
         "🔹 400張大戶", 
-        "🔹 雙引擎共振"
+        "🔹 200張大戶",
+        "🔹 100張大戶"
     ])
 
     # ================= TAB 1: 長短線共振 =================
@@ -381,21 +380,7 @@ def show_b5_page(DATA_DIR, STOCK_DICT):
             else: st.error("⚠️ 資料表欄位解析失敗，請確認前方大戶表中包含 '▼6周增減' 與最新日期。")
         else: st.warning("⚠️ 請確認 1000張 與 400張 資料皆有成功載入。")
 
-    # ================= TAB 2-5: 純資料表格 =================
-    with tab_1000:
-        if not filtered_1000_df.empty: st.dataframe(filtered_1000_df, use_container_width=True, hide_index=True)
-        else: st.info("⚪ 暫無 1000張大戶資料。")
-    with tab_800:
-        if not filtered_800_df.empty: st.dataframe(filtered_800_df, use_container_width=True, hide_index=True)
-        else: st.info("⚪ 暫無 800張大戶資料。")
-    with tab_600:
-        if not filtered_600_df.empty: st.dataframe(filtered_600_df, use_container_width=True, hide_index=True)
-        else: st.info("⚪ 暫無 600張大戶資料。")
-    with tab_400:
-        if not filtered_400_df.empty: st.dataframe(filtered_400_df, use_container_width=True, hide_index=True)
-        else: st.info("⚪ 暫無 400張大戶資料。")
-
-    # ================= TAB 6: 雙引擎共振 =================
+    # ================= TAB 2: 雙引擎共振 =================
     with tab_resonance:
         if not filtered_1000_df.empty and not filtered_400_df.empty:
             df1_inc = filtered_1000_df[filtered_1000_df['週動態'].astype(str).str.contains('增', na=False)].copy()
@@ -441,3 +426,23 @@ def show_b5_page(DATA_DIR, STOCK_DICT):
                 st.dataframe(sync, use_container_width=True, hide_index=True)
             else: st.info("⚪ 最新一週目前沒有「千張與四百張」同時增加的共振標的。")
         else: st.warning("⚠️ 請確保 1000 張與 400 張資料皆有成功載入。")
+
+    # ================= TAB 3-8: 純資料表格 =================
+    with tab_1000:
+        if not filtered_1000_df.empty: st.dataframe(filtered_1000_df, use_container_width=True, hide_index=True)
+        else: st.info("⚪ 暫無 1000張大戶資料。")
+    with tab_800:
+        if not filtered_800_df.empty: st.dataframe(filtered_800_df, use_container_width=True, hide_index=True)
+        else: st.info("⚪ 暫無 800張大戶資料。")
+    with tab_600:
+        if not filtered_600_df.empty: st.dataframe(filtered_600_df, use_container_width=True, hide_index=True)
+        else: st.info("⚪ 暫無 600張大戶資料。")
+    with tab_400:
+        if not filtered_400_df.empty: st.dataframe(filtered_400_df, use_container_width=True, hide_index=True)
+        else: st.info("⚪ 暫無 400張大戶資料。")
+    with tab_200:
+        if not filtered_200_df.empty: st.dataframe(filtered_200_df, use_container_width=True, hide_index=True)
+        else: st.info("⚪ 暫無 200張大戶資料。")
+    with tab_100:
+        if not filtered_100_df.empty: st.dataframe(filtered_100_df, use_container_width=True, hide_index=True)
+        else: st.info("⚪ 暫無 100張大戶資料。")
