@@ -37,6 +37,9 @@ KEY_MAP = {
     'b4_short_dec_amt': ['b4_short_dec_amt', 'df_short_dec_amt'],
     'b5_400': ['b5_400', 'df_blk5'],
     'b5_1000': ['b5_1000', 'df_blk5_1000'],
+    'b5_800': ['b5_800', 'df_blk5_800'],
+    'b5_600': ['b5_600', 'df_blk5_600'],
+    'b5_400': ['b5_400', 'df_blk5_400'],
     'b5_resonance': ['b5_resonance', 'df_b5_resonance', 'df_resonance', 'df_長短線共振'],
     'b5_double': ['b5_double', 'df_b5_double', 'df_double', 'df_雙向共振'],
     'b7_main': ['b7_main', 'df_blk7_main', 'df_b7_main'],
@@ -148,7 +151,7 @@ def show_weight_backtest_page(STOCK_DICT, DATA_DIR="data"):
             st.session_state['filter_b3_it_wk_n'] = 1
             st.session_state['filter_b3_radio'] = "交集 (必須同時符合勾選特徵)"
             st.session_state['filter_b3_multi'] = []
-            ##########################
+            
             # 清空 B4 篩選器
             st.session_state['filter_b4_top_n'] = 50
             for k in ['pct_41', 'vol_41', 'pct_42', 'vol_42', 'pct_43', 'vol_43', 'pct_inc_margin', 'pct_inc_short', 'amt_short_dec', 'amt_short_inc']:
@@ -163,7 +166,11 @@ def show_weight_backtest_page(STOCK_DICT, DATA_DIR="data"):
             st.session_state['filter_b4_radio'] = "交集 (必須同時符合勾選特徵)"
             st.session_state['filter_b4_multi'] = []
 
-            st.session_state['filter_b5_1000'] = False
+            # 清空 B5 篩選器
+            for k in ['long_short', 'double']:
+                st.session_state[f'filter_b5_{k}'] = False
+            for k in ['1000', '800', '600', '400']:
+                st.session_state[f'filter_b5_trend_{k}'] = []
 
         st.button("🧹 清空所有篩選條件", on_click=reset_filters, use_container_width=True)
 
@@ -348,9 +355,34 @@ def show_weight_backtest_page(STOCK_DICT, DATA_DIR="data"):
         selected_b4_trends_display = st.multiselect("可複選雷達特徵：", list(b4_trend_display_map.values()), key="filter_b4_multi")
         b4_trends = [raw for d in selected_b4_trends_display for raw, desc in b4_trend_display_map.items() if d == desc]
         ########################################################################################
-    # --- 展開面板 (預留) ---
-    with st.expander("🐳 B5 大戶籌碼動向 (建置中)", expanded=False):
-        b5_1000 = st.checkbox("千張大戶持股增加 (測試鈕)", key="filter_b5_1000")
+    # 取得 B5 最新資料日期
+    b5_latest_date_str = "未知日期"
+    df_b5_tmp = get_df('b5_1000')
+    if not df_b5_tmp.empty:
+        col_latest = next((c for c in df_b5_tmp.columns if c.startswith('▼') and '6周' not in c), None)
+        if col_latest:
+            date_str = col_latest.replace('▼', '')
+            b5_latest_date_str = f"2026/{date_str[:2]}/{date_str[2:]}"
+
+    # --- 模組 B5 展開面板 ---
+    with st.expander(f"🐳 B5 大腿動向 (資料基準日: {b5_latest_date_str})", expanded=False):
+        st.markdown("**🔹 1. 共振榜單過濾**")
+        c_b5_1, c_b5_2 = st.columns(2)
+        b5_long_short = c_b5_1.checkbox("🎯 長短線共振 (1000張與400張波段+本週皆同步加碼)", key="filter_b5_long_short")
+        b5_double = c_b5_2.checkbox("🎯 雙引擎共振 (1000張與400張本週同步增加)", key="filter_b5_double")
+
+        st.markdown("**🔹 2. 各級距大戶週動態過濾**")
+        st.caption("支援多選，可精準挑選籌碼『劇增』或『大增』的飆股防線。如果該級距尚未爬取資料，過濾將會為空。")
+        
+        trend_options_b5 = ["🚀 劇增", "🔥 大增", "📈 小增", "↗️ 微增", "🔄 持平", "↘️ 微減", "📉 小減", "⚠️ 大減", "🚨 劇減"]
+        
+        c_b5_lvl1, c_b5_lvl2 = st.columns(2)
+        b5_trend_1000 = c_b5_lvl1.multiselect("👑 1000張大戶週動態：", trend_options_b5, key="filter_b5_trend_1000")
+        b5_trend_800 = c_b5_lvl2.multiselect("🦅 800張大戶週動態：", trend_options_b5, key="filter_b5_trend_800")
+        
+        c_b5_lvl3, c_b5_lvl4 = st.columns(2)
+        b5_trend_600 = c_b5_lvl3.multiselect("🦉 600張大戶週動態：", trend_options_b5, key="filter_b5_trend_600")
+        b5_trend_400 = c_b5_lvl4.multiselect("🐺 400張大戶週動態：", trend_options_b5, key="filter_b5_trend_400")
 
     with st.expander("📉 其他籌碼動向模組 (建置中)", expanded=False):
         st.info("包含法人突擊掃貨、連買、資券動向等模組，將於後續開放。")
@@ -635,14 +667,59 @@ def show_weight_backtest_page(STOCK_DICT, DATA_DIR="data"):
                     st.warning(f"⚠️ {df_key} 缺乏當日、5日或成交價欄位，無法計算資金動能。")
                     filtered_df = filtered_df.iloc[0:0]
                     ########################
-    # 處理 B5 過濾 (測試用)
-    if b5_1000:
-        any_filter_applied = True
-        df_b5 = clean_stock_id(get_df('b5_1000'))
-        if not df_b5.empty:
-            filtered_df = filtered_df[filtered_df['統一代號'].isin(df_b5['統一代號'])]
+    # 處理 B5 過濾引擎
+    df_1k = clean_stock_id(get_df('b5_1000'))
+    df_800 = clean_stock_id(get_df('b5_800'))
+    df_600 = clean_stock_id(get_df('b5_600'))
+    df_400 = clean_stock_id(get_df('b5_400'))
+
+    # 1. 處理共振過濾
+    if b5_long_short or b5_double:
+        if df_1k.empty or df_400.empty:
+            st.warning("⚠️ 缺乏 1000張 或 400張 資料，無法計算共振。")
+            filtered_df = filtered_df.iloc[0:0]
         else:
-            filtered_df = filtered_df.iloc[0:0] 
+            any_filter_applied = True
+            latest_col_1k = next((c for c in df_1k.columns if c.startswith('▼') and '6周' not in c), None)
+            latest_col_400 = next((c for c in df_400.columns if c.startswith('▼') and '6周' not in c), None)
+            
+            valid_resonance_codes = set()
+            
+            if b5_long_short and latest_col_1k and latest_col_400:
+                # 長短線共振：1k與400的 6周與本週 皆需 > 0
+                cond_1k = (pd.to_numeric(df_1k['▼6周增減'], errors='coerce').fillna(0) > 0) & (pd.to_numeric(df_1k[latest_col_1k], errors='coerce').fillna(0) > 0)
+                cond_400 = (pd.to_numeric(df_400['▼6周增減'], errors='coerce').fillna(0) > 0) & (pd.to_numeric(df_400[latest_col_400], errors='coerce').fillna(0) > 0)
+                set_1k = set(df_1k[cond_1k]['統一代號'])
+                set_400 = set(df_400[cond_400]['統一代號'])
+                valid_resonance_codes.update(set_1k.intersection(set_400))
+                
+            if b5_double:
+                # 雙引擎共振：1k與400 週動態皆包含「增」
+                cond_1k_inc = df_1k['週動態'].astype(str).str.contains('增', na=False)
+                cond_400_inc = df_400['週動態'].astype(str).str.contains('增', na=False)
+                set_1k_inc = set(df_1k[cond_1k_inc]['統一代號'])
+                set_400_inc = set(df_400[cond_400_inc]['統一代號'])
+                
+                # 如果兩者都有勾，取聯集；如果只有勾雙引擎，就只用雙引擎的交集
+                if b5_long_short: valid_resonance_codes.intersection_update(set_1k_inc.intersection(set_400_inc))
+                else: valid_resonance_codes.update(set_1k_inc.intersection(set_400_inc))
+                
+            filtered_df = filtered_df[filtered_df['統一代號'].isin(list(valid_resonance_codes))]
+
+    # 2. 處理各級距動態過濾 (交集邏輯)
+    b5_trend_configs = [
+        (b5_trend_1000, df_1k, "1000張"), (b5_trend_800, df_800, "800張"),
+        (b5_trend_600, df_600, "600張"), (b5_trend_400, df_400, "400張")
+    ]
+    for trends, df_lvl, lvl_name in b5_trend_configs:
+        if trends:
+            any_filter_applied = True
+            if not df_lvl.empty and '週動態' in df_lvl.columns:
+                valid_lvl_codes = df_lvl[df_lvl['週動態'].isin(trends)]['統一代號'].unique()
+                filtered_df = filtered_df[filtered_df['統一代號'].isin(valid_lvl_codes)]
+            else:
+                st.warning(f"⚠️ {lvl_name} 資料庫尚未建立或缺乏動態欄位，過濾為空。")
+                filtered_df = filtered_df.iloc[0:0]
     # ==========================================
     # 過濾結果結算與除錯檢核
     # ==========================================
