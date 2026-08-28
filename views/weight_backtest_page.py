@@ -312,13 +312,13 @@ def show_weight_backtest_page(STOCK_DICT, DATA_DIR="data"):
             b4_42_pct = st.checkbox(f"借券賣出減少幅度【5日累計比】(前 {b4_top_n} 名)", key="filter_b4_pct_42")
             b4_43_pct = st.checkbox(f"融券增加幅度【5日累計比】(前 {b4_top_n} 名)", key="filter_b4_pct_43")
             b4_inc_margin_pct = st.checkbox(f"融資增加幅度【5日累計比】(前 {b4_top_n} 名)", key="filter_b4_pct_inc_margin")
-            b4_short_dec_amt = st.checkbox(f"💸 借券賣出減少金額【5日累計】(前 {b4_top_n} 名)", key="filter_b4_amt_short_dec")
+            b4_short_dec_amt = st.checkbox(f"借券賣出減少金額【5日累計】(前 {b4_top_n} 名)", key="filter_b4_amt_short_dec")
         with c_b4_2:
             b4_41_vol = st.checkbox(f"融資減少張數【5日累計張】(前 {b4_top_n} 名)", key="filter_b4_vol_41")
             b4_42_vol = st.checkbox(f"借券賣出減少張數【5日累計張】(前 {b4_top_n} 名)", key="filter_b4_vol_42")
             b4_43_vol = st.checkbox(f"融券增加張數【5日累計張】(前 {b4_top_n} 名)", key="filter_b4_vol_43")
             b4_inc_short_pct = st.checkbox(f"借券賣出增加幅度【5日累計比】(前 {b4_top_n} 名)", key="filter_b4_pct_inc_short")
-            b4_short_inc_amt = st.checkbox(f"💸 借券賣出增加金額【5日累計】(前 {b4_top_n} 名)", key="filter_b4_amt_short_inc")
+            b4_short_inc_amt = st.checkbox(f"借券賣出增加金額【5日累計】(前 {b4_top_n} 名)", key="filter_b4_amt_short_inc")
 
         st.markdown("**🔹 2. 今日漲跌幅區間過濾 (%)**")
         b4_price_chg = st.slider("設定漲跌幅區間 (預設 -10~10 代表不限制，設定 2~10 代表只找大漲的標的)：", -10.0, 10.0, (-10.0, 10.0), 0.5, key="filter_b4_price_chg")
