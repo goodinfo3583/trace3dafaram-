@@ -1,3 +1,4 @@
+#views/broker_page.py
 import streamlit as st
 import pandas as pd
 from utils.data_utils import calculate_chip_concentration
@@ -12,12 +13,10 @@ def load_raw_broker_history(url):
         return pd.DataFrame()
 
 def render(STOCK_DICT=None):
-    st.title("🕵️‍♂️ 主力券商分點追蹤 (Beta)")
-    st.markdown("透過每日全市場券商進出明細，追蹤大戶籌碼集中度與區間囤貨特徵。")
+    # 修正命名：改為更精確的「券商分點淨買力」與「集中度」
+    st.title("🕵️‍♂️ 券商分點淨買力與集中度追蹤 (Beta)")
+    st.markdown("觀察前 15 大分點買賣力道相抵後的淨流向，追蹤籌碼集中度連續性與券商進出矩陣。")
     
-    # ==========================================
-    # 🌟 統一的華麗下拉搜尋選單
-    # ==========================================
     stock_options = []
     if STOCK_DICT:
         unique_options = {f"{v['id']} {v['name']}" for v in STOCK_DICT.values() if len(str(v['id'])) <= 4}
@@ -49,39 +48,34 @@ def render(STOCK_DICT=None):
             df_raw_all = load_raw_broker_history(remote_csv_url)
             
             if not df_raw_all.empty:
-                # ==========================================
-                # 區塊 A：大局觀 (籌碼集中度走勢圖與歷史表)
-                # ==========================================
                 df_trend = calculate_chip_concentration(remote_csv_url, target_stock)
                 
                 if not df_trend.empty:
                     st.success("✅ 數據載入成功！")
                     latest_data = df_trend.iloc[-1]
+                    
+                    # 依據集中度定義顯示顏色
                     st.metric(
-                        label=f"{latest_data['trade_date']} 最新籌碼集中度", 
+                        label=f"{latest_data['trade_date']} 最新券商分點集中度", 
                         value=f"{latest_data['concentration_%']}%",
                         delta=f"淨買超 {latest_data['net_buy']:,} 張"
                     )
-                    st.subheader(f"📊 {display_name} 近期籌碼集中度走勢")
+                    
+                    st.subheader(f"📊 {display_name} 分點集中度連續性走勢")
                     st.bar_chart(df_trend, x="trade_date", y="concentration_%")
                     
-                    # 🌟 升級一：近 60 日籌碼集中度歷史表 (用 expander 收合保持版面乾淨)
-                    with st.expander("📅 展開查看：近 60 日籌碼集中度歷史表", expanded=False):
+                    with st.expander("📅 展開查看：近 60 日集中度與淨買超歷史表", expanded=False):
                         df_trend_disp = df_trend.sort_values('trade_date', ascending=False).head(60).copy()
                         df_trend_disp = df_trend_disp[['trade_date', 'net_buy', 'concentration_%']]
                         df_trend_disp.columns = ['交易日期', '淨買超(張)', '集中度(%)']
                         st.dataframe(df_trend_disp, use_container_width=True, hide_index=True)
                 
-                # ==========================================
-                # 區塊 B：主力現形表 (單日明細 vs 區間囤貨)
-                # ==========================================
                 st.markdown("---")
-                st.subheader(f"🔍 {display_name} 主力分點進出解析")
+                st.subheader(f"🔍 {display_name} 券商分點明細與進出矩陣")
                 
                 stock_raw = df_raw_all[df_raw_all['stock_code'] == target_stock].copy()
                 
                 if not stock_raw.empty:
-                    # 自動尋找券商名稱欄位
                     broker_col = next((c for c in ['broker', 'broker_name', '券商名稱', '券商', 'name'] if c in stock_raw.columns), None)
                     
                     if broker_col is None:
@@ -89,8 +83,8 @@ def render(STOCK_DICT=None):
                     else:
                         available_dates = sorted(stock_raw['trade_date'].unique(), reverse=True)
                         
-                        # 🌟 升級二：雙頁籤設計
-                        tab1, tab2 = st.tabs(["📅 單日進出明細", "🏦 區間囤貨追蹤 (近60日)"])
+                        # 🌟 升級：新增第三個頁籤「歷史進出矩陣」
+                        tab1, tab2, tab3 = st.tabs(["📅 單日進出明細", "🏦 區間囤貨追蹤 (近60日)", "🗺️ 歷史進出矩陣 (近30日)"])
                         
                         # --------- 標籤 1: 單日明細 ---------
                         with tab1:
@@ -109,30 +103,27 @@ def render(STOCK_DICT=None):
                                 return df
 
                             with col_buy:
-                                st.markdown("##### 🔴 買超前 15 大券商")
+                                st.markdown("##### 🔴 淨買超前 15 大分點")
                                 styled_buy = format_daily_table(daily_raw[daily_raw['side'] == 'buy'], True)
                                 if styled_buy is not None: st.dataframe(styled_buy, use_container_width=True, hide_index=True)
                                 else: st.write("當日無資料")
                                 
                             with col_sell:
-                                st.markdown("##### 🟢 賣超前 15 大券商")
+                                st.markdown("##### 🟢 淨賣超前 15 大分點")
                                 styled_sell = format_daily_table(daily_raw[daily_raw['side'] == 'sell'], False)
                                 if styled_sell is not None: st.dataframe(styled_sell, use_container_width=True, hide_index=True)
                                 else: st.write("當日無資料")
 
                         # --------- 標籤 2: 區間囤貨 (近60日) ---------
                         with tab2:
-                            st.markdown("##### 🕵️‍♂️ 誰在偷偷吃貨？誰在瘋狂倒貨？")
-                            # 擷取近 60 個有交易的日期
+                            st.markdown("##### 🕵️‍♂️ 誰在連續吃貨？誰在持續倒貨？")
                             recent_dates = available_dates[:60]
                             recent_raw = stock_raw[stock_raw['trade_date'].isin(recent_dates)].copy()
                             
-                            # 標準化淨買賣張數 (買超為正，賣超為負)
                             recent_raw['real_net_vol'] = recent_raw.apply(
                                 lambda x: abs(x['net_vol']) if x['side'] == 'buy' else -abs(x['net_vol']), axis=1
                             )
                             
-                            # 將這 60 天內出現過的券商進行分組加總
                             hoard_df = recent_raw.groupby(broker_col).agg(
                                 買進總計=('real_net_vol', lambda x: x[x > 0].sum()),
                                 賣出總計=('real_net_vol', lambda x: abs(x[x < 0].sum())),
@@ -142,25 +133,70 @@ def render(STOCK_DICT=None):
                             col_hoard, col_dump = st.columns(2)
                             
                             with col_hoard:
-                                st.markdown("##### 📈 近 60 日囤貨大戶 (Top 15)")
+                                st.markdown("##### 📈 近 60 日囤貨分點 (Top 15)")
                                 top_hoarders = hoard_df[hoard_df['區間淨買賣'] > 0].sort_values('區間淨買賣', ascending=False).head(15)
                                 if not top_hoarders.empty:
                                     top_hoarders.columns = ['券商名稱', '總買(張)', '總賣(張)', '淨買超(張)']
                                     st.dataframe(top_hoarders, use_container_width=True, hide_index=True)
-                                else:
-                                    st.write("區間內無明顯囤貨大戶")
+                                else: st.write("區間內無明顯囤貨分點")
                                     
                             with col_dump:
-                                st.markdown("##### 📉 近 60 日倒貨大戶 (Top 15)")
+                                st.markdown("##### 📉 近 60 日倒貨分點 (Top 15)")
                                 top_dumpers = hoard_df[hoard_df['區間淨買賣'] < 0].sort_values('區間淨買賣', ascending=True).head(15).copy()
                                 if not top_dumpers.empty:
-                                    # 將倒貨的淨買賣轉為絕對值方便閱讀
                                     top_dumpers['區間淨買賣'] = top_dumpers['區間淨買賣'].abs()
                                     top_dumpers.columns = ['券商名稱', '總買(張)', '總賣(張)', '淨賣超(張)']
                                     st.dataframe(top_dumpers, use_container_width=True, hide_index=True)
+                                else: st.write("區間內無明顯倒貨分點")
+
+                        # --------- 標籤 3: 歷史進出矩陣 (近30日) ---------
+                        with tab3:
+                            st.markdown("##### 🗺️ 分點淨買賣力道矩陣")
+                            st.write("橫列為各分點，縱欄為交易日期。直接觀察券商籌碼買賣的連續性。")
+                            
+                            matrix_dates = available_dates[:30]
+                            matrix_raw = stock_raw[stock_raw['trade_date'].isin(matrix_dates)].copy()
+                            
+                            if not matrix_raw.empty:
+                                matrix_raw['signed_vol'] = matrix_raw.apply(
+                                    lambda x: abs(x['net_vol']) if x['side'] == 'buy' else -abs(x['net_vol']), axis=1
+                                )
+                                
+                                # 製作樞紐分析表：列為券商，欄為日期，值為淨買賣張數
+                                pivot_df = matrix_raw.pivot_table(
+                                    index=broker_col, 
+                                    columns='trade_date', 
+                                    values='signed_vol', 
+                                    aggfunc='sum'
+                                ).fillna(0)
+                                
+                                # 計算區間總計並排序，讓最具影響力的分點排在最上面
+                                pivot_df['區間累計'] = pivot_df.sum(axis=1)
+                                pivot_df = pivot_df.sort_values('區間累計', ascending=False)
+                                
+                                # 調整欄位順序：區間累計放第一欄，日期由新到舊排列
+                                cols = ['區間累計'] + sorted([c for c in pivot_df.columns if c != '區間累計'], reverse=True)
+                                pivot_df = pivot_df[cols]
+                                
+                                # 🎨 內建字體顏色渲染函式 (無須 matplotlib 也能顯示紅綠字體)
+                                def color_net_vol(val):
+                                    try:
+                                        v = float(val)
+                                        if v > 0: return 'color: #FF4B4B;'
+                                        elif v < 0: return 'color: #00E272;'
+                                    except: pass
+                                    return 'color: #94A3B8;'
+                                
+                                # 相容 Pandas 新舊版本的 styling 寫法
+                                if hasattr(pivot_df.style, 'map'):
+                                    styled_pivot = pivot_df.style.map(color_net_vol).format("{:,.0f}")
                                 else:
-                                    st.write("區間內無明顯倒貨大戶")
-                                    
+                                    styled_pivot = pivot_df.style.applymap(color_net_vol).format("{:,.0f}")
+                                
+                                st.dataframe(styled_pivot, use_container_width=True)
+                            else:
+                                st.write("無足夠資料產生矩陣")
+                                
                 else:
                     st.warning(f"在歷史總帳本中，找不到 **{display_name}** 的紀錄。")
             else:
