@@ -571,12 +571,12 @@ def show_weight_backtest_page(STOCK_DICT, DATA_DIR="data"):
             valid_price_codes = combined_price_df[(combined_price_df['漲跌幅%'] >= b4_price_chg[0]) & (combined_price_df['漲跌幅%'] <= b4_price_chg[1])]['統一代號'].unique()
             filtered_df = filtered_df[filtered_df['統一代號'].isin(valid_price_codes)]
 
-    # 處理 B4 短線籌碼加速特徵過濾 (絕對值運算: 當日 > 5日/5)
+    # 處理 B4 短線籌碼加速特徵過濾 (嚴格方向性與均值運算)
     acc_configs = [
-        (b4_acc_margin_dec, 'b4_margin_pct'), (b4_acc_sbl_dec, 'b4_short_pct'),
-        (b4_acc_margin_inc, 'b4_margin_inc_pct'), (b4_acc_sbl_inc, 'b4_short_inc_pct')
+        (b4_acc_margin_dec, 'b4_margin_pct', 'dec'), (b4_acc_sbl_dec, 'b4_short_pct', 'dec'),
+        (b4_acc_margin_inc, 'b4_margin_inc_pct', 'inc'), (b4_acc_sbl_inc, 'b4_short_inc_pct', 'inc')
     ]
-    for is_checked, df_key in acc_configs:
+    for is_checked, df_key, direction in acc_configs:
         if is_checked:
             any_filter_applied = True
             df_acc = clean_stock_id(get_df(df_key))
@@ -585,11 +585,17 @@ def show_weight_backtest_page(STOCK_DICT, DATA_DIR="data"):
                 col_5d = next((c for c in df_acc.columns if '5日' in c and '%' in c), next((c for c in df_acc.columns if '5日' in c), None))
                 
                 if col_today and col_5d:
-                    # 無論原始資料是正負，全部取絕對值比較動能大小
-                    df_acc['num_today'] = pd.to_numeric(df_acc[col_today], errors='coerce').fillna(0).abs()
-                    df_acc['num_5d'] = pd.to_numeric(df_acc[col_5d], errors='coerce').fillna(0).abs()
+                    # 保留原始正負號，才能正確判斷是增加還是減少
+                    df_acc['num_today'] = pd.to_numeric(df_acc[col_today], errors='coerce').fillna(0)
+                    df_acc['num_5d'] = pd.to_numeric(df_acc[col_5d], errors='coerce').fillna(0)
                     
-                    valid_acc_codes = df_acc[df_acc['num_today'] > (df_acc['num_5d'] / 5.0)]['統一代號'].unique()
+                    if direction == 'inc':
+                        # 【加速套牢/放空】：當日必須是正值(有增加)，且當日的增幅 > 5日平均增幅
+                        valid_acc_codes = df_acc[(df_acc['num_today'] > 0) & (df_acc['num_today'] > (df_acc['num_5d'] / 5.0))]['統一代號'].unique()
+                    else:
+                        # 【加速退場/回補】：當日必須是負值(有減少)，且當日的減幅(負得更多) < 5日平均減幅
+                        valid_acc_codes = df_acc[(df_acc['num_today'] < 0) & (df_acc['num_today'] < (df_acc['num_5d'] / 5.0))]['統一代號'].unique()
+                        
                     filtered_df = filtered_df[filtered_df['統一代號'].isin(valid_acc_codes)]
                 else:
                     st.warning(f"⚠️ {df_key} 缺乏當日或5日欄位，無法計算加速特徵。")
