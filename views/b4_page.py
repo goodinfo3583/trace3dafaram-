@@ -286,12 +286,17 @@ def sync_b4_data(DATA_DIR):
     st.session_state['df_margin_plus_pct'] = process_margin_df(df_43_pct, "幅度")
     st.session_state['df_margin_plus_vol'] = process_margin_df(df_43_vol, "張數")
 
-    # 解鎖額外的增幅數據供策略實驗室weight_backtest使用
+    # 解鎖額外的增幅數據供策略實驗室使用
     df_inc_margin_pct, _ = get_specific_margin_data(DATA_DIR, "融資增加幅度")
     st.session_state['df_margin_inc_pct'] = process_margin_df(df_inc_margin_pct, "幅度")
+    df_inc_margin_vol, _ = get_specific_margin_data(DATA_DIR, "融資增加張數")
+    st.session_state['df_margin_inc_vol'] = process_margin_df(df_inc_margin_vol, "張數")
+    
     df_inc_short_pct, _ = get_specific_margin_data(DATA_DIR, "借券賣出增加幅度")
     st.session_state['df_short_inc_pct'] = process_margin_df(df_inc_short_pct, "幅度")
-
+    df_inc_short_vol, _ = get_specific_margin_data(DATA_DIR, "借券賣出增加張數")
+    st.session_state['df_short_inc_vol'] = process_margin_df(df_inc_short_vol, "張數")
+    
     # 4-4, 4-5
     df_squeeze, _, date_sq, sync_sq = build_squeeze_radar(DATA_DIR)
     st.session_state['b4_squeeze_radar'] = {'df': df_squeeze, 'date': date_sq, 'sync': sync_sq}
