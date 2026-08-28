@@ -149,6 +149,13 @@ def show_weight_backtest_page(STOCK_DICT, DATA_DIR="data"):
             st.session_state['filter_b4_top_n'] = 50
             for k in ['pct_41', 'vol_41', 'pct_42', 'vol_42', 'pct_43', 'vol_43', 'pct_inc_margin', 'pct_inc_short']:
                 st.session_state[f'filter_b4_{k}'] = False
+                
+            # --- 新增的 B4 滑桿與加速特徵清空 ---
+            st.session_state['filter_b4_price_chg'] = (-10.0, 10.0)
+            for k in ['acc_margin_dec', 'acc_sbl_dec', 'acc_margin_inc', 'acc_sbl_inc']:
+                st.session_state[f'filter_b4_{k}'] = False
+            # -----------------------------------
+
             st.session_state['filter_b4_radio'] = "交集 (必須同時符合勾選特徵)"
             st.session_state['filter_b4_multi'] = []
 
@@ -295,23 +302,31 @@ def show_weight_backtest_page(STOCK_DICT, DATA_DIR="data"):
         st.markdown("**🔹 1. 資券榜單 (勾選多個代表必須「同時進榜」)**")
         b4_top_n = st.slider("👑 排名過濾：設定最新進榜的擷取範圍 (名次)", min_value=10, max_value=300, value=50, step=10, key="filter_b4_top_n")
         
-        # 改為 2 個 columns 並排，顯示 8 個選項
         c_b4_1, c_b4_2 = st.columns(2)
         with c_b4_1:
-            b4_41_pct = st.checkbox(f"融資減少幅度【累計比】(前 {b4_top_n} 名)", key="filter_b4_pct_41")
-            b4_42_pct = st.checkbox(f"借券賣出減少幅度【累計比】(前 {b4_top_n} 名)", key="filter_b4_pct_42")
-            b4_43_pct = st.checkbox(f"融券增加幅度【累計比】(前 {b4_top_n} 名)", key="filter_b4_pct_43")
-            b4_inc_margin_pct = st.checkbox(f"融資增加幅度【累計比】(前 {b4_top_n} 名)", key="filter_b4_pct_inc_margin")
+            b4_41_pct = st.checkbox(f"融資減少幅度【5日累計比】(前 {b4_top_n} 名)", key="filter_b4_pct_41")
+            b4_42_pct = st.checkbox(f"借券賣出減少幅度【5日累計比】(前 {b4_top_n} 名)", key="filter_b4_pct_42")
+            b4_43_pct = st.checkbox(f"融券增加幅度【5日累計比】(前 {b4_top_n} 名)", key="filter_b4_pct_43")
+            b4_inc_margin_pct = st.checkbox(f"融資增加幅度【5日累計比】(前 {b4_top_n} 名)", key="filter_b4_pct_inc_margin")
         with c_b4_2:
-            b4_41_vol = st.checkbox(f"融資減少張數【累計張】(前 {b4_top_n} 名)", key="filter_b4_vol_41")
-            b4_42_vol = st.checkbox(f"借券賣出減少張數【累計張】(前 {b4_top_n} 名)", key="filter_b4_vol_42")
-            b4_43_vol = st.checkbox(f"融券增加張數【累計張】(前 {b4_top_n} 名)", key="filter_b4_vol_43")
-            b4_inc_short_pct = st.checkbox(f"借券賣出增加幅度【累計比】(前 {b4_top_n} 名)", key="filter_b4_pct_inc_short")
+            b4_41_vol = st.checkbox(f"融資減少張數【5日累計張】(前 {b4_top_n} 名)", key="filter_b4_vol_41")
+            b4_42_vol = st.checkbox(f"借券賣出減少張數【5日累計張】(前 {b4_top_n} 名)", key="filter_b4_vol_42")
+            b4_43_vol = st.checkbox(f"融券增加張數【5日累計張】(前 {b4_top_n} 名)", key="filter_b4_vol_43")
+            b4_inc_short_pct = st.checkbox(f"借券賣出增加幅度【5日累計比】(前 {b4_top_n} 名)", key="filter_b4_pct_inc_short")
 
-        st.markdown("**🔹 2. 雷達動態特徵 (軋空與套牢訊號)**")
+        st.markdown("**🔹 2. 今日漲跌幅區間過濾 (%)**")
+        b4_price_chg = st.slider("設定漲跌幅區間 (預設 -10~10 代表不限制，設定 2~10 代表只找大漲的標的)：", -10.0, 10.0, (-10.0, 10.0), 0.5, key="filter_b4_price_chg")
+
+        st.markdown("**🔹 3. 籌碼加速特徵 (當日短線力道 > 5日均幅)**")
+        c_acc1, c_acc2 = st.columns(2)
+        b4_acc_margin_dec = c_acc1.checkbox("⏩ 融資加速退場 (當日減幅 > 5日均)", key="filter_b4_acc_margin_dec")
+        b4_acc_sbl_dec = c_acc1.checkbox("⏩ 借券加速回補 (當日減幅 > 5日均)", key="filter_b4_acc_sbl_dec")
+        b4_acc_margin_inc = c_acc2.checkbox("⚠️ 融資加速套牢 (當日增幅 > 5日均)", key="filter_b4_acc_margin_inc")
+        b4_acc_sbl_inc = c_acc2.checkbox("⚠️ 借券加速放空 (當日增幅 > 5日均)", key="filter_b4_acc_sbl_inc")
+
+        st.markdown("**🔹 4. 雷達動態特徵 (軋空與套牢訊號)**")
         b4_trend_logic = st.radio("B4 特徵篩選邏輯：", ["交集 (必須同時符合勾選特徵)", "聯集 (符合任一即可)"], horizontal=True, key="filter_b4_radio")
         
-        # 改為直白描述狀態 (強調法人買賣+漲跌幅的核心價值)
         b4_trend_display_map = {
             "💥 終極": "💥 終極 (法人買超+收紅+融資減.借券減.融券增 3項全中)",
             "🚀 強軋": "🚀 強軋 (法人買超+收紅+前述資券特徵 3中2)",
@@ -323,7 +338,6 @@ def show_weight_backtest_page(STOCK_DICT, DATA_DIR="data"):
         }
         
         selected_b4_trends_display = st.multiselect("可複選雷達特徵：", list(b4_trend_display_map.values()), key="filter_b4_multi")
-        # 還原短字串供後台過濾使用
         b4_trends = [raw for d in selected_b4_trends_display for raw, desc in b4_trend_display_map.items() if d == desc]
 
     # --- 展開面板 (預留) ---
@@ -541,6 +555,45 @@ def show_weight_backtest_page(STOCK_DICT, DATA_DIR="data"):
         else:
             st.warning("⚠️ 找不到任何 B4 雷達數據。")
             filtered_df = filtered_df.iloc[0:0]
+
+    # 處理 B4 漲跌幅區間過濾 (從涵蓋面最廣的融資增減表中建立全局漲跌幅字典)
+    if b4_price_chg[0] > -10.0 or b4_price_chg[1] < 10.0:
+        any_filter_applied = True
+        b4_price_ref1 = clean_stock_id(get_df('b4_margin_pct'))
+        b4_price_ref2 = clean_stock_id(get_df('b4_margin_inc_pct'))
+        
+        combined_price_df = pd.concat([
+            b4_price_ref1[['統一代號', '漲跌幅%']] if not b4_price_ref1.empty and '漲跌幅%' in b4_price_ref1.columns else pd.DataFrame(),
+            b4_price_ref2[['統一代號', '漲跌幅%']] if not b4_price_ref2.empty and '漲跌幅%' in b4_price_ref2.columns else pd.DataFrame()
+        ]).drop_duplicates(subset=['統一代號'])
+        
+        if not combined_price_df.empty:
+            valid_price_codes = combined_price_df[(combined_price_df['漲跌幅%'] >= b4_price_chg[0]) & (combined_price_df['漲跌幅%'] <= b4_price_chg[1])]['統一代號'].unique()
+            filtered_df = filtered_df[filtered_df['統一代號'].isin(valid_price_codes)]
+
+    # 處理 B4 短線籌碼加速特徵過濾 (絕對值運算: 當日 > 5日/5)
+    acc_configs = [
+        (b4_acc_margin_dec, 'b4_margin_pct'), (b4_acc_sbl_dec, 'b4_short_pct'),
+        (b4_acc_margin_inc, 'b4_margin_inc_pct'), (b4_acc_sbl_inc, 'b4_short_inc_pct')
+    ]
+    for is_checked, df_key in acc_configs:
+        if is_checked:
+            any_filter_applied = True
+            df_acc = clean_stock_id(get_df(df_key))
+            if not df_acc.empty:
+                col_today = next((c for c in df_acc.columns if '當日' in c and '%' in c), next((c for c in df_acc.columns if '當日' in c), None))
+                col_5d = next((c for c in df_acc.columns if '5日' in c and '%' in c), next((c for c in df_acc.columns if '5日' in c), None))
+                
+                if col_today and col_5d:
+                    # 無論原始資料是正負，全部取絕對值比較動能大小
+                    df_acc['num_today'] = pd.to_numeric(df_acc[col_today], errors='coerce').fillna(0).abs()
+                    df_acc['num_5d'] = pd.to_numeric(df_acc[col_5d], errors='coerce').fillna(0).abs()
+                    
+                    valid_acc_codes = df_acc[df_acc['num_today'] > (df_acc['num_5d'] / 5.0)]['統一代號'].unique()
+                    filtered_df = filtered_df[filtered_df['統一代號'].isin(valid_acc_codes)]
+                else:
+                    st.warning(f"⚠️ {df_key} 缺乏當日或5日欄位，無法計算加速特徵。")
+                    filtered_df = filtered_df.iloc[0:0]
 
     # 處理 B5 過濾 (測試用)
     if b5_1000:
