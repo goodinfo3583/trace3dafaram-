@@ -152,7 +152,7 @@ def render(STOCK_DICT=None):
                         # --------- 標籤 3: 歷史進出矩陣 (近30日) ---------
                         with tab3:
                             st.markdown("##### 🗺️ 分點淨買賣力道矩陣")
-                            st.write("橫列為各分點，縱欄為交易日期。直接觀察券商籌碼買賣的連續性。")
+                            st.write("橫列為各分點，縱欄為交易日期。若顯示「-」代表當日該分點**未擠進買賣前 15 大 (未進榜)**，而非交易量為零。")
                             
                             matrix_dates = available_dates[:30]
                             matrix_raw = stock_raw[stock_raw['trade_date'].isin(matrix_dates)].copy()
@@ -162,24 +162,28 @@ def render(STOCK_DICT=None):
                                     lambda x: abs(x['net_vol']) if x['side'] == 'buy' else -abs(x['net_vol']), axis=1
                                 )
                                 
-                                # 製作樞紐分析表：列為券商，欄為日期，值為淨買賣張數
+                                # 製作樞紐分析表 (此時缺漏的日期會是 NaN)
                                 pivot_df = matrix_raw.pivot_table(
                                     index=broker_col, 
                                     columns='trade_date', 
                                     values='signed_vol', 
                                     aggfunc='sum'
-                                ).fillna(0)
+                                )
                                 
-                                # 計算區間總計並排序，讓最具影響力的分點排在最上面
+                                # 🌟 修正：在填補字串前先計算「區間累計」，這樣 NaN 會被當作 0 計算，不會報錯
                                 pivot_df['區間累計'] = pivot_df.sum(axis=1)
                                 pivot_df = pivot_df.sort_values('區間累計', ascending=False)
+                                
+                                # 🌟 修正：將未進榜的 NaN 填補為 "-"
+                                pivot_df = pivot_df.fillna("-")
                                 
                                 # 調整欄位順序：區間累計放第一欄，日期由新到舊排列
                                 cols = ['區間累計'] + sorted([c for c in pivot_df.columns if c != '區間累計'], reverse=True)
                                 pivot_df = pivot_df[cols]
                                 
-                                # 🎨 內建字體顏色渲染函式 (無須 matplotlib 也能顯示紅綠字體)
+                                # 🎨 內建字體顏色渲染函式
                                 def color_net_vol(val):
+                                    if val == "-": return 'color: #64748B;' # 未進榜顯示為暗灰色
                                     try:
                                         v = float(val)
                                         if v > 0: return 'color: #FF4B4B;'
@@ -189,9 +193,9 @@ def render(STOCK_DICT=None):
                                 
                                 # 相容 Pandas 新舊版本的 styling 寫法
                                 if hasattr(pivot_df.style, 'map'):
-                                    styled_pivot = pivot_df.style.map(color_net_vol).format("{:,.0f}")
+                                    styled_pivot = pivot_df.style.map(color_net_vol).format(lambda x: "{:,.0f}".format(x) if isinstance(x, (int, float)) else x)
                                 else:
-                                    styled_pivot = pivot_df.style.applymap(color_net_vol).format("{:,.0f}")
+                                    styled_pivot = pivot_df.style.applymap(color_net_vol).format(lambda x: "{:,.0f}".format(x) if isinstance(x, (int, float)) else x)
                                 
                                 st.dataframe(styled_pivot, use_container_width=True)
                             else:
