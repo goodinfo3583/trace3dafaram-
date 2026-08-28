@@ -296,6 +296,11 @@ def sync_b4_data(DATA_DIR):
     st.session_state['df_short_inc_pct'] = process_margin_df(df_inc_short_pct, "幅度")
     df_inc_short_vol, _ = get_specific_margin_data(DATA_DIR, "借券賣出增加張數")
     st.session_state['df_short_inc_vol'] = process_margin_df(df_inc_short_vol, "張數")
+    # 解鎖借券實際金額資料
+    df_inc_short_amt, _ = get_specific_margin_data(DATA_DIR, "借券賣出增加金額")
+    st.session_state['df_short_inc_amt'] = process_margin_df(df_inc_short_amt, "金額")
+    df_dec_short_amt, _ = get_specific_margin_data(DATA_DIR, "借券賣出減少金額")
+    st.session_state['df_short_dec_amt'] = process_margin_df(df_dec_short_amt, "金額")
     
     # 4-4, 4-5
     df_squeeze, _, date_sq, sync_sq = build_squeeze_radar(DATA_DIR)

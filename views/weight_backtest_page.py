@@ -33,6 +33,8 @@ KEY_MAP = {
     'b4_short_inc_pct': ['b4_short_inc_pct', 'df_short_inc_pct'],
     'b4_margin_inc_vol': ['b4_margin_inc_vol', 'df_margin_inc_vol'],
     'b4_short_inc_vol': ['b4_short_inc_vol', 'df_short_inc_vol'],
+    'b4_short_inc_amt': ['b4_short_inc_amt', 'df_short_inc_amt'],
+    'b4_short_dec_amt': ['b4_short_dec_amt', 'df_short_dec_amt'],
     'b5_400': ['b5_400', 'df_blk5'],
     'b5_1000': ['b5_1000', 'df_blk5_1000'],
     'b5_resonance': ['b5_resonance', 'df_b5_resonance', 'df_resonance', 'df_長短線共振'],
@@ -149,7 +151,7 @@ def show_weight_backtest_page(STOCK_DICT, DATA_DIR="data"):
             ##########################
             # 清空 B4 篩選器
             st.session_state['filter_b4_top_n'] = 50
-            for k in ['pct_41', 'vol_41', 'pct_42', 'vol_42', 'pct_43', 'vol_43', 'pct_inc_margin', 'pct_inc_short']:
+            for k in ['pct_41', 'vol_41', 'pct_42', 'vol_42', 'pct_43', 'vol_43', 'pct_inc_margin', 'pct_inc_short', 'amt_short_dec', 'amt_short_inc']:
                 st.session_state[f'filter_b4_{k}'] = False
                 
             # --- 新增的 B4 滑桿與加速特徵清空 ---
@@ -310,11 +312,13 @@ def show_weight_backtest_page(STOCK_DICT, DATA_DIR="data"):
             b4_42_pct = st.checkbox(f"借券賣出減少幅度【5日累計比】(前 {b4_top_n} 名)", key="filter_b4_pct_42")
             b4_43_pct = st.checkbox(f"融券增加幅度【5日累計比】(前 {b4_top_n} 名)", key="filter_b4_pct_43")
             b4_inc_margin_pct = st.checkbox(f"融資增加幅度【5日累計比】(前 {b4_top_n} 名)", key="filter_b4_pct_inc_margin")
+            b4_short_dec_amt = st.checkbox(f"💸 借券賣出減少金額【5日累計】(前 {b4_top_n} 名)", key="filter_b4_amt_short_dec")
         with c_b4_2:
             b4_41_vol = st.checkbox(f"融資減少張數【5日累計張】(前 {b4_top_n} 名)", key="filter_b4_vol_41")
             b4_42_vol = st.checkbox(f"借券賣出減少張數【5日累計張】(前 {b4_top_n} 名)", key="filter_b4_vol_42")
             b4_43_vol = st.checkbox(f"融券增加張數【5日累計張】(前 {b4_top_n} 名)", key="filter_b4_vol_43")
             b4_inc_short_pct = st.checkbox(f"借券賣出增加幅度【5日累計比】(前 {b4_top_n} 名)", key="filter_b4_pct_inc_short")
+            b4_short_inc_amt = st.checkbox(f"💸 借券賣出增加金額【5日累計】(前 {b4_top_n} 名)", key="filter_b4_amt_short_inc")
 
         st.markdown("**🔹 2. 今日漲跌幅區間過濾 (%)**")
         b4_price_chg = st.slider("設定漲跌幅區間 (預設 -10~10 代表不限制，設定 2~10 代表只找大漲的標的)：", -10.0, 10.0, (-10.0, 10.0), 0.5, key="filter_b4_price_chg")
@@ -324,7 +328,8 @@ def show_weight_backtest_page(STOCK_DICT, DATA_DIR="data"):
         c_acc1, c_acc2 = st.columns(2)
         b4_acc_margin_dec = c_acc1.checkbox("⏩ 融資加速退場 (破千萬資金)", key="filter_b4_acc_margin_dec")
         b4_acc_sbl_dec = c_acc1.checkbox("⏩ 借券加速回補 (破千萬資金)", key="filter_b4_acc_sbl_dec")
-        b4_acc_margin_inc = c_acc2.checkbox("⚠️ 融資加速套牢 (破千萬資金)", key="filter_b4_acc_margin_inc")
+        # UI 明確加上「+ 當日下跌」的條件標示
+        b4_acc_margin_inc = c_acc2.checkbox("⚠️ 融資加速套牢 (破千萬資金 + 當日下跌)", key="filter_b4_acc_margin_inc")
         b4_acc_sbl_inc = c_acc2.checkbox("⚠️ 借券加速放空 (破千萬資金)", key="filter_b4_acc_sbl_inc")
 
         st.markdown("**🔹 4. 雷達動態特徵 (軋空與套牢訊號)**")
@@ -516,7 +521,9 @@ def show_weight_backtest_page(STOCK_DICT, DATA_DIR="data"):
         'b4_short_pct': b4_42_pct, 'b4_short_vol': b4_42_vol,
         'b4_margin_plus_pct': b4_43_pct, 'b4_margin_plus_vol': b4_43_vol,
         'b4_margin_inc_pct': b4_inc_margin_pct,
-        'b4_short_inc_pct': b4_inc_short_pct
+        'b4_short_inc_pct': b4_inc_short_pct,
+        'b4_short_dec_amt': b4_short_dec_amt,  # 新增借券減額
+        'b4_short_inc_amt': b4_short_inc_amt   # 新增借券增額
     }
     for b4_key, is_checked in b4_checks.items():
         if is_checked:
@@ -584,32 +591,40 @@ def show_weight_backtest_page(STOCK_DICT, DATA_DIR="data"):
             any_filter_applied = True
             df_acc = clean_stock_id(get_df(df_key))
             if not df_acc.empty:
-                # 抓取張數與股價欄位 (嚴謹比對)
                 col_today = next((c for c in df_acc.columns if '當日' in c and '張' in c), next((c for c in df_acc.columns if '當日' in c), None))
                 col_5d = next((c for c in df_acc.columns if '5日' in c and '張' in c), next((c for c in df_acc.columns if '5日' in c), None))
                 col_price = '成交' if '成交' in df_acc.columns else None
                 
                 if col_today and col_5d and col_price:
-                    # 清理逗號並轉為數值
                     df_acc['num_today'] = pd.to_numeric(df_acc[col_today].astype(str).str.replace(',', '', regex=False), errors='coerce').fillna(0)
                     df_acc['num_5d'] = pd.to_numeric(df_acc[col_5d].astype(str).str.replace(',', '', regex=False), errors='coerce').fillna(0)
                     df_acc['price'] = pd.to_numeric(df_acc[col_price].astype(str).str.replace(',', '', regex=False), errors='coerce').fillna(0)
                     
-                    # 💡 估算金額 = 張數 × 股價 × 1000 (換算為新台幣)
+                    # 💡 攔截漲跌幅 (自動相容各種包含空白的欄位名稱)
+                    col_pct = next((c for c in df_acc.columns if '漲跌幅' in c.replace(' ', '')), None)
+                    df_acc['pct_chg'] = pd.to_numeric(df_acc[col_pct].astype(str).str.replace('%', '', regex=False), errors='coerce').fillna(0) if col_pct else 0
+                    
+                    # 估算金額 = 張數 × 股價 × 1000
                     df_acc['amt_today'] = df_acc['num_today'] * df_acc['price'] * 1000
                     df_acc['amt_5d_avg'] = (df_acc['num_5d'] / 5.0) * df_acc['price'] * 1000
-                    
-                    # 🛡️ 資金防呆門檻：單日變動的資金必須超過 1,000 萬台幣，才視為有意義的法人級別動能！
                     amt_threshold = 10000000 
                     
                     if direction == 'inc':
-                        # 【加速套牢/放空】：當日金額為正且大於 1000萬，且今日金額 > 5日平均金額
-                        valid_acc_codes = df_acc[
-                            (df_acc['amt_today'] >= amt_threshold) & 
-                            (df_acc['amt_today'] > df_acc['amt_5d_avg'])
-                        ]['統一代號'].unique()
+                        if 'margin' in df_key:
+                            # 🚨【融資加速套牢】：必須是大跌/收黑 (pct_chg < 0) 才能叫套牢！
+                            valid_acc_codes = df_acc[
+                                (df_acc['amt_today'] >= amt_threshold) & 
+                                (df_acc['amt_today'] > df_acc['amt_5d_avg']) &
+                                (df_acc['pct_chg'] < 0)
+                            ]['統一代號'].unique()
+                        else:
+                            # 【借券加速放空】：一般只要借券金額異常飆高即可
+                            valid_acc_codes = df_acc[
+                                (df_acc['amt_today'] >= amt_threshold) & 
+                                (df_acc['amt_today'] > df_acc['amt_5d_avg'])
+                            ]['統一代號'].unique()
                     else:
-                        # 【加速退場/回補】：當日金額為負且低於 -1000萬，且今日流出金額 < 5日平均流出金額(負更多)
+                        # 【加速退場/回補】：當日流出金額負更多
                         valid_acc_codes = df_acc[
                             (df_acc['amt_today'] <= -amt_threshold) & 
                             (df_acc['amt_today'] < df_acc['amt_5d_avg'])
@@ -667,13 +682,14 @@ def show_weight_backtest_page(STOCK_DICT, DATA_DIR="data"):
             if not rk_df_debug.empty:
                 debug_df = pd.merge(debug_df, rk_df_debug[['統一代號', '套牢評估']], on='統一代號', how='left')
             #########
-            # 加入 B4 10大資券的 5日與當日動態供核對 (包含漏掉的增張)
+            # 加入 B4 12大資券動態供核對 (包含實際金額)
             b4_debug_keys = {
                 'b4_margin_pct': '融資減幅', 'b4_margin_vol': '融資減張',
                 'b4_short_pct': '借券減幅', 'b4_short_vol': '借券減張',
                 'b4_margin_plus_pct': '融券增幅', 'b4_margin_plus_vol': '融券增張',
                 'b4_margin_inc_pct': '融資增幅', 'b4_short_inc_pct': '借券增幅',
-                'b4_margin_inc_vol': '融資增張', 'b4_short_inc_vol': '借券增張' # 補上了！
+                'b4_margin_inc_vol': '融資增張', 'b4_short_inc_vol': '借券增張',
+                'b4_short_dec_amt': '借券實際減額', 'b4_short_inc_amt': '借券實際增額'
             }
             for k, label in b4_debug_keys.items():
                 df_tmp = clean_stock_id(get_df(k))
