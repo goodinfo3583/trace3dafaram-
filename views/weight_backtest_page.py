@@ -42,6 +42,8 @@ KEY_MAP = {
     'b5_400': ['b5_400', 'df_blk5_400'],
     'b5_resonance': ['b5_resonance', 'df_b5_resonance', 'df_resonance', 'df_長短線共振'],
     'b5_double': ['b5_double', 'df_b5_double', 'df_double', 'df_雙向共振'],
+    'b6_today': ['b6_today', 'b6_today_df'],      # <-- 新增這行 B6 鉅額今日
+    'b6_hist': ['b6_hist', 'b6_hist_matrix'],     # <-- 新增這行 B6 鉅額歷史
     'b7_main': ['b7_main', 'df_blk7_main', 'df_b7_main'],
     'b7_pledge': ['b7_pledge', 'df_pledge', 'df_b7_pledge'],
     'b7_pledge_history': ['b7_pledge_history', 'df_pledge_history', 'df_b7_pledge_history']
@@ -171,6 +173,11 @@ def show_weight_backtest_page(STOCK_DICT, DATA_DIR="data"):
                 st.session_state[f'filter_b5_{k}'] = False
             for k in ['1000', '800', '600', '400']:
                 st.session_state[f'filter_b5_trend_{k}'] = []
+                
+            # 清空 B6 篩選器
+            st.session_state['filter_b6_today'] = False
+            st.session_state['filter_b6_amt_min'] = 0.0
+            st.session_state['filter_b6_status'] = []
 
         st.button("🧹 清空所有篩選條件", on_click=reset_filters, use_container_width=True)
 
@@ -391,6 +398,29 @@ def show_weight_backtest_page(STOCK_DICT, DATA_DIR="data"):
         c_b5_lvl3, c_b5_lvl4 = st.columns(2)
         b5_trend_600 = c_b5_lvl3.multiselect("🦉 600張大戶週動態：", trend_options_b5, key="filter_b5_trend_600")
         b5_trend_400 = c_b5_lvl4.multiselect("🐺 400張大戶週動態：", trend_options_b5, key="filter_b5_trend_400")
+
+        # 取得 B6 最新資料日期
+    b6_latest_date_str = "未知日期"
+    dynamic_price_col_b6 = st.session_state.get('b6_dynamic_price_col')
+    if dynamic_price_col_b6 and "▼" in dynamic_price_col_b6:
+        # 將 "▼0605 成交價" 轉為日期
+        date_part = dynamic_price_col_b6.split(' ')[0].replace('▼', '')
+        if len(date_part) == 4:
+            b6_latest_date_str = f"2026/{date_part[:2]}/{date_part[2:]}"
+
+    # --- 模組 B6 展開面板 ---
+    with st.expander(f"💎 B6 鉅額交易動向 (資料基準日: {b6_latest_date_str})", expanded=False):
+        st.markdown("**🔹 1. 今日鉅額交易過濾**")
+        b6_today_chk = st.checkbox("🎯 今日有發生鉅額交易", key="filter_b6_today")
+        
+        st.markdown("**🔹 2. 資金規模過濾**")
+        st.caption("過濾出具備絕對影響力的破億鉅額交易。")
+        b6_amt_min = st.slider("💰 鉅額總額大於 (億)：", min_value=0.0, max_value=50.0, value=0.0, step=0.5, key="filter_b6_amt_min")
+        
+        st.markdown("**🔹 3. 防守狀態過濾**")
+        b6_status_options = ["🛡️ 防守成功 (收盤 >= 鉅額均價)", "🚨 跌破防線 (收盤 < 鉅額均價)"]
+        b6_status_chk = st.multiselect("可精準挑選主力防線狀態：", b6_status_options, key="filter_b6_status")
+        
     with st.expander("📉 其他籌碼動向模組 (建置中)", expanded=False):
         st.info("包含法人突擊掃貨、連買、資券動向等模組，將於後續開放。")
         
@@ -743,6 +773,37 @@ def show_weight_backtest_page(STOCK_DICT, DATA_DIR="data"):
             else:
                 st.warning(f"⚠️ {lvl_name} 資料庫尚未建立或缺乏動態欄位，過濾為空。")
                 filtered_df = filtered_df.iloc[0:0]
+
+    # 處理 B6 過濾引擎
+    if b6_today_chk or b6_amt_min > 0 or b6_status_chk:
+        df_b6 = clean_stock_id(get_df('b6_today'))
+        if not df_b6.empty:
+            any_filter_applied = True
+            b6_mask = pd.Series(True, index=df_b6.index)
+            
+            # 資金規模
+            if b6_amt_min > 0:
+                df_b6['num_amt'] = pd.to_numeric(df_b6['總額(億)'], errors='coerce').fillna(0)
+                b6_mask &= (df_b6['num_amt'] >= b6_amt_min)
+            
+            # 防守狀態
+            if b6_status_chk and dynamic_price_col_b6 in df_b6.columns:
+                def check_b6_status(row):
+                    try:
+                        prices = [float(p) for p in str(row[dynamic_price_col_b6]).split(' / ')]
+                        avg_p = sum(prices) / len(prices)
+                        c_p = float(str(row['▼收盤價']).replace(',', ''))
+                        return "🛡️ 防守成功 (收盤 >= 鉅額均價)" if c_p >= avg_p else "🚨 跌破防線 (收盤 < 鉅額均價)"
+                    except: return "未知"
+                
+                df_b6['__status'] = df_b6.apply(check_b6_status, axis=1)
+                b6_mask &= df_b6['__status'].isin(b6_status_chk)
+            
+            valid_b6_codes = df_b6[b6_mask]['統一代號'].unique()
+            filtered_df = filtered_df[filtered_df['統一代號'].isin(valid_b6_codes)]
+        else:
+            st.warning("⚠️ 缺乏 B6 今日鉅額交易資料，過濾為空。請確認 B6 頁面已載入資料。")
+            filtered_df = filtered_df.iloc[0:0]
     # ==========================================
     # 過濾結果結算與除錯透視鏡檢核
     # ==========================================
@@ -869,7 +930,27 @@ def show_weight_backtest_page(STOCK_DICT, DATA_DIR="data"):
 
             st.write(f"🔍 檢核明細 (共 {len(debug_df)} 筆)：")
             st.dataframe(debug_df, use_container_width=True, hide_index=True)
+
+            # ==========================================
+            # 🌟 加入 B6 鉅額交易供核對
+            # ==========================================
+            df_b6_debug = clean_stock_id(get_df('b6_today')).drop_duplicates(subset=['統一代號'])
+            if not df_b6_debug.empty:
+                b6_cols = ['統一代號', '總額(億)']
+                dynamic_col = st.session_state.get('b6_dynamic_price_col')
+                if dynamic_col and dynamic_col in df_b6_debug.columns:
+                    b6_cols.append(dynamic_col)
+                if '▼收盤價' in df_b6_debug.columns:
+                    b6_cols.append('▼收盤價')
+                
+                debug_df = pd.merge(debug_df, df_b6_debug[b6_cols].rename(columns={
+                    '總額(億)': 'B6_總額(億)',
+                    dynamic_col: 'B6_成交均價' if dynamic_col else 'B6_成交均價',
+                    '▼收盤價': 'B6_收盤價'
+                }), on='統一代號', how='left')
             #####
+
+            
     else:
         st.info("👆 請在上方展開模組中至少設定一項條件，目前預設顯示全市場標的。")
 
@@ -897,6 +978,7 @@ def show_weight_backtest_page(STOCK_DICT, DATA_DIR="data"):
         with c4:
             st.markdown("**大戶與董監防線**")
             w_b5 = st.number_input("千張大戶持股增加", value=3.0, step=0.5)
+            w_b6 = st.number_input("鉅額防守成功", value=1.5, step=0)  # <-- 新增這行
             w_b7 = st.number_input("董監增持/質押降", value=1.5, step=0.5)
 
     # ==========================================
@@ -932,6 +1014,27 @@ def show_weight_backtest_page(STOCK_DICT, DATA_DIR="data"):
             for k in ['b4_margin_pct', 'b4_short_pct', 'b4_margin_plus_pct', 'b4_margin_vol', 'b4_short_vol', 'b4_margin_plus_vol']:
                 apply_score(k, w_b4_good, "資券有利")
             apply_score('b5_1000', w_b5, "千張大戶")
+            
+            # 處理 B6 鉅額防守成功加分
+            if w_b6 != 0:
+                df_b6 = clean_stock_id(get_df('b6_today'))
+                dynamic_col = st.session_state.get('b6_dynamic_price_col')
+                if not df_b6.empty and dynamic_col in df_b6.columns:
+                    def check_success(row):
+                        try:
+                            prices = [float(p) for p in str(row[dynamic_col]).split(' / ')]
+                            avg_p = sum(prices) / len(prices)
+                            c_p = float(str(row['▼收盤價']).replace(',', ''))
+                            return c_p >= avg_p
+                        except: return False
+                    
+                    df_b6['is_success'] = df_b6.apply(check_success, axis=1)
+                    hit_codes = df_b6[df_b6['is_success']]['統一代號'].unique()
+                    mask = score_df['統一代號'].isin(hit_codes)
+                    score_df.loc[mask, '總分'] += w_b6
+                    sign = "+" if w_b6 > 0 else ""
+                    score_df.loc[mask, '得分明細'] += f"[鉅額防守 {sign}{w_b6}] "
+
             apply_score('b7_main', w_b7, "董監增持")
 
             # ==========================================
