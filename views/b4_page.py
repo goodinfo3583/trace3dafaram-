@@ -72,7 +72,8 @@ def process_margin_df(df, type_name):
     if sort_col:
         df = df.rename(columns={sort_col: '漲跌幅%'}) 
         df['漲跌幅%'] = pd.to_numeric(df['漲跌幅%'], errors='coerce').fillna(0)
-        df = df.sort_values(by='漲跌幅%', ascending=False)
+        # 移除強制用漲跌幅排序，保持原始 CSV 依靠「資券增減」排好的順序
+        # df = df.sort_values(by='漲跌幅%', ascending=False)  <-- 兇手已移除
 
     df = df.reset_index(drop=True)
     df.index = df.index + 1
@@ -139,7 +140,7 @@ def build_squeeze_radar(DATA_DIR):
                 if pd.api.types.is_float_dtype(df_squeeze[col]):
                     df_squeeze[col] = df_squeeze[col].round(2)
         
-        df_squeeze = df_squeeze[df_squeeze['漲跌幅'] >= 0]
+        df_squeeze = df_squeeze[df_squeeze['漲跌幅'] >= 2] # 設定軋空雷達漲幅 >= value改變數值
     except Exception as e:
         return pd.DataFrame(), f"讀取買超母表失敗: {str(e)}", "", False
 
@@ -226,7 +227,7 @@ def build_risk_radar(DATA_DIR):
                 if pd.api.types.is_float_dtype(df_risk[col]):
                     df_risk[col] = df_risk[col].round(2)
         
-        df_risk = df_risk[df_risk['漲跌幅'] <= 0]
+        df_risk = df_risk[df_risk['漲跌幅'] <= 2] #套牢雷達設定漲跌幅必須 <= value 才算套牢
     except Exception as e:
         return pd.DataFrame(), f"讀取賣超母表失敗: {str(e)}", "", False
 
