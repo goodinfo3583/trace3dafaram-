@@ -146,7 +146,7 @@ def show_weight_backtest_page(STOCK_DICT, DATA_DIR="data"):
             st.session_state['filter_b3_it_wk_n'] = 1
             st.session_state['filter_b3_radio'] = "交集 (必須同時符合勾選特徵)"
             st.session_state['filter_b3_multi'] = []
-
+            ##########################
             # 清空 B4 篩選器
             st.session_state['filter_b4_top_n'] = 50
             for k in ['pct_41', 'vol_41', 'pct_42', 'vol_42', 'pct_43', 'vol_43', 'pct_inc_margin', 'pct_inc_short']:
@@ -254,7 +254,7 @@ def show_weight_backtest_page(STOCK_DICT, DATA_DIR="data"):
         
         # 將 UI 選擇的長字串，還原回原始的短字串供後台過濾使用
         b2_trends = [raw_trend for d_trend in selected_display_trends for raw_trend, desc in b2_trend_display_map.items() if d_trend == desc]
-    #
+    
     # 取得 B3 最新資料日期 (取四個表的最新一天作為代表)
     b3_latest_date_str = "未知日期"
     df_b3_tmp = get_df('b3_main')
@@ -319,12 +319,13 @@ def show_weight_backtest_page(STOCK_DICT, DATA_DIR="data"):
         st.markdown("**🔹 2. 今日漲跌幅區間過濾 (%)**")
         b4_price_chg = st.slider("設定漲跌幅區間 (預設 -10~10 代表不限制，設定 2~10 代表只找大漲的標的)：", -10.0, 10.0, (-10.0, 10.0), 0.5, key="filter_b4_price_chg")
 
-        st.markdown("**🔹 3. 籌碼加速特徵 (當日短線力道 > 5日均幅)**")
+        st.markdown("**🔹 3. 籌碼加速特徵 (當日短線資金力道 > 5日均)**")
+        st.caption("🚨 自動轉換為『金額』運算：當日資金變動必須超過 1,000 萬元，且當日資金動能大於 5日平均，徹底過濾低價股雜訊！")
         c_acc1, c_acc2 = st.columns(2)
-        b4_acc_margin_dec = c_acc1.checkbox("⏩ 融資加速退場 (當日減幅 > 5日均)", key="filter_b4_acc_margin_dec")
-        b4_acc_sbl_dec = c_acc1.checkbox("⏩ 借券加速回補 (當日減幅 > 5日均)", key="filter_b4_acc_sbl_dec")
-        b4_acc_margin_inc = c_acc2.checkbox("⚠️ 融資加速套牢 (當日增幅 > 5日均)", key="filter_b4_acc_margin_inc")
-        b4_acc_sbl_inc = c_acc2.checkbox("⚠️ 借券加速放空 (當日增幅 > 5日均)", key="filter_b4_acc_sbl_inc")
+        b4_acc_margin_dec = c_acc1.checkbox("⏩ 融資加速退場 (破千萬資金)", key="filter_b4_acc_margin_dec")
+        b4_acc_sbl_dec = c_acc1.checkbox("⏩ 借券加速回補 (破千萬資金)", key="filter_b4_acc_sbl_dec")
+        b4_acc_margin_inc = c_acc2.checkbox("⚠️ 融資加速套牢 (破千萬資金)", key="filter_b4_acc_margin_inc")
+        b4_acc_sbl_inc = c_acc2.checkbox("⚠️ 借券加速放空 (破千萬資金)", key="filter_b4_acc_sbl_inc")
 
         st.markdown("**🔹 4. 雷達動態特徵 (軋空與套牢訊號)**")
         b4_trend_logic = st.radio("B4 特徵篩選邏輯：", ["交集 (必須同時符合勾選特徵)", "聯集 (符合任一即可)"], horizontal=True, key="filter_b4_radio")
@@ -341,7 +342,7 @@ def show_weight_backtest_page(STOCK_DICT, DATA_DIR="data"):
         
         selected_b4_trends_display = st.multiselect("可複選雷達特徵：", list(b4_trend_display_map.values()), key="filter_b4_multi")
         b4_trends = [raw for d in selected_b4_trends_display for raw, desc in b4_trend_display_map.items() if d == desc]
-
+        ########################################################################################
     # --- 展開面板 (預留) ---
     with st.expander("🐳 B5 大戶籌碼動向 (建置中)", expanded=False):
         b5_1000 = st.checkbox("千張大戶持股增加 (測試鈕)", key="filter_b5_1000")
@@ -572,10 +573,9 @@ def show_weight_backtest_page(STOCK_DICT, DATA_DIR="data"):
         if not combined_price_df.empty:
             valid_price_codes = combined_price_df[(combined_price_df['漲跌幅%'] >= b4_price_chg[0]) & (combined_price_df['漲跌幅%'] <= b4_price_chg[1])]['統一代號'].unique()
             filtered_df = filtered_df[filtered_df['統一代號'].isin(valid_price_codes)]
-
-    # 處理 B4 短線籌碼加速特徵過濾 (改採「張數」運算，杜絕低基期 % 數雜訊)
+    ############
+    # 處理 B4 短線籌碼加速特徵過濾 (🔥 升級版：張數 × 股價 = 真實資金動能)
     acc_configs = [
-        # 全部改為對接 _vol (張數) 的資料表
         (b4_acc_margin_dec, 'b4_margin_vol', 'dec'), (b4_acc_sbl_dec, 'b4_short_vol', 'dec'),
         (b4_acc_margin_inc, 'b4_margin_inc_vol', 'inc'), (b4_acc_sbl_inc, 'b4_short_inc_vol', 'inc')
     ]
@@ -584,34 +584,42 @@ def show_weight_backtest_page(STOCK_DICT, DATA_DIR="data"):
             any_filter_applied = True
             df_acc = clean_stock_id(get_df(df_key))
             if not df_acc.empty:
+                # 抓取張數與股價欄位 (嚴謹比對)
                 col_today = next((c for c in df_acc.columns if '當日' in c and '張' in c), next((c for c in df_acc.columns if '當日' in c), None))
                 col_5d = next((c for c in df_acc.columns if '5日' in c and '張' in c), next((c for c in df_acc.columns if '5日' in c), None))
+                col_price = '成交' if '成交' in df_acc.columns else None
                 
-                if col_today and col_5d:
-                    df_acc['num_today'] = pd.to_numeric(df_acc[col_today], errors='coerce').fillna(0)
-                    df_acc['num_5d'] = pd.to_numeric(df_acc[col_5d], errors='coerce').fillna(0)
+                if col_today and col_5d and col_price:
+                    # 清理逗號並轉為數值
+                    df_acc['num_today'] = pd.to_numeric(df_acc[col_today].astype(str).str.replace(',', '', regex=False), errors='coerce').fillna(0)
+                    df_acc['num_5d'] = pd.to_numeric(df_acc[col_5d].astype(str).str.replace(',', '', regex=False), errors='coerce').fillna(0)
+                    df_acc['price'] = pd.to_numeric(df_acc[col_price].astype(str).str.replace(',', '', regex=False), errors='coerce').fillna(0)
                     
-                    # 💡 設立防呆濾網：當日變動量必須超過 1張，才具備「加速」的分析價值
-                    volume_threshold = 1 
+                    # 💡 估算金額 = 張數 × 股價 × 1000 (換算為新台幣)
+                    df_acc['amt_today'] = df_acc['num_today'] * df_acc['price'] * 1000
+                    df_acc['amt_5d_avg'] = (df_acc['num_5d'] / 5.0) * df_acc['price'] * 1000
+                    
+                    # 🛡️ 資金防呆門檻：單日變動的資金必須超過 1,000 萬台幣，才視為有意義的法人級別動能！
+                    amt_threshold = 10000000 
                     
                     if direction == 'inc':
-                        # 【加速套牢/放空】：當日張數為正且大於門檻，且大於 5日均量
+                        # 【加速套牢/放空】：當日金額為正且大於 1000萬，且今日金額 > 5日平均金額
                         valid_acc_codes = df_acc[
-                            (df_acc['num_today'] >= volume_threshold) & 
-                            (df_acc['num_today'] > (df_acc['num_5d'] / 5.0))
+                            (df_acc['amt_today'] >= amt_threshold) & 
+                            (df_acc['amt_today'] > df_acc['amt_5d_avg'])
                         ]['統一代號'].unique()
                     else:
-                        # 【加速退場/回補】：當日張數為負且低於-門檻，且負得比 5日均量還多
+                        # 【加速退場/回補】：當日金額為負且低於 -1000萬，且今日流出金額 < 5日平均流出金額(負更多)
                         valid_acc_codes = df_acc[
-                            (df_acc['num_today'] <= -volume_threshold) & 
-                            (df_acc['num_today'] < (df_acc['num_5d'] / 5.0))
+                            (df_acc['amt_today'] <= -amt_threshold) & 
+                            (df_acc['amt_today'] < df_acc['amt_5d_avg'])
                         ]['統一代號'].unique()
                         
                     filtered_df = filtered_df[filtered_df['統一代號'].isin(valid_acc_codes)]
                 else:
-                    st.warning(f"⚠️ {df_key} 缺乏當日或5日欄位，無法計算加速特徵。")
+                    st.warning(f"⚠️ {df_key} 缺乏當日、5日或成交價欄位，無法計算資金動能。")
                     filtered_df = filtered_df.iloc[0:0]
-
+                    ########################
     # 處理 B5 過濾 (測試用)
     if b5_1000:
         any_filter_applied = True
