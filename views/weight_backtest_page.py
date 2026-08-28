@@ -970,10 +970,7 @@ def show_weight_backtest_page(STOCK_DICT, DATA_DIR="data"):
                     dynamic_col: 'B6_成交均價' if dynamic_col else 'B6_成交均價',
                     '▼收盤價': 'B6_收盤價'
                 }), on='統一代號', how='left')
-            #####
-            #####
-
-            
+            #####           
     else:
         st.info("👆 請在上方展開模組中至少設定一項條件，目前預設顯示全市場標的。")
 
