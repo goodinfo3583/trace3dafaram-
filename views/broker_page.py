@@ -132,22 +132,44 @@ def render(STOCK_DICT=None):
                             
                             col_hoard, col_dump = st.columns(2)
                             
+                            # 🎨 格式化函式：將 0 轉為 "-" (代表未進榜)，其餘加上千分位逗號
+                            def fmt_dash(val):
+                                if pd.isna(val) or val == 0: 
+                                    return "-"
+                                return "{:,.0f}".format(val)
+                            
                             with col_hoard:
-                                st.markdown("##### 📈 近 60 日囤貨分點 (Top 15)")
-                                top_hoarders = hoard_df[hoard_df['區間淨買賣'] > 0].sort_values('區間淨買賣', ascending=False).head(15)
-                                if not top_hoarders.empty:
-                                    top_hoarders.columns = ['券商名稱', '總買(張)', '總賣(張)', '淨買超(張)']
-                                    st.dataframe(top_hoarders, use_container_width=True, hide_index=True)
-                                else: st.write("區間內無明顯囤貨分點")
+                                st.markdown("##### 📈 近 60 日囤貨分點 (全榜)")
+                                # 移除 .head(15)，列出所有囤貨券商
+                                hoarders = hoard_df[hoard_df['區間淨買賣'] > 0].sort_values('區間淨買賣', ascending=False)
+                                if not hoarders.empty:
+                                    hoarders.columns = ['券商名稱', '總買(張)', '總賣(張)', '淨買超(張)']
+                                    # 套用格式化函式
+                                    styled_hoard = hoarders.style.format({
+                                        '總買(張)': fmt_dash, 
+                                        '總賣(張)': fmt_dash, 
+                                        '淨買超(張)': fmt_dash
+                                    })
+                                    st.dataframe(styled_hoard, use_container_width=True, hide_index=True)
+                                else: 
+                                    st.write("區間內無明顯囤貨分點")
                                     
                             with col_dump:
-                                st.markdown("##### 📉 近 60 日倒貨分點 (Top 15)")
-                                top_dumpers = hoard_df[hoard_df['區間淨買賣'] < 0].sort_values('區間淨買賣', ascending=True).head(15).copy()
-                                if not top_dumpers.empty:
-                                    top_dumpers['區間淨買賣'] = top_dumpers['區間淨買賣'].abs()
-                                    top_dumpers.columns = ['券商名稱', '總買(張)', '總賣(張)', '淨賣超(張)']
-                                    st.dataframe(top_dumpers, use_container_width=True, hide_index=True)
-                                else: st.write("區間內無明顯倒貨分點")
+                                st.markdown("##### 📉 近 60 日倒貨分點 (全榜)")
+                                # 移除 .head(15)，列出所有倒貨券商
+                                dumpers = hoard_df[hoard_df['區間淨買賣'] < 0].sort_values('區間淨買賣', ascending=True).copy()
+                                if not dumpers.empty:
+                                    dumpers['區間淨買賣'] = dumpers['區間淨買賣'].abs()
+                                    dumpers.columns = ['券商名稱', '總買(張)', '總賣(張)', '淨賣超(張)']
+                                    # 套用格式化函式
+                                    styled_dump = dumpers.style.format({
+                                        '總買(張)': fmt_dash, 
+                                        '總賣(張)': fmt_dash, 
+                                        '淨賣超(張)': fmt_dash
+                                    })
+                                    st.dataframe(styled_dump, use_container_width=True, hide_index=True)
+                                else: 
+                                    st.write("區間內無明顯倒貨分點")
 
                         # --------- 標籤 3: 歷史進出矩陣 (近30日) ---------
                         with tab3:
