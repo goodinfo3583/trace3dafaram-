@@ -666,20 +666,21 @@ def show_weight_backtest_page(STOCK_DICT, DATA_DIR="data"):
                 debug_df = pd.merge(debug_df, sq_df_debug[['統一代號', '軋空評估']], on='統一代號', how='left')
             if not rk_df_debug.empty:
                 debug_df = pd.merge(debug_df, rk_df_debug[['統一代號', '套牢評估']], on='統一代號', how='left')
-
-            # 加入 B4 8大資券的 5日與當日動態供核對
+            #########
+            # 加入 B4 10大資券的 5日與當日動態供核對 (包含漏掉的增張)
             b4_debug_keys = {
                 'b4_margin_pct': '融資減幅', 'b4_margin_vol': '融資減張',
                 'b4_short_pct': '借券減幅', 'b4_short_vol': '借券減張',
                 'b4_margin_plus_pct': '融券增幅', 'b4_margin_plus_vol': '融券增張',
-                'b4_margin_inc_pct': '融資增幅', 'b4_short_inc_pct': '借券增幅'
+                'b4_margin_inc_pct': '融資增幅', 'b4_short_inc_pct': '借券增幅',
+                'b4_margin_inc_vol': '融資增張', 'b4_short_inc_vol': '借券增張' # 補上了！
             }
             for k, label in b4_debug_keys.items():
                 df_tmp = clean_stock_id(get_df(k))
                 if not df_tmp.empty:
                     # 智慧搜尋當日與5日欄位 (相容各種資料庫命名)
-                    col_today = next((c for c in df_tmp.columns if '當日' in c and '%' in c), next((c for c in df_tmp.columns if '當日' in c), None))
-                    col_5d = next((c for c in df_tmp.columns if '5日' in c and '%' in c), next((c for c in df_tmp.columns if '5日' in c), None))
+                    col_today = next((c for c in df_tmp.columns if '當日' in c and ('%' in c or '張' in c)), next((c for c in df_tmp.columns if '當日' in c), None))
+                    col_5d = next((c for c in df_tmp.columns if '5日' in c and ('%' in c or '張' in c)), next((c for c in df_tmp.columns if '5日' in c), None))
                     
                     extract_cols = ['統一代號']
                     rename_dict = {}
@@ -690,13 +691,21 @@ def show_weight_backtest_page(STOCK_DICT, DATA_DIR="data"):
                         extract_cols.append(col_5d)
                         rename_dict[col_5d] = f"B4_{label}_5日"
                         
+                    # 💡 如果是張數表，自動幫使用者算出「估算當日資金(萬)」，方便直接核對 1,000 萬門檻！
+                    if '張' in label and '成交' in df_tmp.columns and col_today:
+                        df_tmp['num_today_calc'] = pd.to_numeric(df_tmp[col_today].astype(str).str.replace(',', '', regex=False), errors='coerce').fillna(0)
+                        df_tmp['price_calc'] = pd.to_numeric(df_tmp['成交'].astype(str).str.replace(',', '', regex=False), errors='coerce').fillna(0)
+                        df_tmp[f"B4_{label}_當日估算(萬)"] = (df_tmp['num_today_calc'] * df_tmp['price_calc'] * 1000 / 10000).round(1)
+                        extract_cols.append(f"B4_{label}_當日估算(萬)")
+                        
                     if len(extract_cols) > 1:
                         # 將抽出的欄位與 debug_df 合併
                         debug_df = pd.merge(debug_df, df_tmp[extract_cols].rename(columns=rename_dict), on='統一代號', how='left')
 
             st.write(f"🔍 檢核明細 (共 {len(debug_df)} 筆)：")
+            #####
             st.dataframe(debug_df, use_container_width=True, hide_index=True)
-            #
+            #####
     else:
         st.info("👆 請在上方展開模組中至少設定一項條件，目前預設顯示全市場標的。")
 
