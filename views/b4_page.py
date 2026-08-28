@@ -82,9 +82,10 @@ def process_margin_df(df, type_name):
 def build_squeeze_radar(DATA_DIR):
     """軋空雷達運算引擎"""
     buy_pattern = os.path.join(DATA_DIR, "*三大法人買超佔成交比*.csv")
-    margin_dec_pattern = os.path.join(DATA_DIR, "*融資減少幅度*.csv")       
-    sbl_dec_pattern = os.path.join(DATA_DIR, "*借券賣出減少幅度*.csv")   
-    short_inc_pattern = os.path.join(DATA_DIR, "*融券增加幅度*.csv")       
+    # 🔥 全面改採「張數」或「實際金額」檔案，杜絕 % 數雜訊
+    margin_dec_pattern = os.path.join(DATA_DIR, "*融資減少張數*.csv")       
+    sbl_dec_pattern = os.path.join(DATA_DIR, "*借券賣出減少金額*.csv")   
+    short_inc_pattern = os.path.join(DATA_DIR, "*融券增加張數*.csv")      
     
     buy_files = sorted(glob.glob(buy_pattern), reverse=True)
     margin_dec_files = sorted(glob.glob(margin_dec_pattern), reverse=True)
@@ -140,24 +141,43 @@ def build_squeeze_radar(DATA_DIR):
                 if pd.api.types.is_float_dtype(df_squeeze[col]):
                     df_squeeze[col] = df_squeeze[col].round(2)
         
-        df_squeeze = df_squeeze[df_squeeze['漲跌幅'] >= 2] # 設定軋空雷達漲幅 >= value改變數值
+        # 🔥 嚴格定義軋空：當日必須上漲 (漲跌幅 > 0)
+        df_squeeze = df_squeeze[df_squeeze['漲跌幅'] > 0] 
     except Exception as e:
         return pd.DataFrame(), f"讀取買超母表失敗: {str(e)}", "", False
 
-    def get_danger_ids(files):
+    def get_danger_ids(files, data_type='vol'):
         danger_ids = set()
         if files:
             try:
                 df_temp = robust_read_csv(files[0])
                 t_id_col = next((c for c in df_temp.columns if '代號' in c), None)
                 if t_id_col:
-                    danger_ids = set(df_temp[t_id_col].astype(str).str.replace(r'\D', '', regex=True))
+                    df_temp[t_id_col] = df_temp[t_id_col].astype(str).str.replace(r'\D', '', regex=True)
+                    
+                    # 抓取 5日 欄位與成交價
+                    col_5d = next((c for c in df_temp.columns if '5日' in c), None)
+                    col_price = next((c for c in df_temp.columns if '成交' in c and '買賣' not in c), None)
+                    
+                    if col_5d:
+                        # 加上 abs() 取絕對值，無論原始檔案減幅是正號還是負號，只比較動能大小
+                        df_temp['num_5d'] = pd.to_numeric(df_temp[col_5d].astype(str).str.replace(',', '', regex=False), errors='coerce').fillna(0).abs()
+                        
+                        if data_type == 'amt':
+                            # 借券金額表單位是萬元，門檻設為 1000 萬元 (一千萬)
+                            valid_df = df_temp[df_temp['num_5d'] >= 1000]
+                            danger_ids = set(valid_df[t_id_col])
+                        elif data_type == 'vol' and col_price:
+                            # 張數表需估算金額 = 張數 * 股價 * 1000，門檻設為 10,000,000 元
+                            df_temp['price'] = pd.to_numeric(df_temp[col_price].astype(str).str.replace(',', '', regex=False), errors='coerce').fillna(0)
+                            valid_df = df_temp[(df_temp['num_5d'] * df_temp['price'] * 1000) >= 10000000]
+                            danger_ids = set(valid_df[t_id_col])
             except: pass
         return danger_ids
 
-    df_squeeze['📉融資減'] = df_squeeze['代號'].apply(lambda x: "✔️" if x in get_danger_ids(margin_dec_files) else "")
-    df_squeeze['📉借券減'] = df_squeeze['代號'].apply(lambda x: "✔️" if x in get_danger_ids(sbl_dec_files) else "")
-    df_squeeze['📈融券增'] = df_squeeze['代號'].apply(lambda x: "✔️" if x in get_danger_ids(short_inc_files) else "")
+    df_squeeze['📉融資減'] = df_squeeze['代號'].apply(lambda x: "✔️" if x in get_danger_ids(margin_dec_files, 'vol') else "")
+    df_squeeze['📉借券減'] = df_squeeze['代號'].apply(lambda x: "✔️" if x in get_danger_ids(sbl_dec_files, 'amt') else "")
+    df_squeeze['📈融券增'] = df_squeeze['代號'].apply(lambda x: "✔️" if x in get_danger_ids(short_inc_files, 'vol') else "")
     
     df_squeeze['軋空指數'] = 1 + (df_squeeze['📉融資減'] == "✔️").astype(int) + (df_squeeze['📉借券減'] == "✔️").astype(int) + (df_squeeze['📈融券增'] == "✔️").astype(int)
     df_squeeze = df_squeeze.sort_values(by=['軋空指數', '漲跌幅'], ascending=[False, False]).reset_index(drop=True)
@@ -176,8 +196,9 @@ def build_squeeze_radar(DATA_DIR):
 def build_risk_radar(DATA_DIR):
     """避險雷達運算引擎"""
     sell_pattern = os.path.join(DATA_DIR, "*三大法人賣超佔成交比*.csv")
-    margin_pattern = os.path.join(DATA_DIR, "*融資增加幅度*.csv")
-    short_pattern = os.path.join(DATA_DIR, "*借券賣出增加幅度*.csv")
+    # 🔥 全面改採「張數」或「實際金額」檔案
+    margin_pattern = os.path.join(DATA_DIR, "*融資增加張數*.csv")
+    short_pattern = os.path.join(DATA_DIR, "*借券賣出增加金額*.csv")
     
     sell_files = sorted(glob.glob(sell_pattern), reverse=True)
     margin_files = sorted(glob.glob(margin_pattern), reverse=True)
@@ -227,24 +248,40 @@ def build_risk_radar(DATA_DIR):
                 if pd.api.types.is_float_dtype(df_risk[col]):
                     df_risk[col] = df_risk[col].round(2)
         
-        df_risk = df_risk[df_risk['漲跌幅'] <= 2] #套牢雷達設定漲跌幅必須 <= value 才算套牢
+        # 🔥 嚴格定義套牢：當日必須下跌收黑 (漲跌幅 < 0)
+        df_risk = df_risk[df_risk['漲跌幅'] < 0] 
     except Exception as e:
         return pd.DataFrame(), f"讀取賣超母表失敗: {str(e)}", "", False
 
-    margin_danger_ids, short_danger_ids = set(), set()
-    if margin_files:
-        try:
-            df_margin = robust_read_csv(margin_files[0])
-            m_id_col = next((c for c in df_margin.columns if '代號' in c), None)
-            if m_id_col: margin_danger_ids = set(df_margin[m_id_col].astype(str).str.replace(r'\D', '', regex=True))
-        except: pass
-        
-    if short_files:
-        try:
-            df_short = robust_read_csv(short_files[0])
-            s_id_col = next((c for c in df_short.columns if '代號' in c), None)
-            if s_id_col: short_danger_ids = set(df_short[s_id_col].astype(str).str.replace(r'\D', '', regex=True))
-        except: pass
+    def get_danger_ids(files, data_type='vol'):
+        danger_ids = set()
+        if files:
+            try:
+                df_temp = robust_read_csv(files[0])
+                t_id_col = next((c for c in df_temp.columns if '代號' in c), None)
+                if t_id_col:
+                    df_temp[t_id_col] = df_temp[t_id_col].astype(str).str.replace(r'\D', '', regex=True)
+                    
+                    col_5d = next((c for c in df_temp.columns if '5日' in c), None)
+                    col_price = next((c for c in df_temp.columns if '成交' in c and '買賣' not in c), None)
+                    
+                    if col_5d:
+                        df_temp['num_5d'] = pd.to_numeric(df_temp[col_5d].astype(str).str.replace(',', '', regex=False), errors='coerce').fillna(0).abs()
+                        
+                        if data_type == 'amt':
+                            # 借券金額表單位是萬元，門檻設為 1000 萬元 (一千萬)
+                            valid_df = df_temp[df_temp['num_5d'] >= 1000]
+                            danger_ids = set(valid_df[t_id_col])
+                        elif data_type == 'vol' and col_price:
+                            # 張數表需估算金額 = 張數 * 股價 * 1000，門檻設為 10,000,000 元
+                            df_temp['price'] = pd.to_numeric(df_temp[col_price].astype(str).str.replace(',', '', regex=False), errors='coerce').fillna(0)
+                            valid_df = df_temp[(df_temp['num_5d'] * df_temp['price'] * 1000) >= 10000000]
+                            danger_ids = set(valid_df[t_id_col])
+            except: pass
+        return danger_ids
+
+    margin_danger_ids = get_danger_ids(margin_files, 'vol')
+    short_danger_ids = get_danger_ids(short_files, 'amt')
 
     df_risk['🚨融資套牢'] = df_risk['代號'].apply(lambda x: "✔️" if x in margin_danger_ids else "")
     df_risk['📉借券大增'] = df_risk['代號'].apply(lambda x: "✔️" if x in short_danger_ids else "")
