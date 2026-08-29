@@ -92,9 +92,10 @@ def sync_b0_data(DATA_DIR):
     date_groups = {}
     for f in files:
         basename = os.path.basename(f)
+        # 尋找檔名中連續的數字 (例如 20260828, 0828 等)
         matches = re.findall(r'\d{4,8}', basename)
         if matches:
-            d_str = matches[-1] 
+            d_str = matches[-1] # 取檔名中最後一組數字作為日期基準
             if d_str not in date_groups: date_groups[d_str] = []
             date_groups[d_str].append(f)
             
@@ -106,7 +107,7 @@ def sync_b0_data(DATA_DIR):
     all_dfs = []
     df_today = pd.DataFrame()
     
-    # 步驟 3：依序合併每天的所有切片檔案
+    # 步驟 3：依序合併每天的所有切片檔案 (例如把當天 1~1200 名全黏在一起)
     for i, d_str in enumerate(sorted_dates):
         daily_dfs = []
         for f in date_groups[d_str]:
@@ -127,7 +128,7 @@ def sync_b0_data(DATA_DIR):
         
         if daily_dfs:
             daily_combined = pd.concat(daily_dfs, ignore_index=True)
-            daily_combined = daily_combined.drop_duplicates(subset=['統一代號'])
+            daily_combined = daily_combined.drop_duplicates(subset=['統一代號']) # 防呆，避免同一天股票重複
             all_dfs.append(daily_combined)
             if i == 0:
                 df_today = daily_combined.copy()
@@ -161,10 +162,10 @@ def sync_b0_data(DATA_DIR):
         else: p_stat = "大跌"
         comb = f"{v_stat}{p_stat}"
         mapping = {
-            "放量大漲": "🚀 放量大漲 (量價齊升，持續看漲)", "縮量大漲": "🔒 縮量大漲 (鎖倉高控盤，延續上漲)", "✈️ 平量大漲": "✈️ 平量大漲 (一致看漲無拋壓，加速上漲)",
+            "放量大漲": "🚀 放量大漲 (量價齊升，持續看漲)", "縮量大漲": "🔒 縮量大漲 (鎖倉高控盤，延續上漲)", "平量大漲": "✈️ 平量大漲 (一致看漲無拋壓，加速上漲)",
             "縮量價升": "📈 價升量縮 (量價背離，下方承接看拉高)", "放量滯漲": "⚠️ 放量滯漲 (拋壓增大，即將見頂反轉)", "平量滯漲": "⏸️ 平量滯漲 (拋壓增大，高位見頂)",
             "縮量小跌": "📉 縮量小跌 (主力洗盤止跌，擇機進場)", "放量小跌": "🛡️ 放量小跌 (見底信號，越跌越買反轉)", "平量小跌": "🥀 平量價縮 (下跌中繼，弱反彈信號)",
-            "縮量大跌": "☠️ 縮量大跌 (一致看空無承接，加速下跌)", "放量大跌": "🩸 放量大跌 (跟風砸盤，高位出貨持續跌)", "🕳️ 平量大跌": "🕳️ 平量大跌 (一致看空無承接，加速下跌)"
+            "縮量大跌": "☠️ 縮量大跌 (一致看空無承接，加速下跌)", "放量大跌": "🩸 放量大跌 (跟風砸盤，高位出貨持續跌)", "平量大跌": "🕳️ 平量大跌 (一致看空無承接，加速下跌)"
         }
         return mapping.get(comb, "⚖️ 溫和震盪整理")
 
@@ -298,7 +299,7 @@ def show_weight_backtest_page(STOCK_DICT, DATA_DIR="data"):
     df_b0 = get_df('b0_price')
     if not df_b0.empty and '股價日期' in df_b0.columns:
         date_raw = str(df_b0['股價日期'].iloc[0])
-        b0_latest_date_str = f"2026/{date_raw}" if "/" in date_raw else date_raw
+        b0_latest_date_str = f"2026/{date_raw[-4:-2]}/{date_raw[-2:]}" if len(date_raw)>=4 else date_raw
 
     # --- 模組 B0 ---
     with st.expander(f"💰 B0 基礎價量與估值過濾 (資料基準日: {b0_latest_date_str})", expanded=False):
@@ -937,7 +938,7 @@ def show_weight_backtest_page(STOCK_DICT, DATA_DIR="data"):
             
             st.write(f"🔍 檢核明細 (共 {len(debug_df)} 筆)：")
             st.dataframe(debug_df, use_container_width=True, hide_index=True)
-            st.session_state['debug_df'] = debug_df # 存入 session_state 給後續寫入追蹤用
+            st.session_state['debug_df'] = debug_df 
     else:
         st.info("👆 請在上方展開模組中至少設定一項條件，目前預設顯示全市場標的。")
 
@@ -960,22 +961,22 @@ def show_weight_backtest_page(STOCK_DICT, DATA_DIR="data"):
         with c2:
             st.markdown("**資券籌碼變化**")
             w_b4_good = st.number_input("融資減/融券增", value=1.0, step=0.5)
-            w_b4_short_dec = st.number_input("借券賣出減少", value=1.5, step=0.5) # 新增權重
-            w_b4_short_inc = st.number_input("借券賣出增加", value=-1.5, step=0.5) # 新增權重
-            w_b4_price_up = st.number_input("今日大漲(>3%)", value=0.0, step=0.5) # 新增權重 (預設0)
+            w_b4_short_dec = st.number_input("借券賣出減少", value=1.5, step=0.5) 
+            w_b4_short_inc = st.number_input("借券賣出增加", value=-1.5, step=0.5) 
+            w_b4_price_up = st.number_input("今日大漲(>3%)", value=0.0, step=0.5) 
         with c3:
             st.markdown("**大戶波段防線**")
             w_b5 = st.number_input("千張大戶持股增加", value=3.0, step=0.5)
-            w_b5_800 = st.number_input("800張大戶持股增加", value=2.0, step=0.5) # 新增權重
-            w_b5_600 = st.number_input("600張大戶持股增加", value=1.5, step=0.5) # 新增權重
-            w_b5_400 = st.number_input("400張大戶持股增加", value=1.0, step=0.5) # 新增權重
+            w_b5_800 = st.number_input("800張大戶持股增加", value=2.0, step=0.5) 
+            w_b5_600 = st.number_input("600張大戶持股增加", value=1.5, step=0.5) 
+            w_b5_400 = st.number_input("400張大戶持股增加", value=1.0, step=0.5) 
         with c4:
             st.markdown("**特定資金與董監防線**")
             w_b6 = st.number_input("鉅額防守成功", value=1.5, step=0.5)
             w_b7 = st.number_input("董監增持/質押降", value=1.5, step=0.5)
 
     # ==========================================
-    # 3. 執行計分運算 (Scoring Engine)
+    # 3. 執行計分運算 (Scoring Engine) - 修正互動按鈕狀態流失
     # ==========================================
     if st.button("🚀 開始計算籌碼火力分數", type="primary", use_container_width=True):
         with st.spinner("🧠 籌碼大數據融合計算中..."):
@@ -1059,13 +1060,13 @@ def show_weight_backtest_page(STOCK_DICT, DATA_DIR="data"):
                     sign = "+" if w_b7 > 0 else ""
                     score_df.loc[mask, '得分明細'] += f"[質押下降 {sign}{w_b7}] "
 
-            # 📌 關鍵修正：將運算結果存入 session_state
+            # 將結果鎖定到 session_state，避免互動時表格消失
             score_df = score_df.sort_values(by='總分', ascending=False).reset_index(drop=True)
             st.session_state['scored_result'] = score_df[score_df['總分'] != 0].copy()
             st.session_state['score_calculated'] = True
 
     # ==========================================
-    # 4. 結果展示 (改用 session_state 渲染，避免打勾時表格消失)
+    # 4. 結果展示 & 模擬交易模型驗證 (使用 session_state 保持狀態)
     # ==========================================
     if st.session_state.get('score_calculated', False) and 'scored_result' in st.session_state:
         result_df = st.session_state['scored_result']
@@ -1082,6 +1083,7 @@ def show_weight_backtest_page(STOCK_DICT, DATA_DIR="data"):
                 
                 st.caption("💡 勾選下方『寫入追蹤』，即可將該檔標的與目前的策略過濾特徵，存入歷史模型庫中觀察。")
                 
+                # 互動表格
                 edited_df = st.data_editor(
                     display_df,
                     column_config={
@@ -1196,93 +1198,88 @@ def show_weight_backtest_page(STOCK_DICT, DATA_DIR="data"):
             else:
                 st.warning("名單中沒有標的符合您的嚴格過濾條件，或得分為 0。")
 
-            # ----------------------------------------------------
-            # 歷史模型驗證區塊 (Tab 2)
-            # ----------------------------------------------------
-            with tab_track:
-                st.markdown("### 📈 策略勝率回測雷達")
-                st.caption("驗證您所設定的條件與權重，在過去 1~2 個月內的實際表現，藉此優化策略。")
-                try:
-                    from streamlit_gsheets import GSheetsConnection
-                    conn = st.connection("gsheets", type=GSheetsConnection)
-                    SHEET_URL = st.secrets["connections"]["gsheets"]["spreadsheet"]
+        # ----------------------------------------------------
+        # 歷史模型驗證區塊 (Tab 2)
+        # ----------------------------------------------------
+        with tab_track:
+            st.markdown("### 📈 策略勝率回測雷達")
+            st.caption("驗證您所設定的條件與權重，在過去 1~2 個月內的實際表現，藉此優化策略。")
+            try:
+                from streamlit_gsheets import GSheetsConnection
+                conn = st.connection("gsheets", type=GSheetsConnection)
+                SHEET_URL = st.secrets["connections"]["gsheets"]["spreadsheet"]
+                
+                history_track_df = conn.read(spreadsheet=SHEET_URL, worksheet="實驗室模型追蹤", ttl=0).dropna(how="all")
+                
+                if not history_track_df.empty:
+                    today_obj = datetime.datetime.now()
+                    monday_obj = today_obj - datetime.timedelta(days=today_obj.weekday())
+                    monday_str = monday_obj.strftime("%Y-%m-%d")
+                    history_track_df['date_obj'] = pd.to_datetime(history_track_df['鎖定日期'], errors='coerce')
+                    this_week_data = history_track_df[history_track_df['date_obj'] >= pd.to_datetime(monday_str)]
                     
-                    history_track_df = conn.read(spreadsheet=SHEET_URL, worksheet="實驗室模型追蹤", ttl=0).dropna(how="all")
+                    st.info(f"📊 **本週追蹤額度狀態：已使用 {len(this_week_data)} / 5 檔**")
                     
-                    if not history_track_df.empty:
-                        # 幫使用者計算一下本週額度
-                        today_obj = datetime.datetime.now()
-                        monday_obj = today_obj - datetime.timedelta(days=today_obj.weekday())
-                        monday_str = monday_obj.strftime("%Y-%m-%d")
-                        history_track_df['date_obj'] = pd.to_datetime(history_track_df['鎖定日期'], errors='coerce')
-                        this_week_data = history_track_df[history_track_df['date_obj'] >= pd.to_datetime(monday_str)]
-                        
-                        st.info(f"📊 **本週追蹤額度狀態：已使用 {len(this_week_data)} / 5 檔**")
-                        
-                        # 依據日期選擇回顧
-                        selected_week = st.selectbox("📅 選擇要回顧的策略發動日", sorted(history_track_df['鎖定日期'].astype(str).unique(), reverse=True), key="sel_track_date")
-                        week_df = history_track_df[history_track_df['鎖定日期'] == selected_week].copy()
-                        
-                        lock_date_obj = datetime.datetime.strptime(selected_week, "%Y-%m-%d")
-                        days_passed = (datetime.datetime.now() - lock_date_obj).days
-                        
-                        # 大於 60 天 (2個月) 自動視為結案
-                        is_expired = days_passed >= 60 
-                        
-                        if is_expired:
-                            status_tag = "🔴 已結案 (追蹤期滿 2 個月)"
-                            st.info("🔒 此策略模型已追蹤滿 2 個月。")
-                        else:
-                            weeks_passed = (days_passed // 7) + 1
-                            status_tag = f"🟢 追蹤中 (第 {weeks_passed} 週)"
-                        
-                        st.markdown(f"**目前狀態：** `{status_tag}` ｜ **距今發動天數：** `{days_passed} 天`")
-                        
-                        # 抓取本機 B0 最新價格
-                        df_b0_today = get_df('b0_price')
-                        latest_prices = {}
-                        if not df_b0_today.empty and '成交' in df_b0_today.columns:
-                            for _, row in df_b0_today.iterrows():
-                                try: latest_prices[str(row['統一代號'])] = float(str(row['成交']).replace(',', ''))
-                                except: pass
-                        
-                        week_df['最新價格'] = week_df['代號'].astype(str).map(latest_prices).fillna(0.0)
-                        
-                        def calc_price_return(row):
-                            try:
-                                lock_p = float(row.get('鎖定收盤價', 0))
-                                curr_p = float(row.get('最新價格', 0))
-                                if lock_p > 0 and curr_p > 0:
-                                    pct = ((curr_p - lock_p) / lock_p) * 100
-                                    if pct > 0: return f"🚀 +{pct:.1f}%"
-                                    elif pct < 0: return f"🩸 {pct:.1f}%"
-                                    else: return "0.0%"
-                                return "-"
-                            except: return "-"
-                        
-                        week_df['區間報酬'] = week_df.apply(calc_price_return, axis=1)
-                        
-                        # 準備顯示欄位
-                        show_cols = ['代號', '名稱', '鎖定收盤價', '最新價格', '區間報酬', '總分', '得分明細', '當下策略特徵']
-                        
-                        st.dataframe(
-                            week_df[[c for c in show_cols if c in week_df.columns]], 
-                            use_container_width=True, 
-                            hide_index=True,
-                            column_config={
-                                "當下策略特徵": st.column_config.TextColumn(
-                                    "🔍 當下策略特徵 (滑過查看)", 
-                                    help="紀錄當時觸發的所有量價與籌碼狀態，供您回顧優化策略用。", 
-                                    width="medium", 
-                                    max_chars=30
-                                ),
-                                "得分明細": st.column_config.TextColumn(
-                                    "🏆 得分明細", 
-                                    width="medium"
-                                )
-                            }
-                        )
+                    selected_week = st.selectbox("📅 選擇要回顧的策略發動日", sorted(history_track_df['鎖定日期'].astype(str).unique(), reverse=True), key="sel_track_date")
+                    week_df = history_track_df[history_track_df['鎖定日期'] == selected_week].copy()
+                    
+                    lock_date_obj = datetime.datetime.strptime(selected_week, "%Y-%m-%d")
+                    days_passed = (datetime.datetime.now() - lock_date_obj).days
+                    
+                    is_expired = days_passed >= 60 
+                    
+                    if is_expired:
+                        status_tag = "🔴 已結案 (追蹤期滿 2 個月)"
+                        st.info("🔒 此策略模型已追蹤滿 2 個月。")
                     else:
-                        st.info("⚪ 目前實驗室模型庫中尚無紀錄。請先在上方設定條件，勾選標的後點擊「寫入模擬追蹤系統」。")
-                except Exception as e:
-                    st.warning("⚪ 尚無歷史追蹤紀錄，或 Google Sheets 尚未建立名為「實驗室模型追蹤」的工作表。")
+                        weeks_passed = (days_passed // 7) + 1
+                        status_tag = f"🟢 追蹤中 (第 {weeks_passed} 週)"
+                    
+                    st.markdown(f"**目前狀態：** `{status_tag}` ｜ **距今發動天數：** `{days_passed} 天`")
+                    
+                    df_b0_today = get_df('b0_price')
+                    latest_prices = {}
+                    if not df_b0_today.empty and '成交' in df_b0_today.columns:
+                        for _, row in df_b0_today.iterrows():
+                            try: latest_prices[str(row['統一代號'])] = float(str(row['成交']).replace(',', ''))
+                            except: pass
+                    
+                    week_df['最新價格'] = week_df['代號'].astype(str).map(latest_prices).fillna(0.0)
+                    
+                    def calc_price_return(row):
+                        try:
+                            lock_p = float(row.get('鎖定收盤價', 0))
+                            curr_p = float(row.get('最新價格', 0))
+                            if lock_p > 0 and curr_p > 0:
+                                pct = ((curr_p - lock_p) / lock_p) * 100
+                                if pct > 0: return f"🚀 +{pct:.1f}%"
+                                elif pct < 0: return f"🩸 {pct:.1f}%"
+                                else: return "0.0%"
+                            return "-"
+                        except: return "-"
+                    
+                    week_df['區間報酬'] = week_df.apply(calc_price_return, axis=1)
+                    
+                    show_cols = ['代號', '名稱', '鎖定收盤價', '最新價格', '區間報酬', '總分', '得分明細', '當下策略特徵']
+                    
+                    st.dataframe(
+                        week_df[[c for c in show_cols if c in week_df.columns]], 
+                        use_container_width=True, 
+                        hide_index=True,
+                        column_config={
+                            "當下策略特徵": st.column_config.TextColumn(
+                                "🔍 當下策略特徵 (滑過查看)", 
+                                help="紀錄當時觸發的所有量價與籌碼狀態，供您回顧優化策略用。", 
+                                width="medium", 
+                                max_chars=30
+                            ),
+                            "得分明細": st.column_config.TextColumn(
+                                "🏆 得分明細", 
+                                width="medium"
+                            )
+                        }
+                    )
+                else:
+                    st.info("⚪ 目前實驗室模型庫中尚無紀錄。請先在上方設定條件，勾選標的後點擊「寫入模擬追蹤系統」。")
+            except Exception as e:
+                st.warning("⚪ 尚無歷史追蹤紀錄，或 Google Sheets 尚未建立名為「實驗室模型追蹤」的工作表。")
