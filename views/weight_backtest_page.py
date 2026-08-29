@@ -122,14 +122,7 @@ def sync_b0_data(DATA_DIR):
                 c_code = next((c for c in df.columns if '代號' in c), None)
                 if c_code:
                     df['統一代號'] = df[c_code].astype(str).str.replace(r'\.0$', '', regex=True).str.strip()
-                    
-                    # 🔍 修正：動態尋找成交張數/成交量欄位，避免 KeyError
-                    c_vol = next((c for c in df.columns if '成交張數' in c or '成交量' in c), None)
-                    if c_vol:
-                        df['成交張數_num'] = pd.to_numeric(df[c_vol].astype(str).str.replace(',', ''), errors='coerce').fillna(0)
-                    else:
-                        df['成交張數_num'] = 0 # 若真的沒有該欄位，預設為 0 以防崩潰
-                        
+                    df['成交張數_num'] = pd.to_numeric(df['成交張數'].astype(str).str.replace(',', ''), errors='coerce').fillna(0)
                     df['股價日期'] = d_str
                     daily_dfs.append(df)
         
