@@ -340,7 +340,7 @@ def show_weight_backtest_page(STOCK_DICT, DATA_DIR="data"):
         b0_exclude_loss = c_b0_6.checkbox("🚫 排除虧損公司 (PER 為負或無資料)", key="filter_b0_exclude_loss")
 
         # 👇 新增的量價矩陣 UI 👇
-        st.markdown("**🔹 4. 股市量價動能矩陣 (主力照妖鏡)**")
+        st.markdown("**🔹 4. 股市量價動能矩陣 (主力照妖鏡)測試中**")
         st.caption("透過自動比對當日價量與「近5日均量」，精準判斷主力是正在洗盤、吸籌還是出貨。")
         vp_options = [
             "🚀 放量大漲 (量價齊升，持續看漲)", "🔒 縮量大漲 (鎖倉高控盤，延續上漲)", "✈️ 平量大漲 (一致看漲無拋壓，加速上漲)",
@@ -1416,30 +1416,185 @@ def show_weight_backtest_page(STOCK_DICT, DATA_DIR="data"):
                     sign = "+" if w_b7 > 0 else ""
                     score_df.loc[mask, '得分明細'] += f"[質押下降 {sign}{w_b7}] "
 
-            # ==========================================
-            # 4. 結果展示
+# ==========================================
+            # 4. 結果展示 & 模擬交易模型驗證 (Fragment)
             # ==========================================
             score_df = score_df.sort_values(by='總分', ascending=False).reset_index(drop=True)
             result_df = score_df[score_df['總分'] != 0].copy()
 
             st.write("---")
-            st.markdown(f"### 🏆 策略計分結果 (共 {len(result_df)} 檔獲取分數)")
+            st.markdown(f"### 🏆 策略計分與模型驗證 (共 {len(result_df)} 檔獲取分數)")
             
-            if not result_df.empty:
-                def highlight_score(val):
-                    if val >= 5: return 'color: #FF4B4B; font-weight: bold'
-                    elif val > 0: return 'color: #38BDF8'
-                    elif val < 0: return 'color: #00E676'
-                    return ''
-                
-                display_df = result_df[['統一代號', '股票名稱', '產業別', '總分', '得分明細']].rename(columns={'統一代號': '股票代號'})
-                st.dataframe(
-                    display_df.style.map(highlight_score, subset=['總分']), 
-                    use_container_width=True,
-                    hide_index=True
-                )
-            else:
-                if len(score_df) > 0:
-                    st.warning(f"名單中有 {len(score_df)} 檔標的符合過濾條件，但在您的權重設定下得分均為 0。")
+            tab_result, tab_track = st.tabs(["📊 今日策略計分結果", "🎯 歷史模型驗證追蹤 (模擬交易)"])
+
+            with tab_result:
+                if not result_df.empty:
+                    def highlight_score(val):
+                        if val >= 5: return 'color: #FF4B4B; font-weight: bold'
+                        elif val > 0: return 'color: #38BDF8'
+                        elif val < 0: return 'color: #00E676'
+                        return ''
+                    
+                    display_df = result_df[['統一代號', '股票名稱', '產業別', '總分', '得分明細']].rename(columns={'統一代號': '股票代號'})
+                    st.dataframe(
+                        display_df.style.map(highlight_score, subset=['總分']), 
+                        use_container_width=True,
+                        hide_index=True
+                    )
+                    
+                    # --- 開放給使用者的一鍵追蹤按鈕 ---
+                    st.write("---")
+                    st.markdown("#### 💾 儲存今日策略模型 (Top 5)")
+                    st.caption("將當下分數最高的前 5 檔股票及過濾條件寫入追蹤系統，並鎖定今日價格，藉此驗證此策略的未來勝率。")
+                    
+                    if st.button("🚀 寫入模擬追蹤系統 (每日限一次)", key="btn_save_track", type="primary"):
+                        with st.spinner("正在鎖定收盤價並寫入雲端..."):
+                            try:
+                                import datetime
+                                from streamlit_gsheets import GSheetsConnection
+                                conn = st.connection("gsheets", type=GSheetsConnection)
+                                SHEET_URL = st.secrets["connections"]["gsheets"]["spreadsheet"]
+                                
+                                track_date = datetime.datetime.now().strftime("%Y-%m-%d")
+                                
+                                # 準備寫入的 Top 5 資料
+                                top5_track = result_df.head(5).copy()
+                                top5_track['鎖定日期'] = track_date
+                                
+                                # 取當日 B0 收盤價作為鎖定價格
+                                df_b0_price = get_df('b0_price')
+                                price_dict = {}
+                                if not df_b0_price.empty and '成交' in df_b0_price.columns:
+                                    for _, row in df_b0_price.iterrows():
+                                        try: price_dict[str(row['統一代號'])] = float(str(row['成交']).replace(',', ''))
+                                        except: pass
+                                
+                                top5_track['鎖定收盤價'] = top5_track['統一代號'].map(price_dict).fillna(0.0)
+                                top5_track['追蹤狀態'] = "追蹤中"
+                                
+                                # 為了不破壞原始邏輯，我們把所有的「除錯透視鏡欄位」轉成字串，當作策略特徵存起來
+                                debug_df_merge = top5_track[['統一代號']].copy()
+                                if 'debug_df' in locals() and not debug_df.empty:
+                                    debug_cols_to_keep = [c for c in debug_df.columns if c not in ['統一代號', '股票名稱', '產業別', '總分', '得分明細']]
+                                    top5_track['當下策略特徵'] = ""
+                                    for idx, row in top5_track.iterrows():
+                                        matched = debug_df[debug_df['統一代號'] == row['統一代號']]
+                                        if not matched.empty:
+                                            # 把有值的特徵串起來
+                                            features = []
+                                            for col in debug_cols_to_keep:
+                                                val = str(matched[col].iloc[0])
+                                                if val != 'nan' and val != 'None' and val != '':
+                                                    features.append(f"{col}:{val}")
+                                            top5_track.at[idx, '當下策略特徵'] = " | ".join(features)[:1000] # 避免字數過爆
+                                else:
+                                    top5_track['當下策略特徵'] = "無詳細特徵紀錄"
+                                
+                                # 只保留要存入的欄位，統一格式
+                                final_save_df = top5_track[['鎖定日期', '統一代號', '股票名稱', '鎖定收盤價', '總分', '得分明細', '當下策略特徵', '追蹤狀態']].rename(columns={'統一代號': '代號', '股票名稱': '名稱'})
+                                
+                                # 讀取舊資料並寫入
+                                try: old_track = conn.read(spreadsheet=SHEET_URL, worksheet="實驗室模型追蹤", ttl=0).dropna(how="all")
+                                except: old_track = pd.DataFrame()
+                                
+                                # 防呆：避免同一天重複存入
+                                if not old_track.empty and '鎖定日期' in old_track.columns:
+                                    if track_date in old_track['鎖定日期'].values:
+                                        # 刪除舊的同一天資料，以最新的為主
+                                        old_track = old_track[old_track['鎖定日期'] != track_date]
+                                        
+                                new_track = pd.concat([old_track, final_save_df], ignore_index=True)
+                                conn.update(spreadsheet=SHEET_URL, worksheet="實驗室模型追蹤", data=new_track)
+                                st.success(f"✅ 成功將 5 檔標的寫入模型驗證庫！")
+                                
+                            except Exception as e:
+                                st.error(f"❌ 寫入失敗：{e}。請確認 Google Sheets 已建立名為「實驗室模型追蹤」的工作表。")
+
                 else:
-                    st.warning("沒有任何標的符合您的嚴格過濾條件。")
+                    if len(score_df) > 0:
+                        st.warning(f"名單中有 {len(score_df)} 檔標的符合過濾條件，但在您的權重設定下得分均為 0。")
+                    else:
+                        st.warning("沒有任何標的符合您的嚴格過濾條件。")
+
+            # ----------------------------------------------------
+            # 歷史模型驗證區塊 (Tab 2)
+            # ----------------------------------------------------
+            with tab_track:
+                st.markdown("### 📈 策略勝率回測雷達")
+                st.caption("驗證您所設定的條件與權重，在過去 1~2 個月內的實際表現，藉此優化策略。")
+                try:
+                    from streamlit_gsheets import GSheetsConnection
+                    conn = st.connection("gsheets", type=GSheetsConnection)
+                    SHEET_URL = st.secrets["connections"]["gsheets"]["spreadsheet"]
+                    
+                    history_track_df = conn.read(spreadsheet=SHEET_URL, worksheet="實驗室模型追蹤", ttl=0).dropna(how="all")
+                    
+                    if not history_track_df.empty:
+                        selected_week = st.selectbox("📅 選擇要回顧的策略發動日", sorted(history_track_df['鎖定日期'].astype(str).unique(), reverse=True), key="sel_track_date")
+                        week_df = history_track_df[history_track_df['鎖定日期'] == selected_week].copy()
+                        
+                        import datetime
+                        from datetime import timedelta
+                        lock_date_obj = datetime.datetime.strptime(selected_week, "%Y-%m-%d")
+                        days_passed = (datetime.datetime.now() - lock_date_obj).days
+                        
+                        # 大於 60 天 (2個月) 自動視為結案
+                        is_expired = days_passed >= 60 
+                        
+                        if is_expired:
+                            status_tag = "🔴 已結案 (追蹤期滿 2 個月)"
+                            st.info("🔒 此策略模型已追蹤滿 2 個月。")
+                        else:
+                            weeks_passed = (days_passed // 7) + 1
+                            status_tag = f"🟢 追蹤中 (第 {weeks_passed} 週)"
+                        
+                        st.markdown(f"**目前狀態：** `{status_tag}` ｜ **距今發動天數：** `{days_passed} 天`")
+                        
+                        # 抓取本機 B0 最新價格
+                        df_b0_today = get_df('b0_price')
+                        latest_prices = {}
+                        if not df_b0_today.empty and '成交' in df_b0_today.columns:
+                            for _, row in df_b0_today.iterrows():
+                                try: latest_prices[str(row['統一代號'])] = float(str(row['成交']).replace(',', ''))
+                                except: pass
+                        
+                        week_df['最新價格'] = week_df['代號'].astype(str).map(latest_prices).fillna(0.0)
+                        
+                        def calc_price_return(row):
+                            try:
+                                lock_p = float(row.get('鎖定收盤價', 0))
+                                curr_p = float(row.get('最新價格', 0))
+                                if lock_p > 0 and curr_p > 0:
+                                    pct = ((curr_p - lock_p) / lock_p) * 100
+                                    if pct > 0: return f"🚀 +{pct:.1f}%"
+                                    elif pct < 0: return f"🩸 {pct:.1f}%"
+                                    else: return "0.0%"
+                                return "-"
+                            except: return "-"
+                        
+                        week_df['區間報酬'] = week_df.apply(calc_price_return, axis=1)
+                        
+                        # 準備顯示欄位
+                        show_cols = ['代號', '名稱', '鎖定收盤價', '最新價格', '區間報酬', '總分', '得分明細', '當下策略特徵']
+                        
+                        st.dataframe(
+                            week_df[[c for c in show_cols if c in week_df.columns]], 
+                            use_container_width=True, 
+                            hide_index=True,
+                            column_config={
+                                "當下策略特徵": st.column_config.TextColumn(
+                                    "🔍 當下策略特徵 (滑過查看)", 
+                                    help="紀錄當時觸發的所有量價與籌碼狀態，供您回顧優化策略用。", 
+                                    width="medium", 
+                                    max_chars=30
+                                ),
+                                "得分明細": st.column_config.TextColumn(
+                                    "🏆 得分明細", 
+                                    width="medium"
+                                )
+                            }
+                        )
+                    else:
+                        st.info("⚪ 目前實驗室模型庫中尚無紀錄。請先在上方設定條件，點擊「寫入模擬追蹤系統」。")
+                except Exception as e:
+                    st.warning("⚪ 尚無歷史追蹤紀錄，或 Google Sheets 尚未建立名為「實驗室模型追蹤」的工作表。")
