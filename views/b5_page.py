@@ -224,7 +224,7 @@ def show_b5_page(DATA_DIR, STOCK_DICT):
     # ================= TAB 1: 長短線共振 =================
     with tab_long_short:
         st.markdown("#### 長短線大戶籌碼雙向共振榜")
-        st.caption("💡 核心邏輯：1000張大戶波段吸籌（6周增）且本週加碼（最新週增），同時聯手 400張短線大戶波段與本週皆同步加碼的強勢共振標的。")
+        st.caption("💡 核心邏輯：1000張大戶波段吸籌（6周增）且本週加碼（最新週增），同時聯手 400張短線大戶波段與本週皆同步加碼的強勢共振標的；另外留意分割股票當周會有很大的誤差。")
         
         if not filtered_1000_df.empty and not filtered_400_df.empty:
             df_1k, df_400 = filtered_1000_df.copy(), filtered_400_df.copy()
