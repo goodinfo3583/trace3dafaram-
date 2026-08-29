@@ -79,7 +79,7 @@ def clean_stock_id(df):
     return df
 
 # ==========================================
-# 🌟 B0 專屬背景喚醒：讀取每日成交價量
+# 🌟 B0 專屬背景喚醒：讀取每日成交價量與 5日動能矩陣
 # ==========================================
 def sync_b0_data(DATA_DIR):
     search_patterns = [os.path.join(DATA_DIR, "*成交價*.csv")]
@@ -88,22 +88,84 @@ def sync_b0_data(DATA_DIR):
         files.extend(glob.glob(pattern))
     if not files: return
     
-    # 永遠只抓最新的一天
-    latest_file = sorted(files, reverse=True)[0]
-    df = None
-    for enc in ['utf-8-sig', 'big5', 'cp950', 'utf-8']:
-        try:
-            df = pd.read_csv(latest_file, encoding=enc, header=0)
-            break
-        except: pass
+    # 抓取最近 5 個交易日的檔案
+    files = sorted(files, reverse=True)[:5]
+    
+    df_list = []
+    for i, f in enumerate(files):
+        df = None
+        for enc in ['utf-8-sig', 'big5', 'cp950', 'utf-8']:
+            try:
+                df = pd.read_csv(f, encoding=enc, header=0)
+                break
+            except: pass
+            
+        if df is not None and not df.empty:
+            df.columns = [str(c).replace(' ', '').replace('\u3000', '').replace('\ufeff', '').replace('\xa0', '') for c in df.columns]
+            c_code = next((c for c in df.columns if '代號' in c), None)
+            if c_code:
+                df['統一代號'] = df[c_code].astype(str).str.replace(r'\.0$', '', regex=True).str.strip()
+                df['成交張數_num'] = pd.to_numeric(df['成交張數'].astype(str).str.replace(',', ''), errors='coerce').fillna(0)
+                df_list.append(df)
+                
+    if not df_list: return
+    
+    # 取最新的一天作為主表
+    df_today = df_list[0].copy()
+    
+    # 計算 5 日均量
+    if len(df_list) > 1:
+        all_vols = pd.concat([d[['統一代號', '成交張數_num']] for d in df_list])
+        avg_vol = all_vols.groupby('統一代號')['成交張數_num'].mean().reset_index()
+        avg_vol = avg_vol.rename(columns={'成交張數_num': '5日均量'})
+        df_today = pd.merge(df_today, avg_vol, on='統一代號', how='left')
+    else:
+        df_today['5日均量'] = df_today['成交張數_num']
         
-    if df is not None and not df.empty:
-        # 去除所有欄位名稱中的空白 (例如將 '漲跌 幅' 變成 '漲跌幅')
-        df.columns = [str(c).replace(' ', '').replace('\u3000', '').replace('\ufeff', '').replace('\xa0', '') for c in df.columns]
-        c_code = next((c for c in df.columns if '代號' in c), None)
-        if c_code:
-            df['統一代號'] = df[c_code].astype(str).str.replace(r'\.0$', '', regex=True).str.strip()
-        st.session_state['b0_price'] = df
+    # 🌟 核心：量價關係 12 定律矩陣演算法
+    def get_vp_status(row):
+        pct = pd.to_numeric(str(row.get('漲跌幅', '0')).replace('%', ''), errors='coerce')
+        if pd.isna(pct): pct = 0
+        
+        vol = row.get('成交張數_num', 0)
+        avg_v = row.get('5日均量', 0)
+        if avg_v == 0 or vol == 0: return "⚪ 無明顯動能"
+        
+        ratio = vol / avg_v
+        
+        # 1. 判定量能 (1.5 倍為放量，0.7 倍以下為縮量)
+        if ratio >= 1.5: v_stat = "放量"
+        elif ratio <= 0.7: v_stat = "縮量"
+        else: v_stat = "平量"
+        
+        # 2. 判定價格 (大漲>4%，滯漲/平盤在 -1.5~1.5% 之間)
+        if pct >= 4.0: p_stat = "大漲"
+        elif pct > 1.5: p_stat = "價升"
+        elif pct >= -1.5: p_stat = "滯漲"
+        elif pct > -4.0: p_stat = "小跌"
+        else: p_stat = "大跌"
+        
+        comb = f"{v_stat}{p_stat}"
+        
+        # 3. 映射到您的專業操盤術語
+        mapping = {
+            "放量大漲": "🚀 放量大漲 (量價齊升，持續看漲)",
+            "縮量大漲": "🔒 縮量大漲 (鎖倉高控盤，延續上漲)",
+            "平量大漲": "✈️ 平量大漲 (一致看漲無拋壓，加速上漲)",
+            "縮量價升": "📈 價升量縮 (量價背離，下方承接看拉高)",
+            "放量滯漲": "⚠️ 放量滯漲 (拋壓增大，即將見頂反轉)",
+            "平量滯漲": "⏸️ 平量滯漲 (拋壓增大，高位見頂)",
+            "縮量小跌": "📉 縮量小跌 (主力洗盤止跌，擇機進場)",
+            "放量小跌": "🛡️ 放量小跌 (見底信號，越跌越買反轉)",
+            "平量小跌": "🥀 平量價縮 (下跌中繼，弱反彈信號)",
+            "縮量大跌": "☠️ 縮量大跌 (一致看空無承接，加速下跌)",
+            "放量大跌": "🩸 放量大跌 (跟風砸盤，高位出貨持續跌)",
+            "平量大跌": "🕳️ 平量大跌 (一致看空無承接，加速下跌)"
+        }
+        return mapping.get(comb, "⚖️ 溫和震盪整理")
+
+    df_today['B0_量價狀態'] = df_today.apply(get_vp_status, axis=1)
+    st.session_state['b0_price'] = df_today
 #        
 def show_weight_backtest_page(STOCK_DICT, DATA_DIR="data"):
     # 🌟 自動喚醒 B0 價量資料
@@ -181,6 +243,7 @@ def show_weight_backtest_page(STOCK_DICT, DATA_DIR="data"):
             st.session_state['filter_b0_pct'] = (-10.0, 10.0)
             st.session_state['filter_b0_per'] = 0.0
             st.session_state['filter_b0_exclude_loss'] = False
+            st.session_state['filter_b0_vp_status'] = [] # <-- 新增這行
             st.session_state['filter_b1_delta'] = False
             st.session_state['filter_b1_5d'] = False
             st.session_state['filter_b1_20d'] = False
@@ -277,6 +340,19 @@ def show_weight_backtest_page(STOCK_DICT, DATA_DIR="data"):
         st.write("") # 排版微調用
         b0_exclude_loss = c_b0_6.checkbox("🚫 排除虧損公司 (PER 為負或無資料)", key="filter_b0_exclude_loss")
 
+        # 👇 新增的量價矩陣 UI 👇
+        st.markdown("**🔹 4. 股市量價動能矩陣 (主力照妖鏡)**")
+        st.caption("透過自動比對當日價量與「近5日均量」，精準判斷主力是正在洗盤、吸籌還是出貨。")
+        vp_options = [
+            "🚀 放量大漲 (量價齊升，持續看漲)", "🔒 縮量大漲 (鎖倉高控盤，延續上漲)", "✈️ 平量大漲 (一致看漲無拋壓，加速上漲)",
+            "📈 價升量縮 (量價背離，下方承接看拉高)", "⚠️ 放量滯漲 (拋壓增大，即將見頂反轉)", "⏸️ 平量滯漲 (拋壓增大，高位見頂)",
+            "📉 縮量小跌 (主力洗盤止跌，擇機進場)", "🛡️ 放量小跌 (見底信號，越跌越買反轉)", "🥀 平量價縮 (下跌中繼，弱反彈信號)",
+            "☠️ 縮量大跌 (一致看空無承接，加速下跌)", "🩸 放量大跌 (跟風砸盤，高位出貨持續跌)", "🕳️ 平量大跌 (一致看空無承接，加速下跌)"
+        ]
+        b0_vp_status = st.multiselect("🎯 可複選您想尋找的量價型態：", vp_options, key="filter_b0_vp_status")
+
+
+        
     b1_sorted_dates = st.session_state.get('b1_sorted_dates', [])
     b1_latest_date_str = "未知日期"
     if b1_sorted_dates and len(str(b1_sorted_dates[0])) == 8:
@@ -596,6 +672,13 @@ def show_weight_backtest_page(STOCK_DICT, DATA_DIR="data"):
         
         valid_b0_codes = df_b0[b0_mask]['統一代號'].unique()
         filtered_df = filtered_df[filtered_df['統一代號'].isin(valid_b0_codes)]
+        
+    # 處理量價關係矩陣過濾
+    if b0_vp_status and not df_b0.empty and 'B0_量價狀態' in df_b0.columns:
+        any_filter_applied = True
+        valid_vp_codes = df_b0[df_b0['B0_量價狀態'].isin(b0_vp_status)]['統一代號'].unique()
+        filtered_df = filtered_df[filtered_df['統一代號'].isin(valid_vp_codes)]
+        
         
     if not df_b1_raw.empty:
         hit_mask = pd.Series(True, index=df_b1_raw.index)
@@ -1023,7 +1106,7 @@ def show_weight_backtest_page(STOCK_DICT, DATA_DIR="data"):
             st.warning("⚠️ 缺乏 B7 近半年持股數據，波段過濾為空。")
             filtered_df = filtered_df.iloc[0:0]
 # ==========================================
-# 過濾結果結算與除錯透視鏡檢核
+# 過濾結果結算與 除錯透視鏡 檢核
 # ==========================================
     if any_filter_applied:
         st.success(f"✅ 過濾完成！共有 **{len(filtered_df)}** 檔標的符合您的跨模組條件。")
@@ -1037,16 +1120,14 @@ def show_weight_backtest_page(STOCK_DICT, DATA_DIR="data"):
             if not df_b0_debug.empty:
                 b0_cols = ['統一代號']
                 rename_dict = {}
-                for col in ['成交', '漲跌幅', '成交張數', '成交額(百萬)', 'PER']:
+                # 👇 把 '5日均量' 和 'B0_量價狀態' 也加進去
+                for col in ['成交', '漲跌幅', '成交張數', '成交額(百萬)', 'PER', '5日均量', 'B0_量價狀態']:
                     if col in df_b0_debug.columns:
                         b0_cols.append(col)
-                        rename_dict[col] = f'B0_{col}'
+                        rename_dict[col] = f'B0_{col}' if not col.startswith('B0_') else col
                 debug_df = pd.merge(debug_df, df_b0_debug[b0_cols].rename(columns=rename_dict), on='統一代號', how='left')
 
-            check_cols = [
-                '統一代號', '今日上榜', '△', '法人持股', '最新動態',
-                '5日ΔChange', '20日ΔChange', '60日ΔChange', '120日ΔChange'
-            ]
+
             # (以下是原本的 df_b1_debug 程式碼，維持不變...)
             check_cols = [
                 '統一代號', '今日上榜', '△', '法人持股', '最新動態',
