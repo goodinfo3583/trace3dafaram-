@@ -449,15 +449,31 @@ def show_weight_backtest_page(STOCK_DICT, DATA_DIR="data"):
         b6_status_options = ["🛡️ 防守成功 (收盤 >= 鉅額均價)", "🚨 跌破防線 (收盤 < 鉅額均價)"]
         b6_status_chk = st.multiselect("可精準挑選主力防線狀態：", b6_status_options, key="filter_b6_status")
 
-    # 取得 B7 最新資料月份 (抓取資料庫中實際的月份，反映台股延遲一個月的特性)
+    # 取得 B7 最新資料月份 (自動解析 Goodinfo 的 26M07 格式或 202607 格式)
     b7_latest_date_str = "未知月份"
     df_b7_tmp = get_df('b7_main')
+    
     if not df_b7_tmp.empty:
-        month_cols = [c for c in df_b7_tmp.columns if '持股%' in c and c.replace('持股%', '').isdigit()]
-        if month_cols:
-            latest_m = sorted([c.replace('持股%', '') for c in month_cols], reverse=True)[0]
-            if len(latest_m) == 6:
-                b7_latest_date_str = f"{latest_m[:4]}/{latest_m[4:]}"
+        # 尋找包含 "持股%" 的欄位，並萃取出前面的月份字串
+        raw_months = [c.replace('持股%', '') for c in df_b7_tmp.columns if '持股%' in c]
+        
+        valid_months = []
+        for m in raw_months:
+            # 兼容 26M07 (Goodinfo格式) 或 202607 (傳統格式)
+            if re.match(r'^\d{2}M\d{2}$', m) or re.match(r'^\d{4,6}$', m):
+                valid_months.append(m)
+                
+        if valid_months:
+            # 排序取最新
+            best_m = sorted(valid_months, reverse=True)[0]
+            
+            if 'M' in best_m:
+                # 處理 26M07 -> 2026/07
+                y, m = best_m.split('M')
+                b7_latest_date_str = f"20{y}/{m}"
+            elif len(best_m) == 6:
+                # 處理 202607 -> 2026/07
+                b7_latest_date_str = f"{best_m[:4]}/{best_m[4:]}"
 
     # --- 模組 B7 展開面板 ---
     with st.expander(f"👔 B7 董監事籌碼動向 (資料基準月: {b7_latest_date_str})", expanded=False):
