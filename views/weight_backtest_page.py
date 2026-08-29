@@ -937,8 +937,6 @@ def show_weight_backtest_page(STOCK_DICT, DATA_DIR="data"):
                 
                 debug_df['B5_共振狀態'] = debug_df.apply(check_resonance, axis=1)
 
-            st.write(f"🔍 檢核明細 (共 {len(debug_df)} 筆)：")
-            st.dataframe(debug_df, use_container_width=True, hide_index=True)
 
             # 加入 B6 鉅額交易供核對
             df_b6_debug = clean_stock_id(get_df('b6_today')).drop_duplicates(subset=['統一代號'])
@@ -970,6 +968,9 @@ def show_weight_backtest_page(STOCK_DICT, DATA_DIR="data"):
                     dynamic_col: 'B6_成交均價' if dynamic_col else 'B6_成交均價',
                     '▼收盤價': 'B6_收盤價'
                 }), on='統一代號', how='left')
+
+            st.write(f"🔍 檢核明細 (共 {len(debug_df)} 筆)：")
+            st.dataframe(debug_df, use_container_width=True, hide_index=True)
             #####           
     else:
         st.info("👆 請在上方展開模組中至少設定一項條件，目前預設顯示全市場標的。")
