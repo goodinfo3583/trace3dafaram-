@@ -267,7 +267,8 @@ def show_weight_backtest_page(STOCK_DICT, DATA_DIR="data"):
         
         st.markdown("**🔹 2. 價格與當日強弱勢過濾**")
         c_b0_3, c_b0_4 = st.columns(2)
-        b0_price_range = c_b0_3.slider("🎯 股價區間 (元)：", 0.0, 5000.0, (0.0, 5000.0), 10.0, key="filter_b0_price")
+        #價格區間
+        b0_price_range = c_b0_3.slider("🎯 股價區間 (元)：", 0.0, 25000.0, (0.0, 25000.0), 10.0, key="filter_b0_price"")
         b0_pct_range = c_b0_4.slider("🚀 當日漲跌幅區間 (%)：", -10.0, 10.0, (-10.0, 10.0), 0.5, key="filter_b0_pct")
         
         st.markdown("**🔹 3. 估值安全過濾**")
@@ -558,14 +559,15 @@ def show_weight_backtest_page(STOCK_DICT, DATA_DIR="data"):
         b7_6m_inc = st.checkbox("🎯 近半年董監波段持股增加 (> 0)", key="filter_b7_6m_inc")
         st.caption("挑選近半年內，大股東/董監事持續將籌碼收回口袋的波段保護傘標的。")
         
-# ==========================================
+    # ==========================================
     # 執行過濾邏輯
     # ==========================================
     # 處理 B0 基礎價量過濾引擎
     b0_price_min, b0_price_max = b0_price_range
     b0_pct_min, b0_pct_max = b0_pct_range
     
-    if not df_b0.empty and (b0_vol_min > 0 or b0_amt_min > 0 or b0_price_min > 0 or b0_price_max < 5000.0 or b0_pct_min > -10.0 or b0_pct_max < 10.0 or b0_per_max > 0 or b0_exclude_loss):
+    # 👇 將這裡的價格區間 5000.0 改為 25000.0
+    if not df_b0.empty and (b0_vol_min > 0 or b0_amt_min > 0 or b0_price_min > 0 or b0_price_max < 25000.0 or b0_pct_min > -10.0 or b0_pct_max < 10.0 or b0_per_max > 0 or b0_exclude_loss):
         any_filter_applied = True
         b0_mask = pd.Series(True, index=df_b0.index)
         
