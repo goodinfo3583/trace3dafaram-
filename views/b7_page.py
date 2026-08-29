@@ -6,31 +6,22 @@ import glob
 import re
 
 # ==========================================
-# ⚙️ 區塊 7：董監持股運算引擎
+# ⚙️ 區塊 7：董監持股運算引擎 (高效統一版 - 從質押檔提取)
 # ==========================================
 def process_directors_data(DATA_DIR):
-    """讀取並合併多個月份的董監事持股資料"""
+    """統一讀取 Goodinfo 質押比檔案，並萃取「持股比例」進行多月份動態比較"""
     search_patterns = [
-        os.path.join(DATA_DIR, "*神秘金字塔*董監事*.csv"),
-        os.path.join(DATA_DIR, "*董監事持股*.csv")
+        os.path.join(DATA_DIR, "*質押比*.csv*"),
+        os.path.join(DATA_DIR, "*質押*.csv*")
     ]
     files = set()
     for pattern in search_patterns:
         files.update(glob.glob(pattern))
-    
+        
     if not files: return pd.DataFrame()
     
-    merged_df = None
-    processed_months = set() 
-    
-    for f in sorted(list(files), reverse=True):
-        m = re.search(r'(202[0-9]{3,5})', os.path.basename(f))
-        if not m: continue
-        month_str = m.group(1)[:6] 
-        
-        if month_str in processed_months:
-            continue
-            
+    df_list = []
+    for f in list(files):
         df = None
         for enc in ['utf-8-sig', 'big5', 'cp950', 'utf-8']:
             try:
@@ -38,89 +29,88 @@ def process_directors_data(DATA_DIR):
                 break
             except: pass
             
-        if df is None or df.empty: continue
-        
-        df.columns = [str(c).replace(' ', '').replace('\u3000', '').replace('\ufeff', '').replace('\xa0', '') for c in df.columns]
-        
-        c_id_name = next((c for c in df.columns if '代號' in c and '名稱' in c), None)
-        if c_id_name:
-            df['股票代號'] = df[c_id_name].astype(str).str.extract(r'(\d+)', expand=False)
-            df['股票名稱'] = df[c_id_name].astype(str).str.replace(r'^\d+', '', regex=True).str.strip()
-        else:
-            c_code = next((c for c in df.columns if '代號' in c or '代碼' in c), None)
-            c_name = next((c for c in df.columns if '名稱' in c), None)
-            if c_code and c_name:
-                df['股票代號'] = df[c_code].astype(str).str.extract(r'(\d+)', expand=False)
-                df['股票名稱'] = df[c_name].astype(str).str.strip()
-            else:
-                continue
+        if df is not None and not df.empty:
+            df.columns = [str(c).replace(' ', '').replace('\u3000', '').replace('\ufeff', '').replace('\xa0', '') for c in df.columns]
+            
+            # 鎖定 Goodinfo 的欄位
+            c_code = next((c for c in df.columns if "代號" in c), None)
+            c_name = next((c for c in df.columns if "名稱" in c), None)
+            c_month = next((c for c in df.columns if "持股資料月份" in c), None)
+            c_hold = next((c for c in df.columns if "全體董監持股(%)" in c), None)
+            
+            if all([c_code, c_name, c_month, c_hold]):
+                df = df.rename(columns={
+                    c_code: "股票代號",
+                    c_name: "股票名稱",
+                    c_month: "持股資料月份",
+                    c_hold: "全體董監持股(%)"
+                })
+                clean_df = df[["股票代號", "股票名稱", "持股資料月份", "全體董監持股(%)"]].copy()
+                df_list.append(clean_df)
                 
-        df = df.dropna(subset=['股票代號'])
+    if not df_list: return pd.DataFrame()
+    
+    # 堆疊所有歷史檔案
+    merged_df = pd.concat(df_list, ignore_index=True)
+    merged_df = merged_df.dropna(subset=["股票代號", "持股資料月份"])
+    merged_df["股票代號"] = merged_df["股票代號"].astype(str).str.strip()
+    merged_df["股票名稱"] = merged_df["股票名稱"].astype(str).str.strip()
+    merged_df["持股資料月份"] = merged_df["持股資料月份"].astype(str).str.strip()
+    merged_df["全體董監持股(%)"] = pd.to_numeric(merged_df["全體董監持股(%)"].astype(str).str.replace('%', '').str.replace(',', ''), errors='coerce')
+    
+    # 去重覆後，進行樞紐分析 (將月份轉成直欄)
+    merged_df = merged_df.drop_duplicates(subset=["股票代號", "持股資料月份"], keep='first')
+    pivot_df = merged_df.pivot(index=["股票代號", "股票名稱"], columns="持股資料月份", values="全體董監持股(%)").reset_index()
+    
+    # 抓出所有的月份，由新到舊排序
+    month_cols = sorted([c for c in pivot_df.columns if c not in ["股票代號", "股票名稱"]], reverse=True)
+    
+    if not month_cols: return pd.DataFrame()
+    
+    # 取最新的 6 個月即可 (保持版面乾淨)
+    month_cols = month_cols[:6]
+    
+    # 計算近月與近半年的增減
+    if len(month_cols) >= 2:
+        m1, m2 = month_cols[0], month_cols[1]
+        pivot_df['近月增減%'] = (pivot_df[m1] - pivot_df[m2]).round(2)
         
-        c_this_month = next((c for c in df.columns if c == '本月' or c == '本月%'), None)
-        c_prev_month = next((c for c in df.columns if c == '前一月'), None)
+        # 🌟 近半年波段持股增減 (找前5個月的資料對比，若不足半年則取最舊的)
+        target_idx = min(5, len(month_cols) - 1)
+        m_old = month_cols[target_idx]
+        pivot_df['▼近半年增減%'] = (pivot_df[m1] - pivot_df[m_old]).round(2)
         
-        keep_cols = ['股票代號', '股票名稱']
+        def get_trend(val):
+            if pd.isna(val): return "無"
+            if val >= 1.0: return "🔥 大增"
+            if val >= 0.1: return "📈 增"
+            if val > 0: return "↗️ 微增"
+            if val == 0: return "🔄 持平"
+            if val > -0.1: return "↘️ 微減"
+            return "🚨 減/大減"
+            
+        pivot_df['動態'] = pivot_df['近月增減%'].apply(get_trend)
         
-        if c_this_month:
-            df[f'{month_str}持股%'] = pd.to_numeric(df[c_this_month].astype(str).str.replace('%', '').str.replace(',', ''), errors='coerce')
-            processed_months.add(month_str)
-            keep_cols.append(f'{month_str}持股%')
-            
-        if c_prev_month:
-            df[f'{month_str}_前一月'] = pd.to_numeric(df[c_prev_month].astype(str).str.replace('%', '').str.replace(',', ''), errors='coerce')
-            keep_cols.append(f'{month_str}_前一月')
-            
-        df_clean = df[keep_cols].drop_duplicates(subset=['股票代號'])
+    # 將欄位名稱加上 "持股%" 供前端與策略實驗室辨識
+    rename_dict = {}
+    for m in month_cols:
+        rename_dict[m] = f"{m}持股%"
+    pivot_df = pivot_df.rename(columns=rename_dict)
+    
+    # 安排最終顯示的欄位順序
+    cols_order = ['股票代號', '股票名稱']
+    if '動態' in pivot_df.columns: cols_order.extend(['動態', '近月增減%'])
+    if '▼近半年增減%' in pivot_df.columns: cols_order.append('▼近半年增減%')
+    for m in month_cols:
+        cols_order.append(f"{m}持股%")
         
-        if merged_df is None:
-            merged_df = df_clean
-        else:
-            merged_df = pd.merge(merged_df, df_clean, on=['股票代號', '股票名稱'], how='outer')
-#
-    if merged_df is not None and not merged_df.empty:
-        sorted_months = sorted(list(processed_months), reverse=True)
-        if len(sorted_months) >= 2:
-            m1, m2 = sorted_months[0], sorted_months[1]
-            if f'{m1}持股%' in merged_df.columns and f'{m2}持股%' in merged_df.columns:
-                merged_df['近月增減%'] = merged_df[f'{m1}持股%'] - merged_df[f'{m2}持股%']
-            
-            # 🌟 新增：近半年波段持股增減 (找前5個月的資料對比，若不足半年則取最舊的)
-            target_idx = min(5, len(sorted_months) - 1)
-            m_old = sorted_months[target_idx]
-            if f'{m1}持股%' in merged_df.columns and f'{m_old}持股%' in merged_df.columns:
-                merged_df['▼近半年增減%'] = (merged_df[f'{m1}持股%'] - merged_df[f'{m_old}持股%']).round(2)    
-        if '近月增減%' not in merged_df.columns and len(sorted_months) >= 1:
-            m1 = sorted_months[0]
-            if f'{m1}持股%' in merged_df.columns and f'{m1}_前一月' in merged_df.columns:
-                merged_df['近月增減%'] = merged_df[f'{m1}持股%'] - merged_df[f'{m1}_前一月']
-                
-        if '近月增減%' in merged_df.columns:
-            def get_trend(val):
-                if pd.isna(val): return "無"
-                if val >= 1.0: return "🔥 大增"
-                if val >= 0.1: return "📈 增"
-                if val > 0: return "↗️ 微增"
-                if val == 0: return "🔄 持平"
-                if val > -0.1: return "↘️ 微減"
-                return "🚨 減/大減"
-                
-            merged_df['動態'] = merged_df['近月增減%'].round(2).apply(get_trend)
-            merged_df['近月增減%'] = merged_df['近月增減%'].round(2)
-            
-        cols_order = ['股票代號', '股票名稱']
-        if '動態' in merged_df.columns: cols_order.extend(['動態', '近月增減%'])
-        if '▼近半年增減%' in merged_df.columns: cols_order.append('▼近半年增減%') # 加入新欄位
-        for m in sorted_months:
-            if f'{m}持股%' in merged_df.columns: cols_order.append(f'{m}持股%')
-            
-        merged_df = merged_df[[c for c in cols_order if c in merged_df.columns]]
-        if '近月增減%' in merged_df.columns:
-            merged_df = merged_df.sort_values('近月增減%', ascending=False)
-            
-        return merged_df
+    pivot_df = pivot_df[[c for c in cols_order if c in pivot_df.columns]]
+    
+    # 依照近月增減量排序，凸顯近期內部人加碼的飆股
+    if '近月增減%' in pivot_df.columns:
+        pivot_df = pivot_df.sort_values('近月增減%', ascending=False)
         
-    return pd.DataFrame()
+    return pivot_df
 
 
 # ==========================================
