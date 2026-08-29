@@ -16,6 +16,13 @@ try:
 except ImportError:
     def sync_b6_data(DATA_DIR): pass
 
+try:
+    from views.b7_page import sync_b7_data, sync_pledge_data, sync_pledge_history_data
+except ImportError:
+    def sync_b7_data(DATA_DIR): pass
+    def sync_pledge_data(DATA_DIR): pass
+    def sync_pledge_history_data(DATA_DIR): pass
+
 # ==========================================
 # 🌟 萬能鑰匙：對接全站暫存變數
 # ==========================================
@@ -75,6 +82,11 @@ def show_weight_backtest_page(STOCK_DICT, DATA_DIR="data"):
     # 🌟 自動喚醒 B6 鉅額資料
     if 'b6_today_df' not in st.session_state:
         sync_b6_data(DATA_DIR)
+
+    # 🌟 自動喚醒 B7 董監資料
+    if 'b7_main' not in st.session_state: sync_b7_data(DATA_DIR)
+    if 'b7_pledge' not in st.session_state: sync_pledge_data(DATA_DIR)
+    if 'b7_pledge_history' not in st.session_state: sync_pledge_history_data(DATA_DIR)
 
     st.markdown("<h2 style='color: #38BDF8;'>⚖️ 策略實驗室：自訂權重與勝率回測</h2>", unsafe_allow_html=True)
     st.caption("打造專屬於您的選股邏輯，透過多重條件交集與大數據計分，找出最具爆發力的潛力股。")
@@ -187,6 +199,12 @@ def show_weight_backtest_page(STOCK_DICT, DATA_DIR="data"):
             st.session_state['filter_b6_today'] = False
             st.session_state['filter_b6_amt_min'] = 0.0
             st.session_state['filter_b6_status'] = []
+
+            # 清空 B7 篩選器
+            st.session_state['filter_b7_hold_pct'] = (0.0, 100.0)
+            st.session_state['filter_b7_pledge_pct'] = (0.0, 100.0)
+            st.session_state['filter_b7_hold_trend'] = []
+            st.session_state['filter_b7_pledge_trend'] = []
 
         st.button("🧹 清空所有篩選條件", on_click=reset_filters, use_container_width=True)
 
@@ -429,14 +447,28 @@ def show_weight_backtest_page(STOCK_DICT, DATA_DIR="data"):
         st.markdown("**🔹 3. 防守狀態過濾**")
         b6_status_options = ["🛡️ 防守成功 (收盤 >= 鉅額均價)", "🚨 跌破防線 (收盤 < 鉅額均價)"]
         b6_status_chk = st.multiselect("可精準挑選主力防線狀態：", b6_status_options, key="filter_b6_status")
+
+    # --- 模組 B7 展開面板 ---
+    with st.expander("👔 B7 董監事籌碼動向 (最新月資料)", expanded=False):
+        st.markdown("**🔹 1. 最新董監持股與質押比例 (%)**")
+        c_b7_1, c_b7_2 = st.columns(2)
+        b7_hold_pct = c_b7_1.slider("🛡️ 董監持股比例區間：", 0.0, 100.0, (0.0, 100.0), 0.5, key="filter_b7_hold_pct")
+        b7_pledge_pct = c_b7_2.slider("⚠️ 董監質押比例區間 (拉低以避險)：", 0.0, 100.0, (0.0, 100.0), 0.5, key="filter_b7_pledge_pct")
+
+        st.markdown("**🔹 2. 近月董監持股與質押動態**")
+        c_b7_3, c_b7_4 = st.columns(2)
+        b7_hold_options = ["🔥 大增", "📈 增", "↗️ 微增", "🔄 持平", "↘️ 微減", "🚨 減/大減"]
+        b7_hold_trend = c_b7_3.multiselect("🛡️ 持股增減動態 (尋找內部人加碼)：", b7_hold_options, key="filter_b7_hold_trend")
+
+        b7_pledge_options = ["🚨 暴增", "⚠️ 大增", "↗️ 微增", "➖ 持平", "↘️ 微減", "✅ 大減", "🌟 遽減"]
+        b7_pledge_trend = c_b7_4.multiselect("⚠️ 質押增減動態 (尋找質押下降)：", b7_pledge_options, key="filter_b7_pledge_trend")
         
     with st.expander("📉 其他籌碼動向模組 (建置中)", expanded=False):
         st.info("包含法人突擊掃貨、連買、資券動向等模組，將於後續開放。")
         
-
-    # ==========================================
-    # 執行過濾邏輯
-    # ==========================================
+# ==========================================
+# 執行過濾邏輯
+# ==========================================
     if not df_b1_raw.empty:
         hit_mask = pd.Series(True, index=df_b1_raw.index)
         b1_checked = False
@@ -813,9 +845,47 @@ def show_weight_backtest_page(STOCK_DICT, DATA_DIR="data"):
         else:
             st.warning("⚠️ 缺乏 B6 今日鉅額交易資料，過濾為空。請確認 B6 頁面已載入資料。")
             filtered_df = filtered_df.iloc[0:0]
-    # ==========================================
-    # 過濾結果結算與除錯透視鏡檢核
-    # ==========================================
+
+    # 處理 B7 過濾引擎
+    b7_hold_min, b7_hold_max = b7_hold_pct
+    b7_pledge_min, b7_pledge_max = b7_pledge_pct
+
+    # 1. 處理持股/質押比例過濾
+    if b7_hold_min > 0 or b7_hold_max < 100.0 or b7_pledge_min > 0 or b7_pledge_max < 100.0:
+        df_b7_pledge = clean_stock_id(get_df('b7_pledge'))
+        if not df_b7_pledge.empty:
+            any_filter_applied = True
+            b7_mask = pd.Series(True, index=df_b7_pledge.index)
+            
+            if b7_hold_min > 0 or b7_hold_max < 100.0:
+                df_b7_pledge['num_hold'] = pd.to_numeric(df_b7_pledge['全體 董監 持股 (%)'].astype(str).str.replace('%', ''), errors='coerce').fillna(0)
+                b7_mask &= df_b7_pledge['num_hold'].between(b7_hold_min, b7_hold_max)
+                
+            if b7_pledge_min > 0 or b7_pledge_max < 100.0:
+                df_b7_pledge['num_pledge'] = pd.to_numeric(df_b7_pledge['全體 董監 質押 (%)'].astype(str).str.replace('%', ''), errors='coerce').fillna(0)
+                b7_mask &= df_b7_pledge['num_pledge'].between(b7_pledge_min, b7_pledge_max)
+
+            valid_b7_codes = df_b7_pledge[b7_mask]['統一代號'].unique()
+            filtered_df = filtered_df[filtered_df['統一代號'].isin(valid_b7_codes)]
+
+    # 2. 處理持股動態過濾
+    if b7_hold_trend:
+        df_b7_main = clean_stock_id(get_df('b7_main'))
+        if not df_b7_main.empty and '動態' in df_b7_main.columns:
+            any_filter_applied = True
+            valid_hold_codes = df_b7_main[df_b7_main['動態'].isin(b7_hold_trend)]['統一代號'].unique()
+            filtered_df = filtered_df[filtered_df['統一代號'].isin(valid_hold_codes)]
+
+    # 3. 處理質押動態過濾
+    if b7_pledge_trend:
+        df_b7_hist = clean_stock_id(get_df('b7_pledge_history'))
+        if not df_b7_hist.empty and '動態' in df_b7_hist.columns:
+            any_filter_applied = True
+            valid_pledge_codes = df_b7_hist[df_b7_hist['動態'].isin(b7_pledge_trend)]['統一代號'].unique()
+            filtered_df = filtered_df[filtered_df['統一代號'].isin(valid_pledge_codes)]
+# ==========================================
+# 過濾結果結算與除錯透視鏡檢核
+# ==========================================
     if any_filter_applied:
         st.success(f"✅ 過濾完成！共有 **{len(filtered_df)}** 檔標的符合您的跨模組條件。")
         debug_mode = st.checkbox("🔬 開啟除錯透視鏡 (核對名單與過濾數值)")
@@ -969,6 +1039,33 @@ def show_weight_backtest_page(STOCK_DICT, DATA_DIR="data"):
                     '▼收盤價': 'B6_收盤價'
                 }), on='統一代號', how='left')
 
+            # ==========================================
+            # 🌟 加入 B7 董監動向供核對
+            # ==========================================
+            df_b7_pledge = clean_stock_id(get_df('b7_pledge')).drop_duplicates(subset=['統一代號'])
+            if not df_b7_pledge.empty:
+                cols = ['統一代號']
+                rename_dict = {}
+                if '全體 董監 持股 (%)' in df_b7_pledge.columns:
+                    cols.append('全體 董監 持股 (%)')
+                    rename_dict['全體 董監 持股 (%)'] = 'B7_董監持股%'
+                if '全體 董監 質押 (%)' in df_b7_pledge.columns:
+                    cols.append('全體 董監 質押 (%)')
+                    rename_dict['全體 董監 質押 (%)'] = 'B7_董監質押%'
+                debug_df = pd.merge(debug_df, df_b7_pledge[cols].rename(columns=rename_dict), on='統一代號', how='left')
+
+            df_b7_main = clean_stock_id(get_df('b7_main')).drop_duplicates(subset=['統一代號'])
+            if not df_b7_main.empty and '動態' in df_b7_main.columns:
+                debug_df = pd.merge(debug_df, df_b7_main[['統一代號', '近月增減%', '動態']].rename(columns={
+                    '近月增減%': 'B7_持股近月增減%', '動態': 'B7_持股動態'
+                }), on='統一代號', how='left')
+
+            df_b7_hist = clean_stock_id(get_df('b7_pledge_history')).drop_duplicates(subset=['統一代號'])
+            if not df_b7_hist.empty and '動態' in df_b7_hist.columns:
+                debug_df = pd.merge(debug_df, df_b7_hist[['統一代號', '近月質押增減(%)', '動態']].rename(columns={
+                    '近月質押增減(%)': 'B7_質押近月增減%', '動態': 'B7_質押動態'
+                }), on='統一代號', how='left')
+            #####
             st.write(f"🔍 檢核明細 (共 {len(debug_df)} 筆)：")
             st.dataframe(debug_df, use_container_width=True, hide_index=True)
             #####           
@@ -1056,7 +1153,25 @@ def show_weight_backtest_page(STOCK_DICT, DATA_DIR="data"):
                     sign = "+" if w_b6 > 0 else ""
                     score_df.loc[mask, '得分明細'] += f"[鉅額防守 {sign}{w_b6}] "
 
-            apply_score('b7_main', w_b7, "董監增持")
+            # 處理 B7 董監增持 / 質押降 加分
+            if w_b7 != 0:
+                # 1. 董監持股增加 (近月增減 > 0)
+                df_b7_main = clean_stock_id(get_df('b7_main'))
+                if not df_b7_main.empty and '近月增減%' in df_b7_main.columns:
+                    valid_inc_codes = df_b7_main[pd.to_numeric(df_b7_main['近月增減%'], errors='coerce') > 0]['統一代號'].unique()
+                    mask = score_df['統一代號'].isin(valid_inc_codes)
+                    score_df.loc[mask, '總分'] += w_b7
+                    sign = "+" if w_b7 > 0 else ""
+                    score_df.loc[mask, '得分明細'] += f"[董監增持 {sign}{w_b7}] "
+
+                # 2. 董監質押下降 (近月質押增減 < 0)
+                df_b7_hist = clean_stock_id(get_df('b7_pledge_history'))
+                if not df_b7_hist.empty and '近月質押增減(%)' in df_b7_hist.columns:
+                    valid_dec_codes = df_b7_hist[pd.to_numeric(df_b7_hist['近月質押增減(%)'], errors='coerce') < 0]['統一代號'].unique()
+                    mask = score_df['統一代號'].isin(valid_dec_codes)
+                    score_df.loc[mask, '總分'] += w_b7
+                    sign = "+" if w_b7 > 0 else ""
+                    score_df.loc[mask, '得分明細'] += f"[質押下降 {sign}{w_b7}] "
 
             # ==========================================
             # 4. 結果展示
