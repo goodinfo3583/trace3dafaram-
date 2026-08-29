@@ -2,6 +2,8 @@
 import streamlit as st
 import pandas as pd
 import re
+import os
+import glob
 
 # ==========================================
 # 🌟 導入背景喚醒引擎
@@ -27,6 +29,7 @@ except ImportError:
 # 🌟 萬能鑰匙：對接全站暫存變數
 # ==========================================
 KEY_MAP = {
+    'b0_price': ['b0_price'],
     'b1_final_df': ['b1_final_df', 'my_final_df'],
     'b1_down_final_df': ['b1_down_final_df'],
     'b1_foreign_df': ['b1_foreign_df'],
@@ -75,7 +78,36 @@ def clean_stock_id(df):
         df['統一代號'] = df[col_id].astype(str).str.replace(r'\.0$', '', regex=True).str.strip()
     return df
 
+# ==========================================
+# 🌟 B0 專屬背景喚醒：讀取每日成交價量
+# ==========================================
+def sync_b0_data(DATA_DIR):
+    search_patterns = [os.path.join(DATA_DIR, "*成交價*.csv")]
+    files = []
+    for pattern in search_patterns:
+        files.extend(glob.glob(pattern))
+    if not files: return
+    
+    # 永遠只抓最新的一天
+    latest_file = sorted(files, reverse=True)[0]
+    df = None
+    for enc in ['utf-8-sig', 'big5', 'cp950', 'utf-8']:
+        try:
+            df = pd.read_csv(latest_file, encoding=enc, header=0)
+            break
+        except: pass
+        
+    if df is not None and not df.empty:
+        # 去除所有欄位名稱中的空白 (例如將 '漲跌 幅' 變成 '漲跌幅')
+        df.columns = [str(c).replace(' ', '').replace('\u3000', '').replace('\ufeff', '').replace('\xa0', '') for c in df.columns]
+        c_code = next((c for c in df.columns if '代號' in c), None)
+        if c_code:
+            df['統一代號'] = df[c_code].astype(str).str.replace(r'\.0$', '', regex=True).str.strip()
+        st.session_state['b0_price'] = df
+#        
 def show_weight_backtest_page(STOCK_DICT, DATA_DIR="data"):
+    # 🌟 自動喚醒 B0 價量資料
+    if 'b0_price' not in st.session_state: sync_b0_data(DATA_DIR)
     # 背景自動載入原始資料
     ensure_b1_to_b5_loaded(DATA_DIR)
     
@@ -140,8 +172,15 @@ def show_weight_backtest_page(STOCK_DICT, DATA_DIR="data"):
         st.markdown(f"#### 1️⃣ 設定嚴格過濾條件 (目前全市場總候選池共 {len(base_df)} 檔)")
         st.caption("💡 跨模組複選為「交集 (嚴格篩選)」。動態特徵內的多選可切換交集或聯集。")
     with col_reset:
-        def reset_filters():
+        def reset_filters():           
             # 強制將所有篩選器設回預設值 (最安全穩定的清空法)
+            # 清空 B0 篩選器
+            st.session_state['filter_b0_price'] = (0.0, 5000.0)
+            st.session_state['filter_b0_vol'] = 0
+            st.session_state['filter_b0_amt'] = 0.0
+            st.session_state['filter_b0_pct'] = (-10.0, 10.0)
+            st.session_state['filter_b0_per'] = 0.0
+            st.session_state['filter_b0_exclude_loss'] = False
             st.session_state['filter_b1_delta'] = False
             st.session_state['filter_b1_5d'] = False
             st.session_state['filter_b1_20d'] = False
@@ -208,16 +247,41 @@ def show_weight_backtest_page(STOCK_DICT, DATA_DIR="data"):
             st.session_state['filter_b7_6m_inc'] = False
 
         st.button("🧹 清空所有篩選條件", on_click=reset_filters, use_container_width=True)
-
+#
     filtered_df = base_df.copy()
     any_filter_applied = False
+
+    # 取得 B0 最新資料日期
+    b0_latest_date_str = "未知日期"
+    df_b0 = get_df('b0_price')
+    if not df_b0.empty and '股價日期' in df_b0.columns:
+        date_raw = str(df_b0['股價日期'].iloc[0])
+        b0_latest_date_str = f"2026/{date_raw}" if "/" in date_raw else date_raw
+
+    # --- 模組 B0 展開面板 ---
+    with st.expander(f"💰 B0 基礎價量與估值過濾 (資料基準日: {b0_latest_date_str})", expanded=True):
+        st.markdown("**🔹 1. 流動性過濾 (剔除冷門股/殭屍股)**")
+        c_b0_1, c_b0_2 = st.columns(2)
+        b0_vol_min = c_b0_1.number_input("📈 當日成交張數大於 (張)：", min_value=0, value=0, step=500, key="filter_b0_vol")
+        b0_amt_min = c_b0_2.number_input("💵 當日成交額大於 (百萬)：", min_value=0.0, value=0.0, step=50.0, key="filter_b0_amt")
+        
+        st.markdown("**🔹 2. 價格與當日強弱勢過濾**")
+        c_b0_3, c_b0_4 = st.columns(2)
+        b0_price_range = c_b0_3.slider("🎯 股價區間 (元)：", 0.0, 5000.0, (0.0, 5000.0), 10.0, key="filter_b0_price")
+        b0_pct_range = c_b0_4.slider("🚀 當日漲跌幅區間 (%)：", -10.0, 10.0, (-10.0, 10.0), 0.5, key="filter_b0_pct")
+        
+        st.markdown("**🔹 3. 估值安全過濾**")
+        c_b0_5, c_b0_6 = st.columns(2)
+        b0_per_max = c_b0_5.number_input("⚖️ 本益比 (PER) 小於 (設定 0 為不限)：", min_value=0.0, value=0.0, step=5.0, key="filter_b0_per")
+        st.write("") # 排版微調用
+        b0_exclude_loss = c_b0_6.checkbox("🚫 排除虧損公司 (PER 為負或無資料)", key="filter_b0_exclude_loss")
 
     b1_sorted_dates = st.session_state.get('b1_sorted_dates', [])
     b1_latest_date_str = "未知日期"
     if b1_sorted_dates and len(str(b1_sorted_dates[0])) == 8:
         d_str = str(b1_sorted_dates[0])
         b1_latest_date_str = f"{d_str[:4]}/{d_str[4:6]}/{d_str[6:]}"
-
+    
     # --- 模組 B1 展開面板 ---
     with st.expander(f"📈 B1 法人持股動向 (資料基準日: {b1_latest_date_str})", expanded=False):
         st.markdown("**🔹 1. 近期進榜天數與變化**")
@@ -495,8 +559,42 @@ def show_weight_backtest_page(STOCK_DICT, DATA_DIR="data"):
         st.caption("挑選近半年內，大股東/董監事持續將籌碼收回口袋的波段保護傘標的。")
         
 # ==========================================
-# 執行過濾邏輯
-# ==========================================
+    # 執行過濾邏輯
+    # ==========================================
+    # 處理 B0 基礎價量過濾引擎
+    b0_price_min, b0_price_max = b0_price_range
+    b0_pct_min, b0_pct_max = b0_pct_range
+    
+    if not df_b0.empty and (b0_vol_min > 0 or b0_amt_min > 0 or b0_price_min > 0 or b0_price_max < 5000.0 or b0_pct_min > -10.0 or b0_pct_max < 10.0 or b0_per_max > 0 or b0_exclude_loss):
+        any_filter_applied = True
+        b0_mask = pd.Series(True, index=df_b0.index)
+        
+        if '成交' in df_b0.columns:
+            df_b0['num_price'] = pd.to_numeric(df_b0['成交'].astype(str).str.replace(',', ''), errors='coerce').fillna(0)
+            b0_mask &= df_b0['num_price'].between(b0_price_min, b0_price_max)
+        
+        if '漲跌幅' in df_b0.columns:
+            df_b0['num_pct'] = pd.to_numeric(df_b0['漲跌幅'].astype(str).str.replace('%', ''), errors='coerce').fillna(0)
+            b0_mask &= df_b0['num_pct'].between(b0_pct_min, b0_pct_max)
+            
+        if '成交張數' in df_b0.columns and b0_vol_min > 0:
+            df_b0['num_vol'] = pd.to_numeric(df_b0['成交張數'].astype(str).str.replace(',', ''), errors='coerce').fillna(0)
+            b0_mask &= (df_b0['num_vol'] >= b0_vol_min)
+            
+        if '成交額(百萬)' in df_b0.columns and b0_amt_min > 0:
+            df_b0['num_amt'] = pd.to_numeric(df_b0['成交額(百萬)'].astype(str).str.replace(',', ''), errors='coerce').fillna(0)
+            b0_mask &= (df_b0['num_amt'] >= b0_amt_min)
+            
+        if 'PER' in df_b0.columns:
+            df_b0['num_per'] = pd.to_numeric(df_b0['PER'], errors='coerce')
+            if b0_per_max > 0:
+                b0_mask &= ((df_b0['num_per'] > 0) & (df_b0['num_per'] <= b0_per_max)) | (df_b0['num_per'].isna())
+            if b0_exclude_loss:
+                b0_mask &= (df_b0['num_per'] > 0)
+        
+        valid_b0_codes = df_b0[b0_mask]['統一代號'].unique()
+        filtered_df = filtered_df[filtered_df['統一代號'].isin(valid_b0_codes)]
+        
     if not df_b1_raw.empty:
         hit_mask = pd.Series(True, index=df_b1_raw.index)
         b1_checked = False
@@ -929,6 +1027,25 @@ def show_weight_backtest_page(STOCK_DICT, DATA_DIR="data"):
         st.success(f"✅ 過濾完成！共有 **{len(filtered_df)}** 檔標的符合您的跨模組條件。")
         debug_mode = st.checkbox("🔬 開啟除錯透視鏡 (核對名單與過濾數值)")
         if debug_mode:
+            # ==========================================
+            # 🌟 加入 B0 基礎價量供核對
+            # ==========================================
+            df_b0_debug = clean_stock_id(get_df('b0_price')).drop_duplicates(subset=['統一代號'])
+            debug_df = filtered_df.copy()
+            if not df_b0_debug.empty:
+                b0_cols = ['統一代號']
+                rename_dict = {}
+                for col in ['成交', '漲跌幅', '成交張數', '成交額(百萬)', 'PER']:
+                    if col in df_b0_debug.columns:
+                        b0_cols.append(col)
+                        rename_dict[col] = f'B0_{col}'
+                debug_df = pd.merge(debug_df, df_b0_debug[b0_cols].rename(columns=rename_dict), on='統一代號', how='left')
+
+            check_cols = [
+                '統一代號', '今日上榜', '△', '法人持股', '最新動態',
+                '5日ΔChange', '20日ΔChange', '60日ΔChange', '120日ΔChange'
+            ]
+            # (以下是原本的 df_b1_debug 程式碼，維持不變...)
             check_cols = [
                 '統一代號', '今日上榜', '△', '法人持股', '最新動態',
                 '5日ΔChange', '20日ΔChange', '60日ΔChange', '120日ΔChange'
