@@ -106,8 +106,7 @@ def sync_b0_data(DATA_DIR):
             if c_code:
                 df['統一代號'] = df[c_code].astype(str).str.replace(r'\.0$', '', regex=True).str.strip()
                 df['成交張數_num'] = pd.to_numeric(df['成交張數'].astype(str).str.replace(',', ''), errors='coerce').fillna(0)
-                df_list.append(df)
-                
+                df_list.append(df)          
     if not df_list: return
     
     # 取最新的一天作為主表
@@ -331,7 +330,7 @@ def show_weight_backtest_page(STOCK_DICT, DATA_DIR="data"):
         st.markdown("**🔹 2. 價格與當日強弱勢過濾**")
         c_b0_3, c_b0_4 = st.columns(2)
         #價格區間
-        b0_price_range = c_b0_3.slider("🎯 股價區間 (元)：", 0.0, 25000.0, (0.0, 25000.0), 10.0, key="filter_b0_price"")
+        b0_price_range = c_b0_3.slider("🎯 股價區間 (元)：", 0.0, 25000.0, (0.0, 25000.0), 10.0, key="filter_b0_price")
         b0_pct_range = c_b0_4.slider("🚀 當日漲跌幅區間 (%)：", -10.0, 10.0, (-10.0, 10.0), 0.5, key="filter_b0_pct")
         
         st.markdown("**🔹 3. 估值安全過濾**")
