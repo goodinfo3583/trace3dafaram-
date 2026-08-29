@@ -205,6 +205,7 @@ def show_weight_backtest_page(STOCK_DICT, DATA_DIR="data"):
             st.session_state['filter_b7_pledge_pct'] = (0.0, 100.0)
             st.session_state['filter_b7_hold_trend'] = []
             st.session_state['filter_b7_pledge_trend'] = []
+            st.session_state['filter_b7_6m_inc'] = False
 
         st.button("🧹 清空所有篩選條件", on_click=reset_filters, use_container_width=True)
 
@@ -448,8 +449,18 @@ def show_weight_backtest_page(STOCK_DICT, DATA_DIR="data"):
         b6_status_options = ["🛡️ 防守成功 (收盤 >= 鉅額均價)", "🚨 跌破防線 (收盤 < 鉅額均價)"]
         b6_status_chk = st.multiselect("可精準挑選主力防線狀態：", b6_status_options, key="filter_b6_status")
 
+    # 取得 B7 最新資料月份 (抓取資料庫中實際的月份，反映台股延遲一個月的特性)
+    b7_latest_date_str = "未知月份"
+    df_b7_tmp = get_df('b7_main')
+    if not df_b7_tmp.empty:
+        month_cols = [c for c in df_b7_tmp.columns if '持股%' in c and c.replace('持股%', '').isdigit()]
+        if month_cols:
+            latest_m = sorted([c.replace('持股%', '') for c in month_cols], reverse=True)[0]
+            if len(latest_m) == 6:
+                b7_latest_date_str = f"{latest_m[:4]}/{latest_m[4:]}"
+
     # --- 模組 B7 展開面板 ---
-    with st.expander("👔 B7 董監事籌碼動向 (最新月資料)", expanded=False):
+    with st.expander(f"👔 B7 董監事籌碼動向 (資料基準月: {b7_latest_date_str})", expanded=False):
         st.markdown("**🔹 1. 最新董監持股與質押比例 (%)**")
         c_b7_1, c_b7_2 = st.columns(2)
         b7_hold_pct = c_b7_1.slider("🛡️ 董監持股比例區間：", 0.0, 100.0, (0.0, 100.0), 0.5, key="filter_b7_hold_pct")
@@ -462,9 +473,10 @@ def show_weight_backtest_page(STOCK_DICT, DATA_DIR="data"):
 
         b7_pledge_options = ["🚨 暴增", "⚠️ 大增", "↗️ 微增", "➖ 持平", "↘️ 微減", "✅ 大減", "🌟 遽減"]
         b7_pledge_trend = c_b7_4.multiselect("⚠️ 質押增減動態 (尋找質押下降)：", b7_pledge_options, key="filter_b7_pledge_trend")
-        
-    with st.expander("📉 其他籌碼動向模組 (建置中)", expanded=False):
-        st.info("包含法人突擊掃貨、連買、資券動向等模組，將於後續開放。")
+
+        st.markdown("**🔹 3. 波段持股過濾**")
+        b7_6m_inc = st.checkbox("🎯 近半年董監波段持股增加 (> 0)", key="filter_b7_6m_inc")
+        st.caption("挑選近半年內，大股東/董監事持續將籌碼收回口袋的波段保護傘標的。")
         
 # ==========================================
 # 執行過濾邏輯
@@ -883,6 +895,17 @@ def show_weight_backtest_page(STOCK_DICT, DATA_DIR="data"):
             any_filter_applied = True
             valid_pledge_codes = df_b7_hist[df_b7_hist['動態'].isin(b7_pledge_trend)]['統一代號'].unique()
             filtered_df = filtered_df[filtered_df['統一代號'].isin(valid_pledge_codes)]
+
+    # 4. 處理近半年波段持股增加
+    if b7_6m_inc:
+        df_b7_main = clean_stock_id(get_df('b7_main'))
+        if not df_b7_main.empty and '▼近半年增減%' in df_b7_main.columns:
+            any_filter_applied = True
+            valid_6m_codes = df_b7_main[pd.to_numeric(df_b7_main['▼近半年增減%'], errors='coerce').fillna(0) > 0]['統一代號'].unique()
+            filtered_df = filtered_df[filtered_df['統一代號'].isin(valid_6m_codes)]
+        else:
+            st.warning("⚠️ 缺乏 B7 近半年持股數據，波段過濾為空。")
+            filtered_df = filtered_df.iloc[0:0]
 # ==========================================
 # 過濾結果結算與除錯透視鏡檢核
 # ==========================================
@@ -1056,10 +1079,15 @@ def show_weight_backtest_page(STOCK_DICT, DATA_DIR="data"):
 
             df_b7_main = clean_stock_id(get_df('b7_main')).drop_duplicates(subset=['統一代號'])
             if not df_b7_main.empty and '動態' in df_b7_main.columns:
-                debug_df = pd.merge(debug_df, df_b7_main[['統一代號', '近月增減%', '動態']].rename(columns={
-                    '近月增減%': 'B7_持股近月增減%', '動態': 'B7_持股動態'
-                }), on='統一代號', how='left')
-
+                b7_main_cols = ['統一代號', '近月增減%', '動態']
+                b7_main_rename = {'近月增減%': 'B7_持股近月增減%', '動態': 'B7_持股動態'}
+                
+                # 自動加入近半年增減% 供核對
+                if '▼近半年增減%' in df_b7_main.columns:
+                    b7_main_cols.append('▼近半年增減%')
+                    b7_main_rename['▼近半年增減%'] = 'B7_持股近半年增減%'
+                    
+                debug_df = pd.merge(debug_df, df_b7_main[b7_main_cols].rename(columns=b7_main_rename), on='統一代號', how='left')
             df_b7_hist = clean_stock_id(get_df('b7_pledge_history')).drop_duplicates(subset=['統一代號'])
             if not df_b7_hist.empty and '動態' in df_b7_hist.columns:
                 debug_df = pd.merge(debug_df, df_b7_hist[['統一代號', '近月質押增減(%)', '動態']].rename(columns={

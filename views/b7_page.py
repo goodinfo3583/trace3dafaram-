@@ -77,14 +77,19 @@ def process_directors_data(DATA_DIR):
             merged_df = df_clean
         else:
             merged_df = pd.merge(merged_df, df_clean, on=['股票代號', '股票名稱'], how='outer')
-
+#
     if merged_df is not None and not merged_df.empty:
         sorted_months = sorted(list(processed_months), reverse=True)
         if len(sorted_months) >= 2:
             m1, m2 = sorted_months[0], sorted_months[1]
             if f'{m1}持股%' in merged_df.columns and f'{m2}持股%' in merged_df.columns:
                 merged_df['近月增減%'] = merged_df[f'{m1}持股%'] - merged_df[f'{m2}持股%']
-        
+            
+            # 🌟 新增：近半年波段持股增減 (找前5個月的資料對比，若不足半年則取最舊的)
+            target_idx = min(5, len(sorted_months) - 1)
+            m_old = sorted_months[target_idx]
+            if f'{m1}持股%' in merged_df.columns and f'{m_old}持股%' in merged_df.columns:
+                merged_df['▼近半年增減%'] = (merged_df[f'{m1}持股%'] - merged_df[f'{m_old}持股%']).round(2)    
         if '近月增減%' not in merged_df.columns and len(sorted_months) >= 1:
             m1 = sorted_months[0]
             if f'{m1}持股%' in merged_df.columns and f'{m1}_前一月' in merged_df.columns:
@@ -105,6 +110,7 @@ def process_directors_data(DATA_DIR):
             
         cols_order = ['股票代號', '股票名稱']
         if '動態' in merged_df.columns: cols_order.extend(['動態', '近月增減%'])
+        if '▼近半年增減%' in merged_df.columns: cols_order.append('▼近半年增減%') # 加入新欄位
         for m in sorted_months:
             if f'{m}持股%' in merged_df.columns: cols_order.append(f'{m}持股%')
             
