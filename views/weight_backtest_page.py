@@ -88,7 +88,7 @@ def sync_b0_data(DATA_DIR):
         files.extend(glob.glob(pattern))
     if not files: return
     
-    # 步驟 1：依據檔名中的「日期」進行分組
+    # 步驟 1：依據檔名中的「日期」進行分組 (解決日期變 2026/23/92 的 Bug)
     date_groups = {}
     for f in files:
         basename = os.path.basename(f)
@@ -97,12 +97,9 @@ def sync_b0_data(DATA_DIR):
         if match:
             d_str = match.group(1)
         else:
-            # 備用：若找不到標準 8 碼，抓檔名中的第一組數字
             nums = re.findall(r'\d+', basename)
-            if nums:
-                d_str = nums[0]
-            else:
-                continue
+            if nums: d_str = nums[0]
+            else: continue
                 
         if d_str not in date_groups: date_groups[d_str] = []
         date_groups[d_str].append(f)
@@ -115,10 +112,11 @@ def sync_b0_data(DATA_DIR):
     all_dfs = []
     df_today = pd.DataFrame()
     
-    # 步驟 3：依序合併每天的所有切片檔案 (例如把當天 1~1200 名全黏在一起)
+    # 步驟 3：依序合併每天的所有切片檔案
     for i, d_str in enumerate(sorted_dates):
         daily_dfs = []
         for f in date_groups[d_str]:
+            df = None # 確保每次讀取新檔案前重置變數
             for enc in ['utf-8-sig', 'big5', 'cp950', 'utf-8']:
                 try:
                     df = pd.read_csv(f, encoding=enc, header=0)
@@ -126,17 +124,18 @@ def sync_b0_data(DATA_DIR):
                 except: pass
                 
             if df is not None and not df.empty:
-                df.columns = [str(c).replace(' ', '').replace('\u3000', '').replace('\ufeff', '').replace('\xa0', '') for c in df.columns]
+                # 🚀 終極除錯點：用 Regex 清除所有隱形空白與換行符號 (\n, \r)
+                df.columns = [re.sub(r'\s+', '', str(c)).replace('\ufeff', '').replace('\u3000', '') for c in df.columns]
+                
                 c_code = next((c for c in df.columns if '代號' in c), None)
                 if c_code:
                     df['統一代號'] = df[c_code].astype(str).str.replace(r'\.0$', '', regex=True).str.strip()
                     
-                    # 🛠️ 修復點：動態捕捉成交量欄位 (支援：總量、成交量、成交張數等不同格式)
                     vol_col = next((c for c in df.columns if c in ['成交張數', '總量', '成交量', '累積成交張數', '張數']), None)
                     if vol_col:
                         df['成交張數_num'] = pd.to_numeric(df[vol_col].astype(str).str.replace(',', ''), errors='coerce').fillna(0)
                         if '成交張數' not in df.columns:
-                            df['成交張數'] = df[vol_col] # 統一補齊欄位，避免後續過濾器報錯
+                            df['成交張數'] = df[vol_col] 
                     else:
                         df['成交張數_num'] = 0
                         if '成交張數' not in df.columns:
@@ -147,7 +146,7 @@ def sync_b0_data(DATA_DIR):
         
         if daily_dfs:
             daily_combined = pd.concat(daily_dfs, ignore_index=True)
-            daily_combined = daily_combined.drop_duplicates(subset=['統一代號']) # 防呆，避免同一天股票重複
+            daily_combined = daily_combined.drop_duplicates(subset=['統一代號'])
             all_dfs.append(daily_combined)
             if i == 0:
                 df_today = daily_combined.copy()
