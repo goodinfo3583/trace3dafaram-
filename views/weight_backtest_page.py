@@ -848,10 +848,16 @@ def show_weight_backtest_page(STOCK_DICT, DATA_DIR="data"):
             if not df_b0_debug.empty:
                 b0_cols = ['統一代號']
                 rename_dict = {}
-                for col in ['成交', '漲跌幅', '成交張數', '成交額(百萬)', 'PER', '5日均量', 'B0_量價狀態']:
+                # 🎯 這裡加入了 '股價日期' 以及您要的 '5日均額'
+                for col in ['股價日期', '成交', '漲跌幅', '成交張數', '成交額(百萬)', 'PER', '5日均量', '5日均額', 'B0_量價狀態']:
                     if col in df_b0_debug.columns:
                         b0_cols.append(col)
-                        rename_dict[col] = f'B0_{col}' if not col.startswith('B0_') else col
+                        # 🎯 針對 5日均額 給予您指定的專屬名稱
+                        if col == '5日均額':
+                            rename_dict[col] = 'B0_5日均成交額(百萬)'
+                        else:
+                            rename_dict[col] = f'B0_{col}' if not col.startswith('B0_') else col
+                            
                 debug_df = pd.merge(debug_df, df_b0_debug[b0_cols].rename(columns=rename_dict), on='統一代號', how='left')
 
             check_cols = ['統一代號', '今日上榜', '△', '法人持股', '最新動態', '5日ΔChange', '20日ΔChange', '60日ΔChange', '120日ΔChange']
