@@ -238,38 +238,37 @@ def show_watchlist_page(STOCK_DICT=None, conn=None, SHEET_URL=None):
 
                                 # 渲染卡片 HTML
                                 st.markdown(f"""
-                                <div class="track-card">
-                                    <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 12px;">
-                                        <div style="font-size: 18px; font-weight: bold; color: #fff;">
-                                            <span style="color: #38BDF8; margin-right: 8px;">{code}</span>{name}
-                                        </div>
-                                        <div style="font-size: 12px; color: #94a3b8; background: rgba(0,0,0,0.3); padding: 4px 8px; border-radius: 4px;">
-                                            鎖定日: {lock_date}
-                                        </div>
-                                    </div>
-                                    
-                                    <div style="display: grid; grid-template-columns: repeat(3, 1fr); gap: 10px; margin-bottom: 15px;">
-                                        <div class="stat-box">
-                                            <div class="stat-title">鎖定收盤價</div>
-                                            <div class="stat-value" style="color: #e2e8f0;">{lock_price:.2f}</div>
-                                        </div>
-                                        <div class="stat-box">
-                                            <div class="stat-title">最新價格</div>
-                                            <div class="stat-value" style="color: #e2e8f0;">{current_price:.2f}</div>
-                                        </div>
-                                        <div class="stat-box" style="background: rgba({ '255,75,75' if roi > 0 else ('0,226,114' if roi < 0 else '148,163,184') }, 0.1); border-color: rgba({ '255,75,75' if roi > 0 else ('0,226,114' if roi < 0 else '148,163,184') }, 0.3);">
-                                            <div class="stat-title">區間報酬</div>
-                                            <div class="stat-value {roi_class}">{sign}{roi:.2f}%</div>
-                                        </div>
-                                    </div>
-                                    
-                                    <div style="font-size: 13px; color: #cbd5e1; border-top: 1px dashed rgba(255,255,255,0.1); padding-top: 10px;">
-                                        <span style="color: #94a3b8;">總分:</span> {score} &nbsp;|&nbsp; 
-                                        <span style="color: #94a3b8;">策略:</span> {strategy} &nbsp;|&nbsp; 
-                                        <span style="color: #94a3b8;">狀態:</span> {status}
-                                    </div>
-                                </div>
-                                """, unsafe_allow_html=True)
+<div class="track-card">
+<div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 12px;">
+<div style="font-size: 18px; font-weight: bold; color: #fff;">
+<span style="color: #38BDF8; margin-right: 8px;">{code}</span>{name}
+</div>
+<div style="font-size: 12px; color: #94a3b8; background: rgba(0,0,0,0.3); padding: 4px 8px; border-radius: 4px;">
+鎖定日: {lock_date}
+</div>
+</div>
+                                   
+<div style="display: grid; grid-template-columns: repeat(3, 1fr); gap: 10px; margin-bottom: 15px;">
+<div class="stat-box">
+<div class="stat-title">鎖定收盤價</div>
+<div class="stat-value" style="color: #e2e8f0;">{lock_price:.2f}</div>
+</div>
+<div class="stat-box">
+<div class="stat-title">最新價格</div>
+<div class="stat-value" style="color: #e2e8f0;">{current_price:.2f}</div>
+</div>
+<div class="stat-box" style="background: rgba({ '255,75,75' if roi > 0 else ('0,226,114' if roi < 0 else '148,163,184') }, 0.1); border-color: rgba({ '255,75,75' if roi > 0 else ('0,226,114' if roi < 0 else '148,163,184') }, 0.3);">
+<div class="stat-title">區間報酬</div>
+<div class="stat-value {roi_class}">{sign}{roi:.2f}%</div>
+</div>
+</div>                                   
+<div style="font-size: 13px; color: #cbd5e1; border-top: 1px dashed rgba(255,255,255,0.1); padding-top: 10px;">
+<span style="color: #94a3b8;">總分:</span> {score} &nbsp;|&nbsp; 
+<span style="color: #94a3b8;">策略:</span> {strategy} &nbsp;|&nbsp; 
+<span style="color: #94a3b8;">狀態:</span> {status}
+</div>
+</div>
+""", unsafe_allow_html=True)
 
                             st.markdown("<hr style='border-color: #334155; margin: 20px 0;'>", unsafe_allow_html=True)
                             
