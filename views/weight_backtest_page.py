@@ -1161,8 +1161,9 @@ def show_weight_backtest_page(STOCK_DICT, DATA_DIR="data"):
                                 try:
                                     from streamlit_gsheets import GSheetsConnection
                                     conn = st.connection("gsheets", type=GSheetsConnection)
-                                    SHEET_URL = st.secrets["connections"]["gsheets"]["spreadsheet"]
-                                    
+                                    # 🎯 直接綁定您的專屬 Google Sheets 網址
+                                    SHEET_URL = "https://docs.google.com/spreadsheets/d/1TxHDahg8ul6lmUtDN-7X75cBXbkU0jaZ3M9zg6exBgU/edit?gid=687268023#gid=687268023"                                 
+
                                     track_date = datetime.datetime.now().strftime("%Y-%m-%d")
                                     today_obj = datetime.datetime.now()
                                     monday_obj = today_obj - datetime.timedelta(days=today_obj.weekday())
@@ -1248,7 +1249,8 @@ def show_weight_backtest_page(STOCK_DICT, DATA_DIR="data"):
             try:
                 from streamlit_gsheets import GSheetsConnection
                 conn = st.connection("gsheets", type=GSheetsConnection)
-                SHEET_URL = st.secrets["connections"]["gsheets"]["spreadsheet"]
+                # 🎯 直接綁定您的專屬 Google Sheets 網址
+                SHEET_URL = "https://docs.google.com/spreadsheets/d/1TxHDahg8ul6lmUtDN-7X75cBXbkU0jaZ3M9zg6exBgU/edit?gid=687268023#gid=687268023"
                 
                 history_track_df = conn.read(spreadsheet=SHEET_URL, worksheet="實驗室模型追蹤", ttl=0).dropna(how="all")
                 
