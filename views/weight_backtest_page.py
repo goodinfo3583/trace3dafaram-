@@ -79,95 +79,87 @@ def clean_stock_id(df):
     return df
 
 # ==========================================
-# 🌟 修復版 B0 專屬背景喚醒：精準防禦欄位覆蓋 Bug
+# 🌟 數據潔癖專屬版：嚴格比對檔案內的「股價日期」進行定錨與均值計算
 # ==========================================
 def sync_b0_data(DATA_DIR):
-    # 🎯 核心修正 1：檔名篩選必須嚴格限定「成交價」，避免抓到「外資成交比」等其他檔案導致欄位被空值覆蓋
-    search_patterns = [os.path.join(DATA_DIR, "*成交價*.csv")]
+    search_patterns = [os.path.join(DATA_DIR, "*成交*.csv")]
     files = []
     for pattern in search_patterns:
         files.extend(glob.glob(pattern))
     if not files: return
     
-    # 步驟 1：依據檔名中的「日期」進行分組
-    date_groups = {}
-    for f in files:
-        basename = os.path.basename(f)
-        match = re.search(r'(20\d{6})', basename)
-        if match:
-            d_str = match.group(1)
-        else:
-            nums = re.findall(r'\d+', basename)
-            if nums: d_str = nums[0]
-            else: continue
-                
-        if d_str not in date_groups: date_groups[d_str] = []
-        date_groups[d_str].append(f)
-            
-    if not date_groups: return
-    
-    # 步驟 2：取出最新的前 5 個「日期」
-    sorted_dates = sorted(date_groups.keys(), reverse=True)[:5]
-    
     all_dfs = []
-    df_today = pd.DataFrame()
-    
-    # 步驟 3：依序合併每天的所有切片檔案
-    for i, d_str in enumerate(sorted_dates):
-        daily_dfs = []
-        for f in date_groups[d_str]:
-            df = None 
-            for enc in ['utf-8-sig', 'big5', 'cp950', 'utf-8']:
-                try:
-                    df = pd.read_csv(f, encoding=enc, header=0)
-                    break
-                except: pass
+    # 步驟 1：無差別讀取所有檔案，並直接抓取檔案內的「日期」欄位
+    for f in files:
+        df = None 
+        for enc in ['utf-8-sig', 'big5', 'cp950', 'utf-8']:
+            try:
+                df = pd.read_csv(f, encoding=enc, header=0)
+                break
+            except: pass
+            
+        if df is not None and not df.empty:
+            # 清除所有欄位名稱的隱形空白與換行符號
+            df.columns = [re.sub(r'\s+', '', str(c)).replace('\ufeff', '').replace('\u3000', '') for c in df.columns]
+            
+            c_code = next((c for c in df.columns if '代號' in c), None)
+            date_col = next((c for c in df.columns if '日期' in c), None) # 🎯 嚴格尋找「股價日期」
+            
+            if c_code and date_col:
+                df['統一代號'] = df[c_code].astype(str).str.replace(r'\.0$', '', regex=True).str.strip()
+                df['標準日期'] = df[date_col].astype(str).str.strip() # 🎯 提取檔案內的真實日期
                 
-            if df is not None and not df.empty:
-                # 🚀 終極除錯點：用 Regex 清除所有隱形空白與換行符號
-                df.columns = [re.sub(r'\s+', '', str(c)).replace('\ufeff', '').replace('\u3000', '') for c in df.columns]
-                
-                c_code = next((c for c in df.columns if '代號' in c), None)
-                if c_code:
-                    df['統一代號'] = df[c_code].astype(str).str.replace(r'\.0$', '', regex=True).str.strip()
-                    
-                    vol_col = next((c for c in df.columns if c in ['成交張數', '總量', '成交量', '累積成交張數', '張數']), None)
-                    if vol_col:
-                        df['成交張數_num'] = pd.to_numeric(df[vol_col].astype(str).str.replace(',', ''), errors='coerce').fillna(0)
-                        if '成交張數' not in df.columns:
-                            df['成交張數'] = df[vol_col] 
-                    else:
-                        df['成交張數_num'] = 0
-                        if '成交張數' not in df.columns:
-                            df['成交張數'] = '0'
+                vol_col = next((c for c in df.columns if c in ['成交張數', '總量', '成交量', '累積成交張數', '張數']), None)
+                if vol_col:
+                    df['成交張數_num'] = pd.to_numeric(df[vol_col].astype(str).str.replace(',', ''), errors='coerce').fillna(0)
+                    if '成交張數' not in df.columns: df['成交張數'] = df[vol_col] 
+                else:
+                    df['成交張數_num'] = 0
+                    if '成交張數' not in df.columns: df['成交張數'] = '0'
 
-                    df['股價日期'] = d_str
-                    daily_dfs.append(df)
-        
-        if daily_dfs:
-            daily_combined = pd.concat(daily_dfs, ignore_index=True)
-            
-            # 🎯 核心修正 2：防呆機制，若同檔股票在不同檔案出現，保留「資料最齊全(Non-NA最多)」的那一筆
-            daily_combined['non_na_count'] = daily_combined.notna().sum(axis=1)
-            daily_combined = daily_combined.sort_values('non_na_count', ascending=False)
-            daily_combined = daily_combined.drop_duplicates(subset=['統一代號'])
-            daily_combined = daily_combined.drop(columns=['non_na_count'])
-            
-            all_dfs.append(daily_combined)
-            if i == 0:
-                df_today = daily_combined.copy()
+                amt_col = next((c for c in df.columns if c in ['成交額(百萬)', '成交金額', '成交額', '總金額']), None)
+                if amt_col:
+                    df['成交額_num'] = pd.to_numeric(df[amt_col].astype(str).str.replace(',', ''), errors='coerce').fillna(0)
+                    if '成交額(百萬)' not in df.columns: df['成交額(百萬)'] = df[amt_col]
+                else:
+                    df['成交額_num'] = 0
+                    if '成交額(百萬)' not in df.columns: df['成交額(百萬)'] = '0'
+
+                all_dfs.append(df)
                 
-    if df_today.empty: return
+    if not all_dfs: return
     
-    # 步驟 4：跨越 5 天計算真正的「5日均量」
-    if len(all_dfs) > 1:
-        all_vols = pd.concat([d[['統一代號', '成交張數_num']] for d in all_dfs])
-        avg_vol = all_vols.groupby('統一代號')['成交張數_num'].mean().reset_index()
-        avg_vol = avg_vol.rename(columns={'成交張數_num': '5日均量'})
-        df_today = pd.merge(df_today, avg_vol, on='統一代號', how='left')
-        df_today['5日均量'] = df_today['5日均量'].round(0)
-    else:
-        df_today['5日均量'] = df_today['成交張數_num']
+    # 🎯 核心防線 1：合併所有檔案後，嚴格以「統一代號 + 標準日期」為唯一鍵值去重
+    combined_df = pd.concat(all_dfs, ignore_index=True)
+    combined_df = combined_df.drop_duplicates(subset=['統一代號', '標準日期'], keep='first')
+    
+    # 找出系統中真實存在的最新日期 (以此作為基準日)
+    unique_dates = sorted(combined_df['標準日期'].unique(), reverse=True)
+    if not unique_dates: return
+    latest_date = unique_dates[0]
+    
+    # 取出最新一日的資料作為今日基礎
+    df_today = combined_df[combined_df['標準日期'] == latest_date].copy()
+    
+    # 🎯 核心防線 2：嚴格依照「日期」由新到舊排序，抓取最近 5 天的資料計算均量與均額
+    sorted_df = combined_df.sort_values(by=['統一代號', '標準日期'], ascending=[True, False])
+    # 利用 groupby.head(5) 確保每檔股票只抓到確實存在的最近 5 個交易日
+    top5_df = sorted_df.groupby('統一代號').head(5)
+    
+    # 計算 5 日均量與均額
+    avg_data = top5_df.groupby('統一代號').agg(
+        **{
+            '5日均量': ('成交張數_num', 'mean'),
+            '5日均額': ('成交額_num', 'mean')
+        }
+    ).reset_index()
+        
+    df_today = pd.merge(df_today, avg_data, on='統一代號', how='left')
+    df_today['5日均量'] = df_today['5日均量'].round(0)
+    df_today['5日均額'] = df_today['5日均額'].round(2)
+    
+    # 補回給主程式辨識的日期欄位
+    df_today['股價日期'] = latest_date
         
     def get_vp_status(row):
         pct = pd.to_numeric(str(row.get('漲跌幅', '0')).replace('%', ''), errors='coerce')
