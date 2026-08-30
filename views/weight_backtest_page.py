@@ -1154,7 +1154,7 @@ def show_weight_backtest_page(STOCK_DICT, DATA_DIR="data"):
                 
                 with col_save2:
                     # 🎯 將判斷加在按鈕按下去的瞬間
-                    if st.button("🚀 寫入模擬追蹤系統", icon=":material/database:", use_container_width=True, type="primary"):
+                    if st.button("寫入模擬追蹤 (導覽登入)", icon=":material/database:", use_container_width=True, type="primary"):
                                     
                         # 1. 檢查登入狀態
                         if not st.session_state.get("logged_in", False):
