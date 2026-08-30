@@ -109,11 +109,11 @@ def show_watchlist_page(STOCK_DICT=None, conn=None, SHEET_URL=None):
     # 🗂️ 雙分頁設計：將實驗室模型追蹤置頂為第一個 Tab
     tab_track, tab_custom = st.tabs(["🔹 實驗室模型追蹤", "🔹 自訂追蹤名單"])
 
-    # ==========================================
-    # Tab 1: 🏆 實驗室模型追蹤 (沉浸式戰情室版)
+# ==========================================
+    # Tab 1: 🏆 實驗室模型追蹤 (橫向戰情室版)
     # ==========================================
     with tab_track:
-        st.subheader("模型鎖定清單與績效追蹤")
+        st.subheader("📊 模型鎖定清單與績效追蹤")
         st.markdown("這裡顯示您從「權重與回測」寫入的標的，方便您每日檢視策略績效。")
         
         # 🌟 注入玻璃卡片與報酬率的專屬 CSS 特效
@@ -127,8 +127,8 @@ def show_watchlist_page(STOCK_DICT=None, conn=None, SHEET_URL=None):
                 border-radius: 12px;
                 border: 1px solid rgba(255, 255, 255, 0.1);
                 box-shadow: 0 4px 15px rgba(0, 0, 0, 0.3);
-                padding: 15px 20px;
-                margin-bottom: 12px;
+                padding: 15px 15px;
+                margin-bottom: 15px;
                 transition: all 0.3s cubic-bezier(0.25, 0.8, 0.25, 1);
             }
             .track-card:hover {
@@ -140,17 +140,17 @@ def show_watchlist_page(STOCK_DICT=None, conn=None, SHEET_URL=None):
             .stat-box {
                 background: rgba(15, 23, 42, 0.6);
                 border-radius: 8px;
-                padding: 10px;
+                padding: 8px;
                 text-align: center;
                 border: 1px solid rgba(255, 255, 255, 0.05);
             }
             .stat-title {
-                font-size: 12px;
+                font-size: 11px;
                 color: #94a3b8;
                 margin-bottom: 4px;
             }
             .stat-value {
-                font-size: 18px;
+                font-size: 15px;
                 font-weight: bold;
             }
             .pos-return { color: #FF4B4B; }
@@ -164,7 +164,6 @@ def show_watchlist_page(STOCK_DICT=None, conn=None, SHEET_URL=None):
         if conn and SHEET_URL:
             with st.spinner("載入實驗室追蹤資料中..."):
                 try:
-                    # 讀取追蹤表單
                     TRACKING_URL = "https://docs.google.com/spreadsheets/d/1TxHDahg8ul6lmUtDN-7X75cBXbkU0jaZ3M9zg6exBgU/edit?gid=687268023#gid=687268023"
                     df_track = conn.read(spreadsheet=TRACKING_URL, worksheet="實驗室模型追蹤", ttl=0)
                     
@@ -182,7 +181,6 @@ def show_watchlist_page(STOCK_DICT=None, conn=None, SHEET_URL=None):
                             for idx, row in user_track.iterrows():
                                 code = str(row.get('代號', '')).replace('.0', '').strip()
                                 if not code:
-                                    # 如果沒有獨立的代號欄位，嘗試從統一代號提取
                                     uni_code = str(row.get('統一代號', ''))
                                     m = re.search(r'\d+', uni_code)
                                     if m: code = m.group()
@@ -194,88 +192,85 @@ def show_watchlist_page(STOCK_DICT=None, conn=None, SHEET_URL=None):
                             if track_codes:
                                 track_quotes = get_watchlist_quotes(track_codes)
 
-                            # 3️⃣ 渲染沉浸式玻璃卡片
+                            # 3️⃣ 渲染沉浸式玻璃卡片 (🎯 改為橫向 3 欄並排)
                             st.markdown("### 🎯 鎖定標的戰情面板")
                             
-                            for idx, row in user_track.iterrows():
-                                # 基本資訊
-                                lock_date = row.get('鎖定日期', '未知')
-                                name = row.get('名稱', row.get('股票名稱', '未知'))
-                                
-                                # 提取代號
-                                code = str(row.get('代號', '')).replace('.0', '').strip()
-                                if not code:
-                                    uni_code = str(row.get('統一代號', ''))
-                                    m = re.search(r'\d+', uni_code)
-                                    if m: code = m.group()
+                            cards_data = list(user_track.iterrows())
+                            cols_per_row = 3 # 設定每列顯示幾個卡片
+                            
+                            # 使用迴圈自動折行
+                            for i in range(0, len(cards_data), cols_per_row):
+                                cols = st.columns(cols_per_row)
+                                for j in range(cols_per_row):
+                                    if i + j < len(cards_data):
+                                        idx, row = cards_data[i + j]
+                                        
+                                        # 讀取基本資訊
+                                        lock_date = row.get('鎖定日期', '未知')
+                                        name = row.get('名稱', row.get('股票名稱', '未知'))
+                                        
+                                        code = str(row.get('代號', '')).replace('.0', '').strip()
+                                        if not code:
+                                            uni_code = str(row.get('統一代號', ''))
+                                            m = re.search(r'\d+', uni_code)
+                                            if m: code = m.group()
 
-                                # 鎖定價格處理
-                                lock_price_raw = row.get('鎖定收盤價', row.get('B0_成交', 0))
-                                try:
-                                    lock_price = float(str(lock_price_raw).replace(',', ''))
-                                except:
-                                    lock_price = 0
+                                        lock_price_raw = row.get('鎖定收盤價', row.get('B0_成交', 0))
+                                        try: lock_price = float(str(lock_price_raw).replace(',', ''))
+                                        except: lock_price = 0
 
-                                # 最新價格處理
-                                current_price = lock_price # 預設等於鎖定價
-                                if code in track_quotes:
-                                    current_price = track_quotes[code]['price']
+                                        current_price = lock_price
+                                        if code in track_quotes:
+                                            current_price = track_quotes[code]['price']
 
-                                # 計算區間報酬
-                                if lock_price > 0:
-                                    roi = ((current_price - lock_price) / lock_price) * 100
-                                else:
-                                    roi = 0
+                                        # 🎯 修復區間報酬 -0.00% 的 Bug
+                                        if lock_price > 0:
+                                            roi = ((current_price - lock_price) / lock_price) * 100
+                                            roi = round(roi, 2) # 強制先四捨五入
+                                        else:
+                                            roi = 0.0
+                                            
+                                        # 徹底消除負號幽靈
+                                        if roi == 0.0 or roi == -0.0:
+                                            roi = 0.0
 
-                                # 決定顏色 CSS Class
-                                roi_class = "pos-return" if roi > 0 else ("neg-return" if roi < 0 else "neu-return")
-                                sign = "+" if roi > 0 else ""
+                                        # 給予顏色
+                                        roi_class = "pos-return" if roi > 0 else ("neg-return" if roi < 0 else "neu-return")
+                                        sign = "+" if roi > 0 else ""
 
-                                # 其他特徵 (取前幾個重要特徵展示)
-                                strategy = str(row.get('當下策略特徵', '無'))
-                                status = str(row.get('追蹤狀態', '無'))
-                                score = str(row.get('總分', '無'))
-
-                                # 渲染卡片 HTML
-                                st.markdown(f"""
+                                        # 透過 st.columns 的 with 將卡片塞入對應欄位 (且拿掉底部文字)
+                                        with cols[j]:
+                                            st.markdown(f"""
 <div class="track-card">
 <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 12px;">
-<div style="font-size: 18px; font-weight: bold; color: #fff;">
-<span style="color: #38BDF8; margin-right: 8px;">{code}</span>{name}
+<div style="font-size: 16px; font-weight: bold; color: #fff;"><span style="color: #38BDF8; margin-right: 6px;">{code}</span>{name}
 </div>
-<div style="font-size: 12px; color: #94a3b8; background: rgba(0,0,0,0.3); padding: 4px 8px; border-radius: 4px;">
-鎖定日: {lock_date}
+<div style="font-size: 11px; color: #94a3b8; background: rgba(0,0,0,0.3); padding: 4px 6px; border-radius: 4px;">
+鎖定: {lock_date}
 </div>
-</div>
-                                   
-<div style="display: grid; grid-template-columns: repeat(3, 1fr); gap: 10px; margin-bottom: 15px;">
+</div>                                            
+<div style="display: grid; grid-template-columns: repeat(3, 1fr); gap: 6px;">
 <div class="stat-box">
-<div class="stat-title">鎖定收盤價</div>
+<div class="stat-title">鎖定價</div>
 <div class="stat-value" style="color: #e2e8f0;">{lock_price:.2f}</div>
 </div>
 <div class="stat-box">
-<div class="stat-title">最新價格</div>
+<div class="stat-title">最新價</div>
 <div class="stat-value" style="color: #e2e8f0;">{current_price:.2f}</div>
 </div>
 <div class="stat-box" style="background: rgba({ '255,75,75' if roi > 0 else ('0,226,114' if roi < 0 else '148,163,184') }, 0.1); border-color: rgba({ '255,75,75' if roi > 0 else ('0,226,114' if roi < 0 else '148,163,184') }, 0.3);">
-<div class="stat-title">區間報酬</div>
+<div class="stat-title">報酬</div>
 <div class="stat-value {roi_class}">{sign}{roi:.2f}%</div>
 </div>
-</div>                                   
-<div style="font-size: 13px; color: #cbd5e1; border-top: 1px dashed rgba(255,255,255,0.1); padding-top: 10px;">
-<span style="color: #94a3b8;">總分:</span> {score} &nbsp;|&nbsp; 
-<span style="color: #94a3b8;">策略:</span> {strategy} &nbsp;|&nbsp; 
-<span style="color: #94a3b8;">狀態:</span> {status}
 </div>
 </div>
 """, unsafe_allow_html=True)
 
-                            st.markdown("<hr style='border-color: #334155; margin: 20px 0;'>", unsafe_allow_html=True)
+                            st.markdown("<hr style='border-color: #334155; margin: 10px 0 20px 0;'>", unsafe_allow_html=True)
                             
-                            # 4️⃣ 原本的 DataFrame 總表 (新增欄位)
+                            # 4️⃣ 原始數據總表
                             st.markdown("### 📋 原始數據總表")
                             
-                            # 幫原始表格也加上這兩個欄位方便匯出或觀看
                             display_df = user_track.drop(columns=['帳號']) if '帳號' in user_track.columns else user_track.copy()
                             
                             new_prices = []
@@ -294,12 +289,14 @@ def show_watchlist_page(STOCK_DICT=None, conn=None, SHEET_URL=None):
                                 cur_price = lock_price
                                 if code in track_quotes: cur_price = track_quotes[code]['price']
                                 
-                                roi = ((cur_price - lock_price) / lock_price) * 100 if lock_price > 0 else 0
+                                # 這裡同樣修正總表的 -0.00% 問題
+                                roi = ((cur_price - lock_price) / lock_price) * 100 if lock_price > 0 else 0.0
+                                roi = round(roi, 2)
+                                if roi == 0.0 or roi == -0.0: roi = 0.0
                                 
                                 new_prices.append(cur_price)
                                 new_rois.append(f"{roi:.2f}%")
                             
-                            # 插入欄位到鎖定收盤價後面
                             if '鎖定收盤價' in display_df.columns:
                                 loc = display_df.columns.get_loc('鎖定收盤價') + 1
                                 display_df.insert(loc, '最新價格', new_prices)
@@ -314,7 +311,6 @@ def show_watchlist_page(STOCK_DICT=None, conn=None, SHEET_URL=None):
                     st.error(f"讀取追蹤資料時發生錯誤：{e}")
         else:
             st.warning("資料庫連線尚未建立。")
-
     # ==========================================
     # Tab 2: 📝 自訂追蹤名單 (原來的邏輯)
     # ==========================================
