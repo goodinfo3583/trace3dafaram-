@@ -212,7 +212,7 @@ def show_weight_backtest_page(STOCK_DICT, DATA_DIR="data"):
     if 'b7_pledge' not in st.session_state: sync_pledge_data(DATA_DIR)
     if 'b7_pledge_history' not in st.session_state: sync_pledge_history_data(DATA_DIR)
 
-    st.markdown("<h2 style='color: #38BDF8;'>⚖️ 策略實驗室：自訂權重與勝率回測</h2>", unsafe_allow_html=True)
+    st.markdown("<h2 style='color: #38BDF8;'>權重自訂與勝率回測寶庫</h2>", unsafe_allow_html=True)
     st.caption("打造專屬於您的選股邏輯，透過多重條件交集與大數據計分，找出最具爆發力的潛力股。")
     st.write("---")
 
