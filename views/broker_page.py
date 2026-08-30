@@ -14,7 +14,7 @@ def load_raw_broker_history(url):
 
 def render(STOCK_DICT=None):
     # 修正命名：改為更精確的「券商分點淨買力」與「集中度」
-    st.title("券商分點淨買力與集中度追蹤 (Beta)")
+    st.title("券商分點淨買力與集中度追蹤")
     st.markdown("觀察前 15 大分點買賣力道相抵後的淨流向，追蹤籌碼集中度連續性與券商進出矩陣。")
     
     stock_options = []

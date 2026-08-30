@@ -275,6 +275,15 @@ def inject_custom_header(is_logged_in=False):
                         </span>
                         <p class="dropdown-text">休息一下別殺進殺出占個卜，更多互動功能。</p>
                     </div>
+
+                    <!-- 🌟 這裡新增 B0 量價與估值掃描選項 -->
+                    <div class="dropdown-item actionable">
+                        <a href="#" data-target="NavToB0" class="dropdown-title internal-nav">
+                            <img src="app/static/icon-search.png" class="menu-icon" alt="b0"> B0 量價與估值掃描
+                        </a>
+                        <p class="dropdown-text">透視全市場資金動能與主力控盤狀態。</p>
+                    </div>
+                    <!-- 🌟 新增結束 -->
                 </div>
             </div>
             
@@ -520,7 +529,8 @@ def render_proxy_buttons():
         st.button("NavToContact", on_click=change_page, args=("contact",))
         st.button("NavToCourses", on_click=toggle_course_npc)
         st.button("NavToNews", on_click=change_page, args=("news",))
-        st.button("NavToPool", on_click=change_page, args=("pool",))          
+        st.button("NavToPool", on_click=change_page, args=("pool",))
+        st.button("NavToB0", on_click=change_page, args=("b0",))
         st.button("NavToB1", on_click=change_page, args=("b1",))
         st.button("NavToB2", on_click=change_page, args=("b2",))
         st.button("NavToB3", on_click=change_page, args=("b3",))

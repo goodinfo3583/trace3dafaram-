@@ -23,6 +23,7 @@ from views.login_page import show_login_page
 from views.contact_page import show_contact_page
 from views.news_page import show_news_page
 from views.pool_page import show_pool_page
+from views.b0_page import show_b0_page, sync_b0_data
 from views.b1_page import show_b1_page, sync_b1_data
 from views.b2_page import show_b2_page, sync_b2_data
 from views.b3_page import show_b3_page, sync_b3_data
@@ -38,7 +39,7 @@ from views.weight_backtest_page import show_weight_backtest_page
 # ==========================================
 # 1. 網頁基本設定 & 目錄路徑初始化
 # ==========================================
-st.set_page_config(page_title="股市派對", layout="wide")
+st.set_page_config(page_title="股市派對-韭菜盒子", layout="wide")
 # 集中所有路徑變數
 DATA_DIR = "./data"
 SCORE_HISTORY_DIR = os.path.join(DATA_DIR, "ScoreHistory")
@@ -120,7 +121,8 @@ current_page = st.query_params.get("page", "b1")
 # 頁面渲染分流 (路由中心)
 if current_page == "all":
     # 在觀察名單按下「全市場掃描」後觸發的背景引擎
-    with st.spinner("🚀 背景全市場數據高速運算中..."):
+    with st.spinner("背景全市場數據高速運算中..."):
+        sync_b0_data(DATA_DIR)
         sync_b1_data(DATA_DIR)
         sync_b2_data(DATA_DIR)           # 在背景後台算好 b2
         sync_b3_data(DATA_DIR)
@@ -143,6 +145,8 @@ elif current_page == "contact":
     show_contact_page(conn, SHEET_URL)
 elif current_page == "pool":
     show_pool_page(conn, SHEET_URL, DATA_DIR, STOCK_DICT)
+elif current_page == "b0":
+    show_b0_page(DATA_DIR, STOCK_DICT)
 elif current_page == "b1":
     show_b1_page(DATA_DIR, STOCK_DICT)
 elif current_page == "b2":

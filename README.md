@@ -54,15 +54,19 @@
 
 │   ├── 📄 news\_page.py          # 市場消息
 
+│   ├── 📄 broker\_page.py       # 券商分點
+
 │   ├── 📄 contact\_page.py       # 聯絡我們 (寫入 G-Sheets)
 
 │   ├── 📄 login\_page.py         # 登入頁面
 
 │   ├── 📄 sidebar.py            # 側邊視窗欄位
 
-│   ├── 📄 watchlist\_page.py     # 使用者自訂追蹤清單
+│   ├── 📄 watchlist\_page.py     # 使用者自訂追蹤清單 (寫入 G-Sheets)
 
-│   ├── 📄 pool\_page.py          # 觀察名單 (大數據計分、樹狀圖、歷史回測)
+│   ├── 📄 weight\_backtest\_page.py   # 權重自訂篩選 (自訂權重與連結追蹤清單頁面寫入 G-Sheets)
+
+│   ├── 📄 pool\_page.py          # 觀察名單 (大數據計分、樹狀圖、歷史回測、 寫入 G-Sheets)
 
 │   ├── 📄 b1\_page.py            # 區塊 1 法人動向
 
@@ -76,7 +80,7 @@
 
 │   ├── 📄 b6\_page.py            # 區塊 6 鉅額交易
 
-│   └── 📄 b7\_page.py            # 區塊 7 董監動向
+│   ├── 📄 b7\_page.py            # 區塊 7 董監動向
 
 │   └── 📄setting.py             # 設置中心(瀏覽者自訂網站顏色、CSS及背景圖片)
 
