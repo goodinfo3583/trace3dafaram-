@@ -79,20 +79,20 @@ def clean_stock_id(df):
     return df
 
 # ==========================================
-# 🌟 修復版 B0 專屬背景喚醒：精準依日期分組，解決多重切片導致的 5日均量 Bug
+# 🌟 修復版 B0 專屬背景喚醒：精準防禦欄位覆蓋 Bug
 # ==========================================
 def sync_b0_data(DATA_DIR):
-    search_patterns = [os.path.join(DATA_DIR, "*成交*.csv")]
+    # 🎯 核心修正 1：檔名篩選必須嚴格限定「成交價」，避免抓到「外資成交比」等其他檔案導致欄位被空值覆蓋
+    search_patterns = [os.path.join(DATA_DIR, "*成交價*.csv")]
     files = []
     for pattern in search_patterns:
         files.extend(glob.glob(pattern))
     if not files: return
     
-    # 步驟 1：依據檔名中的「日期」進行分組 (解決日期變 2026/23/92 的 Bug)
+    # 步驟 1：依據檔名中的「日期」進行分組
     date_groups = {}
     for f in files:
         basename = os.path.basename(f)
-        # 【精準修正】強制尋找 20 開頭的 8 碼日期 (例如 20260828)
         match = re.search(r'(20\d{6})', basename)
         if match:
             d_str = match.group(1)
@@ -116,7 +116,7 @@ def sync_b0_data(DATA_DIR):
     for i, d_str in enumerate(sorted_dates):
         daily_dfs = []
         for f in date_groups[d_str]:
-            df = None # 確保每次讀取新檔案前重置變數
+            df = None 
             for enc in ['utf-8-sig', 'big5', 'cp950', 'utf-8']:
                 try:
                     df = pd.read_csv(f, encoding=enc, header=0)
@@ -124,7 +124,7 @@ def sync_b0_data(DATA_DIR):
                 except: pass
                 
             if df is not None and not df.empty:
-                # 🚀 終極除錯點：用 Regex 清除所有隱形空白與換行符號 (\n, \r)
+                # 🚀 終極除錯點：用 Regex 清除所有隱形空白與換行符號
                 df.columns = [re.sub(r'\s+', '', str(c)).replace('\ufeff', '').replace('\u3000', '') for c in df.columns]
                 
                 c_code = next((c for c in df.columns if '代號' in c), None)
@@ -146,7 +146,13 @@ def sync_b0_data(DATA_DIR):
         
         if daily_dfs:
             daily_combined = pd.concat(daily_dfs, ignore_index=True)
+            
+            # 🎯 核心修正 2：防呆機制，若同檔股票在不同檔案出現，保留「資料最齊全(Non-NA最多)」的那一筆
+            daily_combined['non_na_count'] = daily_combined.notna().sum(axis=1)
+            daily_combined = daily_combined.sort_values('non_na_count', ascending=False)
             daily_combined = daily_combined.drop_duplicates(subset=['統一代號'])
+            daily_combined = daily_combined.drop(columns=['non_na_count'])
+            
             all_dfs.append(daily_combined)
             if i == 0:
                 df_today = daily_combined.copy()
