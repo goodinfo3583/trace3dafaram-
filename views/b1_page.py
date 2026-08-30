@@ -513,7 +513,7 @@ def show_b1_page(DATA_DIR, STOCK_DICT):
     search_kw = c3.text_input("🔍 快速尋找標的 (輸入代號或名稱)", placeholder="例如: 2890 或 永豐金")
 
     tab5, tab20, tab60, tab120, tab_all = st.tabs([
-        "🔴 5日排行", "🟡 20日排行", "🟢 60日排行", "🔵 120日排行", "📊 歷史軌跡全能池"
+        "🔹 🔴 5日排行", "🔹 🟡 20日排行", "🔹 🟢 60日排行", "🔹 🔵 120日排行", "🔹  歷史軌跡全能池"
     ])
 
     def format_delta(x):
@@ -753,7 +753,7 @@ def show_b1_page(DATA_DIR, STOCK_DICT):
     down_dfs = fetch_github_json_down()
     
     t_down_5, t_down_10, t_down_20, t_down_30, t_down_history, t_down_all = st.tabs([
-        "🟢 5日衰退", "🟢 10日衰退", "🟢 20日衰退", "🟢 30日衰退", "📅 單日歷史快照", "📊 歷史衰退全能池"
+        "🔹 🟢 5日衰退", "🔹 🟢 10日衰退", "🔹 🟢 20日衰退", "🔹 🟢 30日衰退", "🔹 單日歷史快照", "🔹  歷史衰退全能池"
     ])
     
     def render_down_table(day_key):

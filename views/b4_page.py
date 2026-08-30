@@ -406,7 +406,7 @@ def show_b4_page(DATA_DIR):
     sq_data = st.session_state['b4_squeeze_radar']
     df_squeeze = sq_data['df']
     
-    header_html = "區塊 4-4：可能軋空雷達 "
+    header_html = "可能軋空雷達 "
     if sq_data['date']:
         header_html += f"<span style='color: #00D2FF; font-size: 0.7em;'>({sq_data['date']})</span>"
         if not sq_data['sync']: header_html += " <span style='color: #ffa500; font-size: 0.5em;'>⏳籌碼待更新</span>"
@@ -439,7 +439,7 @@ def show_b4_page(DATA_DIR):
     rk_data = st.session_state['b4_risk_radar']
     df_risk = rk_data['df']
     
-    header_html = "區塊 4-5：短線套牢名單 "
+    header_html = "短線套牢名單 "
     if rk_data['date']:
         header_html += f"<span style='color: #00D2FF; font-size: 0.7em;'>({rk_data['date']})</span>"
         if not rk_data['sync']: header_html += " <span style='color: #ffa500; font-size: 0.5em;'>⏳融券資待更新</span>"
@@ -472,7 +472,7 @@ def show_b4_page(DATA_DIR):
 
     # ==================== 4-1 融資減少 ====================
     st.write("---")
-    st.markdown(f"### 區塊 4-1：融資減少動向", unsafe_allow_html=True)
+    st.markdown(f"### 融資減少動向", unsafe_allow_html=True)
     f_col1, f_col2, _ = st.columns([1, 1, 2])
     with f_col1: show_etf_41 = st.checkbox("顯示 ETF", value=True, key="margin_show_etf")
     with f_col2: show_bond_41 = st.checkbox("顯示債券/債券ETF", value=True, key="margin_show_bond")
@@ -487,7 +487,7 @@ def show_b4_page(DATA_DIR):
 
     # ==================== 4-2 借券賣出減少 ====================
     st.write("---")
-    st.markdown(f"### 區塊 4-2：借券賣出減少動向", unsafe_allow_html=True)
+    st.markdown(f"### 借券賣出減少動向", unsafe_allow_html=True)
     f_col1, f_col2, _ = st.columns([1, 1, 2])
     with f_col1: show_etf_42 = st.checkbox("顯示 ETF", value=True, key="stock_show_etf_42")
     with f_col2: show_bond_42 = st.checkbox("顯示債券/債券ETF", value=True, key="stock_show_bond_42")
@@ -502,7 +502,7 @@ def show_b4_page(DATA_DIR):
 
     # ==================== 4-3 融券增加 ====================
     st.write("---")
-    st.markdown(f"### 區塊 4-3：融券增加動向", unsafe_allow_html=True)
+    st.markdown(f"### 融券增加動向", unsafe_allow_html=True)
     f_col1, f_col2, _ = st.columns([1, 1, 2])
     with f_col1: show_etf_43 = st.checkbox("顯示 ETF", value=True, key="stock_show_etf_43")
     with f_col2: show_bond_43 = st.checkbox("顯示債券/債券ETF", value=True, key="stock_show_bond_43")

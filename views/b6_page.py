@@ -192,7 +192,7 @@ def show_b6_page(DATA_DIR):
 
     st.write("---")
     st.markdown("<div id='section-6'></div>", unsafe_allow_html=True)
-    st.markdown("### 區塊 6：鉅額交易動向", unsafe_allow_html=True)
+    st.markdown("### 鉅額交易動向", unsafe_allow_html=True)
     st.write("💡 鉅額交易有時為大戶私下換手籌碼，成交價可作為「支撐/壓力」的防守線；如果短線跌破建議嚴設停損。")
 
     tab_today, tab_hist = st.tabs(["🔹 今日最新鉅額交易", "🔹 歷史防守價追蹤表"])

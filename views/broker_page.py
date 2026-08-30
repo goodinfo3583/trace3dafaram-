@@ -14,7 +14,7 @@ def load_raw_broker_history(url):
 
 def render(STOCK_DICT=None):
     # 修正命名：改為更精確的「券商分點淨買力」與「集中度」
-    st.title("🕵️‍♂️ 券商分點淨買力與集中度追蹤 (Beta)")
+    st.title("券商分點淨買力與集中度追蹤 (Beta)")
     st.markdown("觀察前 15 大分點買賣力道相抵後的淨流向，追蹤籌碼集中度連續性與券商進出矩陣。")
     
     stock_options = []
@@ -84,7 +84,7 @@ def render(STOCK_DICT=None):
                         available_dates = sorted(stock_raw['trade_date'].unique(), reverse=True)
                         
                         # 🌟 升級：新增第三個頁籤「歷史進出矩陣」
-                        tab1, tab2, tab3 = st.tabs(["📅 單日進出明細", "🏦 區間囤貨追蹤 (近60日)", "🗺️ 歷史進出矩陣 (近30日)"])
+                        tab1, tab2, tab3 = st.tabs(["🔹 單日進出明細", "🔹 區間囤貨追蹤 (近60日)", "🔹 歷史進出矩陣 (近30日)"])
                         
                         # --------- 標籤 1: 單日明細 ---------
                         with tab1:

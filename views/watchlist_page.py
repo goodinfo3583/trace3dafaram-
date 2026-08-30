@@ -94,11 +94,11 @@ def get_watchlist_quotes(stock_codes):
 # 🎨 畫面渲染主程式
 # ==========================================
 def show_watchlist_page(STOCK_DICT=None, conn=None, SHEET_URL=None):
-    st.title("🛡️ 冒險者專屬追蹤名單")
+    st.title("冒險者專屬追蹤名單")
 
     # 🔒 門禁系統
     if not st.session_state.get("logged_in", False):
-        st.warning("守衛：「這區是 VIP 專屬！請先前往『登入』出示邀請函。」")
+        st.warning("「這區是 VIP 專屬！請先前往登入頁面註冊或出示邀請函。」")
         if st.button("前往登入", key="go_login_from_watchlist"):
             st.query_params["page"] = "login"
             st.rerun()
