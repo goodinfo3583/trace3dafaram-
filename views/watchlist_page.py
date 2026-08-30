@@ -107,13 +107,13 @@ def show_watchlist_page(STOCK_DICT=None, conn=None, SHEET_URL=None):
     username = st.session_state.get("username", "guest")
     
     # 🗂️ 雙分頁設計：將實驗室模型追蹤置頂為第一個 Tab
-    tab_track, tab_custom = st.tabs(["🔹 實驗室模型追蹤", "🔹 自訂追蹤名單"])
+    tab_track, tab_custom = st.tabs(["🔹 權重回測寶庫", "🔹 自訂追蹤名單"])
 
 # ==========================================
     # Tab 1: 🏆 實驗室模型追蹤 (橫向戰情室版)
     # ==========================================
     with tab_track:
-        st.subheader("📊 模型鎖定清單與績效追蹤")
+        st.subheader("模型鎖定清單與績效追蹤")
         st.markdown("這裡顯示您從「權重與回測」寫入的標的，方便您每日檢視策略績效。")
         
         # 🌟 注入玻璃卡片與報酬率的專屬 CSS 特效
@@ -193,7 +193,7 @@ def show_watchlist_page(STOCK_DICT=None, conn=None, SHEET_URL=None):
                                 track_quotes = get_watchlist_quotes(track_codes)
 
                             # 3️⃣ 渲染沉浸式玻璃卡片 (🎯 改為橫向 3 欄並排)
-                            st.markdown("### 🎯 鎖定標的戰情面板")
+                            st.markdown("### 鎖定標的戰情面板")
                             
                             cards_data = list(user_track.iterrows())
                             cols_per_row = 3 # 設定每列顯示幾個卡片
@@ -269,7 +269,7 @@ def show_watchlist_page(STOCK_DICT=None, conn=None, SHEET_URL=None):
                             st.markdown("<hr style='border-color: #334155; margin: 10px 0 20px 0;'>", unsafe_allow_html=True)
                             
                             # 4️⃣ 原始數據總表
-                            st.markdown("### 📋 原始數據總表")
+                            st.markdown("### 原始數據總表")
                             
                             display_df = user_track.drop(columns=['帳號']) if '帳號' in user_track.columns else user_track.copy()
                             
