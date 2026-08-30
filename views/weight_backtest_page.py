@@ -92,12 +92,20 @@ def sync_b0_data(DATA_DIR):
     date_groups = {}
     for f in files:
         basename = os.path.basename(f)
-        # 尋找檔名中連續的數字 (例如 20260828, 0828 等)
-        matches = re.findall(r'\d{4,8}', basename)
-        if matches:
-            d_str = matches[-1] # 取檔名中最後一組數字作為日期基準
-            if d_str not in date_groups: date_groups[d_str] = []
-            date_groups[d_str].append(f)
+        # 【精準修正】強制尋找 20 開頭的 8 碼日期 (例如 20260828)
+        match = re.search(r'(20\d{6})', basename)
+        if match:
+            d_str = match.group(1)
+        else:
+            # 備用：若找不到標準 8 碼，抓檔名中的第一組數字
+            nums = re.findall(r'\d+', basename)
+            if nums:
+                d_str = nums[0]
+            else:
+                continue
+                
+        if d_str not in date_groups: date_groups[d_str] = []
+        date_groups[d_str].append(f)
             
     if not date_groups: return
     
@@ -309,8 +317,14 @@ def show_weight_backtest_page(STOCK_DICT, DATA_DIR="data"):
     df_b0 = get_df('b0_price')
     if not df_b0.empty and '股價日期' in df_b0.columns:
         date_raw = str(df_b0['股價日期'].iloc[0])
-        b0_latest_date_str = f"2026/{date_raw[-4:-2]}/{date_raw[-2:]}" if len(date_raw)>=4 else date_raw
-
+        # 【精準修正】針對完整的 8 碼日期 (如 20260828) 進行準確切片
+        if len(date_raw) >= 8:
+            b0_latest_date_str = f"{date_raw[:4]}/{date_raw[4:6]}/{date_raw[6:8]}"
+        elif len(date_raw) >= 4:
+            b0_latest_date_str = f"2026/{date_raw[-4:-2]}/{date_raw[-2:]}"
+        else:
+            b0_latest_date_str = date_raw
+            
     # --- 模組 B0 ---
     with st.expander(f"💰 B0 基礎價量與估值過濾 (資料基準日: {b0_latest_date_str})", expanded=False):
         st.markdown("**🔹 1. 流動性過濾 (剔除冷門股/殭屍股)**")
