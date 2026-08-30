@@ -122,7 +122,18 @@ def sync_b0_data(DATA_DIR):
                 c_code = next((c for c in df.columns if '代號' in c), None)
                 if c_code:
                     df['統一代號'] = df[c_code].astype(str).str.replace(r'\.0$', '', regex=True).str.strip()
-                    df['成交張數_num'] = pd.to_numeric(df['成交張數'].astype(str).str.replace(',', ''), errors='coerce').fillna(0)
+                    
+                    # 🛠️ 修復點：動態捕捉成交量欄位 (支援：總量、成交量、成交張數等不同格式)
+                    vol_col = next((c for c in df.columns if c in ['成交張數', '總量', '成交量', '累積成交張數', '張數']), None)
+                    if vol_col:
+                        df['成交張數_num'] = pd.to_numeric(df[vol_col].astype(str).str.replace(',', ''), errors='coerce').fillna(0)
+                        if '成交張數' not in df.columns:
+                            df['成交張數'] = df[vol_col] # 統一補齊欄位，避免後續過濾器報錯
+                    else:
+                        df['成交張數_num'] = 0
+                        if '成交張數' not in df.columns:
+                            df['成交張數'] = '0'
+
                     df['股價日期'] = d_str
                     daily_dfs.append(df)
         
@@ -171,7 +182,6 @@ def sync_b0_data(DATA_DIR):
 
     df_today['B0_量價狀態'] = df_today.apply(get_vp_status, axis=1)
     st.session_state['b0_price'] = df_today
-
 # ==========================================
 # 🌟 主程式
 # ==========================================
