@@ -1153,11 +1153,21 @@ def show_weight_backtest_page(STOCK_DICT, DATA_DIR="data"):
                     st.markdown(f"#### 💾 儲存今日策略模型 (已勾選 {len(selected_rows)} 檔)")
                 
                 with col_save2:
-                    if st.button("🚀 寫入模擬追蹤系統", key="btn_save_track", type="primary", use_container_width=True):
-                        if len(selected_rows) == 0:
-                            st.warning("⚠️ 請先在上方表格中勾選至少一檔要追蹤的股票。")
+                    # 🎯 將判斷加在按鈕按下去的瞬間
+                    if st.button("🚀 寫入模擬追蹤系統", icon=":material/database:", use_container_width=True, type="primary"):
+                                    
+                        # 1. 檢查登入狀態
+                        if not st.session_state.get("logged_in", False):
+                            st.error("⚠️ 守衛：「寫入追蹤清單需要綁定帳號！正在為您導向登入頁面...」")
+                            import time
+                            time.sleep(1.5) # 稍微停頓讓使用者看到提示
+                            st.query_params["page"] = "login"
+                            st.rerun()
                         else:
-                            with st.spinner("正在驗證扣打並寫入雲端..."):
+                        # 2. 已登入才執行原本的寫入邏輯
+                            username = st.session_state.get("username", "guest")
+                            with st.spinner("寫入中..."):
+
                                 try:
                                     from streamlit_gsheets import GSheetsConnection
                                     conn = st.connection("gsheets", type=GSheetsConnection)

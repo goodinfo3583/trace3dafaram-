@@ -94,8 +94,9 @@ def get_watchlist_quotes(stock_codes):
 # 🎨 畫面渲染主程式
 # ==========================================
 def show_watchlist_page(STOCK_DICT=None, conn=None, SHEET_URL=None):
-    st.title("冒險者專屬追蹤名單")
+    st.title("🛡️ 冒險者專屬追蹤名單")
 
+    # 🔒 門禁系統
     if not st.session_state.get("logged_in", False):
         st.warning("守衛：「這區是 VIP 專屬！請先前往『登入』出示邀請函。」")
         if st.button("前往登入", key="go_login_from_watchlist"):
@@ -105,214 +106,307 @@ def show_watchlist_page(STOCK_DICT=None, conn=None, SHEET_URL=None):
 
     username = st.session_state.get("username", "guest")
     
-    wl_cache_key = f"wl_cache_{username}"
+    # 🗂️ 雙分頁設計：將實驗室模型追蹤置頂為第一個 Tab
+    tab_track, tab_custom = st.tabs(["🏆 實驗室模型追蹤", "📝 自訂追蹤名單"])
 
-    if wl_cache_key not in st.session_state:
-        with st.spinner("載入您的專屬名單中..."):
-            st.session_state[wl_cache_key] = get_user_watchlist(username, conn, SHEET_URL)
-            
-    watchlist = st.session_state[wl_cache_key]
-    MAX_STOCKS = 20
-
-    for stock in list(watchlist.keys()):
-        nk = f"note_{stock}"
-        if nk not in st.session_state:
-            st.session_state[nk] = watchlist[stock]
-
-    st.subheader(f"新增追蹤標的 (目前 {len(watchlist)}/{MAX_STOCKS} 檔)")
-    col1, col2 = st.columns([3, 1])
-    
-    # 🚀 升級：自動產生下拉選單，並使用 set {...} 剃除重複的雙胞胎！
-    stock_options = []
-    if STOCK_DICT:
-        unique_options = {f"{v['id']} {v['name']}" for v in STOCK_DICT.values() if len(str(v['id'])) <= 4}
-        stock_options = sorted(list(unique_options))
-
-    with col1:
-        new_stock = st.selectbox(
-            "請選擇股票", 
-            options=[""] + stock_options,
-            key="new_stock_input",
-            label_visibility="collapsed"
-        )
+    # ==========================================
+    # Tab 1: 🏆 實驗室模型追蹤
+    # ==========================================
+    with tab_track:
+        st.subheader("📊 模型鎖定清單與績效追蹤")
+        st.markdown("這裡顯示您從「權重與回測」寫入的標的，方便您每日檢視策略績效。")
         
-    with col2:
-        if st.button("加入追蹤", use_container_width=True):
-            if new_stock:
-                if len(watchlist) >= MAX_STOCKS:
-                    st.error(f"追蹤名單已達 {MAX_STOCKS} 檔上限！")
-                else:
-                    # 💡 因為選單出來的值已經是完美的 "2330 台積電" 格式，我們不需要再做任何文字處理！
-                    if new_stock not in watchlist:
-                        watchlist[new_stock] = "" 
-                        st.session_state[f"note_{new_stock}"] = ""
-                        st.success(f"已暫存「{new_stock}」，請記得點擊左上方「存檔」！")
-                        time.sleep(1)
-                        st.rerun()
-                    else:
-                        st.info(f"「{new_stock}」已在名單中囉！")
-
-    st.markdown("<hr style='border-color: #334155; margin: 10px 0;'>", unsafe_allow_html=True)
-    
-    # 準備報價資料
-    stock_codes = []
-    for stock in watchlist.keys():
-        m = re.search(r'\d+', stock)
-        if m: stock_codes.append(m.group())
-
-    market_data = {}
-    market_date = "今日"
-    if stock_codes:
-        with st.spinner("正在同步即時報價與成交量..."):
-            market_data = get_watchlist_quotes(stock_codes)
-            if market_data:
-                market_date = list(market_data.values())[0]["date"]
-
-    # ==========================================
-    # 💾 左上角存檔、匯出與日期區塊 
-    # ==========================================
-    col_save, col_export, col_date, col_space = st.columns([1.5, 1.5, 3.0, 4.0])
-    with col_save:
-        if st.button("存檔", icon=":material/save:", use_container_width=True, type="primary", help="將目前的變更同步至雲端"):
-            with st.spinner("正在上傳至雲端..."):
-                for stock in list(watchlist.keys()):
-                    nk = f"note_{stock}"
-                    if nk in st.session_state:
-                        watchlist[stock] = st.session_state[nk]
-                save_user_watchlist(username, watchlist, conn, SHEET_URL)
-            st.success("存檔成功！")
-            time.sleep(1)
-            st.rerun()
-            
-    with col_export:
-        # 製作匯出專用的 DataFrame
-        if watchlist:
-            export_data = []
-            for stock, note in watchlist.items():
-                current_note = st.session_state.get(f"note_{stock}", note)
-                pure_code = None
-                stock_code_match = re.search(r'\d+', stock)
-                if stock_code_match: pure_code = stock_code_match.group()
-                
-                # 若有抓到即時報價也一併附上
-                price, vol = "", ""
-                if pure_code and pure_code in market_data:
-                    price = market_data[pure_code]["price"]
-                    vol = market_data[pure_code]["vol"]
+        if conn and SHEET_URL:
+            with st.spinner("載入實驗室追蹤資料中..."):
+                try:
+                    # 改為您的專屬網址，讀取「實驗室模型追蹤」表單
+                    TRACKING_URL = "https://docs.google.com/spreadsheets/d/1TxHDahg8ul6lmUtDN-7X75cBXbkU0jaZ3M9zg6exBgU/edit?gid=687268023#gid=687268023"
+                    df_track = conn.read(spreadsheet=TRACKING_URL, worksheet="實驗室模型追蹤", ttl=0)
                     
-                export_data.append({"標的名稱": stock, "最新價": price, "成交量(張)": vol, "專屬筆記": current_note})
-                
-            df_export = pd.DataFrame(export_data)
-            csv = df_export.to_csv(index=False, encoding='utf-8-sig').encode('utf-8-sig')
-            
-            # 使用 Streamlit 內建的下載按鈕
-            st.download_button(
-                label="匯出",
-                icon=":material/download:",
-                data=csv,
-                file_name=f"watchlist_{username}.csv",
-                mime="text/csv",
-                use_container_width=True,
-                help="下載為 CSV 檔"
-            )
+                    if df_track.empty or '帳號' not in df_track.columns:
+                        st.info("尚無追蹤紀錄。請至「權重與回測」過濾標的並點擊寫入。")
+                    else:
+                        # 過濾出屬於該帳號的紀錄
+                        clean_accounts = df_track['帳號'].astype(str).str.replace(r'\.0$', '', regex=True).str.strip().str.lower()
+                        user_track = df_track[clean_accounts == username.strip().lower()].copy()
+                        
+                        if user_track.empty:
+                            st.info("您目前沒有將任何模型標的寫入追蹤喔！")
+                        else:
+                            # 隱藏帳號欄位不顯示，並使用 dataframe 漂亮呈現
+                            display_df = user_track.drop(columns=['帳號']) if '帳號' in user_track.columns else user_track
+                            st.dataframe(display_df, use_container_width=True, hide_index=True)
+                except Exception as e:
+                    st.error(f"讀取追蹤資料時發生錯誤：{e}")
         else:
-            st.button("匯出", icon=":material/download:", use_container_width=True, disabled=True)
+            st.warning("資料庫連線尚未建立。")
 
-    with col_date:
-        if watchlist and market_data:
-            st.markdown(f"<div style='padding-top:8px; color:#38BDF8; font-size:15px; font-weight:bold;'>日期：{market_date}</div>", unsafe_allow_html=True)
+    # ==========================================
+    # Tab 2: 📝 自訂追蹤名單 (原來的邏輯)
+    # ==========================================
+    with tab_custom:
+        wl_cache_key = f"wl_cache_{username}"
 
-    st.write("") 
-    #
-    if not watchlist:
-        st.info("目前還沒有追蹤任何標的，趕快新增一個吧！")
-    else:
-        # 🌟 1. 注入玻璃卡片的專屬 CSS 特效 & 批次按鈕色彩特效
-        st.markdown(
-            """
-            <style>
-            /* ==== 玻璃卡片外框設定 ==== */
-            div[data-testid="stVerticalBlockBorderWrapper"]:has(.stock-card-marker) {
-                background: rgba(30, 41, 59, 0.3) !important;
-                backdrop-filter: blur(12px) !important;
-                -webkit-backdrop-filter: blur(12px) !important;
-                border-radius: 12px !important;
-                border: 1px solid rgba(255, 255, 255, 0.1) !important;
-                box-shadow: 0 4px 15px rgba(0, 0, 0, 0.2) !important;
-                margin-bottom: 8px !important; 
-                transition: all 0.3s cubic-bezier(0.25, 0.8, 0.25, 1) !important;
-            }
-            div[data-testid="stVerticalBlockBorderWrapper"]:has(.stock-card-marker):hover {
-                background: rgba(30, 41, 59, 0.6) !important;
-                border: 1px solid rgba(56, 189, 248, 0.4) !important;
-                box-shadow: 0 8px 25px rgba(56, 189, 248, 0.15) !important;
-                transform: translateY(-2px) !important;
-            }
-            div[data-testid="stVerticalBlockBorderWrapper"]:has(.stock-card-marker) > div {
-                padding: 10px 15px !important;
-                gap: 0px !important;
-            }
+        if wl_cache_key not in st.session_state:
+            with st.spinner("載入您的自訂名單中..."):
+                st.session_state[wl_cache_key] = get_user_watchlist(username, conn, SHEET_URL)
+                
+        watchlist = st.session_state[wl_cache_key]
+        MAX_STOCKS = 20
 
-            /* ==== 🛡️ 表頭完美對齊設定 (賦予與卡片相同的 Padding，但隱藏邊框) ==== */
-            div[data-testid="stVerticalBlockBorderWrapper"]:has(.header-row-marker) {
-                border: none !important;
-                background: transparent !important;
-                box-shadow: none !important;
-                margin-bottom: -15px !important; /* 縮小與下方第一張卡片的距離 */
-            }
-            div[data-testid="stVerticalBlockBorderWrapper"]:has(.header-row-marker) > div {
-                padding: 10px 15px !important;
-                gap: 0px !important;
-            }
+        for stock in list(watchlist.keys()):
+            nk = f"note_{stock}"
+            if nk not in st.session_state:
+                st.session_state[nk] = watchlist[stock]
 
-            /* ==== 🚀 一鍵批次按鈕專屬樣式 (透過隱形標記精準鎖定) ==== */
-            
-            /* 批次按鈕: 實心天藍色 (清空、帶入行情、帶入動態) */
-            div[data-testid="stColumn"]:has(.header-btn-blue) button {
-                background-color: #0284C7 !important; /* 實心深藍/天藍 */
-                color: #FFFFFF !important;
-                border: none !important;
-                border-radius: 6px !important;
-                transition: all 0.3s ease !important;
-                margin-top: 0px !important;
-            }
-            div[data-testid="stColumn"]:has(.header-btn-blue) button:hover {
-                background-color: #0EA5E9 !important;
-                transform: translateY(-2px) !important;
-                box-shadow: 0 4px 10px rgba(14, 165, 233, 0.4) !important;
-            }
-            
-            /* 批次按鈕: 實心紅色 (刪除) */
-            div[data-testid="stColumn"]:has(.header-btn-red) button {
-                background-color: #E11D48 !important; /* 實心深紅 */
-                color: #FFFFFF !important;
-                border: none !important;
-                border-radius: 6px !important;
-                transition: all 0.3s ease !important;
-            }
-            div[data-testid="stColumn"]:has(.header-btn-red) button:hover {
-                background-color: #F43F5E !important;
-                transform: translateY(-2px) !important;
-                box-shadow: 0 4px 10px rgba(225, 29, 72, 0.4) !important;
-            }
-            </style>
-            """,
-            unsafe_allow_html=True
-        )
-
-        col_ratios = [1.1, 0.9, 1.1, 1.1, 3.9, 0.5, 0.5, 0.5, 0.5]
+        st.subheader(f"新增自訂標的 (目前 {len(watchlist)}/{MAX_STOCKS} 檔)")
+        col1, col2 = st.columns([3, 1])
         
-        def fmt_color(val, is_pct=False, is_vol=False):
-            color = "#FF4B4B" if val > 0 else ("#00E272" if val < 0 else "#94A3B8")
-            sign = "+" if val > 0 else ""
-            tail = "%" if is_pct else ""
-            if is_vol: return f"<span style='color:{color}; font-size:12px;'>({sign}{val:.1f}%)</span>"
-            return f"<span style='color:{color}; font-weight:bold;'>{sign}{val:.2f}{tail}</span>"
+        stock_options = []
+        if STOCK_DICT:
+            unique_options = {f"{v['id']} {v['name']}" for v in STOCK_DICT.values() if len(str(v['id'])) <= 4}
+            stock_options = sorted(list(unique_options))
 
-        def append_quote_to_note(stock_name, p_code):
-            if p_code and p_code in market_data:
-                d = market_data[p_code]
-                append_str = f"[{d['date'][5:]}] 收:{d['price']:.2f} 量:{d['vol']:,}張"
+        with col1:
+            new_stock = st.selectbox(
+                "請選擇股票", 
+                options=[""] + stock_options,
+                key="new_stock_input",
+                label_visibility="collapsed"
+            )
+            
+        with col2:
+            if st.button("加入追蹤", use_container_width=True):
+                if new_stock:
+                    if len(watchlist) >= MAX_STOCKS:
+                        st.error(f"追蹤名單已達 {MAX_STOCKS} 檔上限！")
+                    else:
+                        if new_stock not in watchlist:
+                            watchlist[new_stock] = "" 
+                            st.session_state[f"note_{new_stock}"] = ""
+                            st.success(f"已暫存「{new_stock}」，請記得點擊下方「存檔」！")
+                            time.sleep(1)
+                            st.rerun()
+                        else:
+                            st.info(f"「{new_stock}」已在名單中囉！")
+
+        st.markdown("<hr style='border-color: #334155; margin: 10px 0;'>", unsafe_allow_html=True)
+        
+        stock_codes = []
+        for stock in watchlist.keys():
+            m = re.search(r'\d+', stock)
+            if m: stock_codes.append(m.group())
+
+        market_data = {}
+        market_date = "今日"
+        if stock_codes:
+            with st.spinner("正在同步即時報價與成交量..."):
+                market_data = get_watchlist_quotes(stock_codes)
+                if market_data:
+                    market_date = list(market_data.values())[0]["date"]
+
+        # 左上角存檔、匯出與日期區塊 
+        col_save, col_export, col_date, col_space = st.columns([1.5, 1.5, 3.0, 4.0])
+        with col_save:
+            if st.button("存檔", icon=":material/save:", use_container_width=True, type="primary", help="將目前的變更同步至雲端"):
+                with st.spinner("正在上傳至雲端..."):
+                    for stock in list(watchlist.keys()):
+                        nk = f"note_{stock}"
+                        if nk in st.session_state:
+                            watchlist[stock] = st.session_state[nk]
+                    save_user_watchlist(username, watchlist, conn, SHEET_URL)
+                st.success("存檔成功！")
+                time.sleep(1)
+                st.rerun()
+                
+        with col_export:
+            if watchlist:
+                export_data = []
+                for stock, note in watchlist.items():
+                    current_note = st.session_state.get(f"note_{stock}", note)
+                    pure_code = None
+                    stock_code_match = re.search(r'\d+', stock)
+                    if stock_code_match: pure_code = stock_code_match.group()
+                    
+                    price, vol = "", ""
+                    if pure_code and pure_code in market_data:
+                        price = market_data[pure_code]["price"]
+                        vol = market_data[pure_code]["vol"]
+                        
+                    export_data.append({"標的名稱": stock, "最新價": price, "成交量(張)": vol, "專屬筆記": current_note})
+                    
+                df_export = pd.DataFrame(export_data)
+                csv = df_export.to_csv(index=False, encoding='utf-8-sig').encode('utf-8-sig')
+                
+                st.download_button(
+                    label="匯出",
+                    icon=":material/download:",
+                    data=csv,
+                    file_name=f"watchlist_{username}.csv",
+                    mime="text/csv",
+                    use_container_width=True,
+                    help="下載為 CSV 檔"
+                )
+            else:
+                st.button("匯出", icon=":material/download:", use_container_width=True, disabled=True)
+
+        with col_date:
+            if watchlist and market_data:
+                st.markdown(f"<div style='padding-top:8px; color:#38BDF8; font-size:15px; font-weight:bold;'>日期：{market_date}</div>", unsafe_allow_html=True)
+
+        st.write("") 
+        
+        if not watchlist:
+            st.info("目前還沒有追蹤任何標的，趕快新增一個吧！")
+        else:
+            # 注入玻璃卡片的專屬 CSS 特效
+            st.markdown(
+                """
+                <style>
+                div[data-testid="stVerticalBlockBorderWrapper"]:has(.stock-card-marker) {
+                    background: rgba(30, 41, 59, 0.3) !important;
+                    backdrop-filter: blur(12px) !important;
+                    -webkit-backdrop-filter: blur(12px) !important;
+                    border-radius: 12px !important;
+                    border: 1px solid rgba(255, 255, 255, 0.1) !important;
+                    box-shadow: 0 4px 15px rgba(0, 0, 0, 0.2) !important;
+                    margin-bottom: 8px !important; 
+                    transition: all 0.3s cubic-bezier(0.25, 0.8, 0.25, 1) !important;
+                }
+                div[data-testid="stVerticalBlockBorderWrapper"]:has(.stock-card-marker):hover {
+                    background: rgba(30, 41, 59, 0.6) !important;
+                    border: 1px solid rgba(56, 189, 248, 0.4) !important;
+                    box-shadow: 0 8px 25px rgba(56, 189, 248, 0.15) !important;
+                    transform: translateY(-2px) !important;
+                }
+                div[data-testid="stVerticalBlockBorderWrapper"]:has(.stock-card-marker) > div {
+                    padding: 10px 15px !important;
+                    gap: 0px !important;
+                }
+                div[data-testid="stVerticalBlockBorderWrapper"]:has(.header-row-marker) {
+                    border: none !important;
+                    background: transparent !important;
+                    box-shadow: none !important;
+                    margin-bottom: -15px !important;
+                }
+                div[data-testid="stVerticalBlockBorderWrapper"]:has(.header-row-marker) > div {
+                    padding: 10px 15px !important;
+                    gap: 0px !important;
+                }
+                div[data-testid="stColumn"]:has(.header-btn-blue) button {
+                    background-color: #0284C7 !important;
+                    color: #FFFFFF !important;
+                    border: none !important;
+                    border-radius: 6px !important;
+                    transition: all 0.3s ease !important;
+                    margin-top: 0px !important;
+                }
+                div[data-testid="stColumn"]:has(.header-btn-blue) button:hover {
+                    background-color: #0EA5E9 !important;
+                    transform: translateY(-2px) !important;
+                    box-shadow: 0 4px 10px rgba(14, 165, 233, 0.4) !important;
+                }
+                div[data-testid="stColumn"]:has(.header-btn-red) button {
+                    background-color: #E11D48 !important;
+                    color: #FFFFFF !important;
+                    border: none !important;
+                    border-radius: 6px !important;
+                    transition: all 0.3s ease !important;
+                }
+                div[data-testid="stColumn"]:has(.header-btn-red) button:hover {
+                    background-color: #F43F5E !important;
+                    transform: translateY(-2px) !important;
+                    box-shadow: 0 4px 10px rgba(225, 29, 72, 0.4) !important;
+                }
+                </style>
+                """,
+                unsafe_allow_html=True
+            )
+
+            col_ratios = [1.1, 0.9, 1.1, 1.1, 3.9, 0.5, 0.5, 0.5, 0.5]
+            
+            def fmt_color(val, is_pct=False, is_vol=False):
+                color = "#FF4B4B" if val > 0 else ("#00E272" if val < 0 else "#94A3B8")
+                sign = "+" if val > 0 else ""
+                tail = "%" if is_pct else ""
+                if is_vol: return f"<span style='color:{color}; font-size:12px;'>({sign}{val:.1f}%)</span>"
+                return f"<span style='color:{color}; font-weight:bold;'>{sign}{val:.2f}{tail}</span>"
+
+            def append_quote_to_note(stock_name, p_code):
+                if p_code and p_code in market_data:
+                    d = market_data[p_code]
+                    append_str = f"[{d['date'][5:]}] 收:{d['price']:.2f} 量:{d['vol']:,}張"
+                    nk = f"note_{stock_name}"
+                    current_text = st.session_state.get(nk, "").strip()
+                    if current_text:
+                        st.session_state[nk] = current_text + f"\n{append_str}"
+                    else:
+                        st.session_state[nk] = append_str
+                    watchlist[stock_name] = st.session_state[nk]
+
+            def append_dynamic_to_note(stock_name, p_code):
+                dyn_msg = "⚪ B1未進榜"
+                display_date = market_date[5:] if '/' in market_date else "今日"
+                try:
+                    df_b1 = st.session_state.get('b1_final_df')
+                    if df_b1 is None or df_b1.empty:
+                        df_b1 = st.session_state.get('my_final_df')
+                    df_b1_down = st.session_state.get('b1_down_final_df')
+
+                    if df_b1 is not None and not df_b1.empty:
+                        date_cols = [c for c in df_b1.columns if '持股%' in c or str(c).isdigit()]
+                        if date_cols:
+                            sorted_dates = sorted(date_cols, reverse=True)
+                            date_match = re.search(r'20\d{6}', str(sorted_dates[0]))
+                            if date_match:
+                                ds = date_match.group()
+                                display_date = f"{ds[4:6]}/{ds[6:8]}"
+
+                        col_id = '股票代號' if '股票代號' in df_b1.columns else ('代號' if '代號' in df_b1.columns else None)
+                        if col_id:
+                            df_b1[col_id] = df_b1[col_id].astype(str).str.strip()
+                            res = df_b1[df_b1[col_id] == str(p_code)]
+                            if not res.empty:
+                                row = res.iloc[0]
+                                def safe_get(target_row, target_cols, col_keywords, exclude_keywords=[], default="-"):
+                                    for col in target_cols:
+                                        if any(exc in col for exc in exclude_keywords): continue
+                                        if any(k in col for k in col_keywords):
+                                            val = str(target_row[col]).strip()
+                                            if val.lower() in ['nan', 'none', '']: return default
+                                            try:
+                                                f_val = float(val)
+                                                return f"{f_val:.2f}"
+                                            except ValueError:
+                                                return val
+                                    return default
+
+                                status = safe_get(row, res.columns, ['最新動態', '狀態動態', '動態'], exclude_keywords=['衰退'])
+                                tags = safe_get(row, res.columns, ['今日上榜', '原始上榜', '上榜'], exclude_keywords=['衰退'])
+                                delta = safe_get(row, res.columns, ['單日△', '精準單日', '單日', '△'], exclude_keywords=['衰退'])
+                                msg_lines = [f"📌動態:{status} | 🏷️上榜:{tags} | 📊單日△:{delta}"]
+                                
+                                decay_tags, decay_delta = "無", "-"
+                                if df_b1_down is not None and not df_b1_down.empty:
+                                    col_id_down = '股票代號' if '股票代號' in df_b1_down.columns else ('代號' if '代號' in df_b1_down.columns else None)
+                                    if col_id_down:
+                                        df_b1_down[col_id_down] = df_b1_down[col_id_down].astype(str).str.strip()
+                                        res_down = df_b1_down[df_b1_down[col_id_down] == str(p_code)]
+                                        if not res_down.empty:
+                                            row_down = res_down.iloc[0]
+                                            decay_tags = safe_get(row_down, res_down.columns, ['衰退上榜', '提款機', '衰退追蹤', '衰退'])
+                                            decay_delta = safe_get(row_down, res_down.columns, ['衰退單日', '提款單日', '衰退△', '單日△', '精準單日', '△'])
+
+                                if decay_tags != "無" and decay_tags != "未進榜" and decay_tags != "-":
+                                    msg_lines.append(f"📉提款 🏷️衰退:{decay_tags} | 📊單日△:{decay_delta}")
+                                    
+                                dyn_msg = "\n  ".join(msg_lines)
+                    else:
+                        dyn_msg = "⚠️ B1資料未載入(請先點側邊欄搜尋或全市場掃描)"
+                except Exception as e:
+                    dyn_msg = f"讀取異常: {e}"
+
+                append_str = f"[{display_date}]\n  {dyn_msg}"
                 nk = f"note_{stock_name}"
                 current_text = st.session_state.get(nk, "").strip()
                 if current_text:
@@ -321,293 +415,157 @@ def show_watchlist_page(STOCK_DICT=None, conn=None, SHEET_URL=None):
                     st.session_state[nk] = append_str
                 watchlist[stock_name] = st.session_state[nk]
 
-        def append_dynamic_to_note(stock_name, p_code):
-            """讀取 B1 法人動向與衰退追蹤，並附加到筆記"""
-            dyn_msg = "⚪ B1未進榜"
-            display_date = market_date[5:] if '/' in market_date else "今日"
-            try:
-                df_b1 = st.session_state.get('b1_final_df')
-                if df_b1 is None or df_b1.empty:
-                    df_b1 = st.session_state.get('my_final_df')
-                df_b1_down = st.session_state.get('b1_down_final_df')
+            def batch_append_quotes():
+                for stock_name in list(watchlist.keys()):
+                    stock_code_match = re.search(r'\d+', stock_name)
+                    pure_code = stock_code_match.group() if stock_code_match else None
+                    append_quote_to_note(stock_name, pure_code)
 
-                if df_b1 is not None and not df_b1.empty:
-                    date_cols = [c for c in df_b1.columns if '持股%' in c or str(c).isdigit()]
-                    if date_cols:
-                        sorted_dates = sorted(date_cols, reverse=True)
-                        date_match = re.search(r'20\d{6}', str(sorted_dates[0]))
-                        if date_match:
-                            ds = date_match.group()
-                            display_date = f"{ds[4:6]}/{ds[6:8]}"
+            def batch_append_dynamics():
+                for stock_name in list(watchlist.keys()):
+                    stock_code_match = re.search(r'\d+', stock_name)
+                    pure_code = stock_code_match.group() if stock_code_match else None
+                    append_dynamic_to_note(stock_name, pure_code)
 
-                    col_id = '股票代號' if '股票代號' in df_b1.columns else ('代號' if '代號' in df_b1.columns else None)
-                    if col_id:
-                        df_b1[col_id] = df_b1[col_id].astype(str).str.strip()
-                        res = df_b1[df_b1[col_id] == str(p_code)]
-                        if not res.empty:
-                            row = res.iloc[0]
+            def batch_remove_all():
+                for stock_name in list(watchlist.keys()):
+                    nk = f"note_{stock_name}"
+                    if nk in st.session_state:
+                        del st.session_state[nk]
+                watchlist.clear()
+                if "selected_watch_stock" in st.session_state:
+                    st.session_state["selected_watch_stock"] = None
+                if "global_search_final" in st.session_state:
+                    st.session_state["global_search_final"] = ""
 
-                            def safe_get(target_row, target_cols, col_keywords, exclude_keywords=[], default="-"):
-                                for col in target_cols:
-                                    if any(exc in col for exc in exclude_keywords): continue
-                                    if any(k in col for k in col_keywords):
-                                        val = str(target_row[col]).strip()
-                                        if val.lower() in ['nan', 'none', '']: return default
-                                        try:
-                                            f_val = float(val)
-                                            return f"{f_val:.2f}"
-                                        except ValueError:
-                                            return val
-                                return default
+            def batch_clear_notes():
+                for stock_name in list(watchlist.keys()):
+                    nk = f"note_{stock_name}"
+                    st.session_state[nk] = ""
+                    watchlist[stock_name] = ""
 
-                            status = safe_get(row, res.columns, ['最新動態', '狀態動態', '動態'], exclude_keywords=['衰退'])
-                            tags = safe_get(row, res.columns, ['今日上榜', '原始上榜', '上榜'], exclude_keywords=['衰退'])
-                            delta = safe_get(row, res.columns, ['單日△', '精準單日', '單日', '△'], exclude_keywords=['衰退'])
-                            
-                            msg_lines = [f"📌動態:{status} | 🏷️上榜:{tags} | 📊單日△:{delta}"]
-                            
-                            decay_tags = "無"
-                            decay_delta = "-"
-                            if df_b1_down is not None and not df_b1_down.empty:
-                                col_id_down = '股票代號' if '股票代號' in df_b1_down.columns else ('代號' if '代號' in df_b1_down.columns else None)
-                                if col_id_down:
-                                    df_b1_down[col_id_down] = df_b1_down[col_id_down].astype(str).str.strip()
-                                    res_down = df_b1_down[df_b1_down[col_id_down] == str(p_code)]
-                                    if not res_down.empty:
-                                        row_down = res_down.iloc[0]
-                                        decay_tags = safe_get(row_down, res_down.columns, ['衰退上榜', '提款機', '衰退追蹤', '衰退'])
-                                        decay_delta = safe_get(row_down, res_down.columns, ['衰退單日', '提款單日', '衰退△', '單日△', '精準單日', '△'])
-
-                            if decay_tags != "無" and decay_tags != "未進榜" and decay_tags != "-":
-                                msg_lines.append(f"📉提款 🏷️衰退:{decay_tags} | 📊單日△:{decay_delta}")
-                                
-                            dyn_msg = "\n  ".join(msg_lines)
-                else:
-                    dyn_msg = "⚠️ B1資料未載入(請先點側邊欄搜尋或全市場掃描)"
-            except Exception as e:
-                dyn_msg = f"讀取異常: {e}"
-
-            append_str = f"[{display_date}]\n  {dyn_msg}"
-            nk = f"note_{stock_name}"
-            current_text = st.session_state.get(nk, "").strip()
-            if current_text:
-                st.session_state[nk] = current_text + f"\n{append_str}"
-            else:
-                st.session_state[nk] = append_str
-            watchlist[stock_name] = st.session_state[nk]
-
-        # ==========================================
-        # 🚀 一鍵批次功能引擎 (Callback)
-        # ==========================================
-        def batch_append_quotes():
-            for stock_name in list(watchlist.keys()):
-                stock_code_match = re.search(r'\d+', stock_name)
-                pure_code = stock_code_match.group() if stock_code_match else None
-                append_quote_to_note(stock_name, pure_code)
-
-        def batch_append_dynamics():
-            for stock_name in list(watchlist.keys()):
-                stock_code_match = re.search(r'\d+', stock_name)
-                pure_code = stock_code_match.group() if stock_code_match else None
-                append_dynamic_to_note(stock_name, pure_code)
-
-        def batch_remove_all():
-            for stock_name in list(watchlist.keys()):
-                nk = f"note_{stock_name}"
-                if nk in st.session_state:
-                    del st.session_state[nk]
-            watchlist.clear()
-            if "selected_watch_stock" in st.session_state:
-                st.session_state["selected_watch_stock"] = None
-            if "global_search_final" in st.session_state:
-                st.session_state["global_search_final"] = ""
-
-        def batch_clear_notes():
-            for stock_name in list(watchlist.keys()):
-                nk = f"note_{stock_name}"
-                st.session_state[nk] = ""
-                watchlist[stock_name] = ""
-
-        # 📋 顯示標題列 (裝在與卡片完全相同的隱形框架中，達成 100% 水平對齊)
-        with st.container(border=True):
-            st.markdown("<span class='header-row-marker'></span>", unsafe_allow_html=True)
-            h1, h2, h3, h4, h5, h6, h7, h8, h9 = st.columns(col_ratios)
-            
-            with h1: st.markdown("<div style='padding-top:10px;'><span style='color:#94a3b8; font-size:14px;'>標的名稱</span></div>", unsafe_allow_html=True)
-            with h2: st.markdown("<div style='padding-top:10px;'><span style='color:#94a3b8; font-size:14px;'>產業別</span></div>", unsafe_allow_html=True)
-            with h3: st.markdown("<div style='padding-top:10px;'><span style='color:#94a3b8; font-size:14px;'>最新價</span></div>", unsafe_allow_html=True)
-            with h4: st.markdown("<div style='padding-top:10px;'><span style='color:#94a3b8; font-size:14px;'>成交量 (張)</span></div>", unsafe_allow_html=True)
-            
-            with h5:
-                # 🔥 完美對齊修正：將 3.9 的空間精準拆分為 3.4 與 0.5
-                # 這樣一來，清空按鈕的寬度 (0.5) 就會跟右側所有按鈕 (0.5) 在數學上 100% 完全相同！
-                hc1, hc2 = st.columns([3.4, 0.5])
-                with hc1:
-                    st.markdown("<div style='padding-top:10px;'><span style='color:#94a3b8; font-size:14px;'>專屬筆記 (一鍵清空 👉)</span></div>", unsafe_allow_html=True)
-                with hc2:
-                    st.markdown("<span class='header-btn-blue'></span>", unsafe_allow_html=True)
-                    st.button("", icon=":material/ink_eraser:", key="batch_clear", help="一鍵清空所有筆記", use_container_width=True, on_click=batch_clear_notes)
-            
-            with h6:
-                st.markdown("<span class='header-btn-blue'></span>", unsafe_allow_html=True)
-                st.button("", icon=":material/input:", key="batch_quote", help="一鍵帶入所有今日行情", use_container_width=True, on_click=batch_append_quotes)
-            with h7:
-                st.markdown("<span class='header-btn-blue'></span>", unsafe_allow_html=True)
-                st.button("", icon=":material/psychology:", key="batch_dyn", help="一鍵帶入所有籌碼動態", use_container_width=True, on_click=batch_append_dynamics)
-            with h8:
-                st.markdown("") # 診斷按鈕的空位，留白以完美對齊下方的個股卡片
-            with h9:
-                st.markdown("<span class='header-btn-red'></span>", unsafe_allow_html=True)
-                st.button("", icon=":material/delete:", key="batch_delete", help="一鍵移除所有標的", use_container_width=True, on_click=batch_remove_all)
-        
-        # 📋 開始渲染每一檔股票 (原有的卡片迴圈)
-        for stock in list(watchlist.keys()):
-            nk = f"note_{stock}"
-            pure_code = None
-            stock_code_match = re.search(r'\d+', stock)
-            if stock_code_match: pure_code = stock_code_match.group()
-
-            industry_label = "未知"
-            if pure_code and STOCK_DICT and pure_code in STOCK_DICT:
-                industry_label = STOCK_DICT[pure_code].get("industry", "未知")
-
-            p_str, v_str = "<span style='color:#555;'>-</span>", "<span style='color:#555;'>-</span>"
-            if pure_code and pure_code in market_data:
-                d = market_data[pure_code]
-                p_str = f"<span style='font-size:16px;'>{d['price']:.2f}</span><br>{fmt_color(d['price_pct'], True)}"
-                v_str = f"<span style='font-size:15px;'>{d['vol']:,}</span><br>{fmt_color(d['vol_pct'], False, True)}"
-            
-            # 🌟 2. 魔法所在：把這檔股票的所有欄位包進 container 裡面！
             with st.container(border=True):
-                # 放入我們專屬的隱形標記，讓上面的 CSS 知道這是一個股票卡片
-                st.markdown("<span class='stock-card-marker'></span>", unsafe_allow_html=True)
+                st.markdown("<span class='header-row-marker'></span>", unsafe_allow_html=True)
+                h1, h2, h3, h4, h5, h6, h7, h8, h9 = st.columns(col_ratios)
                 
-                # 筆記欄位按鈕
-                c1, c2, c3, c4, c5, c6, c7, c8, c9 = st.columns(col_ratios)
+                with h1: st.markdown("<div style='padding-top:10px;'><span style='color:#94a3b8; font-size:14px;'>標的名稱</span></div>", unsafe_allow_html=True)
+                with h2: st.markdown("<div style='padding-top:10px;'><span style='color:#94a3b8; font-size:14px;'>產業別</span></div>", unsafe_allow_html=True)
+                with h3: st.markdown("<div style='padding-top:10px;'><span style='color:#94a3b8; font-size:14px;'>最新價</span></div>", unsafe_allow_html=True)
+                with h4: st.markdown("<div style='padding-top:10px;'><span style='color:#94a3b8; font-size:14px;'>成交量 (張)</span></div>", unsafe_allow_html=True)
                 
-                with c1:
-                    st.markdown(f"<div style='padding-top:8px; font-weight:bold; font-size:15px;'>{stock}</div>", unsafe_allow_html=True)
-                with c2:
-                    st.markdown(f"<div style='padding-top:10px; font-size:12px; color:#38BDF8;'><span style='background-color:#1E293B; padding:2px 5px; border-radius:4px; border: 1px solid #0369a1;'>{industry_label}</span></div>", unsafe_allow_html=True)
-                with c3:
-                    st.markdown(f"<div style='padding-top:4px;'>{p_str}</div>", unsafe_allow_html=True)
-                with c4:
-                    st.markdown(f"<div style='padding-top:4px;'>{v_str}</div>", unsafe_allow_html=True)
-                with c5:
-                    st.markdown("<div style='padding-top:2px;'>", unsafe_allow_html=True)
-                    st.text_area(
-                        "筆記", 
-                        key=nk, 
-                        label_visibility="collapsed", 
-                        placeholder="點此輸入筆記...", 
-                        height=68 
-                    )
-                    st.markdown("</div>", unsafe_allow_html=True)
-                with c6:
-                    st.markdown("<div style='padding-top:15px;'>", unsafe_allow_html=True)
-                    st.button(
-                        "", 
-                        icon=":material/input:", 
-                        key=f"import_{stock}", 
-                        use_container_width=True, 
-                        help="將今日行情寫入筆記",
-                        on_click=append_quote_to_note,
-                        args=(stock, pure_code)
-                    )
-                    st.markdown("</div>", unsafe_allow_html=True)
-                with c7:
-                    st.markdown("<div style='padding-top:15px;'>", unsafe_allow_html=True)
-                    st.button(
-                        "", 
-                        icon=":material/psychology:", 
-                        key=f"dyn_{stock}", 
-                        use_container_width=True, 
-                        help="將籌碼動態寫入筆記",
-                        on_click=append_dynamic_to_note,
-                        args=(stock, pure_code)
-                    )
-                    st.markdown("</div>", unsafe_allow_html=True)
-                with c8:
-                    st.markdown("<div style='padding-top:15px;'>", unsafe_allow_html=True)
-                    if st.button("", icon=":material/monitoring:", key=f"view_{stock}", use_container_width=True, help="顯示籌碼診斷"):
-                        standard_format = stock
-                        if pure_code and STOCK_DICT and pure_code in STOCK_DICT:
-                            v = STOCK_DICT[pure_code]
-                            standard_format = f"{v['id']} {v['name']}"
-                            
-                        st.session_state["selected_watch_stock"] = standard_format
-                        st.session_state["global_search_final"] = standard_format
-                        st.rerun()
-                    st.markdown("</div>", unsafe_allow_html=True)
+                with h5:
+                    hc1, hc2 = st.columns([3.4, 0.5])
+                    with hc1:
+                        st.markdown("<div style='padding-top:10px;'><span style='color:#94a3b8; font-size:14px;'>專屬筆記 (一鍵清空 👉)</span></div>", unsafe_allow_html=True)
+                    with hc2:
+                        st.markdown("<span class='header-btn-blue'></span>", unsafe_allow_html=True)
+                        st.button("", icon=":material/ink_eraser:", key="batch_clear", help="一鍵清空所有筆記", use_container_width=True, on_click=batch_clear_notes)
+                
+                with h6:
+                    st.markdown("<span class='header-btn-blue'></span>", unsafe_allow_html=True)
+                    st.button("", icon=":material/input:", key="batch_quote", help="一鍵帶入所有今日行情", use_container_width=True, on_click=batch_append_quotes)
+                with h7:
+                    st.markdown("<span class='header-btn-blue'></span>", unsafe_allow_html=True)
+                    st.button("", icon=":material/psychology:", key="batch_dyn", help="一鍵帶入所有籌碼動態", use_container_width=True, on_click=batch_append_dynamics)
+                with h8:
+                    st.markdown("") 
+                with h9:
+                    st.markdown("<span class='header-btn-red'></span>", unsafe_allow_html=True)
+                    st.button("", icon=":material/delete:", key="batch_delete", help="一鍵移除所有標的", use_container_width=True, on_click=batch_remove_all)
+            
+            for stock in list(watchlist.keys()):
+                nk = f"note_{stock}"
+                pure_code = None
+                stock_code_match = re.search(r'\d+', stock)
+                if stock_code_match: pure_code = stock_code_match.group()
 
-                with c9:
-                    st.markdown("<div style='padding-top:15px;'>", unsafe_allow_html=True)
-                    if st.button("", icon=":material/delete:", key=f"remove_{stock}", use_container_width=True, help="移除此標的"):
-                        del watchlist[stock]
-                        if nk in st.session_state:
-                            del st.session_state[nk]
-                        if st.session_state.get("selected_watch_stock") == stock:
-                            st.session_state["selected_watch_stock"] = None
-                            st.session_state["global_search_final"] = ""
-                        st.rerun()
-                    st.markdown("</div>", unsafe_allow_html=True)
-                #
-    # 📌 新增：底部回到頂部按鈕  
-    # 1. 載入 Google Material Icons 的字型庫
-    st.markdown(
-        '<link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined" rel="stylesheet" />',
-        unsafe_allow_html=True
-    )
-    
-    # 2. 渲染回到頂部按鈕外觀 (💡 拿掉 onclick，並賦予專屬 ID: custom-b2t-btn)
-    st.markdown(
-        """
-        <a href="#" id="custom-b2t-btn"
-           style="display: flex; justify-content: center; align-items: center; background-color: rgba(14, 165, 233, 0.1); 
-                  color: #38bdf8; font-size: 14px; font-weight: bold; padding: 12px; 
-                  border-radius: 8px; text-decoration: none; margin-top: 40px; margin-bottom: 20px; 
-                  border: 1px solid rgba(56, 189, 248, 0.3); box-shadow: 0px 4px 6px rgba(0,0,0,0.3); gap: 6px;">
-            <span class="material-symbols-outlined" style="font-size: 20px;">move_up</span> 
-            回到頂部
-        </a>
-        """, 
-        unsafe_allow_html=True
-    )
+                industry_label = "未知"
+                if pure_code and STOCK_DICT and pure_code in STOCK_DICT:
+                    industry_label = STOCK_DICT[pure_code].get("industry", "未知")
 
-    # 3. 透過 components.html 綁定點擊事件 (💡 完美繞過 Streamlit 過濾機制)
-    import streamlit.components.v1 as components
-    components.html(
-        """
-        <script>
-        // 從 iframe 網上找回 Streamlit 的主文檔 (與你的 nav_manager.py 邏輯相同)
-        const parentDoc = window.parent.document;
-        const parentWin = window.parent;
-        
-        // 抓取剛才渲染的按鈕
-        const b2tBtn = parentDoc.getElementById('custom-b2t-btn');
-        
-        if (b2tBtn) {
-            b2tBtn.onclick = function(e) {
-                e.preventDefault(); // 阻止 href="#" 讓畫面亂跳
+                p_str, v_str = "<span style='color:#555;'>-</span>", "<span style='color:#555;'>-</span>"
+                if pure_code and pure_code in market_data:
+                    d = market_data[pure_code]
+                    p_str = f"<span style='font-size:16px;'>{d['price']:.2f}</span><br>{fmt_color(d['price_pct'], True)}"
+                    v_str = f"<span style='font-size:15px;'>{d['vol']:,}</span><br>{fmt_color(d['vol_pct'], False, True)}"
                 
-                // 🔫 散彈槍打鳥法：把 Streamlit 可能的卷軸容器全部滾動一次，確保絕對成功！
-                const containers = [
-                    parentDoc.querySelector('[data-testid="stAppViewContainer"]'),
-                    parentDoc.querySelector('[data-testid="stMain"]'),
-                    parentDoc.documentElement,
-                    parentWin
-                ];
-                
-                containers.forEach(container => {
-                    if (container) {
-                        try {
-                            container.scrollTo({top: 0, behavior: 'smooth'});
-                        } catch(err) {}
-                    }
-                });
-            };
-        }
-        </script>
-        """,
-        height=0, width=0
-    )
+                with st.container(border=True):
+                    st.markdown("<span class='stock-card-marker'></span>", unsafe_allow_html=True)
+                    c1, c2, c3, c4, c5, c6, c7, c8, c9 = st.columns(col_ratios)
+                    
+                    with c1: st.markdown(f"<div style='padding-top:8px; font-weight:bold; font-size:15px;'>{stock}</div>", unsafe_allow_html=True)
+                    with c2: st.markdown(f"<div style='padding-top:10px; font-size:12px; color:#38BDF8;'><span style='background-color:#1E293B; padding:2px 5px; border-radius:4px; border: 1px solid #0369a1;'>{industry_label}</span></div>", unsafe_allow_html=True)
+                    with c3: st.markdown(f"<div style='padding-top:4px;'>{p_str}</div>", unsafe_allow_html=True)
+                    with c4: st.markdown(f"<div style='padding-top:4px;'>{v_str}</div>", unsafe_allow_html=True)
+                    with c5:
+                        st.markdown("<div style='padding-top:2px;'>", unsafe_allow_html=True)
+                        st.text_area("筆記", key=nk, label_visibility="collapsed", placeholder="點此輸入筆記...", height=68)
+                        st.markdown("</div>", unsafe_allow_html=True)
+                    with c6:
+                        st.markdown("<div style='padding-top:15px;'>", unsafe_allow_html=True)
+                        st.button("", icon=":material/input:", key=f"import_{stock}", use_container_width=True, help="將今日行情寫入筆記", on_click=append_quote_to_note, args=(stock, pure_code))
+                        st.markdown("</div>", unsafe_allow_html=True)
+                    with c7:
+                        st.markdown("<div style='padding-top:15px;'>", unsafe_allow_html=True)
+                        st.button("", icon=":material/psychology:", key=f"dyn_{stock}", use_container_width=True, help="將籌碼動態寫入筆記", on_click=append_dynamic_to_note, args=(stock, pure_code))
+                        st.markdown("</div>", unsafe_allow_html=True)
+                    with c8:
+                        st.markdown("<div style='padding-top:15px;'>", unsafe_allow_html=True)
+                        if st.button("", icon=":material/monitoring:", key=f"view_{stock}", use_container_width=True, help="顯示籌碼診斷"):
+                            standard_format = stock
+                            if pure_code and STOCK_DICT and pure_code in STOCK_DICT:
+                                v = STOCK_DICT[pure_code]
+                                standard_format = f"{v['id']} {v['name']}"
+                            st.session_state["selected_watch_stock"] = standard_format
+                            st.session_state["global_search_final"] = standard_format
+                            st.rerun()
+                        st.markdown("</div>", unsafe_allow_html=True)
+                    with c9:
+                        st.markdown("<div style='padding-top:15px;'>", unsafe_allow_html=True)
+                        if st.button("", icon=":material/delete:", key=f"remove_{stock}", use_container_width=True, help="移除此標的"):
+                            del watchlist[stock]
+                            if nk in st.session_state: del st.session_state[nk]
+                            if st.session_state.get("selected_watch_stock") == stock:
+                                st.session_state["selected_watch_stock"] = None
+                                st.session_state["global_search_final"] = ""
+                            st.rerun()
+                        st.markdown("</div>", unsafe_allow_html=True)
+                        
+        st.markdown('<link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined" rel="stylesheet" />', unsafe_allow_html=True)
+        st.markdown(
+            """
+            <a href="#" id="custom-b2t-btn"
+               style="display: flex; justify-content: center; align-items: center; background-color: rgba(14, 165, 233, 0.1); 
+                      color: #38bdf8; font-size: 14px; font-weight: bold; padding: 12px; 
+                      border-radius: 8px; text-decoration: none; margin-top: 40px; margin-bottom: 20px; 
+                      border: 1px solid rgba(56, 189, 248, 0.3); box-shadow: 0px 4px 6px rgba(0,0,0,0.3); gap: 6px;">
+                <span class="material-symbols-outlined" style="font-size: 20px;">move_up</span> 
+                回到頂部
+            </a>
+            """, 
+            unsafe_allow_html=True
+        )
+        import streamlit.components.v1 as components
+        components.html(
+            """
+            <script>
+            const parentDoc = window.parent.document;
+            const parentWin = window.parent;
+            const b2tBtn = parentDoc.getElementById('custom-b2t-btn');
+            if (b2tBtn) {
+                b2tBtn.onclick = function(e) {
+                    e.preventDefault(); 
+                    const containers = [
+                        parentDoc.querySelector('[data-testid="stAppViewContainer"]'),
+                        parentDoc.querySelector('[data-testid="stMain"]'),
+                        parentDoc.documentElement,
+                        parentWin
+                    ];
+                    containers.forEach(container => {
+                        if (container) { try { container.scrollTo({top: 0, behavior: 'smooth'}); } catch(err) {} }
+                    });
+                };
+            }
+            </script>
+            """, height=0, width=0
+        )
