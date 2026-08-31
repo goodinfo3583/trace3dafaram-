@@ -161,11 +161,16 @@ def show_b0_page(DATA_DIR, STOCK_DICT):
     st.caption(f"資料基準日: **{b0_latest_date_str}** ｜ 透視全市場資金動能與主力控盤狀態。")
     st.write("---")
     
-    # 🎯 映射股票名稱
-    if '股票名稱' not in df_b0.columns:
-        def get_stock_name(code):
+    # 🎯 強制映射與填補空值的股票名稱
+    def get_stock_name(code, existing_name):
+        if pd.isna(existing_name) or str(existing_name).strip() == "" or str(existing_name).lower() == "nan":
             return STOCK_DICT.get(str(code), {}).get("name", "") if STOCK_DICT else ""
-        df_b0.insert(1, '股票名稱', df_b0['統一代號'].apply(get_stock_name))
+        return existing_name
+
+    if '股票名稱' in df_b0.columns:
+        df_b0['股票名稱'] = df_b0.apply(lambda row: get_stock_name(row['統一代號'], row['股票名稱']), axis=1)
+    else:
+        df_b0.insert(1, '股票名稱', df_b0['統一代號'].apply(lambda x: get_stock_name(x, None)))
 
     # ==========================================
     # 🕵️‍♂️ 頁面專屬過濾器
