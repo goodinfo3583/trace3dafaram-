@@ -5,7 +5,10 @@ import re
 import os
 import glob
 import datetime
-
+try:
+    from views.b0_page import sync_b0_data
+except ImportError:
+    def sync_b0_data(DATA_DIR): pass
 # ==========================================
 # 🌟 導入背景喚醒引擎
 # ==========================================
@@ -78,129 +81,7 @@ def clean_stock_id(df):
         df['統一代號'] = df[col_id].astype(str).str.replace(r'\.0$', '', regex=True).str.strip()
     return df
 
-# ==========================================
-# 🌟 數據潔癖最終版：嚴格檔名過濾 + 強制數值轉換 + 防禦空值覆蓋
-# ==========================================
-def sync_b0_data(DATA_DIR):
-    import os, glob, re
-    import pandas as pd
-    
-    # 🎯 防線 1：絕對嚴格鎖定「成交價」三個字，阻絕其他籌碼檔案干擾
-    search_patterns = [os.path.join(DATA_DIR, "*成交價*.csv")]
-    files = []
-    for pattern in search_patterns:
-        files.extend(glob.glob(pattern))
-    if not files: return
-    
-    all_dfs = []
-    # 步驟 1：讀取並以「日期」定錨
-    for f in files:
-        df = None 
-        for enc in ['utf-8-sig', 'big5', 'cp950', 'utf-8']:
-            try:
-                # 🎯 防線 2：統一先用字串讀取，避免 Pandas 被千分位逗號干擾導致型態錯亂
-                df = pd.read_csv(f, encoding=enc, header=0, dtype=str)
-                break
-            except: pass
-            
-        if df is not None and not df.empty:
-            # 清除所有欄位名稱的隱形空白與換行符號
-            df.columns = [re.sub(r'[\s\n\r\t\u3000\ufeff]+', '', str(c)) for c in df.columns]
-            
-            c_code = next((c for c in df.columns if '代號' in c), None)
-            date_col = next((c for c in df.columns if '日期' in c), None)
-            
-            if c_code and date_col:
-                df['統一代號'] = df[c_code].astype(str).str.replace(r'\.0$', '', regex=True).str.strip()
-                df['標準日期'] = df[date_col].astype(str).str.strip()
-                
-                # 🎯 防線 3：強力清洗數值！拔除逗號並轉為乾淨數字
-                vol_col = next((c for c in df.columns if c in ['成交張數', '總量', '成交量', '累積成交張數', '張數']), None)
-                if vol_col:
-                    df['成交張數_num'] = pd.to_numeric(df[vol_col].astype(str).str.replace(',', ''), errors='coerce').fillna(0)
-                    df['成交張數'] = df['成交張數_num'] 
-                else:
-                    df['成交張數_num'] = 0
-                    df['成交張數'] = 0
 
-                amt_col = next((c for c in df.columns if c in ['成交額(百萬)', '成交金額', '成交額', '總金額']), None)
-                if amt_col:
-                    df['成交額_num'] = pd.to_numeric(df[amt_col].astype(str).str.replace(',', ''), errors='coerce').fillna(0)
-                    df['成交額(百萬)'] = df['成交額_num']
-                else:
-                    df['成交額_num'] = 0
-                    df['成交額(百萬)'] = 0
-                    
-                # 確保 PER、成交價、漲跌幅 被正確轉換，避免在透視鏡中變成空字串
-                if 'PER' in df.columns:
-                    df['PER'] = pd.to_numeric(df['PER'].astype(str).str.replace(',', ''), errors='coerce')
-                if '成交' in df.columns:
-                    df['成交'] = pd.to_numeric(df['成交'].astype(str).str.replace(',', ''), errors='coerce')
-                if '漲跌幅' in df.columns:
-                    df['漲跌幅'] = pd.to_numeric(df['漲跌幅'].astype(str).str.replace(',', '').str.replace('%', ''), errors='coerce')
-
-                all_dfs.append(df)
-                
-    if not all_dfs: return
-    
-    combined_df = pd.concat(all_dfs, ignore_index=True)
-    
-    # 🎯 防線 4：強者生存去重法！同一天若有多筆資料，優先保留「成交張數最大」的那筆，絕不讓空資料上位
-    combined_df = combined_df.sort_values(by=['統一代號', '標準日期', '成交張數_num'], ascending=[True, True, False])
-    combined_df = combined_df.drop_duplicates(subset=['統一代號', '標準日期'], keep='first')
-    
-    # 找出系統中真實存在的最新日期
-    unique_dates = sorted(combined_df['標準日期'].unique(), reverse=True)
-    if not unique_dates: return
-    latest_date = unique_dates[0]
-    
-    # 取出最新一日資料
-    df_today = combined_df[combined_df['標準日期'] == latest_date].copy()
-    
-    # 嚴格依照日期排排站，抓出真材實料的 5 天
-    sorted_df = combined_df.sort_values(by=['統一代號', '標準日期'], ascending=[True, False])
-    top5_df = sorted_df.groupby('統一代號').head(5)
-    
-    # 精準計算 5 日均量與 5 日均額
-    avg_data = top5_df.groupby('統一代號').agg(
-        **{
-            '5日均量': ('成交張數_num', 'mean'),
-            '5日均額': ('成交額_num', 'mean')
-        }
-    ).reset_index()
-        
-    df_today = pd.merge(df_today, avg_data, on='統一代號', how='left')
-    df_today['5日均量'] = df_today['5日均量'].round(0)
-    df_today['5日均額'] = df_today['5日均額'].round(2)
-    
-    df_today['股價日期'] = latest_date
-        
-    def get_vp_status(row):
-        pct = row.get('漲跌幅', 0)
-        if pd.isna(pct): pct = 0
-        vol = row.get('成交張數_num', 0)
-        avg_v = row.get('5日均量', 0)
-        if avg_v == 0 or vol == 0: return "⚪ 無明顯動能"
-        ratio = vol / avg_v
-        if ratio >= 1.5: v_stat = "放量"
-        elif ratio <= 0.7: v_stat = "縮量"
-        else: v_stat = "平量"
-        if pct >= 4.0: p_stat = "大漲"
-        elif pct > 1.5: p_stat = "價升"
-        elif pct >= -1.5: p_stat = "滯漲"
-        elif pct > -4.0: p_stat = "小跌"
-        else: p_stat = "大跌"
-        comb = f"{v_stat}{p_stat}"
-        mapping = {
-            "放量大漲": "🚀 放量大漲 (量價齊升，持續看漲)", "縮量大漲": "🔒 縮量大漲 (鎖倉高控盤，延續上漲)", "平量大漲": "✈️ 平量大漲 (一致看漲無拋壓，加速上漲)",
-            "縮量價升": "📈 價升量縮 (量價背離，下方承接看拉高)", "放量滯漲": "⚠️ 放量滯漲 (拋壓增大，即將見頂反轉)", "平量滯漲": "⏸️ 平量滯漲 (拋壓增大，高位見頂)",
-            "縮量小跌": "📉 縮量小跌 (主力洗盤止跌，擇機進場)", "放量小跌": "🛡️ 放量小跌 (見底信號，越跌越買反轉)", "平量小跌": "🥀 平量價縮 (下跌中繼，弱反彈信號)",
-            "縮量大跌": "☠️ 縮量大跌 (一致看空無承接，加速下跌)", "放量大跌": "🩸 放量大跌 (跟風砸盤，高位出貨持續跌)", "平量大跌": "🕳️ 平量大跌 (一致看空無承接，加速下跌)"
-        }
-        return mapping.get(comb, "⚖️ 溫和震盪整理")
-
-    df_today['B0_量價狀態'] = df_today.apply(get_vp_status, axis=1)
-    st.session_state['b0_price'] = df_today
 # ==========================================
 # 🌟 主程式
 # ==========================================
