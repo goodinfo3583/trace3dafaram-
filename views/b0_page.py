@@ -139,7 +139,7 @@ def sync_b0_data(DATA_DIR):
 def show_b0_page(DATA_DIR, STOCK_DICT):
     # 確保 B0 數據已載入記憶體
     if 'b0_price' not in st.session_state:
-        with st.spinner("🚀 B0 基礎價量引擎啟動中..."):
+        with st.spinner("基礎價量引擎啟動中..."):
             sync_b0_data(DATA_DIR)
             
     df_b0 = st.session_state.get('b0_price', pd.DataFrame())
