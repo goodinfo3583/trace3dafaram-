@@ -264,7 +264,7 @@ def inject_custom_header(is_logged_in=False):
                     
                     <div class="dropdown-item actionable">
                         <a href="#" data-target="NavToBroker" class="dropdown-title internal-nav">
-                            <img src="app/static/icon-podiumaward.png" class="menu-icon" alt="broker"> 券商分點
+                            <img src="app/static/icon-docker.png" class="menu-icon" alt="broker"> 券商分點
                         </a>
                         <p class="dropdown-text">追蹤特定券商分點進出動向。</p>
                     </div>  
@@ -276,10 +276,10 @@ def inject_custom_header(is_logged_in=False):
                         <p class="dropdown-text">休息一下別殺進殺出占個卜，更多互動功能。</p>
                     </div>
 
-                    <!-- 🌟 這裡新增 B0 量價與估值掃描選項 -->
+                    <!-- 🌟 這裡新增 量價與估值掃描選項 -->
                     <div class="dropdown-item actionable">
                         <a href="#" data-target="NavToB0" class="dropdown-title internal-nav">
-                            <img src="app/static/icon-search.png" class="menu-icon" alt="b0"> B0 量價與估值掃描
+                            <img src="app/static/icon-stats.png" class="menu-icon" alt="b0"> 量價模型
                         </a>
                         <p class="dropdown-text">透視全市場資金動能與主力控盤狀態。</p>
                     </div>
