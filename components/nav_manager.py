@@ -257,7 +257,7 @@ def inject_custom_header(is_logged_in=False):
                     
                     <div class="dropdown-item actionable">
                         <a href="#" data-target="NavToCourses" class="dropdown-title internal-nav">
-                            <img src="app/static/icon-malware-shield.png" class="menu-icon" alt="courses"> 課程
+                            <img src="app/static/icon-openbookapple.png" class="menu-icon" alt="courses"> 課程
                         </a>
                         <p class="dropdown-text">增加最大智識，提升能力不求人。</p>
                     </div>                           
