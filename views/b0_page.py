@@ -29,14 +29,24 @@ def sync_b0_data(DATA_DIR):
             except: pass
             
         if df is not None and not df.empty:
+            # 清除欄位名稱的隱藏空白
             df.columns = [re.sub(r'[\s\n\r\t\u3000\ufeff]+', '', str(c)) for c in df.columns]
             
             c_code = next((c for c in df.columns if '代號' in c), None)
             date_col = next((c for c in df.columns if '日期' in c), None)
             
+            # 🎯 直接在原始 CSV 中抓取名稱欄位 (可能是名稱、股票名稱、證券名稱)
+            name_col = next((c for c in df.columns if c in ['名稱', '股票名稱', '證券名稱']), None)
+            
             if c_code and date_col:
                 df['統一代號'] = df[c_code].astype(str).str.replace(r'\.0$', '', regex=True).str.strip()
                 df['標準日期'] = df[date_col].astype(str).str.strip()
+                
+                # 🎯 保留原始 CSV 中的名稱，不再讓它被洗掉
+                if name_col:
+                    df['B0_原始名稱'] = df[name_col].astype(str).str.strip()
+                else:
+                    df['B0_原始名稱'] = ""
                 
                 vol_col = next((c for c in df.columns if c in ['成交張數', '總量', '成交量', '累積成交張數', '張數']), None)
                 if vol_col:
@@ -67,6 +77,7 @@ def sync_b0_data(DATA_DIR):
     
     combined_df = pd.concat(all_dfs, ignore_index=True)
     
+    # 依成交張數排序去重，確保不被空資料蓋掉
     combined_df = combined_df.sort_values(by=['統一代號', '標準日期', '成交張數_num'], ascending=[True, True, False])
     combined_df = combined_df.drop_duplicates(subset=['統一代號', '標準日期'], keep='first')
     
@@ -147,14 +158,23 @@ def show_b0_page(DATA_DIR, STOCK_DICT):
     st.caption(f"資料基準日: **{b0_latest_date_str}** ｜ 透視全市場資金動能與主力控盤狀態。")
     st.write("---")
     
-    # 🎯 暴力破解法：強制覆蓋名稱 (解決 NaN 讀不出來的問題)
-    def force_get_name(code):
-        if not STOCK_DICT: return ""
-        return STOCK_DICT.get(str(code), {}).get("name", "")
+    # 🎯 完美解法：優先讀取 CSV 內的名稱，防禦 00400A 等新標的名稱遺失
+    def resolve_stock_name(row):
+        # 1. 優先拿原始 CSV 的名稱
+        raw_name = str(row.get('B0_原始名稱', '')).strip()
+        if raw_name and raw_name.lower() != 'nan' and raw_name != 'none':
+            return raw_name
+            
+        # 2. 如果 CSV 真的漏了，才拿 STOCK_DICT 補底
+        code = str(row.get('統一代號', ''))
+        if STOCK_DICT:
+            dict_name = STOCK_DICT.get(code, {}).get("name", "")
+            if dict_name: 
+                return dict_name
+                
+        return ""
         
-    df_b0['統一代號'] = df_b0['統一代號'].astype(str)
-    # 直接覆寫，不管原本裡面是不是 NaN
-    df_b0['股票名稱'] = df_b0['統一代號'].apply(force_get_name)
+    df_b0['股票名稱'] = df_b0.apply(resolve_stock_name, axis=1)
 
     # ==========================================
     # 🗂️ 建立雙分頁 (Tabs)
