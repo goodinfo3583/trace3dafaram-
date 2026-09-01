@@ -1,16 +1,15 @@
 # views/b0_page.py
 import streamlit as st
 import pandas as pd
+import numpy as np
 import os
 import glob
 import re
 
 # ==========================================
 # 🌟 數據潔癖最終版：嚴格檔名過濾 + 強制數值轉換 + 防禦空值覆蓋
-# (完全繼承您的嚴謹邏輯，作為 B0 專屬背景引擎)
 # ==========================================
 def sync_b0_data(DATA_DIR):
-    # 🎯 防線 1：絕對嚴格鎖定「成交價」三個字，阻絕其他籌碼檔案干擾
     search_patterns = [os.path.join(DATA_DIR, "*成交價*.csv")]
     files = []
     for pattern in search_patterns:
@@ -21,18 +20,15 @@ def sync_b0_data(DATA_DIR):
         return
     
     all_dfs = []
-    # 步驟 1：讀取並以「日期」定錨
     for f in files:
         df = None 
         for enc in ['utf-8-sig', 'big5', 'cp950', 'utf-8']:
             try:
-                # 🎯 防線 2：統一先用字串讀取，避免 Pandas 被千分位逗號干擾
                 df = pd.read_csv(f, encoding=enc, header=0, dtype=str)
                 break
             except: pass
             
         if df is not None and not df.empty:
-            # 清除所有欄位名稱的隱形空白與換行符號
             df.columns = [re.sub(r'[\s\n\r\t\u3000\ufeff]+', '', str(c)) for c in df.columns]
             
             c_code = next((c for c in df.columns if '代號' in c), None)
@@ -42,7 +38,6 @@ def sync_b0_data(DATA_DIR):
                 df['統一代號'] = df[c_code].astype(str).str.replace(r'\.0$', '', regex=True).str.strip()
                 df['標準日期'] = df[date_col].astype(str).str.strip()
                 
-                # 🎯 防線 3：強力清洗數值！拔除逗號並轉為乾淨數字
                 vol_col = next((c for c in df.columns if c in ['成交張數', '總量', '成交量', '累積成交張數', '張數']), None)
                 if vol_col:
                     df['成交張數_num'] = pd.to_numeric(df[vol_col].astype(str).str.replace(',', ''), errors='coerce').fillna(0)
@@ -59,7 +54,6 @@ def sync_b0_data(DATA_DIR):
                     df['成交額_num'] = 0
                     df['成交額(百萬)'] = 0
                     
-                # 確保 PER、成交價、漲跌幅 被正確轉換
                 if 'PER' in df.columns:
                     df['PER'] = pd.to_numeric(df['PER'].astype(str).str.replace(',', ''), errors='coerce')
                 if '成交' in df.columns:
@@ -73,7 +67,6 @@ def sync_b0_data(DATA_DIR):
     
     combined_df = pd.concat(all_dfs, ignore_index=True)
     
-    # 🎯 防線 4：強者生存去重法！同一天若有多筆資料，優先保留「成交張數最大」的那筆
     combined_df = combined_df.sort_values(by=['統一代號', '標準日期', '成交張數_num'], ascending=[True, True, False])
     combined_df = combined_df.drop_duplicates(subset=['統一代號', '標準日期'], keep='first')
     
@@ -81,14 +74,11 @@ def sync_b0_data(DATA_DIR):
     if not unique_dates: return
     latest_date = unique_dates[0]
     
-    # 取出最新一日資料
     df_today = combined_df[combined_df['標準日期'] == latest_date].copy()
     
-    # 嚴格依照日期排排站，抓出真材實料的 5 天
     sorted_df = combined_df.sort_values(by=['統一代號', '標準日期'], ascending=[True, False])
     top5_df = sorted_df.groupby('統一代號').head(5)
     
-    # 精準計算 5 日均量與 5 日均額
     avg_data = top5_df.groupby('統一代號').agg(
         **{
             '5日均量': ('成交張數_num', 'mean'),
@@ -128,8 +118,6 @@ def sync_b0_data(DATA_DIR):
         return mapping.get(comb, "⚖️ 溫和震盪整理")
 
     df_today['B0_量價狀態'] = df_today.apply(get_vp_status, axis=1)
-    
-    # 存入 Session State 供全站使用
     st.session_state['b0_price'] = df_today
 
 
@@ -137,9 +125,8 @@ def sync_b0_data(DATA_DIR):
 # 🌟 頁面渲染主程式
 # ==========================================
 def show_b0_page(DATA_DIR, STOCK_DICT):
-    # 確保 B0 數據已載入記憶體
     if 'b0_price' not in st.session_state:
-        with st.spinner("基礎價量引擎啟動中..."):
+        with st.spinner("🚀 B0 基礎價量引擎啟動中..."):
             sync_b0_data(DATA_DIR)
             
     df_b0 = st.session_state.get('b0_price', pd.DataFrame())
@@ -148,80 +135,124 @@ def show_b0_page(DATA_DIR, STOCK_DICT):
         st.warning("⚠️ 目前資料庫中無任何有效的成交價檔案，請確認 `data` 資料夾狀態。")
         return
 
-    # 取得最新日期 (美化顯示)
+    # 取得最新日期
     date_raw = str(df_b0['股價日期'].iloc[0])
     b0_latest_date_str = date_raw
     if len(date_raw) >= 8:
         b0_latest_date_str = f"{date_raw[:4]}/{date_raw[4:6]}/{date_raw[6:8]}"
-    elif len(date_raw) == 4: # 處理可能只有 0828 的情況
+    elif len(date_raw) == 4:
         b0_latest_date_str = f"2026/{date_raw[:2]}/{date_raw[2:]}"
 
-    # UI 標題
-    st.markdown("<h2 style='color: #38BDF8;'>⚖️ B0 基礎量價與估值掃描</h2>", unsafe_allow_html=True)
+    st.markdown("<h2 style='color: #38BDF8;'>⚖️ B0 量價與估值掃描</h2>", unsafe_allow_html=True)
     st.caption(f"資料基準日: **{b0_latest_date_str}** ｜ 透視全市場資金動能與主力控盤狀態。")
     st.write("---")
     
-    # 🎯 強制映射與填補空值的股票名稱
-    def get_stock_name(code, existing_name):
-        if pd.isna(existing_name) or str(existing_name).strip() == "" or str(existing_name).lower() == "nan":
-            return STOCK_DICT.get(str(code), {}).get("name", "") if STOCK_DICT else ""
-        return existing_name
-
-    if '股票名稱' in df_b0.columns:
-        df_b0['股票名稱'] = df_b0.apply(lambda row: get_stock_name(row['統一代號'], row['股票名稱']), axis=1)
-    else:
-        df_b0.insert(1, '股票名稱', df_b0['統一代號'].apply(lambda x: get_stock_name(x, None)))
+    # 🎯 暴力破解法：強制覆蓋名稱 (解決 NaN 讀不出來的問題)
+    def force_get_name(code):
+        if not STOCK_DICT: return ""
+        return STOCK_DICT.get(str(code), {}).get("name", "")
+        
+    df_b0['統一代號'] = df_b0['統一代號'].astype(str)
+    # 直接覆寫，不管原本裡面是不是 NaN
+    df_b0['股票名稱'] = df_b0['統一代號'].apply(force_get_name)
 
     # ==========================================
-    # 🕵️‍♂️ 頁面專屬過濾器
+    # 🗂️ 建立雙分頁 (Tabs)
     # ==========================================
-    col1, col2, col3 = st.columns([1, 1, 2])
-    with col1:
-        search_kw = st.text_input("🔍 搜尋代號/名稱", placeholder="例如: 2330 或 台積電")
-    with col2:
-        vol_filter = st.number_input("📈 成交量大於 (張)", min_value=0, value=0, step=1000)
-    with col3:
-        status_options = sorted(df_b0['B0_量價狀態'].unique().tolist())
-        sel_status = st.multiselect("🎯 過濾量價型態", status_options, placeholder="預設顯示全部")
+    tab_basic, tab_momentum = st.tabs(["📊 全市場基礎量價", "🔥 資金動能雷達"])
 
-    # 執行過濾
-    view_df = df_b0.copy()
-    if search_kw:
-        view_df = view_df[view_df['統一代號'].str.contains(search_kw) | view_df['股票名稱'].str.contains(search_kw)]
-    if vol_filter > 0:
-        view_df = view_df[view_df['成交張數_num'] >= vol_filter]
-    if sel_status:
-        view_df = view_df[view_df['B0_量價狀態'].isin(sel_status)]
+    # ------------------------------------------
+    # 分頁 1：基礎量價總表
+    # ------------------------------------------
+    with tab_basic:
+        col1, col2, col3 = st.columns([1, 1, 2])
+        with col1:
+            search_kw = st.text_input("🔍 搜尋代號/名稱", placeholder="例如: 2330 或 台積電")
+        with col2:
+            vol_filter = st.number_input("📈 成交量大於 (張)", min_value=0, value=0, step=1000)
+        with col3:
+            status_options = sorted(df_b0['B0_量價狀態'].unique().tolist())
+            sel_status = st.multiselect("🎯 過濾量價型態", status_options, placeholder="預設顯示全部")
 
-    # 篩選要顯示的完美欄位
-    display_cols = ['統一代號', '股票名稱', '成交', '漲跌幅', '成交張數', '成交額(百萬)', 'PER', '5日均量', '5日均額', 'B0_量價狀態']
-    view_df = view_df[[c for c in display_cols if c in view_df.columns]].copy()
+        view_df = df_b0.copy()
+        if search_kw:
+            view_df = view_df[view_df['統一代號'].str.contains(search_kw) | view_df['股票名稱'].str.contains(search_kw)]
+        if vol_filter > 0:
+            view_df = view_df[view_df['成交張數_num'] >= vol_filter]
+        if sel_status:
+            view_df = view_df[view_df['B0_量價狀態'].isin(sel_status)]
 
-    # ==========================================
-    # 📊 渲染數據表 (使用潔癖級別的對齊與顏色)
-    # ==========================================
-    st.markdown(f"**共找到 {len(view_df)} 檔符合條件的標的**")
-    
-    st.dataframe(
-        view_df,
-        use_container_width=True,
-        hide_index=True,
-        height=600,
-        column_config={
-            "統一代號": st.column_config.TextColumn("代號", width="small"),
-            "股票名稱": st.column_config.TextColumn("名稱", width="small"),
-            "成交": st.column_config.NumberColumn("成交價", format="%.2f"),
-            "漲跌幅": st.column_config.NumberColumn(
-                "漲跌幅(%)", 
-                format="%.2f",
-                # 用顏色標示漲跌
-                help="紅色為漲，綠色為跌 (依台股習慣)"
-            ),
-            "成交張數": st.column_config.NumberColumn("今日成交(張)", format="%d"),
-            "5日均量": st.column_config.NumberColumn("5日均量(張)", format="%d"),
-            "成交額(百萬)": st.column_config.NumberColumn("成交額(百萬)", format="%.2f"),
-            "5日均額": st.column_config.NumberColumn("5日均成交額(百萬)", format="%.2f"),
-            "PER": st.column_config.NumberColumn("本益比", format="%.2f"),
-            "B0_量價狀態": st.column_config.TextColumn("量價主力照妖鏡", width="large"),
-        }
-    )
+        display_cols = ['統一代號', '股票名稱', '成交', '漲跌幅', '成交張數', '成交額(百萬)', 'PER', '5日均量', '5日均額', 'B0_量價狀態']
+        view_df = view_df[[c for c in display_cols if c in view_df.columns]].copy()
+
+        st.markdown(f"**共找到 {len(view_df)} 檔符合條件的標的**")
+        st.dataframe(
+            view_df,
+            use_container_width=True, hide_index=True, height=500,
+            column_config={
+                "統一代號": st.column_config.TextColumn("代號", width="small"),
+                "股票名稱": st.column_config.TextColumn("名稱", width="small"),
+                "成交": st.column_config.NumberColumn("成交價", format="%.2f"),
+                "漲跌幅": st.column_config.NumberColumn("漲跌幅(%)", format="%.2f"),
+                "成交張數": st.column_config.NumberColumn("今日成交(張)", format="%d"),
+                "5日均量": st.column_config.NumberColumn("5日均量(張)", format="%d"),
+                "成交額(百萬)": st.column_config.NumberColumn("成交額(百萬)", format="%.2f"),
+                "5日均額": st.column_config.NumberColumn("5日均成交額(百萬)", format="%.2f"),
+                "PER": st.column_config.NumberColumn("本益比", format="%.2f"),
+                "B0_量價狀態": st.column_config.TextColumn("量價主力照妖鏡", width="large"),
+            }
+        )
+
+    # ------------------------------------------
+    # 分頁 2：資金動能雷達 (實戰意義與趨勢捕捉)
+    # ------------------------------------------
+    with tab_momentum:
+        st.markdown("#### 資金推動力學：找出真正的行情燃料")
+        st.caption("排除流動性過差的標的 (成交額 > 50百萬 且 股價 > 10元)，以避免倍數失真。")
+
+        # 1. 核心動能運算
+        momentum_df = df_b0[(df_b0['成交額(百萬)'] > 50) & (df_b0['成交'] > 10)].copy()
+        
+        # A. 絕對值增量 (找出巨鯨)
+        momentum_df['額度增加絕對值'] = momentum_df['成交額(百萬)'] - momentum_df['5日均額']
+        
+        # B. 爆發倍數 (避免除以 0，將 0 替換為極小值 0.01)
+        momentum_df['5日均額_safe'] = momentum_df['5日均額'].replace(0, 0.01)
+        momentum_df['額度爆發倍數'] = (momentum_df['成交額(百萬)'] / momentum_df['5日均額_safe']).fillna(0)
+
+        # 2. 雙榜單對比顯示
+        col_m1, col_m2 = st.columns(2)
+        
+        with col_m1:
+            st.markdown("##### 🏆 巨鯨吸金榜")
+            st.caption("資金總量絕對增加最多 (主升段發動或大型法人調倉)")
+            
+            top_abs = momentum_df.sort_values('額度增加絕對值', ascending=False).head(30)
+            st.dataframe(
+                top_abs[['統一代號', '股票名稱', '成交額(百萬)', '額度增加絕對值', '漲跌幅']],
+                use_container_width=True, hide_index=True, height=500,
+                column_config={
+                    "統一代號": st.column_config.TextColumn("代號"),
+                    "股票名稱": st.column_config.TextColumn("名稱"),
+                    "成交額(百萬)": st.column_config.NumberColumn("今日成交額", format="%.0f"),
+                    "額度增加絕對值": st.column_config.NumberColumn("▲較均額增加", format="+%.0f"),
+                    "漲跌幅": st.column_config.NumberColumn("漲跌幅%", format="%.2f")
+                }
+            )
+
+        with col_m2:
+            st.markdown("##### 🚀 異常點火榜")
+            st.caption("相較均額爆發倍數最高 (通常為冷門股出量突破第一根)")
+            
+            top_ratio = momentum_df.sort_values('額度爆發倍數', ascending=False).head(30)
+            st.dataframe(
+                top_ratio[['統一代號', '股票名稱', '成交額(百萬)', '額度爆發倍數', '漲跌幅']],
+                use_container_width=True, hide_index=True, height=500,
+                column_config={
+                    "統一代號": st.column_config.TextColumn("代號"),
+                    "股票名稱": st.column_config.TextColumn("名稱"),
+                    "成交額(百萬)": st.column_config.NumberColumn("今日成交額", format="%.0f"),
+                    "額度爆發倍數": st.column_config.NumberColumn("🚀爆發倍數", format="%.1fx"),
+                    "漲跌幅": st.column_config.NumberColumn("漲跌幅%", format="%.2f")
+                }
+            )
