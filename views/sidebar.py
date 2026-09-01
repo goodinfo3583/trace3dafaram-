@@ -115,6 +115,7 @@ def ensure_b1_to_b5_loaded(DATA_DIR):
             df_broker = load_raw_broker_history(remote_csv_url)
             if not df_broker.empty:
                 st.session_state['broker_history_df'] = df_broker
+        except: pass
                 # 新增補載頁面2
 
 # ==========================================
