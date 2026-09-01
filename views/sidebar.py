@@ -33,7 +33,7 @@ KEY_MAP = {
     'b5_1000': ['b5_1000', 'df_blk5_1000'],
     'b7_main': ['b7_main', 'df_blk7_main', 'df_b7_main'],
     'b7_pledge': ['b7_pledge', 'df_pledge', 'df_b7_pledge'],# 🟢 新增：董監最新質押比                    
-    'b7_pledge_history': ['b7_pledge_history', 'df_pledge_history', 'df_b7_pledge_history']  # 🟢 新增：董監質押歷史趨勢
+    'b7_pledge_history': ['b7_pledge_history', 'df_pledge_history', 'df_b7_pledge_history'],  # 🟢 新增：董監質押歷史趨勢
     'broker_history': ['broker_history_df'] # 👇 新增：券商分點歷史明細
     
     # 新增其他變數載入頁面，如'b7_main': ['b7_main'],--步驟2
@@ -105,7 +105,7 @@ def ensure_b1_to_b5_loaded(DATA_DIR):
         try:
             from views.b7_page import sync_pledge_history_data
             sync_pledge_history_data(DATA_DIR)
-
+        except: pass
     # 👇 新增：券商分點歷史明細 補載
     if get_sidebar_df('broker_history').empty:
         try:
@@ -115,7 +115,7 @@ def ensure_b1_to_b5_loaded(DATA_DIR):
             if not df_broker.empty:
                 st.session_state['broker_history_df'] = df_broker
                 # 新增補載頁面2
-        except: pass
+
 # ==========================================
 # 🌟 快搜各頁面與顯示工具函數區 
 # ==========================================
