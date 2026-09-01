@@ -338,7 +338,62 @@ def render_sidebar_broker_tracking(query, display_name):
     available_dates = sorted(stock_raw['trade_date'].unique(), reverse=True)
     if not available_dates: return
     
+    # ==========================================
+    # 🌟 新增：取得並顯示整體「淨買超(張)」與「集中度」歷史
+    # ==========================================
+    try:
+        from utils.data_utils import calculate_chip_concentration
+        remote_csv_url = "https://raw.githubusercontent.com/goodinfo3583/tw-broker-data/main/data/broker/broker_history.csv"
+        df_trend = calculate_chip_concentration(remote_csv_url, str(query))
+        
+        if not df_trend.empty:
+            latest_data = df_trend.iloc[-1]
+            
+            # 使用兩欄設計，讓數字看起來更緊湊美觀
+            m_col1, m_col2 = st.columns(2)
+            with m_col1:
+                st.metric(
+                    label=f"最新集中度 ({latest_data['trade_date']})", 
+                    value=f"{latest_data['concentration_%']}%"
+                )
+            with m_col2:
+                # 判斷淨買超正負來決定顏色字串
+                net_buy_val = latest_data['net_buy']
+                net_str = f"+{net_buy_val:,}" if net_buy_val > 0 else f"{net_buy_val:,}"
+                st.metric(
+                    label="主體淨買賣超", 
+                    value=f"{net_str} 張"
+                )
+            
+            # 展開查看 60 日歷史
+            with st.expander("📅 展開查看：近 60 日集中度與淨買超", expanded=False):
+                df_trend_disp = df_trend.sort_values('trade_date', ascending=False).head(60).copy()
+                df_trend_disp = df_trend_disp[['trade_date', 'net_buy', 'concentration_%']]
+                df_trend_disp.columns = ['交易日期', '淨買超(張)', '集中度(%)']
+                
+                # 套用顏色樣式
+                def color_trend(val):
+                    try:
+                        v = float(val)
+                        if v > 0: return 'color: #FF4B4B;'
+                        elif v < 0: return 'color: #00E272;'
+                    except: pass
+                    return 'color: #94A3B8;'
+                
+                if hasattr(df_trend_disp.style, 'map'):
+                    styled_trend = df_trend_disp.style.map(color_trend, subset=['淨買超(張)', '集中度(%)']).format({'淨買超(張)': "{:,.0f}"})
+                else:
+                    styled_trend = df_trend_disp.style.applymap(color_trend, subset=['淨買超(張)', '集中度(%)']).format({'淨買超(張)': "{:,.0f}"})
+                
+                st.dataframe(styled_trend, use_container_width=True, hide_index=True)
+            
+            st.markdown("<hr style='border-color: rgba(56, 189, 248, 0.3); margin: 10px 0px;'>", unsafe_allow_html=True)
+    except Exception as e:
+        pass # 如果集中度計算失敗，就靜默跳過，繼續顯示下方分點
+
+    # ==========================================
     # 1. 計算近 60 日囤貨前 5 名
+    # ==========================================
     recent_dates = available_dates[:60]
     recent_raw = stock_raw[stock_raw['trade_date'].isin(recent_dates)].copy()
     recent_raw['real_net_vol'] = recent_raw.apply(
@@ -356,14 +411,18 @@ def render_sidebar_broker_tracking(query, display_name):
         
     top_5_names = top_5_hoarders[broker_col].tolist()
     
+    # ==========================================
     # 2. 顯示區間囤貨追蹤 (前5名)
+    # ==========================================
     st.markdown("<h6 style='color: #E2E8F0; margin-top: 5px; margin-bottom: 5px;'>📈 近 60 日囤貨分點 (前 5 名)</h6>", unsafe_allow_html=True)
     styled_hoard = top_5_hoarders.copy()
     styled_hoard.columns = ['中文券商分點', '淨買超(張)']
     styled_hoard = styled_hoard.style.format({'淨買超(張)': "{:,.0f}"})
     st.dataframe(styled_hoard, use_container_width=True, hide_index=True)
     
+    # ==========================================
     # 3. 提取前 5 名的「全歷史」來計算連買，並顯示近 15 日矩陣
+    # ==========================================
     st.markdown("<h6 style='color: #E2E8F0; margin-top: 10px; margin-bottom: 5px;'>🗺️ 囤貨分點進出矩陣 (近 15 日)</h6>", unsafe_allow_html=True)
     
     matrix_raw = stock_raw[stock_raw[broker_col].isin(top_5_names)].copy()
