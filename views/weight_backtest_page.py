@@ -987,233 +987,150 @@ def show_weight_backtest_page(STOCK_DICT, DATA_DIR="data"):
             st.session_state['scored_result'] = score_df[score_df['總分'] != 0].copy()
             st.session_state['score_calculated'] = True
 
-    # ==========================================
-    # 4. 結果展示 & 模擬交易模型驗證 (使用 session_state 保持狀態)
+# ==========================================
+    # 4. 結果展示 (隱藏歷史追蹤 Tab，保留寫入功能)
     # ==========================================
     if st.session_state.get('score_calculated', False) and 'scored_result' in st.session_state:
         result_df = st.session_state['scored_result']
 
         st.write("---")
-        st.markdown(f"### 🏆 策略計分與模型驗證 (共 {len(result_df)} 檔獲取分數)")
+        st.markdown(f"### 🏆 策略計分結果 (共 {len(result_df)} 檔獲取分數)")
         
-        tab_result, tab_track = st.tabs(["📊 今日策略計分結果", "🎯 歷史模型驗證追蹤 (模擬交易)"])
-
-        with tab_result:
-            if not result_df.empty:
-                display_df = result_df[['統一代號', '股票名稱', '產業別', '總分', '得分明細']].rename(columns={'統一代號': '股票代號'})
-                display_df.insert(0, '寫入追蹤 (本週上限5檔)', False)
-                
-                st.caption("💡 勾選下方『寫入追蹤』，即可將該檔標的與目前的策略過濾特徵，存入歷史模型庫中觀察。")
-                
-                # 互動表格
-                edited_df = st.data_editor(
-                    display_df,
-                    column_config={
-                        "寫入追蹤 (本週上限5檔)": st.column_config.CheckboxColumn(
-                            "寫入追蹤",
-                            help="勾選欲寫入追蹤系統的標的",
-                            default=False,
-                        ),
-                        "總分": st.column_config.NumberColumn(
-                            "總分",
-                            help="策略加權總分",
-                            format="%.1f",
-                        )
-                    },
-                    disabled=["股票代號", "股票名稱", "產業別", "總分", "得分明細"],
-                    hide_index=True,
-                    use_container_width=True,
-                    key="editor_save_track"
-                )
-                
-                selected_rows = edited_df[edited_df['寫入追蹤 (本週上限5檔)'] == True]
-                
-                st.write("---")
-                col_save1, col_save2 = st.columns([1, 1])
-                with col_save1:
-                    st.markdown(f"#### 💾 儲存今日策略模型 (已勾選 {len(selected_rows)} 檔)")
-                
-                with col_save2:
-                    # 🎯 將判斷加在按鈕按下去的瞬間
-                    if st.button("寫入模擬追蹤 (導覽登入)", icon=":material/database:", use_container_width=True, type="primary"):
-                                    
-                        # 1. 檢查登入狀態
-                        if not st.session_state.get("logged_in", False):
-                            st.error("⚠️ 守衛：「寫入追蹤清單需要綁定帳號！正在為您導向登入頁面...」")
-                            import time
-                            time.sleep(1.5) # 稍微停頓讓使用者看到提示
-                            st.query_params["page"] = "login"
-                            st.rerun()
-                        else:
-                        # 2. 已登入才執行原本的寫入邏輯
-                            username = st.session_state.get("username", "guest")
-                            with st.spinner("寫入中..."):
-
-                                try:
-                                    from streamlit_gsheets import GSheetsConnection
-                                    conn = st.connection("gsheets", type=GSheetsConnection)
-                                    # 🎯 直接綁定您的專屬 Google Sheets 網址
-                                    SHEET_URL = "https://docs.google.com/spreadsheets/d/1TxHDahg8ul6lmUtDN-7X75cBXbkU0jaZ3M9zg6exBgU/edit?gid=687268023#gid=687268023"                                 
-
-                                    track_date = datetime.datetime.now().strftime("%Y-%m-%d")
-                                    today_obj = datetime.datetime.now()
-                                    monday_obj = today_obj - datetime.timedelta(days=today_obj.weekday())
-                                    monday_str = monday_obj.strftime("%Y-%m-%d")
-                                    
-                                    try: 
-                                        old_track = conn.read(spreadsheet=SHEET_URL, worksheet="實驗室模型追蹤", ttl=0).dropna(how="all")
-                                    except: 
-                                        old_track = pd.DataFrame(columns=['鎖定日期', '代號', '名稱', '鎖定收盤價', '總分', '得分明細', '當下策略特徵', '追蹤狀態'])
-                                    
-                                    this_week_count = 0
-                                    if not old_track.empty and '鎖定日期' in old_track.columns:
-                                        old_track['date_obj'] = pd.to_datetime(old_track['鎖定日期'], errors='coerce')
-                                        this_week_data = old_track[old_track['date_obj'] >= pd.to_datetime(monday_str)]
-                                        this_week_count = len(this_week_data)
-                                        old_track = old_track.drop(columns=['date_obj'])
-                                        
-                                    if this_week_count + len(selected_rows) > 5:
-                                        st.error(f"❌ 寫入失敗：每週最多只能存取 5 檔標的。您本週已存取 {this_week_count} 檔，本次勾選 {len(selected_rows)} 檔，已達上限。")
-                                    else:
-                                        save_targets = selected_rows.copy()
-                                        save_targets['鎖定日期'] = track_date
-                                        
-                                        df_b0_price = get_df('b0_price')
-                                        price_dict = {}
-                                        if not df_b0_price.empty and '成交' in df_b0_price.columns:
-                                            for _, row in df_b0_price.iterrows():
-                                                try: price_dict[str(row['統一代號'])] = float(str(row['成交']).replace(',', ''))
-                                                except: pass
-                                        
-                                        save_targets['鎖定收盤價'] = save_targets['股票代號'].map(price_dict).fillna(0.0)
-                                        save_targets['追蹤狀態'] = "追蹤中"
-                                        
-                                        debug_df_global = st.session_state.get('debug_df', pd.DataFrame())
-                                        save_targets['當下策略特徵'] = ""
-                                        
-                                        if not debug_df_global.empty:
-                                            debug_cols_to_keep = [c for c in debug_df_global.columns if c not in ['統一代號', '股票名稱', '產業別', '總分', '得分明細']]
-                                            for idx, row in save_targets.iterrows():
-                                                matched = debug_df_global[debug_df_global['統一代號'] == row['股票代號']]
-                                                if not matched.empty:
-                                                    features = []
-                                                    for col in debug_cols_to_keep:
-                                                        val = str(matched[col].iloc[0])
-                                                        if val != 'nan' and val != 'None' and val != '':
-                                                            features.append(f"{col}:{val}")
-                                                    save_targets.at[idx, '當下策略特徵'] = " | ".join(features)[:1000]
-                                        else:
-                                            save_targets['當下策略特徵'] = "無詳細特徵紀錄 (未開啟除錯透視鏡)"
-                                        
-                                        final_save_df = save_targets[['鎖定日期', '股票代號', '股票名稱', '鎖定收盤價', '總分', '得分明細', '當下策略特徵', '追蹤狀態']].rename(columns={'股票代號': '代號', '股票名稱': '名稱'})
-                                        
-                                        if not old_track.empty and '鎖定日期' in old_track.columns and '代號' in old_track.columns:
-                                            for _, row in final_save_df.iterrows():
-                                                mask = (old_track['鎖定日期'] == row['鎖定日期']) & (old_track['代號'] == row['代號'])
-                                                old_track = old_track[~mask]
-                                                
-                                        new_track = pd.concat([old_track, final_save_df], ignore_index=True)
-                                        conn.update(spreadsheet=SHEET_URL, worksheet="實驗室模型追蹤", data=new_track)
-                                        
-                                        if 'pending_watchlist_adds' not in st.session_state:
-                                            st.session_state['pending_watchlist_adds'] = []
-                                        for _, row in final_save_df.iterrows():
-                                            item = f"{row['代號']} {row['名稱']}"
-                                            if item not in st.session_state['pending_watchlist_adds']:
-                                                st.session_state['pending_watchlist_adds'].append(item)
-                                                
-                                        st.success(f"✅ 成功將 {len(selected_rows)} 檔標的寫入模型驗證庫！(本週已使用 {this_week_count + len(selected_rows)}/5 扣打)")
-                                        st.info("💡 已自動為您標記，之後若開啟 Watchlist (自選股) 頁面，可直接無縫加入。")
-                                        
-                                except Exception as e:
-                                    st.error(f"❌ 寫入失敗：{e}。請確認 Google Sheets 已建立名為「實驗室模型追蹤」的工作表。")
-
-            else:
-                st.warning("名單中沒有標的符合您的嚴格過濾條件，或得分為 0。")
-
-        # ----------------------------------------------------
-        # 歷史模型驗證區塊 (Tab 2)
-        # ----------------------------------------------------
-        with tab_track:
-            st.markdown("### 📈 策略勝率回測雷達")
-            st.caption("驗證您所設定的條件與權重，在過去 1~2 個月內的實際表現，藉此優化策略。")
-            try:
-                from streamlit_gsheets import GSheetsConnection
-                conn = st.connection("gsheets", type=GSheetsConnection)
-                # 🎯 直接綁定您的專屬 Google Sheets 網址
-                SHEET_URL = "https://docs.google.com/spreadsheets/d/1TxHDahg8ul6lmUtDN-7X75cBXbkU0jaZ3M9zg6exBgU/edit?gid=687268023#gid=687268023"
-                
-                history_track_df = conn.read(spreadsheet=SHEET_URL, worksheet="實驗室模型追蹤", ttl=0).dropna(how="all")
-                
-                if not history_track_df.empty:
-                    today_obj = datetime.datetime.now()
-                    monday_obj = today_obj - datetime.timedelta(days=today_obj.weekday())
-                    monday_str = monday_obj.strftime("%Y-%m-%d")
-                    history_track_df['date_obj'] = pd.to_datetime(history_track_df['鎖定日期'], errors='coerce')
-                    this_week_data = history_track_df[history_track_df['date_obj'] >= pd.to_datetime(monday_str)]
-                    
-                    st.info(f"📊 **本週追蹤額度狀態：已使用 {len(this_week_data)} / 5 檔**")
-                    
-                    selected_week = st.selectbox("📅 選擇要回顧的策略發動日", sorted(history_track_df['鎖定日期'].astype(str).unique(), reverse=True), key="sel_track_date")
-                    week_df = history_track_df[history_track_df['鎖定日期'] == selected_week].copy()
-                    
-                    lock_date_obj = datetime.datetime.strptime(selected_week, "%Y-%m-%d")
-                    days_passed = (datetime.datetime.now() - lock_date_obj).days
-                    
-                    is_expired = days_passed >= 60 
-                    
-                    if is_expired:
-                        status_tag = "🔴 已結案 (追蹤期滿 2 個月)"
-                        st.info("🔒 此策略模型已追蹤滿 2 個月。")
-                    else:
-                        weeks_passed = (days_passed // 7) + 1
-                        status_tag = f"🟢 追蹤中 (第 {weeks_passed} 週)"
-                    
-                    st.markdown(f"**目前狀態：** `{status_tag}` ｜ **距今發動天數：** `{days_passed} 天`")
-                    
-                    df_b0_today = get_df('b0_price')
-                    latest_prices = {}
-                    if not df_b0_today.empty and '成交' in df_b0_today.columns:
-                        for _, row in df_b0_today.iterrows():
-                            try: latest_prices[str(row['統一代號'])] = float(str(row['成交']).replace(',', ''))
-                            except: pass
-                    
-                    week_df['最新價格'] = week_df['代號'].astype(str).map(latest_prices).fillna(0.0)
-                    
-                    def calc_price_return(row):
-                        try:
-                            lock_p = float(row.get('鎖定收盤價', 0))
-                            curr_p = float(row.get('最新價格', 0))
-                            if lock_p > 0 and curr_p > 0:
-                                pct = ((curr_p - lock_p) / lock_p) * 100
-                                if pct > 0: return f"🚀 +{pct:.1f}%"
-                                elif pct < 0: return f"🩸 {pct:.1f}%"
-                                else: return "0.0%"
-                            return "-"
-                        except: return "-"
-                    
-                    week_df['區間報酬'] = week_df.apply(calc_price_return, axis=1)
-                    
-                    show_cols = ['代號', '名稱', '鎖定收盤價', '最新價格', '區間報酬', '總分', '得分明細', '當下策略特徵']
-                    
-                    st.dataframe(
-                        week_df[[c for c in show_cols if c in week_df.columns]], 
-                        use_container_width=True, 
-                        hide_index=True,
-                        column_config={
-                            "當下策略特徵": st.column_config.TextColumn(
-                                "🔍 當下策略特徵 (滑過查看)", 
-                                help="紀錄當時觸發的所有量價與籌碼狀態，供您回顧優化策略用。", 
-                                width="medium", 
-                                max_chars=30
-                            ),
-                            "得分明細": st.column_config.TextColumn(
-                                "🏆 得分明細", 
-                                width="medium"
-                            )
-                        }
+        if not result_df.empty:
+            display_df = result_df[['統一代號', '股票名稱', '產業別', '總分', '得分明細']].rename(columns={'統一代號': '股票代號'})
+            display_df.insert(0, '寫入追蹤 (本週上限5檔)', False)
+            
+            st.caption("💡 勾選下方『寫入追蹤』，即可將該檔標的存入歷史模型庫中，並在「建立名單」中觀察。")
+            
+            # 互動表格
+            edited_df = st.data_editor(
+                display_df,
+                column_config={
+                    "寫入追蹤 (本週上限5檔)": st.column_config.CheckboxColumn(
+                        "寫入追蹤",
+                        help="勾選欲寫入追蹤系統的標的",
+                        default=False,
+                    ),
+                    "總分": st.column_config.NumberColumn(
+                        "總分",
+                        help="策略加權總分",
+                        format="%.1f",
                     )
-                else:
-                    st.info("⚪ 目前實驗室模型庫中尚無紀錄。請先在上方設定條件，勾選標的後點擊「寫入模擬追蹤系統」。")
-            except Exception as e:
-                st.warning("⚪ 尚無歷史追蹤紀錄，或 Google Sheets 尚未建立名為「實驗室模型追蹤」的工作表。")
+                },
+                disabled=["股票代號", "股票名稱", "產業別", "總分", "得分明細"],
+                hide_index=True,
+                use_container_width=True,
+                key="editor_save_track"
+            )
+            
+            selected_rows = edited_df[edited_df['寫入追蹤 (本週上限5檔)'] == True]
+            
+            st.write("---")
+            col_save1, col_save2 = st.columns([1, 1])
+            with col_save1:
+                st.markdown(f"#### 💾 儲存今日策略模型 (已勾選 {len(selected_rows)} 檔)")
+            
+            with col_save2:
+                # 🎯 按下按鈕時檢查登入狀態
+                if st.button("寫入模擬追蹤 (導覽登入)", icon=":material/database:", use_container_width=True, type="primary"):
+                                    
+                    # 1. 檢查登入狀態
+                    if not st.session_state.get("logged_in", False):
+                        st.error("⚠️ 守衛：「寫入追蹤清單需要綁定帳號！正在為您導向登入頁面...」")
+                        import time
+                        time.sleep(1.5) # 稍微停頓讓使用者看到提示
+                        st.query_params["page"] = "login"
+                        st.rerun()
+                    else:
+                        # 2. 已登入才執行寫入邏輯
+                        username = st.session_state.get("username", "guest")
+                        with st.spinner("寫入中..."):
+                            try:
+                                from streamlit_gsheets import GSheetsConnection
+                                conn = st.connection("gsheets", type=GSheetsConnection)
+                                # 🎯 您的專屬 Google Sheets 網址
+                                SHEET_URL = "https://docs.google.com/spreadsheets/d/1TxHDahg8ul6lmUtDN-7X75cBXbkU0jaZ3M9zg6exBgU/edit?gid=687268023#gid=687268023"                                 
+
+                                track_date = datetime.datetime.now().strftime("%Y-%m-%d")
+                                today_obj = datetime.datetime.now()
+                                monday_obj = today_obj - datetime.timedelta(days=today_obj.weekday())
+                                monday_str = monday_obj.strftime("%Y-%m-%d")
+                                
+                                try: 
+                                    old_track = conn.read(spreadsheet=SHEET_URL, worksheet="實驗室模型追蹤", ttl=0).dropna(how="all")
+                                except: 
+                                    old_track = pd.DataFrame(columns=['鎖定日期', '代號', '名稱', '鎖定收盤價', '總分', '得分明細', '當下策略特徵', '追蹤狀態', '帳號'])
+                                
+                                # 加入自動補上 '帳號' 欄位防呆機制
+                                if '帳號' not in old_track.columns:
+                                    old_track['帳號'] = ""
+                                
+                                this_week_count = 0
+                                if not old_track.empty and '鎖定日期' in old_track.columns and '帳號' in old_track.columns:
+                                    # 只計算該使用者的本週額度
+                                    user_mask = old_track['帳號'].astype(str).str.replace(r'\.0$', '', regex=True).str.strip().str.lower() == str(username).strip().lower()
+                                    old_track['date_obj'] = pd.to_datetime(old_track['鎖定日期'], errors='coerce')
+                                    this_week_data = old_track[(old_track['date_obj'] >= pd.to_datetime(monday_str)) & user_mask]
+                                    this_week_count = len(this_week_data)
+                                    old_track = old_track.drop(columns=['date_obj'])
+                                    
+                                if this_week_count + len(selected_rows) > 5:
+                                    st.error(f"❌ 寫入失敗：每週最多只能存取 5 檔標的。您本週已存取 {this_week_count} 檔，本次勾選 {len(selected_rows)} 檔，已達上限。")
+                                else:
+                                    save_targets = selected_rows.copy()
+                                    save_targets['鎖定日期'] = track_date
+                                    save_targets['帳號'] = username # 🎯 確保把帳號寫進去！
+                                    
+                                    df_b0_price = get_df('b0_price')
+                                    price_dict = {}
+                                    if not df_b0_price.empty and '成交' in df_b0_price.columns:
+                                        for _, row in df_b0_price.iterrows():
+                                            try: price_dict[str(row['統一代號'])] = float(str(row['成交']).replace(',', ''))
+                                            except: pass
+                                            
+                                    save_targets['鎖定收盤價'] = save_targets['股票代號'].map(price_dict).fillna(0.0)
+                                    save_targets['追蹤狀態'] = "追蹤中"
+                                    
+                                    debug_df_global = st.session_state.get('debug_df', pd.DataFrame())
+                                    save_targets['當下策略特徵'] = ""
+                                    
+                                    if not debug_df_global.empty:
+                                        debug_cols_to_keep = [c for c in debug_df_global.columns if c not in ['統一代號', '股票名稱', '產業別', '總分', '得分明細']]
+                                        for idx, row in save_targets.iterrows():
+                                            matched = debug_df_global[debug_df_global['統一代號'] == row['股票代號']]
+                                            if not matched.empty:
+                                                features = []
+                                                for col in debug_cols_to_keep:
+                                                    val = str(matched[col].iloc[0])
+                                                    if val != 'nan' and val != 'None' and val != '':
+                                                        features.append(f"{col}:{val}")
+                                                save_targets.at[idx, '當下策略特徵'] = " | ".join(features)[:1000]
+                                    else:
+                                        save_targets['當下策略特徵'] = "無詳細特徵紀錄 (未開啟除錯透視鏡)"
+                                        
+                                    final_save_df = save_targets[['鎖定日期', '股票代號', '股票名稱', '鎖定收盤價', '總分', '得分明細', '當下策略特徵', '追蹤狀態', '帳號']].rename(columns={'股票代號': '代號', '股票名稱': '名稱'})
+                                    
+                                    # 避免重複寫入同一天同一檔標的 (針對該使用者)
+                                    if not old_track.empty and '鎖定日期' in old_track.columns and '代號' in old_track.columns and '帳號' in old_track.columns:
+                                        for _, row in final_save_df.iterrows():
+                                            user_match = old_track['帳號'].astype(str).str.replace(r'\.0$', '', regex=True).str.strip().str.lower() == str(username).strip().lower()
+                                            mask = (old_track['鎖定日期'] == row['鎖定日期']) & (old_track['代號'] == row['代號']) & user_match
+                                            old_track = old_track[~mask]
+                                            
+                                    new_track = pd.concat([old_track, final_save_df], ignore_index=True)
+                                    conn.update(spreadsheet=SHEET_URL, worksheet="實驗室模型追蹤", data=new_track)
+                                    
+                                    if 'pending_watchlist_adds' not in st.session_state:
+                                        st.session_state['pending_watchlist_adds'] = []
+                                    for _, row in final_save_df.iterrows():
+                                        item = f"{row['代號']} {row['名稱']}"
+                                        if item not in st.session_state['pending_watchlist_adds']:
+                                            st.session_state['pending_watchlist_adds'].append(item)
+                                            
+                                    st.success(f"✅ 成功將 {len(selected_rows)} 檔標的寫入模型驗證庫！(本週已使用 {this_week_count + len(selected_rows)}/5 扣打)")
+                                    st.info("💡 寫入成功！請前往「建立名單(Watchlist)」頁面查看您的專屬追蹤標的。")
+                                    
+                            except Exception as e:
+                                st.error(f"❌ 寫入失敗：{e}。請確認 Google Sheets 連線是否正常。")
+        else:
+            st.warning("名單中沒有標的符合您的嚴格過濾條件，或得分為 0。")

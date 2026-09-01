@@ -1461,7 +1461,7 @@ def render_sidebar_war_room(STOCK_DICT, DATA_DIR="data"):
 
             # 👇 新增：區塊 8 券商分點追蹤 往下新增補載頁面
             st.markdown("<hr style='border-color: #334155;'>", unsafe_allow_html=True)
-            icon_broker = get_img_html("magicbookwater.png") # 可以換成適合的圖示
+            icon_broker = get_img_html("icon-building.png") # 可以換成適合的圖示
             st.markdown(f"<h4 style='color: #FCD34D;'>{icon_broker}分點追蹤</h4>", unsafe_allow_html=True)
             render_sidebar_broker_tracking(target_query, display_name)
             
