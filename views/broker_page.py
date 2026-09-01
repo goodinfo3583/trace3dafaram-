@@ -174,7 +174,7 @@ def render(STOCK_DICT=None):
                         # --------- 標籤 3: 歷史進出矩陣 (近30日) ---------
                         with tab3:
                             st.markdown("##### 🗺️ 分點淨買賣力道矩陣")
-                            st.write("橫列為各分點，縱欄為交易日期。若顯示「-」代表當日該分點**未擠進買賣前 15 大 (未進榜)**，而非交易量為零。")
+                            st.write("橫列為各分點，縱欄為交易日期。若顯示「-」代表當日該分點**未擠進買賣前 15 大 (未進榜)**，中斷則重新計算連買/連賣天數。")
                             
                             matrix_dates = available_dates[:30]
                             matrix_raw = stock_raw[stock_raw['trade_date'].isin(matrix_dates)].copy()
@@ -184,6 +184,21 @@ def render(STOCK_DICT=None):
                                     lambda x: abs(x['net_vol']) if x['side'] == 'buy' else -abs(x['net_vol']), axis=1
                                 )
                                 
+                                # 準備週資料 (為了更準確的週延續性，拉取近60日的資料來彙整週數據)
+                                week_raw = stock_raw[stock_raw['trade_date'].isin(available_dates[:60])].copy()
+                                if not week_raw.empty:
+                                    week_raw['signed_vol'] = week_raw.apply(
+                                        lambda x: abs(x['net_vol']) if x['side'] == 'buy' else -abs(x['net_vol']), axis=1
+                                    )
+                                    week_raw['date_dt'] = pd.to_datetime(week_raw['trade_date'])
+                                    week_raw['year_week'] = week_raw['date_dt'].dt.strftime('%Y-%W')
+                                    week_cols = sorted(week_raw['year_week'].unique(), reverse=True)
+                                    # 加總每週淨買賣
+                                    weekly_sum = week_raw.groupby([broker_col, 'year_week'])['signed_vol'].sum().unstack(fill_value=0)
+                                else:
+                                    week_cols = []
+                                    weekly_sum = pd.DataFrame()
+
                                 # 製作樞紐分析表 (此時缺漏的日期會是 NaN)
                                 pivot_df = matrix_raw.pivot_table(
                                     index=broker_col, 
@@ -196,16 +211,71 @@ def render(STOCK_DICT=None):
                                 pivot_df['區間累計'] = pivot_df.sum(axis=1)
                                 pivot_df = pivot_df.sort_values('區間累計', ascending=False)
                                 
+                                # --------- 計算日連買/連賣動態 ---------
+                                date_cols = sorted(matrix_raw['trade_date'].unique(), reverse=True)
+                                def calc_daily_streak(row):
+                                    streak = 0
+                                    sign = None
+                                    for c in date_cols:
+                                        val = row.get(c, None)
+                                        if pd.isna(val) or val == 0:
+                                            break  # 沒進榜或是0即中斷
+                                        current_sign = 1 if val > 0 else -1
+                                        if sign is None:
+                                            sign = current_sign
+                                            streak = sign
+                                        elif sign == current_sign:
+                                            streak += sign
+                                        else:
+                                            break  # 轉買或轉賣即中斷
+                                    if streak > 0: return f"連買 {streak} 日"
+                                    elif streak < 0: return f"連賣 {-streak} 日"
+                                    else: return "-"
+                                    
+                                pivot_df['日連買動態'] = pivot_df.apply(calc_daily_streak, axis=1)
+
+                                # --------- 計算週連買/連賣動態 ---------
+                                def calc_weekly_streak(broker_name):
+                                    if weekly_sum.empty or broker_name not in weekly_sum.index:
+                                        return "-"
+                                    row = weekly_sum.loc[broker_name]
+                                    streak = 0
+                                    sign = None
+                                    for c in week_cols:
+                                        val = row.get(c, 0)
+                                        if val == 0 or pd.isna(val):
+                                            break
+                                        current_sign = 1 if val > 0 else -1
+                                        if sign is None:
+                                            sign = current_sign
+                                            streak = sign
+                                        elif sign == current_sign:
+                                            streak += sign
+                                        else:
+                                            break
+                                    if streak > 0: return f"連買 {streak} 週"
+                                    elif streak < 0: return f"連賣 {-streak} 週"
+                                    else: return "-"
+                                    
+                                pivot_df['週連買動態'] = pivot_df.index.to_series().apply(calc_weekly_streak)
+                                
                                 # 🌟 修正：將未進榜的 NaN 填補為 "-"
                                 pivot_df = pivot_df.fillna("-")
                                 
-                                # 調整欄位順序：區間累計放第一欄，日期由新到舊排列
-                                cols = ['區間累計'] + sorted([c for c in pivot_df.columns if c != '區間累計'], reverse=True)
+                                # 更改 index 名稱為中文 (取代 broker_name)
+                                pivot_df.index.name = "中文券商分點"
+                                
+                                # 調整欄位順序：日連買動態、週連買動態、區間累計放前面，之後日期由新到舊排列
+                                matrix_date_columns = sorted([c for c in pivot_df.columns if c not in ['區間累計', '日連買動態', '週連買動態']], reverse=True)
+                                cols = ['日連買動態', '週連買動態', '區間累計'] + matrix_date_columns
                                 pivot_df = pivot_df[cols]
                                 
                                 # 🎨 內建字體顏色渲染函式
                                 def color_net_vol(val):
-                                    if val == "-": return 'color: #64748B;' # 未進榜顯示為暗灰色
+                                    if isinstance(val, str):
+                                        if val == "-": return 'color: #64748B;' # 未進榜顯示為暗灰色
+                                        if "連買" in val: return 'color: #FF4B4B;' # 連買顯示紅色
+                                        if "連賣" in val: return 'color: #00E272;' # 連賣顯示綠色
                                     try:
                                         v = float(val)
                                         if v > 0: return 'color: #FF4B4B;'
