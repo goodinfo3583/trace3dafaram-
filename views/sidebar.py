@@ -105,7 +105,8 @@ def ensure_b1_to_b5_loaded(DATA_DIR):
         try:
             from views.b7_page import sync_pledge_history_data
             sync_pledge_history_data(DATA_DIR)
-        except: pass
+        except: pass  # 👈 這裡補上！
+
     # 👇 新增：券商分點歷史明細 補載
     if get_sidebar_df('broker_history').empty:
         try:
