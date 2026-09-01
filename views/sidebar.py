@@ -11,9 +11,10 @@ from plotly.subplots import make_subplots
 from utils.data_utils import get_latest_csv, get_prev_csv
 
 # ==========================================
-# 🌟 "側邊雙視窗" 變數雷達與自動載入各區塊引擎 
+# 🌟 "側邊雙視窗" 變數雷達與自動載入各區塊引擎  新增補載頁面1
 # ==========================================
 KEY_MAP = {
+    
     'b1_final_df': ['b1_final_df', 'my_final_df'],
     'b1_down_final_df': ['b1_down_final_df'],
     'b1_foreign_df': ['b1_foreign_df'],
@@ -33,6 +34,8 @@ KEY_MAP = {
     'b7_main': ['b7_main', 'df_blk7_main', 'df_b7_main'],
     'b7_pledge': ['b7_pledge', 'df_pledge', 'df_b7_pledge'],# 🟢 新增：董監最新質押比                    
     'b7_pledge_history': ['b7_pledge_history', 'df_pledge_history', 'df_b7_pledge_history']  # 🟢 新增：董監質押歷史趨勢
+    'broker_history': ['broker_history_df'] # 👇 新增：券商分點歷史明細
+    
     # 新增其他變數載入頁面，如'b7_main': ['b7_main'],--步驟2
 }
 
@@ -102,6 +105,16 @@ def ensure_b1_to_b5_loaded(DATA_DIR):
         try:
             from views.b7_page import sync_pledge_history_data
             sync_pledge_history_data(DATA_DIR)
+
+    # 👇 新增：券商分點歷史明細 補載
+    if get_sidebar_df('broker_history').empty:
+        try:
+            from views.broker_page import load_raw_broker_history
+            remote_csv_url = "https://raw.githubusercontent.com/goodinfo3583/tw-broker-data/main/data/broker/broker_history.csv"
+            df_broker = load_raw_broker_history(remote_csv_url)
+            if not df_broker.empty:
+                st.session_state['broker_history_df'] = df_broker
+                # 新增補載頁面2
         except: pass
 # ==========================================
 # 🌟 快搜各頁面與顯示工具函數區 
@@ -304,6 +317,115 @@ def render_b4_panorama(view_title, keys_and_labels, query, stock_name="-"):
                 st.markdown(f"<div style='font-size:13px; color:#94a3b8; margin-top:4px; margin-bottom:4px;'>{label}： <span style='color:#E2E8F0;'>⚪ 未進榜</span></div>", unsafe_allow_html=True)
         else:
             st.markdown(f"<div style='font-size:13px; color:#94a3b8; margin-top:4px; margin-bottom:4px;'>{label}： <span style='color:#f59e0b;'>⚠️ 尚未載入</span></div>", unsafe_allow_html=True)
+
+#=========補載券商分點資料
+def render_sidebar_broker_tracking(query, display_name):
+    df_raw = get_sidebar_df('broker_history')
+    if df_raw.empty:
+        st.write("⚪ 尚未載入券商資料")
+        return
+        
+    stock_raw = df_raw[df_raw['stock_code'] == str(query)].copy()
+    if stock_raw.empty:
+        st.write("⚪ 未進榜 (無近期券商資料)")
+        return
+        
+    broker_col = next((c for c in ['broker', 'broker_name', '券商名稱', '券商', 'name'] if c in stock_raw.columns), None)
+    if not broker_col: return
+
+    available_dates = sorted(stock_raw['trade_date'].unique(), reverse=True)
+    if not available_dates: return
+    
+    # 1. 計算近 60 日囤貨前 5 名
+    recent_dates = available_dates[:60]
+    recent_raw = stock_raw[stock_raw['trade_date'].isin(recent_dates)].copy()
+    recent_raw['real_net_vol'] = recent_raw.apply(
+        lambda x: abs(x['net_vol']) if x['side'] == 'buy' else -abs(x['net_vol']), axis=1
+    )
+    
+    hoard_df = recent_raw.groupby(broker_col)['real_net_vol'].sum().reset_index()
+    hoard_df.columns = [broker_col, '區間淨買賣']
+    
+    top_5_hoarders = hoard_df[hoard_df['區間淨買賣'] > 0].sort_values('區間淨買賣', ascending=False).head(5)
+    
+    if top_5_hoarders.empty:
+        st.write("⚪ 近 60 日無明顯囤貨分點")
+        return
+        
+    top_5_names = top_5_hoarders[broker_col].tolist()
+    
+    # 2. 顯示區間囤貨追蹤 (前5名)
+    st.markdown("<h6 style='color: #E2E8F0; margin-top: 5px; margin-bottom: 5px;'>📈 近 60 日囤貨分點 (前 5 名)</h6>", unsafe_allow_html=True)
+    styled_hoard = top_5_hoarders.copy()
+    styled_hoard.columns = ['中文券商分點', '淨買超(張)']
+    styled_hoard = styled_hoard.style.format({'淨買超(張)': "{:,.0f}"})
+    st.dataframe(styled_hoard, use_container_width=True, hide_index=True)
+    
+    # 3. 提取前 5 名的「全歷史」來計算連買，並顯示近 15 日矩陣
+    st.markdown("<h6 style='color: #E2E8F0; margin-top: 10px; margin-bottom: 5px;'>🗺️ 囤貨分點進出矩陣 (近 15 日)</h6>", unsafe_allow_html=True)
+    
+    matrix_raw = stock_raw[stock_raw[broker_col].isin(top_5_names)].copy()
+    matrix_raw['signed_vol'] = matrix_raw.apply(
+        lambda x: abs(x['net_vol']) if x['side'] == 'buy' else -abs(x['net_vol']), axis=1
+    )
+    
+    # 全歷史日資料樞紐，用來算連買
+    full_pivot = matrix_raw.pivot_table(index=broker_col, columns='trade_date', values='signed_vol', aggfunc='sum')
+    all_dates_sorted = sorted(full_pivot.columns, reverse=True)
+    
+    # 畫面只顯示近 15 日
+    display_dates = available_dates[:15]
+    display_dates = [d for d in display_dates if d in full_pivot.columns]
+    
+    pivot_df = full_pivot[display_dates].copy()
+    
+    def calc_daily_streak(row_name):
+        if row_name not in full_pivot.index: return "-"
+        row = full_pivot.loc[row_name]
+        streak = 0
+        sign = None
+        for c in all_dates_sorted:
+            val = row.get(c, 0)
+            if pd.isna(val) or val == 0: break
+            current_sign = 1 if val > 0 else -1
+            if sign is None:
+                sign = current_sign
+                streak = sign
+            elif sign == current_sign:
+                streak += sign
+            else:
+                break
+        if streak > 0: return f"連買 {streak} 日"
+        elif streak < 0: return f"連賣 {-streak} 日"
+        else: return "-"
+
+    pivot_df['日連買動態'] = pivot_df.index.to_series().apply(calc_daily_streak)
+    pivot_df = pivot_df.reindex(top_5_names) # 依照囤貨名次排序
+    pivot_df[display_dates] = pivot_df[display_dates].fillna("-")
+    pivot_df.index.name = "中文券商分點"
+    
+    cols = ['日連買動態'] + display_dates
+    pivot_df = pivot_df[cols]
+    
+    def color_net_vol(val):
+        if isinstance(val, str):
+            if val == "-": return 'color: #64748B;'
+            if "連買" in val: return 'color: #FF4B4B;'
+            if "連賣" in val: return 'color: #00E272;'
+        try:
+            v = float(val)
+            if v > 0: return 'color: #FF4B4B;'
+            elif v < 0: return 'color: #00E272;'
+        except: pass
+        return 'color: #94A3B8;'
+
+    if hasattr(pivot_df.style, 'map'):
+        styled_pivot = pivot_df.style.map(color_net_vol).format(lambda x: "{:,.0f}".format(x) if isinstance(x, (int, float)) else x)
+    else:
+        styled_pivot = pivot_df.style.applymap(color_net_vol).format(lambda x: "{:,.0f}".format(x) if isinstance(x, (int, float)) else x)
+    
+    st.dataframe(styled_pivot, use_container_width=True)
+
 # ==========================================
 # 📈 側邊雙視窗 K 線圖與技術分析引擎
 # ==========================================
@@ -1275,6 +1397,12 @@ def render_sidebar_war_room(STOCK_DICT, DATA_DIR="data"):
             scan_and_display("🔹 董監最新質押比", 'b7_pledge', target_query)
             scan_and_display("🔹 董監質押歷史趨勢", 'b7_pledge_history', target_query)
             scan_and_display("🔹 董監持股比增減", 'b7_main', target_query)
+
+            # 👇 新增：區塊 8 券商分點追蹤 往下新增補載頁面
+            st.markdown("<hr style='border-color: #334155;'>", unsafe_allow_html=True)
+            icon_broker = get_img_html("magicbookwater.png") # 可以換成適合的圖示
+            st.markdown(f"<h4 style='color: #FCD34D;'>{icon_broker}分點追蹤</h4>", unsafe_allow_html=True)
+            render_sidebar_broker_tracking(target_query, display_name)
             
     # ==========================================            
     # 💡 當搜尋列「沒有內容」時，顯示大盤總經

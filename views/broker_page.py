@@ -13,7 +13,6 @@ def load_raw_broker_history(url):
         return pd.DataFrame()
 
 def render(STOCK_DICT=None):
-    # 修正命名：改為更精確的「券商分點淨買力」與「集中度」
     st.title("券商分點淨買力與集中度追蹤")
     st.markdown("觀察前 15 大分點買賣力道相抵後的淨流向，追蹤籌碼集中度連續性與券商進出矩陣。")
     
@@ -54,7 +53,6 @@ def render(STOCK_DICT=None):
                     st.success("✅ 數據載入成功！")
                     latest_data = df_trend.iloc[-1]
                     
-                    # 依據集中度定義顯示顏色
                     st.metric(
                         label=f"{latest_data['trade_date']} 最新券商分點集中度", 
                         value=f"{latest_data['concentration_%']}%",
@@ -83,7 +81,6 @@ def render(STOCK_DICT=None):
                     else:
                         available_dates = sorted(stock_raw['trade_date'].unique(), reverse=True)
                         
-                        # 🌟 升級：新增第三個頁籤「歷史進出矩陣」
                         tab1, tab2, tab3 = st.tabs(["🔹 單日進出明細", "🔹 區間囤貨追蹤 (近60日)", "🔹 歷史進出矩陣 (近30日)"])
                         
                         # --------- 標籤 1: 單日明細 ---------
@@ -132,7 +129,6 @@ def render(STOCK_DICT=None):
                             
                             col_hoard, col_dump = st.columns(2)
                             
-                            # 🎨 格式化函式：將 0 轉為 "-" (代表未進榜)，其餘加上千分位逗號
                             def fmt_dash(val):
                                 if pd.isna(val) or val == 0: 
                                     return "-"
@@ -140,11 +136,9 @@ def render(STOCK_DICT=None):
                             
                             with col_hoard:
                                 st.markdown("##### 📈 近 60 日囤貨分點 (全榜)")
-                                # 移除 .head(15)，列出所有囤貨券商
                                 hoarders = hoard_df[hoard_df['區間淨買賣'] > 0].sort_values('區間淨買賣', ascending=False)
                                 if not hoarders.empty:
                                     hoarders.columns = ['券商名稱', '總買(張)', '總賣(張)', '淨買超(張)']
-                                    # 套用格式化函式
                                     styled_hoard = hoarders.style.format({
                                         '總買(張)': fmt_dash, 
                                         '總賣(張)': fmt_dash, 
@@ -156,12 +150,10 @@ def render(STOCK_DICT=None):
                                     
                             with col_dump:
                                 st.markdown("##### 📉 近 60 日倒貨分點 (全榜)")
-                                # 移除 .head(15)，列出所有倒貨券商
                                 dumpers = hoard_df[hoard_df['區間淨買賣'] < 0].sort_values('區間淨買賣', ascending=True).copy()
                                 if not dumpers.empty:
                                     dumpers['區間淨買賣'] = dumpers['區間淨買賣'].abs()
                                     dumpers.columns = ['券商名稱', '總買(張)', '總賣(張)', '淨賣超(張)']
-                                    # 套用格式化函式
                                     styled_dump = dumpers.style.format({
                                         '總買(張)': fmt_dash, 
                                         '總賣(張)': fmt_dash, 
@@ -174,50 +166,48 @@ def render(STOCK_DICT=None):
                         # --------- 標籤 3: 歷史進出矩陣 (近30日) ---------
                         with tab3:
                             st.markdown("##### 🗺️ 分點淨買賣力道矩陣")
-                            st.write("橫列為各分點，縱欄為交易日期。若顯示「-」代表當日該分點**未擠進買賣前 15 大 (未進榜)**，中斷則重新計算連買/連賣天數。")
+                            st.write("橫列為各分點，縱欄顯示**近 30 個交易日**。但「動態連買/連賣」是往前回溯**所有歷史資料**統計而成。")
+                            st.write("若表格顯示「-」代表當日該分點**未進榜 (前15大)**，中斷則重新計算天數。")
                             
-                            matrix_dates = available_dates[:30]
-                            matrix_raw = stock_raw[stock_raw['trade_date'].isin(matrix_dates)].copy()
+                            # 🌟 改良：使用「全部」歷史資料來做精準統計
+                            all_matrix_raw = stock_raw.copy()
                             
-                            if not matrix_raw.empty:
-                                matrix_raw['signed_vol'] = matrix_raw.apply(
+                            if not all_matrix_raw.empty:
+                                all_matrix_raw['signed_vol'] = all_matrix_raw.apply(
                                     lambda x: abs(x['net_vol']) if x['side'] == 'buy' else -abs(x['net_vol']), axis=1
                                 )
                                 
-                                # 準備週資料 (為了更準確的週延續性，拉取近60日的資料來彙整週數據)
-                                week_raw = stock_raw[stock_raw['trade_date'].isin(available_dates[:60])].copy()
-                                if not week_raw.empty:
-                                    week_raw['signed_vol'] = week_raw.apply(
-                                        lambda x: abs(x['net_vol']) if x['side'] == 'buy' else -abs(x['net_vol']), axis=1
-                                    )
-                                    week_raw['date_dt'] = pd.to_datetime(week_raw['trade_date'])
-                                    week_raw['year_week'] = week_raw['date_dt'].dt.strftime('%Y-%W')
-                                    week_cols = sorted(week_raw['year_week'].unique(), reverse=True)
-                                    # 加總每週淨買賣
-                                    weekly_sum = week_raw.groupby([broker_col, 'year_week'])['signed_vol'].sum().unstack(fill_value=0)
-                                else:
-                                    week_cols = []
-                                    weekly_sum = pd.DataFrame()
-
-                                # 製作樞紐分析表 (此時缺漏的日期會是 NaN)
-                                pivot_df = matrix_raw.pivot_table(
+                                # --- 1. 計算全歷史的週資料 ---
+                                all_matrix_raw['date_dt'] = pd.to_datetime(all_matrix_raw['trade_date'])
+                                all_matrix_raw['year_week'] = all_matrix_raw['date_dt'].dt.strftime('%Y-%W')
+                                weekly_sum = all_matrix_raw.groupby([broker_col, 'year_week'])['signed_vol'].sum().unstack(fill_value=0)
+                                week_cols = sorted(weekly_sum.columns, reverse=True)
+                                
+                                # --- 2. 建立全歷史的日資料樞紐分析表 ---
+                                full_pivot = all_matrix_raw.pivot_table(
                                     index=broker_col, 
                                     columns='trade_date', 
                                     values='signed_vol', 
                                     aggfunc='sum'
                                 )
+                                all_dates_sorted = sorted(full_pivot.columns, reverse=True)
                                 
-                                # 🌟 修正：在填補字串前先計算「區間累計」，這樣 NaN 會被當作 0 計算，不會報錯
+                                # --- 3. 畫面顯示區間裁切 (近30日) ---
+                                display_dates = all_dates_sorted[:30]
+                                # 複製出要顯示的 DataFrame
+                                pivot_df = full_pivot[display_dates].copy()
+                                # 區間累計「只」計算畫面上這30天內的加總，才不會跟畫面數字對不起來
                                 pivot_df['區間累計'] = pivot_df.sum(axis=1)
                                 pivot_df = pivot_df.sort_values('區間累計', ascending=False)
                                 
-                                # --------- 計算日連買/連賣動態 ---------
-                                date_cols = sorted(matrix_raw['trade_date'].unique(), reverse=True)
-                                def calc_daily_streak(row):
+                                # --- 4. 計算日連買動態 (從全歷史資料 full_pivot 去追蹤) ---
+                                def calc_daily_streak(row_name):
+                                    if row_name not in full_pivot.index: return "-"
+                                    row = full_pivot.loc[row_name]
                                     streak = 0
                                     sign = None
-                                    for c in date_cols:
-                                        val = row.get(c, None)
+                                    for c in all_dates_sorted:
+                                        val = row.get(c, 0)
                                         if pd.isna(val) or val == 0:
                                             break  # 沒進榜或是0即中斷
                                         current_sign = 1 if val > 0 else -1
@@ -232,9 +222,9 @@ def render(STOCK_DICT=None):
                                     elif streak < 0: return f"連賣 {-streak} 日"
                                     else: return "-"
                                     
-                                pivot_df['日連買動態'] = pivot_df.apply(calc_daily_streak, axis=1)
+                                pivot_df['日連買動態'] = pivot_df.index.to_series().apply(calc_daily_streak)
 
-                                # --------- 計算週連買/連賣動態 ---------
+                                # --- 5. 計算週連買動態 (從全歷史資料 weekly_sum 去追蹤) ---
                                 def calc_weekly_streak(broker_name):
                                     if weekly_sum.empty or broker_name not in weekly_sum.index:
                                         return "-"
@@ -259,15 +249,15 @@ def render(STOCK_DICT=None):
                                     
                                 pivot_df['週連買動態'] = pivot_df.index.to_series().apply(calc_weekly_streak)
                                 
-                                # 🌟 修正：將未進榜的 NaN 填補為 "-"
-                                pivot_df = pivot_df.fillna("-")
+                                # --- 6. 收尾與排版 ---
+                                # 將顯示範圍內的 NaN 填補為 "-"
+                                pivot_df[display_dates] = pivot_df[display_dates].fillna("-")
                                 
-                                # 更改 index 名稱為中文 (取代 broker_name)
+                                # 更改 index 名稱為中文券商分點
                                 pivot_df.index.name = "中文券商分點"
                                 
-                                # 調整欄位順序：日連買動態、週連買動態、區間累計放前面，之後日期由新到舊排列
-                                matrix_date_columns = sorted([c for c in pivot_df.columns if c not in ['區間累計', '日連買動態', '週連買動態']], reverse=True)
-                                cols = ['日連買動態', '週連買動態', '區間累計'] + matrix_date_columns
+                                # 調整欄位順序：日連買動態、週連買動態、區間累計放前面，之後依日期排列
+                                cols = ['日連買動態', '週連買動態', '區間累計'] + display_dates
                                 pivot_df = pivot_df[cols]
                                 
                                 # 🎨 內建字體顏色渲染函式
