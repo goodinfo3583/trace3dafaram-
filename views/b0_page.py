@@ -137,7 +137,7 @@ def sync_b0_data(DATA_DIR):
 # ==========================================
 def show_b0_page(DATA_DIR, STOCK_DICT):
     if 'b0_price' not in st.session_state:
-        with st.spinner("🚀 B0 基礎價量引擎啟動中..."):
+        with st.spinner("🚀 基礎價量引擎啟動中..."):
             sync_b0_data(DATA_DIR)
             
     df_b0 = st.session_state.get('b0_price', pd.DataFrame())
@@ -154,7 +154,7 @@ def show_b0_page(DATA_DIR, STOCK_DICT):
     elif len(date_raw) == 4:
         b0_latest_date_str = f"2026/{date_raw[:2]}/{date_raw[2:]}"
 
-    st.markdown("<h2 style='color: #38BDF8;'>⚖️ B0 量價與估值掃描</h2>", unsafe_allow_html=True)
+    st.markdown("<h2 style='color: #38BDF8;'>量價與估值掃描</h2>", unsafe_allow_html=True)
     st.caption(f"資料基準日: **{b0_latest_date_str}** ｜ 透視全市場資金動能與主力控盤狀態。")
     st.write("---")
     
@@ -179,7 +179,7 @@ def show_b0_page(DATA_DIR, STOCK_DICT):
     # ==========================================
     # 🗂️ 建立雙分頁 (Tabs)
     # ==========================================
-    tab_basic, tab_momentum = st.tabs(["📊 全市場基礎量價", "🔥 資金動能雷達"])
+    tab_basic, tab_momentum = st.tabs(["🔹 全市場基礎量價", "🔹 資金動能雷達"])
 
     # ------------------------------------------
     # 分頁 1：基礎量價總表
@@ -189,7 +189,7 @@ def show_b0_page(DATA_DIR, STOCK_DICT):
         with col1:
             search_kw = st.text_input("🔍 搜尋代號/名稱", placeholder="例如: 2330 或 台積電")
         with col2:
-            vol_filter = st.number_input("📈 成交量大於 (張)", min_value=0, value=0, step=1000)
+            vol_filter = st.number_input("成交量大於 (張)", min_value=0, value=0, step=1000)
         with col3:
             status_options = sorted(df_b0['B0_量價狀態'].unique().tolist())
             sel_status = st.multiselect("🎯 過濾量價型態", status_options, placeholder="預設顯示全部")
@@ -244,7 +244,7 @@ def show_b0_page(DATA_DIR, STOCK_DICT):
         col_m1, col_m2 = st.columns(2)
         
         with col_m1:
-            st.markdown("##### 🏆 巨鯨吸金榜")
+            st.markdown("##### 🏆 成交金額熱門焦點")
             st.caption("資金總量絕對增加最多 (主升段發動或大型法人調倉)")
             
             top_abs = momentum_df.sort_values('額度增加絕對值', ascending=False).head(30)
@@ -262,7 +262,7 @@ def show_b0_page(DATA_DIR, STOCK_DICT):
 
         with col_m2:
             st.markdown("##### 🚀 異常點火榜")
-            st.caption("相較均額爆發倍數最高 (通常為冷門股出量突破第一根)")
+            st.caption("相較5日均成交額爆增倍數比例最高 (可能為冷門股出量突破第一根)")
             
             top_ratio = momentum_df.sort_values('額度爆發倍數', ascending=False).head(30)
             st.dataframe(

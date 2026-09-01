@@ -233,26 +233,40 @@ def inject_custom_header(is_logged_in=False):
                         </a>
                         <p class="dropdown-text">自訂計分籌碼權重與未來勝率回測模擬。</p>
                     </div>
+
+                    <div class="dropdown-item actionable">
+                        <a href="#" data-target="NavToB0" class="dropdown-title internal-nav">
+                            <img src="app/static/icon-stats.png" class="menu-icon" alt="b0"> 量價模型
+                        </a>
+                        <p class="dropdown-text">透視全市場資金動能與主力控盤狀態。</p>
+                    </div>
+
+                    <div class="dropdown-item actionable">
+                        <a href="#" data-target="NavToBroker" class="dropdown-title internal-nav">
+                            <img src="app/static/icon-building.png" class="menu-icon" alt="broker"> 券商分點
+                        </a>
+                        <p class="dropdown-text">追蹤特定券商分點進出動向。</p>
+                    </div>
                     
                     <div class="dropdown-item actionable">
                         <a href="#" data-target="NavToNews" class="dropdown-title internal-nav">
-                            <img src="app/static/magicbook2.png" class="menu-icon" alt="news"> 市場消息
+                            <img src="app/static/icon-coffee-time.png" class="menu-icon" alt="news"> 市場消息
                         </a>
                         <p class="dropdown-text">掌握最新市場動態與總經快訊。</p>
                     </div>
                     
                     <div class="dropdown-item actionable">
-                        <a href="https://www.facebook.com/DOUBLEE04/?locale=zh_TW" target="_blank" class="dropdown-title" style="text-decoration: none;">
-                            <img src="app/static/icon-scam1.png" class="menu-icon" alt="fb-group"> 靠北投顧 3.0 
-                        </a>
-                        <p class="dropdown-text">分享分析師真實績效，避免受話術白繳學費。</p>
-                    </div>
-                    
-                    <div class="dropdown-item actionable">
                         <a href="#" data-target="NavToCourses" class="dropdown-title internal-nav">
-                            <img src="app/static/icon-education.png" class="menu-icon" alt="courses"> 課程
+                            <img src="app/static/icon-malware-shield.png" class="menu-icon" alt="courses"> 課程
                         </a>
                         <p class="dropdown-text">增加最大智識，提升能力不求人。</p>
+                    </div>                           
+                    
+                    <div class="dropdown-item actionable">
+                        <a href="https://www.facebook.com/DOUBLEE04/?locale=zh_TW" target="_blank" class="dropdown-title" style="text-decoration: none;">
+                            <img src="app/static/icon-malware-shield.png" class="menu-icon" alt="fb-group"> 靠北投顧 3.0 
+                        </a>
+                        <p class="dropdown-text">分享分析師真實績效，避免受話術白繳學費。</p>
                     </div>
                     
                     <div class="dropdown-item locked-item">
@@ -262,13 +276,6 @@ def inject_custom_header(is_logged_in=False):
                         <p class="dropdown-text">深度解析主力籌碼囤積路徑。</p>
                     </div>
                     
-                    <div class="dropdown-item actionable">
-                        <a href="#" data-target="NavToBroker" class="dropdown-title internal-nav">
-                            <img src="app/static/icon-docker.png" class="menu-icon" alt="broker"> 券商分點
-                        </a>
-                        <p class="dropdown-text">追蹤特定券商分點進出動向。</p>
-                    </div>  
-                    
                     <div class="dropdown-item locked-item" style="border-bottom: none;">
                         <span class="dropdown-title">
                             <img src="app/static/icon-chessknightalt.png" class="menu-icon" alt="game"> 命運酒館 (開發中)
@@ -276,14 +283,6 @@ def inject_custom_header(is_logged_in=False):
                         <p class="dropdown-text">休息一下別殺進殺出占個卜，更多互動功能。</p>
                     </div>
 
-                    <!-- 🌟 這裡新增 量價與估值掃描選項 -->
-                    <div class="dropdown-item actionable">
-                        <a href="#" data-target="NavToB0" class="dropdown-title internal-nav">
-                            <img src="app/static/icon-stats.png" class="menu-icon" alt="b0"> 量價模型
-                        </a>
-                        <p class="dropdown-text">透視全市場資金動能與主力控盤狀態。</p>
-                    </div>
-                    <!-- 🌟 新增結束 -->
                 </div>
             </div>
             
