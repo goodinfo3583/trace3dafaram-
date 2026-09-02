@@ -223,7 +223,7 @@ def show_b0_page(DATA_DIR, STOCK_DICT):
         if sel_status:
             view_df = view_df[view_df['B0_量價狀態'].isin(sel_status)]
 
-        display_cols = ['統一代號', '股票名稱', '成交', '漲跌幅', '成交張數', '成交額(百萬)', 'PER', '5日均量', '5日均額', 'B0_量價狀態']
+        display_cols = ['統一代號', '股票名稱', '成交', '漲跌幅', '成交張數', '成交額(百萬)', '成交金額日變化率', 'PER', '5日均量', '5日均額', 'B0_量價狀態']
         view_df = view_df[[c for c in display_cols if c in view_df.columns]].copy()
 
         st.markdown(f"**共找到 {len(view_df)} 檔符合條件的標的**")
@@ -238,6 +238,8 @@ def show_b0_page(DATA_DIR, STOCK_DICT):
                 "成交張數": st.column_config.NumberColumn("今日成交(張)", format="%d"),
                 "5日均量": st.column_config.NumberColumn("5日均量(張)", format="%d"),
                 "成交額(百萬)": st.column_config.NumberColumn("成交額(百萬)", format="%.2f"),
+                # 👇 這裡新增這一行，設定為帶有正負號的百分比格式
+                "成交金額日變化率": st.column_config.NumberColumn("日變化率(%)", format="%+.1f %%"),
                 "5日均額": st.column_config.NumberColumn("5日均成交額(百萬)", format="%.2f"),
                 "PER": st.column_config.NumberColumn("本益比", format="%.2f"),
                 "B0_量價狀態": st.column_config.TextColumn("量價主力照妖鏡", width="large"),
