@@ -110,7 +110,19 @@ def sync_b0_data(DATA_DIR):
 
     df_today['股價日期'] = latest_date
     # === 替換結束，下方接著 def get_vp_status(row): ===
+    # 🎯 新增：取得上一交易日(昨日)的成交額，並計算「成交金額日變化率」
+        # .nth(1) 代表在時間倒序中抓取第二筆 (即昨天) 的資料
+        prev_day_df = sorted_df.groupby('統一代號').nth(1).reset_index()
+        prev_day_df = prev_day_df[['統一代號', '成交額_num']].rename(columns={'成交額_num': '昨日成交額'})
         
+        # 併入今日 dataframe
+        df_today = pd.merge(df_today, prev_day_df, on='統一代號', how='left')
+        
+        # 避免除以 0 導致無限大，將昨日為 0 或 NaN 的防呆設為極小值 0.01
+        safe_prev_amt = df_today['昨日成交額'].replace(0, 0.01).fillna(0.01)
+        # 邏輯：(今日成交金額 ÷ 昨日成交金額 - 1) * 100，轉換為百分比格式
+        df_today['成交金額日變化率'] = ((df_today['成交額_num'] / safe_prev_amt) - 1) * 100  
+
     def get_vp_status(row):
         pct = row.get('漲跌幅', 0)
         if pd.isna(pct): pct = 0
@@ -249,18 +261,20 @@ def show_b0_page(DATA_DIR, STOCK_DICT):
         st.caption("資金總量絕對增加最多 (主升段發動或大型法人調倉)")
         
         top_abs = momentum_df.sort_values('額度增加絕對值', ascending=False).head(30)
+
+        # 🎯 這裡新增了 '成交金額日變化率' 欄位與對應的 column_config 格式
         st.dataframe(
-            top_abs[['統一代號', '股票名稱', '成交額(百萬)', '額度增加絕對值', '漲跌幅']],
+            top_abs[['統一代號', '股票名稱', '成交額(百萬)', '成交金額日變化率', '額度增加絕對值', '漲跌幅']],
             use_container_width=True, hide_index=True, height=400,
             column_config={
                 "統一代號": st.column_config.TextColumn("代號"),
                 "股票名稱": st.column_config.TextColumn("名稱"),
                 "成交額(百萬)": st.column_config.NumberColumn("今日成交額(百萬)", format="%.0f"),
+                "成交金額日變化率": st.column_config.NumberColumn("日變化率(%)", format="%+.1f %%"),
                 "額度增加絕對值": st.column_config.NumberColumn("▲較5日均額增加", format="+%.0f"),
                 "漲跌幅": st.column_config.NumberColumn("漲跌幅%", format="%.2f")
             }
         )
-
         st.markdown("<br>", unsafe_allow_html=True)
         st.markdown("##### 🚀 異常點火榜 (各週期暴增倍數)")
         st.caption("相較於過往平均成交額爆增比例最高 (通常為冷門股出量突破第一根，或波段重新發動)")
