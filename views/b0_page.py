@@ -278,7 +278,7 @@ def show_b0_page(DATA_DIR, STOCK_DICT):
                     # 計算相較各週期的「絕對增加金額」
                     momentum_df[f'較{p}日均額增加'] = momentum_df['成交額(百萬)'] - momentum_df[avg_col]
                     
-                    top_abs = momentum_df.sort_values(f'較{p}日均額增加', ascending=False).head(30)
+                    top_abs = momentum_df.sort_values(f'較{p}日均額增加', ascending=False).head(300)
                     
                     # 🎯 調整欄位順序與新增 f日均額
                     display_cols_abs = [
@@ -323,7 +323,7 @@ def show_b0_page(DATA_DIR, STOCK_DICT):
                     safe_avg = momentum_df[avg_col].replace(0, 0.01)
                     momentum_df[f'{p}日爆發倍數'] = (momentum_df['成交額(百萬)'] / safe_avg).fillna(0)
                     
-                    top_ratio = momentum_df.sort_values(f'{p}日爆發倍數', ascending=False).head(30)
+                    top_ratio = momentum_df.sort_values(f'{p}日爆發倍數', ascending=False).head(300)
                     
                     display_cols_ratio = [
                         '統一代號', 
