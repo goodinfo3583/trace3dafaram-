@@ -298,15 +298,30 @@ def show_b0_page(DATA_DIR, STOCK_DICT):
                     
                     # 🎯 這裡同樣新增了 '成交金額日變化率' 欄位與對應的 column_config 格式
                     st.dataframe(
-                        top_ratio[['統一代號', '股票名稱', '成交額(百萬)', '成交金額日變化率', f'{p}日爆發倍數', '漲跌幅']],
+                    # ... 上方的安全防呆與倍數計算維持不變 ...
+                    top_ratio = momentum_df.sort_values(f'{p}日爆發倍數', ascending=False).head(30)
+                    
+                    # 🎯 替換這裡：調整欄位順序，並將該週期的均額 (f'{p}日均額') 加入顯示
+                    display_cols = [
+                        '統一代號', 
+                        '股票名稱', 
+                        f'{p}日爆發倍數', 
+                        '成交額(百萬)', 
+                        f'{p}日均額', 
+                        '成交金額日變化率', 
+                        '漲跌幅'
+                    ]
+                    
+                    st.dataframe(
+                        top_ratio[display_cols],
                         use_container_width=True, hide_index=True, height=400,
                         column_config={
                             "統一代號": st.column_config.TextColumn("代號"),
                             "股票名稱": st.column_config.TextColumn("名稱"),
-                            "成交額(百萬)": st.column_config.NumberColumn("今日成交額", format="%.0f"),
-                            
-                            "成交金額日變化率": st.column_config.NumberColumn("日變化率(%)", format="%+.1f %%"),
                             f'{p}日爆發倍數': st.column_config.NumberColumn("🚀爆發倍數", format="%.1fx"),
+                            "成交額(百萬)": st.column_config.NumberColumn("今日成交額", format="%.0f"),
+                            f'{p}日均額': st.column_config.NumberColumn(f"{p}日均額", format="%.0f"),
+                            "成交金額日變化率": st.column_config.NumberColumn("日變化率(%)", format="%+.1f %%"),
                             "漲跌幅": st.column_config.NumberColumn("漲跌幅%", format="%.2f")
                         }
                     )
