@@ -111,17 +111,17 @@ def sync_b0_data(DATA_DIR):
     df_today['股價日期'] = latest_date
     # === 替換結束，下方接著 def get_vp_status(row): ===
     # 🎯 新增：取得上一交易日(昨日)的成交額，並計算「成交金額日變化率」
-        # .nth(1) 代表在時間倒序中抓取第二筆 (即昨天) 的資料
-        prev_day_df = sorted_df.groupby('統一代號').nth(1).reset_index()
-        prev_day_df = prev_day_df[['統一代號', '成交額_num']].rename(columns={'成交額_num': '昨日成交額'})
+    # .nth(1) 代表在時間倒序中抓取第二筆 (即昨天) 的資料
+    prev_day_df = sorted_df.groupby('統一代號').nth(1).reset_index()
+    prev_day_df = prev_day_df[['統一代號', '成交額_num']].rename(columns={'成交額_num': '昨日成交額'})
+    
+    # 併入今日 dataframe
+    df_today = pd.merge(df_today, prev_day_df, on='統一代號', how='left')
         
-        # 併入今日 dataframe
-        df_today = pd.merge(df_today, prev_day_df, on='統一代號', how='left')
-        
-        # 避免除以 0 導致無限大，將昨日為 0 或 NaN 的防呆設為極小值 0.01
-        safe_prev_amt = df_today['昨日成交額'].replace(0, 0.01).fillna(0.01)
-        # 邏輯：(今日成交金額 ÷ 昨日成交金額 - 1) * 100，轉換為百分比格式
-        df_today['成交金額日變化率'] = ((df_today['成交額_num'] / safe_prev_amt) - 1) * 100  
+    # 避免除以 0 導致無限大，將昨日為 0 或 NaN 的防呆設為極小值 0.01
+    safe_prev_amt = df_today['昨日成交額'].replace(0, 0.01).fillna(0.01)
+    # 邏輯：(今日成交金額 ÷ 昨日成交金額 - 1) * 100，轉換為百分比格式
+    df_today['成交金額日變化率'] = ((df_today['成交額_num'] / safe_prev_amt) - 1) * 100  
 
     def get_vp_status(row):
         pct = row.get('漲跌幅', 0)
