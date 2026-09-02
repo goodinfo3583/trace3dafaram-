@@ -278,7 +278,7 @@ def show_b0_page(DATA_DIR, STOCK_DICT):
             }
         )
         st.markdown("<br>", unsafe_allow_html=True)
-        st.markdown("##### 🚀 多週期異常點火榜 (各週期暴增倍數)")
+        st.markdown("##### 🚀 多週期異常點火榜 (各週期暴增倍數8/12起算)")
         st.caption("相較於過往平均成交額爆增比例最高 (通常為冷門股出量突破第一根，或波段重新發動)")
         
         # 建立內部子分頁
@@ -315,8 +315,8 @@ def show_b0_page(DATA_DIR, STOCK_DICT):
         # 3. 資金趨勢總表 (均額多頭排列追蹤)
         # ------------------------------------------
         st.markdown("---")
-        st.markdown("##### 📈 資金趨勢總表 (中長期延續性追蹤)")
-        st.caption("將各週期均額並排，一眼看穿資金是「單日煙火」還是「波段連續湧入 (5日>10日>20日)」。")
+        st.markdown("##### 📈 資金水龍頭 (各週期暴增倍數8/12起算)")
+        st.caption("不同週期均額，是「波段連續湧入 (5日>10日>20日)」或只是「單日煙火」觀察短中長期資金延續性，這裡只看成交金額，不看籌碼流向何處")
         
         # 建立趨勢判斷邏輯
         def get_fund_trend(row):
@@ -328,7 +328,7 @@ def show_b0_page(DATA_DIR, STOCK_DICT):
                 
                 if ma5 > 0 and ma10 > 0 and ma20 > 0:
                     if ma5 > ma10 and ma10 > ma20:
-                        return "🔥 資金多頭 (延續性強)"
+                        return "🔥 資金湧入 (延續性強)"
                     elif today > ma5 and ma5 <= ma10:
                         return "⚡ 單日點火 (需觀察)"
                     elif ma5 < ma10 and ma10 < ma20:
