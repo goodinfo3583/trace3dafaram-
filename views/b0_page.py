@@ -278,7 +278,7 @@ def show_b0_page(DATA_DIR, STOCK_DICT):
             }
         )
         st.markdown("<br>", unsafe_allow_html=True)
-        st.markdown("##### 🚀 異常點火榜 (各週期暴增倍數)")
+        st.markdown("##### 🚀 多週期異常點火榜 (各週期暴增倍數)")
         st.caption("相較於過往平均成交額爆增比例最高 (通常為冷門股出量突破第一根，或波段重新發動)")
         
         # 建立內部子分頁
@@ -311,4 +311,56 @@ def show_b0_page(DATA_DIR, STOCK_DICT):
                     )
                 else:
                     st.warning(f"目前資料庫中尚未累積滿 {p} 日的歷史成交資料。")
+        # ------------------------------------------
+        # 3. 資金趨勢總表 (均額多頭排列追蹤)
+        # ------------------------------------------
+        st.markdown("---")
+        st.markdown("##### 📈 資金趨勢總表 (中長期延續性追蹤)")
+        st.caption("將各週期均額並排，一眼看穿資金是「單日煙火」還是「波段連續湧入 (5日>10日>20日)」。")
+        
+        # 建立趨勢判斷邏輯
+        def get_fund_trend(row):
+            try:
+                today = float(row.get('成交額(百萬)', 0))
+                ma5 = float(row.get('5日均額', 0))
+                ma10 = float(row.get('10日均額', 0))
+                ma20 = float(row.get('20日均額', 0))
+                
+                if ma5 > 0 and ma10 > 0 and ma20 > 0:
+                    if ma5 > ma10 and ma10 > ma20:
+                        return "🔥 資金多頭 (延續性強)"
+                    elif today > ma5 and ma5 <= ma10:
+                        return "⚡ 單日點火 (需觀察)"
+                    elif ma5 < ma10 and ma10 < ma20:
+                        return "💧 資金退潮 (動能弱)"
+                    else:
+                        return "⚖️ 震盪換手"
+                return "⚪ 資料不足"
+            except:
+                return "-"
+                
+        momentum_df['資金延續趨勢'] = momentum_df.apply(get_fund_trend, axis=1)
+        
+        # 排序：以今日成交額為主，抓出全市場最具影響力的資金流向 (取前 150 名)
+        trend_df = momentum_df.sort_values('成交額(百萬)', ascending=False).head(150)
+        
+        trend_cols = ['統一代號', '股票名稱', '資金延續趨勢', '成交額(百萬)', '5日均額', '10日均額', '20日均額', '30日均額']
+        
+        # 防禦機制：確保欄位都有被算出來才顯示
+        display_trend_cols = [c for c in trend_cols if c in trend_df.columns]
+        
+        st.dataframe(
+            trend_df[display_trend_cols],
+            use_container_width=True, hide_index=True, height=600,
+            column_config={
+                "統一代號": st.column_config.TextColumn("代號"),
+                "股票名稱": st.column_config.TextColumn("名稱"),
+                "資金延續趨勢": st.column_config.TextColumn("資金延續狀態", width="medium"),
+                "成交額(百萬)": st.column_config.NumberColumn("今日成交", format="%.0f"),
+                "5日均額": st.column_config.NumberColumn("5日均", format="%.0f"),
+                "10日均額": st.column_config.NumberColumn("10日均", format="%.0f"),
+                "20日均額": st.column_config.NumberColumn("20日均", format="%.0f"),
+                "30日均額": st.column_config.NumberColumn("30日均", format="%.0f"),
+            }
+        )
     # === 替換結束 ===
