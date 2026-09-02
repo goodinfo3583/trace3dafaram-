@@ -293,11 +293,6 @@ def show_b0_page(DATA_DIR, STOCK_DICT):
                     # 計算倍數 (避免除以 0，將 0 替換為極小值 0.01)
                     safe_avg = momentum_df[avg_col].replace(0, 0.01)
                     momentum_df[f'{p}日爆發倍數'] = (momentum_df['成交額(百萬)'] / safe_avg).fillna(0)
-                    
-                    top_ratio = momentum_df.sort_values(f'{p}日爆發倍數', ascending=False).head(30)
-                    
-                    # 🎯 這裡同樣新增了 '成交金額日變化率' 欄位與對應的 column_config 格式
-                    st.dataframe(
                     # ... 上方的安全防呆與倍數計算維持不變 ...
                     top_ratio = momentum_df.sort_values(f'{p}日爆發倍數', ascending=False).head(30)
                     
