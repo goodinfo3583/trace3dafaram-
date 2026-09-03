@@ -248,8 +248,8 @@ def show_b0_page(DATA_DIR, STOCK_DICT):
 
     # === 替換 `with tab_momentum:` 區塊內的所有內容 ===
     with tab_momentum:
-        st.markdown("#### 資金推動力學：找出真正的行情燃料")
-        st.caption("排除流動性過差的標的 (成交額 > 50百萬 且 股價 > 10元)，以避免倍數失真。")
+        st.markdown("#### 資金動力渦輪：找出真正的行情燃料")
+        st.caption("本區塊先行排除流動性太差的標的 (成交額 > 5000萬 且 股價 > 10元)，以避免倍數失真，本表至8/12開始更新30日.45日還不準確。")
 
         # 1. 核心動能運算
         momentum_df = df_b0[(df_b0['成交額(百萬)'] > 50) & (df_b0['成交'] > 10)].copy()
@@ -259,53 +259,131 @@ def show_b0_page(DATA_DIR, STOCK_DICT):
         
         # 🎯 上下分開顯示：上方為絕對金額榜，下方為倍數點火榜
         st.markdown("---")
-        st.markdown("##### 🏆 成交金額熱門焦點")
-        st.caption("資金總量絕對增加最多 (主升段發動或大型法人調倉)")
+        # ==========================================
+        # 🎯 雙榜單多週期進化版：絕對增額 (熱門焦點) & 爆發倍數 (異常點火)
+        # ==========================================
+        st.markdown("---")
+        st.markdown("##### 🏆 多週期成交金額增加焦點(各週期暴增倍數8/12起算)")
+        st.caption("資金總量絕對增加最多 (主升段發動或大型法人調倉，排除流動性過差標的)")
         
-        top_abs = momentum_df.sort_values('額度增加絕對值', ascending=False).head(30)
-
-        # 🎯 這裡新增了 '成交金額日變化率' 欄位與對應的 column_config 格式
-        st.dataframe(
-            top_abs[['統一代號', '股票名稱', '成交額(百萬)', '成交金額日變化率', '額度增加絕對值', '漲跌幅']],
-            use_container_width=True, hide_index=True, height=400,
-            column_config={
-                "統一代號": st.column_config.TextColumn("代號"),
-                "股票名稱": st.column_config.TextColumn("名稱"),
-                "成交額(百萬)": st.column_config.NumberColumn("今日成交額(百萬)", format="%.0f"),
-                "成交金額日變化率": st.column_config.NumberColumn("日變化率(%)", format="%+.1f %%"),
-                "額度增加絕對值": st.column_config.NumberColumn("▲較5日均額增加", format="+%.0f"),
-                "漲跌幅": st.column_config.NumberColumn("漲跌幅%", format="%.2f")
-            }
-        )
-        st.markdown("<br>", unsafe_allow_html=True)
-        st.markdown("##### 🚀 多週期異常點火榜 (各週期暴增倍數)")
-        st.caption("相較於過往平均成交額爆增比例最高 (通常為冷門股出量突破第一根，或波段重新發動)")
-        
-        # 建立內部子分頁
         periods = [5, 10, 20, 30, 45]
-        ignition_tabs = st.tabs([f"相較 {p} 日均額" for p in periods])
+        
+        # 建立 🏆 熱門焦點的內部子分頁
+        abs_tabs = st.tabs([f"🔹相較 {p} 日均額" for p in periods])
         
         for idx, p in enumerate(periods):
-            with ignition_tabs[idx]:
-                # 確保該週期的均額欄位存在 (防禦機制)
+            with abs_tabs[idx]:
                 avg_col = f'{p}日均額'
                 if avg_col in momentum_df.columns:
-                    # 計算倍數 (避免除以 0，將 0 替換為極小值 0.01)
-                    safe_avg = momentum_df[avg_col].replace(0, 0.01)
-                    momentum_df[f'{p}日爆發倍數'] = (momentum_df['成交額(百萬)'] / safe_avg).fillna(0)
+                    # 計算相較各週期的「絕對增加金額」
+                    momentum_df[f'較{p}日均額增加'] = momentum_df['成交額(百萬)'] - momentum_df[avg_col]
                     
-                    top_ratio = momentum_df.sort_values(f'{p}日爆發倍數', ascending=False).head(30)
+                    top_abs = momentum_df.sort_values(f'較{p}日均額增加', ascending=False).head(300)
                     
-                    # 🎯 這裡同樣新增了 '成交金額日變化率' 欄位與對應的 column_config 格式
+                    # 🎯 調整欄位順序與新增 f日均額
+                    display_cols_abs = [
+                        '統一代號', 
+                        '股票名稱', 
+                        f'較{p}日均額增加', 
+                        '成交額(百萬)', 
+                        avg_col, 
+                        '成交金額日變化率', 
+                        '漲跌幅'
+                    ]
+                    
                     st.dataframe(
-                        top_ratio[['統一代號', '股票名稱', '成交額(百萬)', '成交金額日變化率', f'{p}日爆發倍數', '漲跌幅']],
+                        top_abs[display_cols_abs],
                         use_container_width=True, hide_index=True, height=400,
                         column_config={
                             "統一代號": st.column_config.TextColumn("代號"),
                             "股票名稱": st.column_config.TextColumn("名稱"),
+                            f'較{p}日均額增加': st.column_config.NumberColumn(f"▲較{p}日均額增加", format="+%.0f"),
                             "成交額(百萬)": st.column_config.NumberColumn("今日成交額", format="%.0f"),
+                            avg_col: st.column_config.NumberColumn(f"{p}日均額", format="%.0f"),
                             "成交金額日變化率": st.column_config.NumberColumn("日變化率(%)", format="%+.1f %%"),
+                            "漲跌幅": st.column_config.NumberColumn("漲跌幅%", format="%.2f")
+                        }
+                    )
+                else:
+                    st.warning(f"目前資料庫中尚未累積滿 {p} 日的歷史成交資料。")
+
+
+        st.markdown("<br>", unsafe_allow_html=True)
+        st.markdown("##### 🚀 多週期異常點火榜 (各週期暴增倍數8/12起算)")
+        st.caption("相較於過往平均成交額爆增比例最高 (通常為冷門股出量突破第一根，或波段重新發動)")
+        
+        # 🎯 先把所有週期的倍數都算出來，才能在「總表」中一次呼叫使用
+        periods = [5, 10, 20, 30, 45]
+        for p in periods:
+            avg_col = f'{p}日均額'
+            if avg_col in momentum_df.columns:
+                safe_avg = momentum_df[avg_col].replace(0, 0.01)
+                momentum_df[f'{p}日爆發倍數'] = (momentum_df['成交額(百萬)'] / safe_avg).fillna(0)
+        
+        # 建立 🚀 異常點火的內部子分頁 (在最前方插入「異常點火短中長趨勢」)
+        tab_names = ["🔥 異常點火短中長趨勢"] + [f"🔹相較 {p} 日均額" for p in periods]
+        ignition_tabs = st.tabs(tab_names)
+        
+        # ==========================================
+        # 1. 渲染第一個分頁：異常點火短中長趨勢 (總表)
+        # ==========================================
+        with ignition_tabs[0]:
+            # 依照您指定的順序準備總表的欄位
+            summary_cols = ['統一代號', '股票名稱', '成交金額日變化率', '成交額(百萬)']
+            summary_col_config = {
+                "統一代號": st.column_config.TextColumn("代號"),
+                "股票名稱": st.column_config.TextColumn("名稱"),
+                "成交金額日變化率": st.column_config.NumberColumn("日變化率(%)", format="%+.1f %%"),
+                "成交額(百萬)": st.column_config.NumberColumn("今日成交額", format="%.0f"),
+            }
+            
+            # 將算好的各週期倍數動態加入欄位與格式設定中
+            for p in periods:
+                if f'{p}日爆發倍數' in momentum_df.columns:
+                    summary_cols.append(f'{p}日爆發倍數')
+                    summary_col_config[f'{p}日爆發倍數'] = st.column_config.NumberColumn(f"{p}日倍數", format="%.1fx")
+                    
+            # 排序：以 5 日爆發倍數作為預設排名依據，抓出前 50 名榜單
+            if '5日爆發倍數' in momentum_df.columns:
+                top_summary = momentum_df.sort_values('5日爆發倍數', ascending=False).head(50)
+            else:
+                top_summary = momentum_df.sort_values('成交額(百萬)', ascending=False).head(50)
+                
+            st.dataframe(
+                top_summary[summary_cols],
+                use_container_width=True, hide_index=True, height=500,
+                column_config=summary_col_config
+            )
+
+        # ==========================================
+        # 2. 渲染後續的各單一週期分頁
+        # ==========================================
+        for idx, p in enumerate(periods):
+            # 注意 idx 要 +1，因為 ignition_tabs[0] 已經被總表用掉了
+            with ignition_tabs[idx + 1]: 
+                if f'{p}日爆發倍數' in momentum_df.columns:
+                    top_ratio = momentum_df.sort_values(f'{p}日爆發倍數', ascending=False).head(30)
+                    
+                    display_cols_ratio = [
+                        '統一代號', 
+                        '股票名稱', 
+                        f'{p}日爆發倍數', 
+                        '成交額(百萬)', 
+                        f'{p}日均額', 
+                        '成交金額日變化率', 
+                        '漲跌幅'
+                    ]
+                    
+                    st.dataframe(
+                        top_ratio[display_cols_ratio],
+                        use_container_width=True, hide_index=True, height=400,
+                        column_config={
+                            "統一代號": st.column_config.TextColumn("代號"),
+                            "股票名稱": st.column_config.TextColumn("名稱"),
                             f'{p}日爆發倍數': st.column_config.NumberColumn("🚀爆發倍數", format="%.1fx"),
+                            "成交額(百萬)": st.column_config.NumberColumn("今日成交額", format="%.0f"),
+                            f'{p}日均額': st.column_config.NumberColumn(f"{p}日均額", format="%.0f"),
+                            "成交金額日變化率": st.column_config.NumberColumn("日變化率(%)", format="%+.1f %%"),
                             "漲跌幅": st.column_config.NumberColumn("漲跌幅%", format="%.2f")
                         }
                     )
@@ -315,8 +393,8 @@ def show_b0_page(DATA_DIR, STOCK_DICT):
         # 3. 資金趨勢總表 (均額多頭排列追蹤)
         # ------------------------------------------
         st.markdown("---")
-        st.markdown("##### 📈 資金趨勢總表 (中長期延續性追蹤)")
-        st.caption("將各週期均額並排，一眼看穿資金是「單日煙火」還是「波段連續湧入 (5日>10日>20日)」。")
+        st.markdown("##### 📈 多週期資金水龍頭 (各週期暴增倍數8/12起算)")
+        st.caption("不同週期均額，是「波段連續湧入 (5日>10日>20日)」或只是「單日煙火」觀察短中長期資金延續性，這裡只看成交金額，不看籌碼流向何處")
         
         # 建立趨勢判斷邏輯
         def get_fund_trend(row):
@@ -328,7 +406,7 @@ def show_b0_page(DATA_DIR, STOCK_DICT):
                 
                 if ma5 > 0 and ma10 > 0 and ma20 > 0:
                     if ma5 > ma10 and ma10 > ma20:
-                        return "🔥 資金多頭 (延續性強)"
+                        return "🔥 資金湧入 (延續性強)"
                     elif today > ma5 and ma5 <= ma10:
                         return "⚡ 單日點火 (需觀察)"
                     elif ma5 < ma10 and ma10 < ma20:
