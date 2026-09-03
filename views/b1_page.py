@@ -623,7 +623,7 @@ def show_b1_page(DATA_DIR, STOCK_DICT):
         with c_search:
             treemap_search = st.text_input("🔍 板塊內標的搜尋", placeholder="輸入代號/名稱以聚焦...", label_visibility="visible")
 
-        t_5, t_20, t_60, t_120, t_all = st.tabs(["🔴 5日排行", "🟡 20日排行", "🟢 60日排行", "🔵 120日排行", "🌟 綜合熱力池"])
+        t_5, t_20, t_60, t_120, t_all = st.tabs(["🔹🔴 5日排行", "🔹🟡 20日排行", "🔹🟢 60日排行", "🔹🔵 120日排行", "🔹🌟 綜合熱力池"])
 
         def render_period_treemap(period_days):
             if period_days == "all":

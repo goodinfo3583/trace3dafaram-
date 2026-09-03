@@ -198,9 +198,81 @@ def show_b0_page(DATA_DIR, STOCK_DICT):
     df_b0['股票名稱'] = df_b0.apply(resolve_stock_name, axis=1)
 
     # ==========================================
+    # 🎛️ 全域篩選器 (置於 Tab 之上，讓所有分頁共享)
+    # ==========================================
+    with st.expander("🛠️ 全域條件篩選 (點擊展開/收合)", expanded=True):
+        col1, col2, col3, col4 = st.columns([1.5, 1, 1.5, 1])
+        with col1:
+            search_kw = st.text_input("🔍 搜尋代號/名稱", placeholder="例如: 2330 或 台積電")
+        with col2:
+            vol_filter = st.number_input("成交量 > (張)", min_value=0, value=0, step=1000)
+        with col3:
+            status_options = sorted(df_b0['B0_量價狀態'].unique().tolist())
+            sel_status = st.multiselect("🎯 狀態過濾", status_options, placeholder="預設全選")
+        with col4:
+            # 🎯 新增 PER 篩選
+            per_options = ["全部顯示", "PER < 15 (低估值)", "PER < 30 (合理)", "僅顯示獲利公司 (PER>0)"]
+            sel_per = st.selectbox("⚖️ 估值(PER)過濾", per_options)
+
+    # 執行全域過濾邏輯
+    filtered_df = df_b0.copy()
+    if search_kw:
+        filtered_df = filtered_df[filtered_df['統一代號'].str.contains(search_kw) | filtered_df['股票名稱'].str.contains(search_kw)]
+    if vol_filter > 0:
+        filtered_df = filtered_df[filtered_df['成交張數_num'] >= vol_filter]
+    if sel_status:
+        filtered_df = filtered_df[filtered_df['B0_量價狀態'].isin(sel_status)]
+    
+    # 執行 PER 過濾
+    if sel_per == "PER < 15 (低估值)":
+        filtered_df = filtered_df[(filtered_df['PER'] > 0) & (filtered_df['PER'] < 15)]
+    elif sel_per == "PER < 30 (合理)":
+        filtered_df = filtered_df[(filtered_df['PER'] > 0) & (filtered_df['PER'] < 30)]
+    elif sel_per == "僅顯示獲利公司 (PER>0)":
+        filtered_df = filtered_df[filtered_df['PER'] > 0]
+
+    # ==========================================
     # 🗂️ 建立雙分頁 (Tabs)
     # ==========================================
     tab_basic, tab_momentum = st.tabs(["🔹 全市場基礎量價", "🔹 資金動能雷達"])
+
+    # ------------------------------------------
+    # 分頁 1：基礎量價總表
+    # ------------------------------------------
+    with tab_basic:
+        display_cols = ['統一代號', '股票名稱', '成交', '漲跌幅', '成交張數', '成交額(百萬)', '成交金額日變化率', 'PER', '5日均量', '5日均額', 'B0_量價狀態']
+        view_df = filtered_df[[c for c in display_cols if c in filtered_df.columns]].copy()
+
+        st.markdown(f"**共找到 {len(view_df)} 檔符合條件的標的**")
+        
+        # 🎯 Pandas Styling: 針對虧損公司 (PER <= 0 或 NaN) 標註特殊顏色
+        def highlight_negative_per(val):
+            try:
+                if pd.isna(val) or float(val) <= 0:
+                    return 'color: #EF4444; background-color: #FEE2E2;' # 紅字紅底警告
+            except:
+                pass
+            return ''
+            
+        styled_df = view_df.style.map(highlight_negative_per, subset=['PER'])
+
+        st.dataframe(
+            styled_df,  # 使用加上樣式的 dataframe
+            use_container_width=True, hide_index=True, height=500,
+            column_config={
+                "統一代號": st.column_config.TextColumn("代號", width="small"),
+                "股票名稱": st.column_config.TextColumn("名稱", width="small"),
+                "成交": st.column_config.NumberColumn("成交價", format="%.2f"),
+                "漲跌幅": st.column_config.NumberColumn("漲跌幅(%)", format="%.2f"),
+                "成交張數": st.column_config.NumberColumn("今日成交(張)", format="%d"),
+                "5日均量": st.column_config.NumberColumn("5日均量(張)", format="%d"),
+                "成交額(百萬)": st.column_config.NumberColumn("成交額(百萬)", format="%.2f"),
+                "成交金額日變化率": st.column_config.NumberColumn("日變化率(%)", format="%+.1f %%"),
+                "5日均額": st.column_config.NumberColumn("5日均成交額(百萬)", format="%.2f"),
+                "PER": st.column_config.NumberColumn("本益比", format="%.2f"),
+                "B0_量價狀態": st.column_config.TextColumn("量價主力照妖鏡", width="large"),
+            }
+        )
 
     # ------------------------------------------
     # 分頁 1：基礎量價總表
@@ -251,8 +323,13 @@ def show_b0_page(DATA_DIR, STOCK_DICT):
         st.markdown("#### 資金動力渦輪：找出真正的行情燃料")
         st.caption("本區塊先行排除流動性太差的標的 (成交額 > 5000萬 且 股價 > 10元)，以避免倍數失真，本表至8/12開始更新30日.45日還不準確。")
 
-        # 1. 核心動能運算
-        momentum_df = df_b0[(df_b0['成交額(百萬)'] > 50) & (df_b0['成交'] > 10)].copy()
+        # 1. 核心動能運算 (改吃過濾後的 filtered_df，讓上方篩選器連動生效)
+        # 🎯 優化基期門檻：除了今日成交額 > 50 之外，要求 '5日均額' 至少 > 10，避免抓到無意義的殭屍股爆發
+        momentum_df = filtered_df[
+            (filtered_df['成交額(百萬)'] > 50) & 
+            (filtered_df['成交'] > 10) &
+            (filtered_df.get('5日均額', 0) > 10) # 新增防呆門檻
+        ].copy()
         
         # A. 絕對值增量 (找出巨鯨)
         momentum_df['額度增加絕對值'] = momentum_df['成交額(百萬)'] - momentum_df['5日均額']
