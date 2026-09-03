@@ -266,7 +266,7 @@ def show_b0_page(DATA_DIR, STOCK_DICT):
             
             # 只有「一般股票」且「沒有本益比或小於等於0」時，才亮紅燈警告
             if is_normal_stock and (pd.isna(per_val) or per_val <= 0):
-                styles['PER'] = 'color: #EF4444; background-color: #FEE2E2;' # 紅字紅底警告
+                styles['PER'] = 'color: #EF4444' # 紅字紅底警告
                 
             return styles
             
