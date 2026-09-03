@@ -263,24 +263,62 @@ def show_b0_page(DATA_DIR, STOCK_DICT):
         # 🎯 雙榜單多週期進化版：絕對增額 (熱門焦點) & 爆發倍數 (異常點火)
         # ==========================================
         st.markdown("---")
-        st.markdown("##### 🏆 多週期成交金額增加焦點(各週期暴增倍數8/12起算)")
+        st.markdown("##### 🏆 多週期成交金額熱門焦點")
         st.caption("資金總量絕對增加最多 (主升段發動或大型法人調倉，排除流動性過差標的)")
         
         periods = [5, 10, 20, 30, 45]
         
-        # 建立 🏆 熱門焦點的內部子分頁
-        abs_tabs = st.tabs([f"🔹相較 {p} 日均額" for p in periods])
+        # 🎯 先把所有週期的「絕對增加金額」都算出來
+        for p in periods:
+            avg_col = f'{p}日均額'
+            if avg_col in momentum_df.columns:
+                momentum_df[f'較{p}日均額增加'] = momentum_df['成交額(百萬)'] - momentum_df[avg_col]
         
+        # 建立 🏆 熱門焦點的內部子分頁 (在最前方插入「成交金額增加短中長趨勢」)
+        abs_tab_names = ["🔥 成交金額增加短中長趨勢"] + [f"🔹相較 {p} 日均額" for p in periods]
+        abs_tabs = st.tabs(abs_tab_names)
+        
+        # ==========================================
+        # 1. 渲染第一個分頁：成交金額增加短中長趨勢 (總表)
+        # ==========================================
+        with abs_tabs[0]:
+            # 依照您指定的順序準備總表的欄位
+            summary_cols_abs = ['統一代號', '股票名稱', '成交金額日變化率', '成交額(百萬)']
+            summary_col_config_abs = {
+                "統一代號": st.column_config.TextColumn("代號"),
+                "股票名稱": st.column_config.TextColumn("名稱"),
+                "成交金額日變化率": st.column_config.NumberColumn("日變化率(%)", format="%+.1f %%"),
+                "成交額(百萬)": st.column_config.NumberColumn("今日成交額", format="%.0f"),
+            }
+            
+            # 動態將各週期的增加金額加入
+            for p in periods:
+                if f'較{p}日均額增加' in momentum_df.columns:
+                    summary_cols_abs.append(f'較{p}日均額增加')
+                    summary_col_config_abs[f'較{p}日均額增加'] = st.column_config.NumberColumn(f"較{p}日增加", format="+%.0f")
+            
+            # 排序：以 5 日增加金額為基準，抓出前 50 名榜單
+            if '較5日均額增加' in momentum_df.columns:
+                top_abs_summary = momentum_df.sort_values('較5日均額增加', ascending=False).head(50)
+            else:
+                top_abs_summary = momentum_df.sort_values('成交額(百萬)', ascending=False).head(50)
+                
+            st.dataframe(
+                top_abs_summary[summary_cols_abs],
+                use_container_width=True, hide_index=True, height=500,
+                column_config=summary_col_config_abs
+            )
+
+        # ==========================================
+        # 2. 渲染後續的各單一週期分頁
+        # ==========================================
         for idx, p in enumerate(periods):
-            with abs_tabs[idx]:
+            # 注意 idx 要 +1，避開總表
+            with abs_tabs[idx + 1]:
                 avg_col = f'{p}日均額'
                 if avg_col in momentum_df.columns:
-                    # 計算相較各週期的「絕對增加金額」
-                    momentum_df[f'較{p}日均額增加'] = momentum_df['成交額(百萬)'] - momentum_df[avg_col]
+                    top_abs = momentum_df.sort_values(f'較{p}日均額增加', ascending=False).head(30)
                     
-                    top_abs = momentum_df.sort_values(f'較{p}日均額增加', ascending=False).head(300)
-                    
-                    # 🎯 調整欄位順序與新增 f日均額
                     display_cols_abs = [
                         '統一代號', 
                         '股票名稱', 
