@@ -245,33 +245,16 @@ def show_b0_page(DATA_DIR, STOCK_DICT):
 
         st.markdown(f"**共找到 {len(view_df)} 檔符合條件的標的**")
         
-        # 🎯 Pandas Styling: 進階版 (過濾 ETF/特別股的誤判，並將 NONE 轉為 "-")
-        def format_per(val):
-            if pd.isna(val) or val <= 0:
-                return "-"
-            return f"{val:.2f}"
-
-        def highlight_per(row):
-            # 建立與 row 欄位數相同的空白樣式陣列
-            styles = pd.Series([''] * len(row), index=row.index)
-            
-            code = str(row.get('統一代號', ''))
+        # 🎯 Pandas Styling: 針對虧損公司 (PER <= 0 或 NaN) 標註特殊顏色
+        def highlight_negative_per(val):
             try:
-                per_val = float(row.get('PER', 0))
+                if pd.isna(val) or float(val) <= 0:
+                    return 'color: #EF4444; background-color: #FEE2E2;' # 紅字紅底警告
             except:
-                per_val = 0
+                pass
+            return ''
             
-            # 判斷是否為一般股票 (排除 00、02開頭的ETF，以及長度大於4的特別股如1101B)
-            is_normal_stock = not (code.startswith('00') or code.startswith('02') or len(code) > 4)
-            
-            # 只有「一般股票」且「沒有本益比或小於等於0」時，才亮紅燈警告
-            if is_normal_stock and (pd.isna(per_val) or per_val <= 0):
-                styles['PER'] = 'color: #EF4444' # 紅字紅底警告
-                
-            return styles
-            
-        # 套用列樣式與數值格式化
-        styled_df = view_df.style.apply(highlight_per, axis=1).format({'PER': format_per})
+        styled_df = view_df.style.map(highlight_negative_per, subset=['PER'])
 
         st.dataframe(
             styled_df,  # 使用加上樣式的 dataframe
@@ -286,11 +269,7 @@ def show_b0_page(DATA_DIR, STOCK_DICT):
                 "成交額(百萬)": st.column_config.NumberColumn("成交額(百萬)", format="%.2f"),
                 "成交金額日變化率": st.column_config.NumberColumn("日變化率(%)", format="%+.1f %%"),
                 "5日均額": st.column_config.NumberColumn("5日均成交額(百萬)", format="%.2f"),
-                
-                # 👇 這裡的重點：將原本的 NumberColumn 改為一般 Column，並移除 format
-                # 這樣 Streamlit 才會接手顯示我們在上面 format_per 寫好的 "-"
-                "PER": st.column_config.Column("本益比"),
-                
+                "PER": st.column_config.NumberColumn("本益比", format="%.2f"),
                 "B0_量價狀態": st.column_config.TextColumn("量價主力照妖鏡", width="large"),
             }
         )
