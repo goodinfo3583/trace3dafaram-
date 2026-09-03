@@ -378,10 +378,10 @@ def render_top10_glass_card():
 <label for="close-card" class="action-btn close-btn" title="關閉">✕</label>
 </div></div>
 <div class="carousel-wrapper">
-<div class="carousel-item"><div class="panel-title"><span>🌐 外資日連買</span><span class="date-badge">{d_fo_day}</span></div>{fo_day_html}</div>
-<div class="carousel-item"><div class="panel-title"><span>🏦 投信日連買</span><span class="date-badge">{d_it_day}</span></div>{it_day_html}</div>
-<div class="carousel-item"><div class="panel-title"><span>👑 外資週連買</span><span class="date-badge">{d_fo_wk}</span></div>{fo_wk_html}</div>
-<div class="carousel-item"><div class="panel-title"><span>🚀 投信週連買</span><span class="date-badge">{d_it_wk}</span></div>{it_wk_html}</div>
+<div class="carousel-item"><div class="panel-title"><span>外資日連買</span><span class="date-badge">{d_fo_day}</span></div>{fo_day_html}</div>
+<div class="carousel-item"><div class="panel-title"><span>投信日連買</span><span class="date-badge">{d_it_day}</span></div>{it_day_html}</div>
+<div class="carousel-item"><div class="panel-title"><span>外資週連買</span><span class="date-badge">{d_fo_wk}</span></div>{fo_wk_html}</div>
+<div class="carousel-item"><div class="panel-title"><span>投信週連買</span><span class="date-badge">{d_it_wk}</span></div>{it_wk_html}</div>
 </div></div>
 """
         st.markdown(card_html, unsafe_allow_html=True)
@@ -468,10 +468,10 @@ def render_b4_top10_glass_card():
 <label for="close-b4-card" class="action-btn-b4" title="關閉">✕</label>
 </div></div>
 <div class="carousel-wrapper-b4">
-<div class="carousel-item-b4"><div class="panel-title-b4"><span>🚀 軋空(1-10)</span><span class="date-badge-b4">{date_sq}</span></div>{h_sq_1_10}</div>
-<div class="carousel-item-b4"><div class="panel-title-b4"><span>🚀 軋空(11-20)</span><span class="date-badge-b4">{date_sq}</span></div>{h_sq_11_20}</div>
-<div class="carousel-item-b4"><div class="panel-title-b4 risk"><span>☠ 套牢(1-10)</span><span class="date-badge-b4">{date_rk}</span></div>{h_rk_1_10}</div>
-<div class="carousel-item-b4"><div class="panel-title-b4 risk"><span>☠ 套牢(11-20)</span><span class="date-badge-b4">{date_rk}</span></div>{h_rk_11_20}</div>
+<div class="carousel-item-b4"><div class="panel-title-b4"><span>軋空(1-10)</span><span class="date-badge-b4">{date_sq}</span></div>{h_sq_1_10}</div>
+<div class="carousel-item-b4"><div class="panel-title-b4"><span>軋空(11-20)</span><span class="date-badge-b4">{date_sq}</span></div>{h_sq_11_20}</div>
+<div class="carousel-item-b4"><div class="panel-title-b4 risk"><span>套牢(1-10)</span><span class="date-badge-b4">{date_rk}</span></div>{h_rk_1_10}</div>
+<div class="carousel-item-b4"><div class="panel-title-b4 risk"><span>套牢(11-20)</span><span class="date-badge-b4">{date_rk}</span></div>{h_rk_11_20}</div>
 </div></div>
 """
         st.markdown(card_html, unsafe_allow_html=True)
@@ -581,8 +581,8 @@ def render_b5_top10_glass_card():
 <label for="close-b5-card" class="action-btn-b5" title="關閉">✕</label>
 </div></div>
 <div class="carousel-wrapper-b5">
-<div class="carousel-item-b5"><div class="panel-title-b5"><span>📊 6周累積(1000/400)</span><span class="date-badge-b5">{date_str}</span></div>{h_6w}</div>
-<div class="carousel-item-b5"><div class="panel-title-b5"><span>⚡ 週動能(1000/400)</span><span class="date-badge-b5">{date_str}</span></div>{h_latest}</div>
+<div class="carousel-item-b5"><div class="panel-title-b5"><span>6周累積(1000/400)</span><span class="date-badge-b5">{date_str}</span></div>{h_6w}</div>
+<div class="carousel-item-b5"><div class="panel-title-b5"><span>本週動能(1000/400)</span><span class="date-badge-b5">{date_str}</span></div>{h_latest}</div>
 </div></div>
 """
         st.markdown(card_html, unsafe_allow_html=True)
