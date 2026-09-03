@@ -273,51 +273,6 @@ def show_b0_page(DATA_DIR, STOCK_DICT):
                 "B0_量價狀態": st.column_config.TextColumn("量價主力照妖鏡", width="large"),
             }
         )
-
-    # ------------------------------------------
-    # 分頁 1：基礎量價總表
-    # ------------------------------------------
-    with tab_basic:
-        col1, col2, col3 = st.columns([1, 1, 2])
-        with col1:
-            search_kw = st.text_input("🔍 搜尋代號/名稱", placeholder="例如: 2330 或 台積電")
-        with col2:
-            vol_filter = st.number_input("成交量大於 (張)", min_value=0, value=0, step=1000)
-        with col3:
-            status_options = sorted(df_b0['B0_量價狀態'].unique().tolist())
-            sel_status = st.multiselect("🎯 過濾量價型態", status_options, placeholder="預設顯示全部")
-
-        view_df = df_b0.copy()
-        if search_kw:
-            view_df = view_df[view_df['統一代號'].str.contains(search_kw) | view_df['股票名稱'].str.contains(search_kw)]
-        if vol_filter > 0:
-            view_df = view_df[view_df['成交張數_num'] >= vol_filter]
-        if sel_status:
-            view_df = view_df[view_df['B0_量價狀態'].isin(sel_status)]
-
-        display_cols = ['統一代號', '股票名稱', '成交', '漲跌幅', '成交張數', '成交額(百萬)', '成交金額日變化率', 'PER', '5日均量', '5日均額', 'B0_量價狀態']
-        view_df = view_df[[c for c in display_cols if c in view_df.columns]].copy()
-
-        st.markdown(f"**共找到 {len(view_df)} 檔符合條件的標的**")
-        st.dataframe(
-            view_df,
-            use_container_width=True, hide_index=True, height=500,
-            column_config={
-                "統一代號": st.column_config.TextColumn("代號", width="small"),
-                "股票名稱": st.column_config.TextColumn("名稱", width="small"),
-                "成交": st.column_config.NumberColumn("成交價", format="%.2f"),
-                "漲跌幅": st.column_config.NumberColumn("漲跌幅(%)", format="%.2f"),
-                "成交張數": st.column_config.NumberColumn("今日成交(張)", format="%d"),
-                "5日均量": st.column_config.NumberColumn("5日均量(張)", format="%d"),
-                "成交額(百萬)": st.column_config.NumberColumn("成交額(百萬)", format="%.2f"),
-                # 👇 這裡新增這一行，設定為帶有正負號的百分比格式
-                "成交金額日變化率": st.column_config.NumberColumn("日變化率(%)", format="%+.1f %%"),
-                "5日均額": st.column_config.NumberColumn("5日均成交額(百萬)", format="%.2f"),
-                "PER": st.column_config.NumberColumn("本益比", format="%.2f"),
-                "B0_量價狀態": st.column_config.TextColumn("量價主力照妖鏡", width="large"),
-            }
-        )
-
     # === 替換 `with tab_momentum:` 區塊內的所有內容 ===
     with tab_momentum:
         st.markdown("#### 資金動力渦輪：找出真正的行情燃料")
