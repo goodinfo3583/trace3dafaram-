@@ -249,7 +249,7 @@ def show_b0_page(DATA_DIR, STOCK_DICT):
         def highlight_negative_per(val):
             try:
                 if pd.isna(val) or float(val) <= 0:
-                    return 'color: #EF4444; background-color: #FEE2E2;' # 紅字紅底警告
+                    return 'color: #EF4444; ' # 紅字警告
             except:
                 pass
             return ''
