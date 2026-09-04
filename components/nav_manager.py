@@ -148,6 +148,25 @@ def inject_custom_header(is_logged_in=False):
             .global-radar-toggle { display: flex; margin-right: 5px; } 
         }
         .stApp { margin-top: 50px !important; }
+
+
+        /* --- 🔮 命運酒館專屬樣式 --- */
+        .tavern-nav-link {
+            color: #e2e8f0 !important; /* 預設顏色 */
+            transition: all 0.3s ease;
+        }
+
+        .dropdown-item.actionable:hover .tavern-nav-link {
+            color: #FFD700 !important;
+            text-shadow: 0 0 10px rgba(255, 215, 0, 0.8), 0 0 20px rgba(255, 215, 0, 0.4);
+            transform: translateX(3px); /* 滑鼠游標過去時微微向右滑 */
+        }
+
+        @keyframes pulse {
+            0% { opacity: 0.5; transform: scale(0.9); }
+            50% { opacity: 1; transform: scale(1.1); filter: drop-shadow(0 0 5px rgba(255,215,0,0.8)); }
+            100% { opacity: 0.5; transform: scale(0.9); }
+        }
         
         /* 贊助彈窗樣式 */
         .donate-modal-overlay {
@@ -276,11 +295,13 @@ def inject_custom_header(is_logged_in=False):
                         <p class="dropdown-text">深度解析主力籌碼囤積路徑。</p>
                     </div>
                     
-                    <div class="dropdown-item locked-item" style="border-bottom: none;">
-                        <span class="dropdown-title">
-                            <img src="app/static/icon-chessknightalt.png" class="menu-icon" alt="game"> 命運酒館 (開發中)
-                        </span>
-                        <p class="dropdown-text">休息一下別殺進殺出占個卜，更多互動功能。</p>
+                    <!-- 🔮 解鎖：命運酒館入口 -->
+                    <div class="dropdown-item actionable" style="border-bottom: none; background: rgba(255, 215, 0, 0.03);">
+                        <a href="https://tarot-app-iota.vercel.app/" target="_blank" class="dropdown-title tavern-nav-link" style="text-decoration: none;">
+                            <img src="app/static/icon-chessknightalt.png" class="menu-icon" alt="game"> 命運酒館 
+                            <span style="color:#FFD700; font-size:10px; margin-left: 5px; animation: pulse 2s infinite;">(NEW)</span>
+                        </a>
+                        <p class="dropdown-text">休息一下別殺進殺出占個卜，抽牌預見籌碼動向。</p>
                     </div>
 
                 </div>
