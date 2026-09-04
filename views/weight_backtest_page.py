@@ -141,7 +141,11 @@ def show_weight_backtest_page(STOCK_DICT, DATA_DIR="data"):
             st.session_state['filter_b0_pct'] = (-10.0, 10.0)
             st.session_state['filter_b0_per'] = 0.0
             st.session_state['filter_b0_exclude_loss'] = False
-            st.session_state['filter_b0_vp_status'] = [] 
+            st.session_state['filter_b0_vp_status'] = []
+            # 👇 新增兩個變數
+            st.session_state['filter_b0_fund_trend'] = [] 
+            st.session_state['filter_b0_explode_ratio'] = 0.0
+            
             st.session_state['filter_b1_delta'] = False
             st.session_state['filter_b1_5d'] = False
             st.session_state['filter_b1_20d'] = False
@@ -245,6 +249,13 @@ def show_weight_backtest_page(STOCK_DICT, DATA_DIR="data"):
         ]
         b0_vp_status = st.multiselect("🎯 可複選您想尋找的量價型態：", vp_options, key="filter_b0_vp_status")
 
+        # 👇 在 B0 展開區塊的最下方，加入新指標
+        st.markdown("**🔹 5. 資金動能與趨勢 (尋找異常點火)**")
+        c_b0_7, c_b0_8 = st.columns(2)
+        b0_explode_ratio = c_b0_7.number_input("🚀 今日成交額大於【5日均額】的倍數：", min_value=0.0, value=0.0, step=0.5, key="filter_b0_explode_ratio", help="設定 1.5 代表今日成交額是 5 日均額的 1.5 倍以上")
+        
+        fund_trend_options = ["🔥 資金湧入 (延續性強)", "⚡ 單日點火 (需觀察)", "💧 資金退潮 (動能弱)", "⚖️ 震盪換手"]
+        b0_fund_trend = c_b0_8.multiselect("📈 資金延續狀態 (均額多頭排列)：", fund_trend_options, key="filter_b0_fund_trend")
     # --- 模組 B1 ---
     b1_sorted_dates = st.session_state.get('b1_sorted_dates', [])
     b1_latest_date_str = "未知日期"
@@ -489,11 +500,30 @@ def show_weight_backtest_page(STOCK_DICT, DATA_DIR="data"):
         valid_b0_codes = df_b0[b0_mask]['統一代號'].unique()
         filtered_df = filtered_df[filtered_df['統一代號'].isin(valid_b0_codes)]
         
+    # === 原本的 B0 過濾邏輯 ===
+    # ... 前略 ...
     if b0_vp_status and not df_b0.empty and 'B0_量價狀態' in df_b0.columns:
         any_filter_applied = True
         valid_vp_codes = df_b0[df_b0['B0_量價狀態'].isin(b0_vp_status)]['統一代號'].unique()
         filtered_df = filtered_df[filtered_df['統一代號'].isin(valid_vp_codes)]
-        
+
+    # 👇 新增：爆發倍數與資金趨勢的過濾邏輯
+    if not df_b0.empty:
+        if b0_explode_ratio > 0.0:
+            if '成交額(百萬)' in df_b0.columns and '5日均額' in df_b0.columns:
+                any_filter_applied = True
+                # 為了避免除以 0，將 5日均額為 0 的設為 0.01
+                safe_avg = pd.to_numeric(df_b0['5日均額'].astype(str).str.replace(',', ''), errors='coerce').fillna(0).replace(0, 0.01)
+                today_amt = pd.to_numeric(df_b0['成交額(百萬)'].astype(str).str.replace(',', ''), errors='coerce').fillna(0)
+                df_b0['temp_ratio'] = today_amt / safe_avg
+                
+                valid_ratio_codes = df_b0[df_b0['temp_ratio'] >= b0_explode_ratio]['統一代號'].unique()
+                filtered_df = filtered_df[filtered_df['統一代號'].isin(valid_ratio_codes)]
+                
+        if b0_fund_trend and '資金延續趨勢' in df_b0.columns:
+            any_filter_applied = True
+            valid_trend_codes = df_b0[df_b0['資金延續趨勢'].isin(b0_fund_trend)]['統一代號'].unique()
+            filtered_df = filtered_df[filtered_df['統一代號'].isin(valid_trend_codes)]     
     # B1 過濾
     if not df_b1_raw.empty:
         hit_mask = pd.Series(True, index=df_b1_raw.index)
