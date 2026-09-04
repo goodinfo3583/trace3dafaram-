@@ -245,21 +245,9 @@ def show_b0_page(DATA_DIR, STOCK_DICT):
 
         st.markdown(f"**共找到 {len(view_df)} 檔符合條件的標的**")
         
-        # 🎯 乾淨版顯示邏輯：移除底色，並將所有 None/NaN/負數 暴力統一轉為 "-"
-        def format_per(val):
-            try:
-                v = float(val)
-                if pd.isna(v) or v <= 0:
-                    return "-"
-                return f"{v:.2f}"
-            except:
-                # 只要轉數字失敗 (例如遇到字串 "None")，通通回傳 "-"
-                return "-"
-                
-        styled_df = view_df.style.format({'PER': format_per})
-
+        # 🎯 乾淨還原版：不套用任何特殊 Style，讓缺失的 PER 統一顯示為預設的 None
         st.dataframe(
-            styled_df,
+            view_df,
             use_container_width=True, hide_index=True, height=500,
             column_config={
                 "統一代號": st.column_config.TextColumn("代號", width="small"),
@@ -272,8 +260,8 @@ def show_b0_page(DATA_DIR, STOCK_DICT):
                 "成交金額日變化率": st.column_config.NumberColumn("日變化率(%)", format="%+.1f %%"),
                 "5日均額": st.column_config.NumberColumn("5日均成交額(百萬)", format="%.2f"),
                 
-                # 👇 這裡維持一般 Column，以接收我們在上面 format 寫好的 "-" 文字，且保留排序功能
-                "PER": st.column_config.Column("本益比"),
+                # 恢復為原本的 NumberColumn 設定，Streamlit 會自動將 NaN 顯示為 None
+                "PER": st.column_config.NumberColumn("本益比", format="%.2f"),
                 
                 "B0_量價狀態": st.column_config.TextColumn("量價主力照妖鏡", width="large"),
             }
