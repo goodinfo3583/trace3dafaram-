@@ -297,7 +297,7 @@ def inject_custom_header(is_logged_in=False):
                     
                     <!-- 🔮 解鎖：命運酒館入口 -->
                     <div class="dropdown-item actionable" style="border-bottom: none; background: rgba(255, 215, 0, 0.03);">
-                        <a href="https://tarot-app-iota.vercel.app/" target="_blank" class="dropdown-title tavern-nav-link" style="text-decoration: none;">
+                        <a href="https://tarot-app-gold-eight.vercel.app/" target="_blank" class="dropdown-title tavern-nav-link" style="text-decoration: none;">
                             <img src="app/static/icon-chessknightalt.png" class="menu-icon" alt="game"> 命運酒館 
                             <span style="color:#FFD700; font-size:10px; margin-left: 5px; animation: pulse 2s infinite;">(NEW)</span>
                         </a>
