@@ -757,15 +757,28 @@ def show_weight_backtest_page(STOCK_DICT, DATA_DIR="data"):
             df_b0_debug = clean_stock_id(get_df('b0_price')).drop_duplicates(subset=['統一代號'])
             debug_df = filtered_df.copy()
             if not df_b0_debug.empty:
+                # 👇 1. 動態計算「爆發倍數」供透視鏡核對
+                if '成交額(百萬)' in df_b0_debug.columns and '5日均額' in df_b0_debug.columns:
+                    safe_avg = pd.to_numeric(df_b0_debug['5日均額'].astype(str).str.replace(',', ''), errors='coerce').fillna(0).replace(0, 0.01)
+                    today_amt = pd.to_numeric(df_b0_debug['成交額(百萬)'].astype(str).str.replace(',', ''), errors='coerce').fillna(0)
+                    df_b0_debug['今日爆發倍數'] = (today_amt / safe_avg).round(2)
+
                 b0_cols = ['統一代號']
                 rename_dict = {}
-                # 🎯 這裡加入了 '股價日期' 以及您要的 '5日均額'
-                for col in ['股價日期', '成交', '漲跌幅', '成交張數', '成交額(百萬)', 'PER', '5日均量', '5日均額', 'B0_量價狀態']:
+                
+                # 👇 2. 擴充檢核欄位：加入 '成交金額日變化率', '今日爆發倍數', '資金延續趨勢'
+                check_b0_cols = ['股價日期', '成交', '漲跌幅', '成交張數', '成交額(百萬)', 'PER', '5日均量', '5日均額', 'B0_量價狀態', '成交金額日變化率', '今日爆發倍數', '資金延續趨勢']
+                
+                for col in check_b0_cols:
                     if col in df_b0_debug.columns:
                         b0_cols.append(col)
-                        # 🎯 針對 5日均額 給予您指定的專屬名稱
+                        # 客製化名稱，讓表格更好看
                         if col == '5日均額':
-                            rename_dict[col] = 'B0_5日均成交額(百萬)'
+                            rename_dict[col] = 'B0_5日均額(百萬)'
+                        elif col == '成交金額日變化率':
+                            rename_dict[col] = 'B0_金額日變化率(%)'
+                        elif col == '今日爆發倍數':
+                            rename_dict[col] = 'B0_爆發倍數(X)'
                         else:
                             rename_dict[col] = f'B0_{col}' if not col.startswith('B0_') else col
                             
