@@ -109,19 +109,46 @@ def sync_b0_data(DATA_DIR):
         df_today[f'{p}日均額'] = df_today[f'{p}日均額'].round(2)
 
     df_today['股價日期'] = latest_date
-    # === 替換結束，下方接著 def get_vp_status(row): ===
-    # 🎯 新增：取得上一交易日(昨日)的成交額，並計算「成交金額日變化率」
-    # .nth(1) 代表在時間倒序中抓取第二筆 (即昨天) 的資料
+    # 🎯 取得上一交易日(昨日)的成交額、成交量與漲跌幅
     prev_day_df = sorted_df.groupby('統一代號').nth(1).reset_index()
-    prev_day_df = prev_day_df[['統一代號', '成交額_num']].rename(columns={'成交額_num': '昨日成交額'})
+    prev_day_df = prev_day_df[['統一代號', '成交額_num', '成交張數_num', '漲跌幅']].rename(columns={
+        '成交額_num': '昨日成交額',
+        '成交張數_num': '昨日成交量',
+        '漲跌幅': '昨日漲跌幅'
+    })
     
     # 併入今日 dataframe
     df_today = pd.merge(df_today, prev_day_df, on='統一代號', how='left')
         
     # 避免除以 0 導致無限大，將昨日為 0 或 NaN 的防呆設為極小值 0.01
     safe_prev_amt = df_today['昨日成交額'].replace(0, 0.01).fillna(0.01)
-    # 邏輯：(今日成交金額 ÷ 昨日成交金額 - 1) * 100，轉換為百分比格式
     df_today['成交金額日變化率'] = ((df_today['成交額_num'] / safe_prev_amt) - 1) * 100  
+
+    # 👇👇👇 [新增] B0 特殊洗盤與窒息量雷達邏輯
+    def get_special_pattern(row):
+        today_pct = row.get('漲跌幅', 0)
+        today_vol = row.get('成交張數_num', 0)
+        yesterday_pct = row.get('昨日漲跌幅', 0)
+        yesterday_vol = row.get('昨日成交量', 0)
+        avg_v = row.get('5日均量', 0)
+        
+        if pd.isna(today_pct): today_pct = 0
+        if pd.isna(yesterday_pct): yesterday_pct = 0
+        
+        # 1. 🕵️ 主力急縮洗盤 (昨日漲幅>4%且量>1000張，今日量縮小於昨日一半，且今日跌幅不超過 -2%)
+        if yesterday_pct >= 4.0 and yesterday_vol >= 1000:
+            if today_vol <= (yesterday_vol * 0.5) and today_pct >= -2.0:
+                return "🕵️ 昨強今急縮 (洗盤防守)"
+                
+        # 2. 💤 窒息量極致 (5日均量>500張確保非殭屍股，今日量不到均量的30%，且價格波動小於 +-1.5%)
+        if avg_v >= 500 and today_vol > 0:
+            if today_vol <= (avg_v * 0.3) and abs(today_pct) <= 1.5:
+                return "💤 極致窒息量 (醞釀表態)"
+                
+        return "-"
+
+    df_today['B0_特殊型態'] = df_today.apply(get_special_pattern, axis=1)
+    # 👆👆👆 [新增結束]
 
     def get_vp_status(row):
         pct = row.get('漲跌幅', 0)
@@ -210,9 +237,13 @@ def show_b0_page(DATA_DIR, STOCK_DICT):
             status_options = sorted(df_b0['B0_量價狀態'].unique().tolist())
             sel_status = st.multiselect("🎯 狀態過濾", status_options, placeholder="預設全選")
         with col4:
-            # 🎯 新增 PER 篩選
             per_options = ["全部顯示", "PER < 15 (低估值)", "PER < 30 (合理)", "僅顯示獲利公司 (PER>0)"]
             sel_per = st.selectbox("⚖️ 估值(PER)過濾", per_options)
+            
+        # 👇 [新增] 特殊洗盤型態篩選
+        st.markdown("---")
+        special_opts = [opt for opt in df_b0['B0_特殊型態'].unique() if opt != "-"]
+        sel_special = st.multiselect("🕵️ 特殊洗盤與窒息量篩選 (高勝率買點)", special_opts, placeholder="未選擇則顯示全部")
 
     # 執行全域過濾邏輯
     filtered_df = df_b0.copy()
@@ -222,7 +253,7 @@ def show_b0_page(DATA_DIR, STOCK_DICT):
         filtered_df = filtered_df[filtered_df['成交張數_num'] >= vol_filter]
     if sel_status:
         filtered_df = filtered_df[filtered_df['B0_量價狀態'].isin(sel_status)]
-    
+        
     # 執行 PER 過濾
     if sel_per == "PER < 15 (低估值)":
         filtered_df = filtered_df[(filtered_df['PER'] > 0) & (filtered_df['PER'] < 15)]
@@ -231,41 +262,41 @@ def show_b0_page(DATA_DIR, STOCK_DICT):
     elif sel_per == "僅顯示獲利公司 (PER>0)":
         filtered_df = filtered_df[filtered_df['PER'] > 0]
 
-    # ==========================================
-    # 🗂️ 建立雙分頁 (Tabs)
-    # ==========================================
-    tab_basic, tab_momentum = st.tabs(["🔹 全市場基礎量價", "🔹 資金動能雷達"])
+    # 👇 [新增] 執行特殊型態過濾
+    if sel_special:
+        filtered_df = filtered_df[filtered_df['B0_特殊型態'].isin(sel_special)]
 
-    # ------------------------------------------
-    # 分頁 1：基礎量價總表
-    # ------------------------------------------
-    with tab_basic:
-        display_cols = ['統一代號', '股票名稱', '成交', '漲跌幅', '成交張數', '成交額(百萬)', '成交金額日變化率', 'PER', '5日均量', '5日均額', 'B0_量價狀態']
-        view_df = filtered_df[[c for c in display_cols if c in filtered_df.columns]].copy()
+        # ------------------------------------------
+        # 分頁 1：基礎量價總表
+        # ------------------------------------------
+        with tab_basic:
+            # 👇 這裡多加了 'B0_特殊型態'
+            display_cols = ['統一代號', '股票名稱', '成交', '漲跌幅', '成交張數', '成交額(百萬)', '成交金額日變化率', 'PER', '5日均量', '5日均額', 'B0_量價狀態', 'B0_特殊型態']
+            view_df = filtered_df[[c for c in display_cols if c in filtered_df.columns]].copy()
 
-        st.markdown(f"**共找到 {len(view_df)} 檔符合條件的標的**")
-        
-        # 🎯 乾淨還原版：不套用任何特殊 Style，讓缺失的 PER 統一顯示為預設的 None
-        st.dataframe(
-            view_df,
-            use_container_width=True, hide_index=True, height=500,
-            column_config={
-                "統一代號": st.column_config.TextColumn("代號", width="small"),
-                "股票名稱": st.column_config.TextColumn("名稱", width="small"),
-                "成交": st.column_config.NumberColumn("成交價", format="%.2f"),
-                "漲跌幅": st.column_config.NumberColumn("漲跌幅(%)", format="%.2f"),
-                "成交張數": st.column_config.NumberColumn("今日成交(張)", format="%d"),
-                "5日均量": st.column_config.NumberColumn("5日均量(張)", format="%d"),
-                "成交額(百萬)": st.column_config.NumberColumn("成交額(百萬)", format="%.2f"),
-                "成交金額日變化率": st.column_config.NumberColumn("日變化率(%)", format="%+.1f %%"),
-                "5日均額": st.column_config.NumberColumn("5日均成交額(百萬)", format="%.2f"),
-                
-                # 恢復為原本的 NumberColumn 設定，Streamlit 會自動將 NaN 顯示為 None
-                "PER": st.column_config.NumberColumn("本益比", format="%.2f"),
-                
-                "B0_量價狀態": st.column_config.TextColumn("量價主力照妖鏡", width="large"),
-            }
-        )
+            st.markdown(f"**共找到 {len(view_df)} 檔符合條件的標的**")
+            
+            # 🎯 乾淨還原版：不套用任何特殊 Style，讓缺失的 PER 統一顯示為預設的 None
+            st.dataframe(
+                view_df,
+                use_container_width=True, hide_index=True, height=500,
+                column_config={
+                    "統一代號": st.column_config.TextColumn("代號", width="small"),
+                    "股票名稱": st.column_config.TextColumn("名稱", width="small"),
+                    "成交": st.column_config.NumberColumn("成交價", format="%.2f"),
+                    "漲跌幅": st.column_config.NumberColumn("漲跌幅(%)", format="%.2f"),
+                    "成交張數": st.column_config.NumberColumn("今日成交(張)", format="%d"),
+                    "5日均量": st.column_config.NumberColumn("5日均量(張)", format="%d"),
+                    "成交額(百萬)": st.column_config.NumberColumn("成交額(百萬)", format="%.2f"),
+                    "成交金額日變化率": st.column_config.NumberColumn("日變化率(%)", format="%+.1f %%"),
+                    "5日均額": st.column_config.NumberColumn("5日均成交額(百萬)", format="%.2f"),
+                    "PER": st.column_config.NumberColumn("本益比", format="%.2f"),
+                    "B0_量價狀態": st.column_config.TextColumn("量價主力照妖鏡", width="large"),
+                    
+                    # 👇 這裡新增我們剛做好的雷達欄位
+                    "B0_特殊型態": st.column_config.TextColumn("特殊型態雷達", width="medium"),
+                }
+            )
 
     # === 替換 `with tab_momentum:` 區塊內的所有內容 ===
     with tab_momentum:
