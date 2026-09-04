@@ -236,64 +236,48 @@ def show_b0_page(DATA_DIR, STOCK_DICT):
     # ==========================================
     tab_basic, tab_momentum = st.tabs(["🔹 全市場基礎量價", "🔹 資金動能雷達"])
 
-    # ------------------------------------------
-    # 分頁 1：基礎量價總表
-    # ------------------------------------------
-    with tab_basic:
-        display_cols = ['統一代號', '股票名稱', '成交', '漲跌幅', '成交張數', '成交額(百萬)', '成交金額日變化率', 'PER', '5日均量', '5日均額', 'B0_量價狀態']
-        view_df = filtered_df[[c for c in display_cols if c in filtered_df.columns]].copy()
+        # ------------------------------------------
+        # 分頁 1：基礎量價總表
+        # ------------------------------------------
+        with tab_basic:
+            display_cols = ['統一代號', '股票名稱', '成交', '漲跌幅', '成交張數', '成交額(百萬)', '成交金額日變化率', 'PER', '5日均量', '5日均額', 'B0_量價狀態']
+            view_df = filtered_df[[c for c in display_cols if c in filtered_df.columns]].copy()
 
-        st.markdown(f"**共找到 {len(view_df)} 檔符合條件的標的**")
-        
-        # 🎯 Pandas Styling: 進階版 (過濾 ETF/特別股的誤判，並將 NONE 轉為 "-")
-        def format_per(val):
-            if pd.isna(val) or val <= 0:
-                return "-"
-            return f"{val:.2f}"
+            st.markdown(f"**共找到 {len(view_df)} 檔符合條件的標的**")
+            
+            # 🎯 乾淨版顯示邏輯：移除底色，並將所有 None/NaN/負數 暴力統一轉為 "-"
+            def format_per(val):
+                try:
+                    v = float(val)
+                    if pd.isna(v) or v <= 0:
+                        return "-"
+                    return f"{v:.2f}"
+                except:
+                    # 只要轉數字失敗 (例如遇到字串 "None")，通通回傳 "-"
+                    return "-"
+                    
+            styled_df = view_df.style.format({'PER': format_per})
 
-        def highlight_per(row):
-            # 建立與 row 欄位數相同的空白樣式陣列
-            styles = pd.Series([''] * len(row), index=row.index)
-            
-            code = str(row.get('統一代號', ''))
-            try:
-                per_val = float(row.get('PER', 0))
-            except:
-                per_val = 0
-            
-            # 判斷是否為一般股票 (排除 00、02開頭的ETF，以及長度大於4的特別股如1101B)
-            is_normal_stock = not (code.startswith('00') or code.startswith('02') or len(code) > 4)
-            
-            # 只有「一般股票」且「沒有本益比或小於等於0」時，才亮紅燈警告
-            if is_normal_stock and (pd.isna(per_val) or per_val <= 0):
-                styles['PER'] = 'color: #EF4444; background-color: #FEE2E2;' # 紅字紅底警告
-                
-            return styles
-            
-        # 套用列樣式與數值格式化
-        styled_df = view_df.style.apply(highlight_per, axis=1).format({'PER': format_per})
-
-        st.dataframe(
-            styled_df,  # 使用加上樣式的 dataframe
-            use_container_width=True, hide_index=True, height=500,
-            column_config={
-                "統一代號": st.column_config.TextColumn("代號", width="small"),
-                "股票名稱": st.column_config.TextColumn("名稱", width="small"),
-                "成交": st.column_config.NumberColumn("成交價", format="%.2f"),
-                "漲跌幅": st.column_config.NumberColumn("漲跌幅(%)", format="%.2f"),
-                "成交張數": st.column_config.NumberColumn("今日成交(張)", format="%d"),
-                "5日均量": st.column_config.NumberColumn("5日均量(張)", format="%d"),
-                "成交額(百萬)": st.column_config.NumberColumn("成交額(百萬)", format="%.2f"),
-                "成交金額日變化率": st.column_config.NumberColumn("日變化率(%)", format="%+.1f %%"),
-                "5日均額": st.column_config.NumberColumn("5日均成交額(百萬)", format="%.2f"),
-                
-                # 👇 這裡的重點：將原本的 NumberColumn 改為一般 Column，並移除 format
-                # 這樣 Streamlit 才會接手顯示我們在上面 format_per 寫好的 "-"
-                "PER": st.column_config.Column("本益比"),
-                
-                "B0_量價狀態": st.column_config.TextColumn("量價主力照妖鏡", width="large"),
-            }
-        )
+            st.dataframe(
+                styled_df,
+                use_container_width=True, hide_index=True, height=500,
+                column_config={
+                    "統一代號": st.column_config.TextColumn("代號", width="small"),
+                    "股票名稱": st.column_config.TextColumn("名稱", width="small"),
+                    "成交": st.column_config.NumberColumn("成交價", format="%.2f"),
+                    "漲跌幅": st.column_config.NumberColumn("漲跌幅(%)", format="%.2f"),
+                    "成交張數": st.column_config.NumberColumn("今日成交(張)", format="%d"),
+                    "5日均量": st.column_config.NumberColumn("5日均量(張)", format="%d"),
+                    "成交額(百萬)": st.column_config.NumberColumn("成交額(百萬)", format="%.2f"),
+                    "成交金額日變化率": st.column_config.NumberColumn("日變化率(%)", format="%+.1f %%"),
+                    "5日均額": st.column_config.NumberColumn("5日均成交額(百萬)", format="%.2f"),
+                    
+                    # 👇 這裡維持一般 Column，以接收我們在上面 format 寫好的 "-" 文字，且保留排序功能
+                    "PER": st.column_config.Column("本益比"),
+                    
+                    "B0_量價狀態": st.column_config.TextColumn("量價主力照妖鏡", width="large"),
+                }
+            )
     # === 替換 `with tab_momentum:` 區塊內的所有內容 ===
     with tab_momentum:
         st.markdown("#### 資金動力渦輪：找出真正的行情燃料")
