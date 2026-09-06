@@ -195,7 +195,7 @@ def show_b6_page(DATA_DIR):
 
     st.write("---")
     st.markdown("<div id='section-6'></div>", unsafe_allow_html=True)
-    global_latest_date = get_b6_latest_date(DATA_DIR)
+
     st.markdown("""
     <div style="background: linear-gradient(90deg, rgba(15,23,42,1) 0%, rgba(14,165,233,0.3) 50%, rgba(15,23,42,1) 100%); 
                 border-top: 1px solid #38bdf8; border-bottom: 1px solid #38bdf8; padding: 15px 20px; 
@@ -203,9 +203,7 @@ def show_b6_page(DATA_DIR):
         <h2 style="color: #e0f2fe; margin: 0; letter-spacing: 2px; text-shadow: 0 0 15px rgba(56, 189, 248, 0.8);">
             鉅額交易動向
         </h2>
-        <div style='font-size:13px; color:#00D2FF; font-weight:500; margin-top:8px;'>
-            基準日 : {global_latest_date[:2]}/{global_latest_date[2:]} 
-        </div>
+
     </div>
     """, unsafe_allow_html=True)
     st.write("💡 鉅額交易有時為大戶私下換手籌碼，成交價可作為「支撐/壓力」的防守線；如果短線跌破建議嚴設停損。")
