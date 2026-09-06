@@ -242,9 +242,9 @@ def inject_custom_header(is_logged_in=False):
                     <div class="dropdown-item actionable">
                         <a href="#" data-target="NavToWatchlist" class="dropdown-title internal-nav">
                             <img src="app/static/icon-watchlist.png" class="menu-icon" alt="create"> 自選名單 <span style="color:#64748b; font-size:10px;">(Alt+L)</span>
+                            <span style="color:#FFD700; font-size:10px; margin-left: 5px; animation: pulse 2s infinite;">(NEW)</span>
                         </a>
                         <p class="dropdown-text">自訂與管理您的專屬觀察清單。</p>
-                        <span style="color:#FFD700; font-size:10px; margin-left: 5px; animation: pulse 2s infinite;">(NEW)</span>
                     </div>
 
                 <div class="dropdown-item actionable">
