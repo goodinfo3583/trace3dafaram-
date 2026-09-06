@@ -1,4 +1,4 @@
-#views/b7_page.py
+# views/b7_page.py
 import streamlit as st
 import pandas as pd
 import os
@@ -8,6 +8,8 @@ import re
 # ==========================================
 # ⚙️ 區塊 7：董監持股運算引擎 (高效統一版 - 從質押檔提取)
 # ==========================================
+# 💡 效能救星 1：快取所有的檔案讀取與樞紐運算 (10 分鐘更新一次)
+@st.cache_data(show_spinner=False, ttl=600)
 def process_directors_data(DATA_DIR):
     """統一讀取 Goodinfo 質押比檔案，並萃取「持股比例」進行多月份動態比較"""
     search_patterns = [
@@ -116,6 +118,7 @@ def process_directors_data(DATA_DIR):
 # ==========================================
 # ⚙️ 區塊 7：董監質押比最新月份 (第一張表)
 # ==========================================
+@st.cache_data(show_spinner=False, ttl=600)
 def process_pledge_data(DATA_DIR):
     """讀取並自動堆疊所有檔案，動態過濾並僅保留最新月份資料"""
     search_patterns = [
@@ -193,6 +196,7 @@ def process_pledge_data(DATA_DIR):
 # ==========================================
 # ⚙️ 區塊 7：董監質押歷史趨勢引擎 (第二張表 - 終極動態防呆 + 圖示版)
 # ==========================================
+@st.cache_data(show_spinner=False, ttl=600)
 def process_pledge_history_data(DATA_DIR):
     """
     不管未來累積了多少個月的檔案，系統自動降冪排好後，
@@ -307,7 +311,7 @@ def process_pledge_history_data(DATA_DIR):
 
 
 # ==========================================
-# 🔄 資料同步接口
+# 🔄 資料同步接口：供後台引擎呼叫
 # ==========================================
 def sync_b7_data(DATA_DIR):
     st.session_state['b7_main'] = process_directors_data(DATA_DIR)
@@ -320,20 +324,44 @@ def sync_pledge_history_data(DATA_DIR):
 
 
 # ==========================================
+# 🚀 局部渲染魔法：將 Tabs 包裝進 Fragment
+# ==========================================
+@st.fragment
+def render_b7_dashboard(df_pledge, df_history, df_b7):
+    tab1, tab2, tab3 = st.tabs(["🔹 董監最新質押比", "🔹 董監質押歷史趨勢", "🔹 董監持股比增減"])
+
+    with tab1:
+        if df_pledge.empty:
+            st.warning("⚠️ 找不到董監質押比資料，請確認 data 資料夾中存在相關 CSV 檔案。")
+        else:
+            st.dataframe(df_pledge, use_container_width=True, hide_index=True)
+            
+    with tab2:
+        if df_history.empty:
+            st.warning("⚠️ 歷史質押資料不足或檔案讀取異常，請確認檔名包含「質押比」。")
+        else:
+            st.dataframe(df_history, use_container_width=True, hide_index=True)
+
+    with tab3:
+        if df_b7.empty:
+            st.warning("⚠️ 在資料夾中找不到董監事持股資料，請確認檔名包含「神秘金字塔」與「董監事持股」。")
+        else:
+            st.dataframe(df_b7, use_container_width=True, hide_index=True)
+
+
+# ==========================================
 # 🖼️ 前台畫面渲染 (三頁籤切換)
 # ==========================================
 def show_b7_page(DATA_DIR, STOCK_DICT):
+    # 💡 移除 spinner 避免載入時畫面往下擠壓閃爍，因為快取函數是瞬間完成的！
     if 'b7_main' not in st.session_state:
-        with st.spinner("⏳ 載入董監持股數據中..."):
-            sync_b7_data(DATA_DIR)
+        sync_b7_data(DATA_DIR)
             
     if 'b7_pledge' not in st.session_state:
-        with st.spinner("⏳ 載入董監質押最新數據中..."):
-            sync_pledge_data(DATA_DIR)
+        sync_pledge_data(DATA_DIR)
             
     if 'b7_pledge_history' not in st.session_state:
-        with st.spinner("⏳ 載入董監質押歷史數據中..."):
-            sync_pledge_history_data(DATA_DIR)
+        sync_pledge_history_data(DATA_DIR)
             
     st.write("---")
     st.markdown("<div id='section-7'></div>", unsafe_allow_html=True)
@@ -348,25 +376,9 @@ def show_b7_page(DATA_DIR, STOCK_DICT):
     </div>
     """, unsafe_allow_html=True)
 
-    tab1, tab2, tab3 = st.tabs(["🔹 董監最新質押比", "🔹 董監質押歷史趨勢", "🔹 董監持股比增減"])
+    # 取出資料傳給 Fragment 渲染
+    df_pledge = st.session_state.get('b7_pledge', pd.DataFrame())
+    df_history = st.session_state.get('b7_pledge_history', pd.DataFrame())
+    df_b7 = st.session_state.get('b7_main', pd.DataFrame())
 
-    with tab1:
-        df_pledge = st.session_state['b7_pledge']
-        if df_pledge.empty:
-            st.warning("⚠️ 找不到董監質押比資料，請確認 data 資料夾中存在相關 CSV 檔案。")
-        else:
-            st.dataframe(df_pledge, use_container_width=True, hide_index=True)
-            
-    with tab2:
-        df_history = st.session_state['b7_pledge_history']
-        if df_history.empty:
-            st.warning("⚠️ 歷史質押資料不足或檔案讀取異常，請確認檔名包含「質押比」。")
-        else:
-            st.dataframe(df_history, use_container_width=True, hide_index=True)
-
-    with tab3:
-        df_b7 = st.session_state['b7_main']
-        if df_b7.empty:
-            st.warning("⚠️ 在資料夾中找不到董監事持股資料，請確認檔名包含「神秘金字塔」與「董監事持股」。")
-        else:
-            st.dataframe(df_b7, use_container_width=True, hide_index=True)
+    render_b7_dashboard(df_pledge, df_history, df_b7)
