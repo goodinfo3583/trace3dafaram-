@@ -83,11 +83,11 @@ def read_live_ln_report(DATA_DIR, file_keyword, strict_type, exact_field_name, p
         return pd.DataFrame(), f"解讀失敗: {str(e)}"
 
 # ==========================================
-# ⚙️ 後台資料引擎 (Data Engine)：專責運算並寫入 Session
+# 💡 效能救星 1：將複雜的讀取與合併動作快取起來
 # ==========================================
-def sync_b3_data(DATA_DIR):
-    """只在背景讀取 B3 資料並寫入 session_state，絕對不繪製任何 UI"""
-    
+@st.cache_data(show_spinner=False, ttl=300)
+def get_cached_b3_data(DATA_DIR):
+    """回傳 (b3_data_dict, df_blk3_main) 兩個變數"""
     # 讀取日資料
     live_fo_day, date_fo_day = read_live_ln_report(DATA_DIR, "外資連續買超", "日", "外資連續買賣日數", "外資", "最新連買天數")
     if live_fo_day.empty and date_fo_day is None: 
@@ -114,15 +114,14 @@ def sync_b3_data(DATA_DIR):
         if live_it_wk.empty:
             live_it_wk, date_it_wk = read_live_ln_report(DATA_DIR, "外資連買", "週", "投信連續買賣週數", "投信", "最新連買週數")
 
-    # 分別存入記憶體供 UI 顯示
-    st.session_state['b3_data'] = {
+    b3_data_dict = {
         'fo_day': (live_fo_day, date_fo_day),
         'it_day': (live_it_day, date_it_day),
         'fo_wk': (live_fo_wk, date_fo_wk),
         'it_wk': (live_it_wk, date_it_wk)
     }
 
-    # 💡 記憶體整合連動區塊 (在此組合，保證包含 ETF 的完整資料)
+    # 組合給 Sidebar 和 Weight Backtest 使用的全市場母表
     b3_combined_list = []
     if not live_fo_day.empty:
         df_tmp = live_fo_day.copy()
@@ -150,23 +149,28 @@ def sync_b3_data(DATA_DIR):
 
     if b3_combined_list:
         df_b3 = pd.concat(b3_combined_list, ignore_index=True)
-        st.session_state['df_blk3_main'] = df_b3[['連買類型', '股票代號', '股票名稱', '狀態動態', '連買週期數']]
+        df_blk3_main = df_b3[['連買類型', '股票代號', '股票名稱', '狀態動態', '連買週期數']]
     else:
-        st.session_state['df_blk3_main'] = pd.DataFrame(columns=['連買類型', '股票代號', '股票名稱', '狀態動態', '連買週期數'])
+        df_blk3_main = pd.DataFrame(columns=['連買類型', '股票代號', '股票名稱', '狀態動態', '連買週期數'])
+
+    return b3_data_dict, df_blk3_main
 
 # ==========================================
-# 🖼️ 前台畫面渲染 (Views)
+# ⚙️ 後台資料引擎 (橋接函式)：讓其他頁面抓得到資料
 # ==========================================
-def show_b3_page(DATA_DIR):
-    """B3 專屬頁面 UI 渲染"""
-    if 'b3_data' not in st.session_state:
-        with st.spinner("⏳ 載入連續買超數據中..."):
-            sync_b3_data(DATA_DIR)
+def sync_b3_data(DATA_DIR):
+    """將瞬間算好的快取資料，寫入 session_state 供側邊欄與過濾器讀取"""
+    b3_data_dict, df_blk3_main = get_cached_b3_data(DATA_DIR)
+    st.session_state['b3_data'] = b3_data_dict
+    st.session_state['df_blk3_main'] = df_blk3_main
 
-    st.write("---")
-    st.markdown("<div id='section-3'></div>", unsafe_allow_html=True)
-    st.header("法人連續買超")
 
+# ==========================================
+# 🚀 局部渲染魔法：UI 與表格的結界
+# ==========================================
+@st.fragment
+def render_b3_dashboard(data):
+    """負責渲染 4 個表格與 Checkbox，隔離點擊造成的閃爍"""
     c_f1, c_f2 = st.columns(2)
     show_etf_b3 = c_f1.checkbox("顯示 ETF", value=True, key="b3_etf_filter")
     show_bond_b3 = c_f2.checkbox("顯示 債券/債券ETF", value=True, key="b3_bond_filter")
@@ -181,7 +185,6 @@ def show_b3_page(DATA_DIR):
         res_df.index = range(1, len(res_df) + 1)
         return res_df
 
-    data = st.session_state['b3_data']
     live_fo_day, date_fo_day = data['fo_day']
     live_it_day, date_it_day = data['it_day']
     live_fo_wk, date_fo_wk = data['fo_wk']
@@ -234,3 +237,24 @@ def show_b3_page(DATA_DIR):
         if not live_it_wk_disp.empty: st.dataframe(live_it_wk_disp, use_container_width=True)
         else: st.write("無資料")
         st.markdown(f"<div style='color: #00D2FF; font-size: 16px; margin-top: 1px;'>基準日: {date_it_wk if date_it_wk else '無資料'}</div>", unsafe_allow_html=True)
+
+
+# ==========================================
+# 🖼️ 前台畫面渲染主程式
+# ==========================================
+def show_b3_page(DATA_DIR):
+    """B3 專屬頁面 UI 渲染"""
+    
+    # 💡 效能救星啟動：直接呼叫快取取得資料
+    b3_data_dict, df_blk3_main = get_cached_b3_data(DATA_DIR)
+    
+    # 確保側邊欄與其他頁面抓得到最新的無過濾資料
+    st.session_state['b3_data'] = b3_data_dict
+    st.session_state['df_blk3_main'] = df_blk3_main
+
+    st.write("---")
+    st.markdown("<div id='section-3'></div>", unsafe_allow_html=True)
+    st.header("法人連續買超")
+
+    # 💡 呼叫 Fragment 隔離渲染，打勾時不再閃爍！
+    render_b3_dashboard(b3_data_dict)
