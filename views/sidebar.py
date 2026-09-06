@@ -14,7 +14,6 @@ from utils.data_utils import get_latest_csv, get_prev_csv
 # 🌟 "側邊雙視窗" 變數雷達與自動載入各區塊引擎  新增補載頁面1
 # ==========================================
 KEY_MAP = {
-    
     'b1_final_df': ['b1_final_df', 'my_final_df'],
     'b1_down_final_df': ['b1_down_final_df'],
     'b1_foreign_df': ['b1_foreign_df'],
@@ -32,11 +31,9 @@ KEY_MAP = {
     'b5_400': ['b5_400', 'df_blk5'],
     'b5_1000': ['b5_1000', 'df_blk5_1000'],
     'b7_main': ['b7_main', 'df_blk7_main', 'df_b7_main'],
-    'b7_pledge': ['b7_pledge', 'df_pledge', 'df_b7_pledge'],# 🟢 新增：董監最新質押比                    
-    'b7_pledge_history': ['b7_pledge_history', 'df_pledge_history', 'df_b7_pledge_history'],  # 🟢 新增：董監質押歷史趨勢
-    'broker_history': ['broker_history_df'] # 👇 新增：券商分點歷史明細
-    
-    # 新增其他變數載入頁面，如'b7_main': ['b7_main'],--步驟2
+    'b7_pledge': ['b7_pledge', 'df_pledge', 'df_b7_pledge'],
+    'b7_pledge_history': ['b7_pledge_history', 'df_pledge_history', 'df_b7_pledge_history'],  
+    'broker_history': ['broker_history_df'] 
 }
 
 def get_sidebar_df(primary_key):
@@ -52,7 +49,6 @@ def ensure_b1_to_b5_loaded(DATA_DIR):
     """🚀 背景自動補載機制：當搜尋時發現數據缺失，自動觸發 B1~B5 後台同步引擎"""
     if not DATA_DIR or not os.path.exists(DATA_DIR):
         return
-    # 放入所有擷入頁面--步驟3
     # B1 補載
     if get_sidebar_df('b1_final_df').empty:
         try:
@@ -87,27 +83,29 @@ def ensure_b1_to_b5_loaded(DATA_DIR):
             from views.b5_page import sync_b5_data
             sync_b5_data(DATA_DIR)
         except: pass
-    # B7 補載 (貼在 B5 補載邏輯的下方)
+        
+    # B7 補載 
     if get_sidebar_df('b7_main').empty:
         try:
             from views.b7_page import sync_b7_data
             sync_b7_data(DATA_DIR)
         except: pass
-    # 🟢 新增：B7 最新質押比 補載
+        
+    # B7 最新質押比 補載
     if get_sidebar_df('b7_pledge').empty:
         try:
             from views.b7_page import sync_pledge_data
             sync_pledge_data(DATA_DIR)
         except: pass
 
-    # 🟢 新增：B7 質押歷史趨勢 補載
+    # B7 質押歷史趨勢 補載
     if get_sidebar_df('b7_pledge_history').empty:
         try:
             from views.b7_page import sync_pledge_history_data
             sync_pledge_history_data(DATA_DIR)
-        except: pass  # 👈 這裡補上！
+        except: pass 
 
-    # 👇 新增：券商分點歷史明細 補載
+    # 券商分點歷史明細 補載
     if get_sidebar_df('broker_history').empty:
         try:
             from views.broker_page import load_raw_broker_history
@@ -116,49 +114,35 @@ def ensure_b1_to_b5_loaded(DATA_DIR):
             if not df_broker.empty:
                 st.session_state['broker_history_df'] = df_broker
         except: pass
-                # 新增補載頁面2
 
 # ==========================================
 # 🌟 快搜各頁面與顯示工具函數區 
 # ==========================================
 def robust_search_engine(df, query):
-    """
-    強化版搜尋引擎：先精準比對 (Exact Match)，找不到才模糊比對 (Partial Match)
-    解決權證 (如 054430) 攔截真實代號 (5443) 的問題
-    """
     if df is None or df.empty: return pd.DataFrame()
     df = df.loc[:, ~df.columns.duplicated()].copy()
     
     query = str(query).strip()
     if not query: return pd.DataFrame()
 
-    # 1. 找出正確的欄位名稱
     col_id = '股票代號' if '股票代號' in df.columns else ('代號' if '代號' in df.columns else None)
     col_name = '股票名稱' if '股票名稱' in df.columns else ('名稱' if '名稱' in df.columns else None)
 
-    # 確保欄位都是乾淨的字串，並強制剃除 Pandas 產生的 .0
     if col_id:
         df[col_id] = df[col_id].astype(str).str.replace(r'\.0$', '', regex=True).str.strip()
     if col_name:
         df[col_name] = df[col_name].astype(str).str.strip()
 
-    # ==========================================
-    # 🌟 第一階段：【嚴格精準比對】
-    # ==========================================
     exact_mask = pd.Series(False, index=df.index)
     if col_id:
         exact_mask = exact_mask | (df[col_id] == query)
     if col_name:
         exact_mask = exact_mask | (df[col_name].str.lower() == query.lower())
 
-    # 如果有找到「完全一模一樣」的，就直接回傳，不再往下找！
     exact_result = df[exact_mask]
     if not exact_result.empty:
         return exact_result
 
-    # ==========================================
-    # 🌟 第二階段：【模糊包含比對】 (只有精準找不到時才啟動)
-    # ==========================================
     partial_mask = pd.Series(False, index=df.index)
     if col_id:
         partial_mask = partial_mask | df[col_id].str.contains(query, na=False)
@@ -196,14 +180,11 @@ def scan_and_display(title, session_key, query):
     else:
         st.write("⚪ 未進榜")
 
-# 🤖 [AI 籌碼訊號] 診斷
 def generate_stock_commentary(query):
     if not query: return ""
-    
     score = 0
     warns = []
     
-    # 🎯 掃描 1: 法人買超診斷 (區塊2 - 共4個表)
     for key in ['b2_1', 'b2_2', 'b2_3', 'b2_4']:
         df = get_sidebar_df(key)
         if not df.empty:
@@ -211,14 +192,12 @@ def generate_stock_commentary(query):
             if not res.empty:
                 score += 1.5
 
-    # 📅 掃描 2: 法人連買診斷 (區塊3)
     df_b3 = get_sidebar_df('b3_main')
     if not df_b3.empty:
         res = robust_search_engine(df_b3, query)
         if not res.empty:
             score += len(res) * 1.5
 
-    # 🔄 掃描 3: 券資有利排名 (區塊4 - 共6個表)
     for key in ['b4_margin_pct', 'b4_short_pct', 'b4_margin_plus_pct', 'b4_margin_vol', 'b4_short_vol', 'b4_margin_plus_vol']:
         df = get_sidebar_df(key)
         if not df.empty:
@@ -226,7 +205,6 @@ def generate_stock_commentary(query):
             if not res.empty:
                 score += 0.5
 
-    # 💰 掃描 4: 大戶動向診斷 (區塊5)
     def check_big_holder(key):
         df = get_sidebar_df(key)
         if not df.empty:
@@ -254,23 +232,22 @@ def generate_stock_commentary(query):
     high_score = score >= 4
     
     if has_warning and high_score:
-        return f"⚔️ 【激烈換手】系統偵測到法人與大戶分歧 ({warn_str})，但籌碼動能依然獲 {score} 分的高評估！代表『倒貨正被強勢吃下』。若能維持強勢，承接方實力極強，需嚴設停損。"
+        return f"⚔️ 【激烈換手】偵測到法人大戶分歧 ({warn_str})，但籌碼動能獲 {score} 分評估！倒貨正被吃下，需嚴設停損。"
     if has_warning and not high_score:
-        return f"🚨 【風險警示】大戶正在進行倒貨調節 ({warn_str})，且無強大買盤承接，籌碼結構面臨鬆動。建議暫避風頭。"
+        return f"🚨 【風險警示】大戶正在進行倒貨調節 ({warn_str})，且無強大買盤承接。建議暫避風頭。"
     if "大減" in b5_trend_400 or "大減" in b5_trend_1000:
         return "⚠️ 【大戶撤退】大戶出現明顯『大減』跡象，主力籌碼渙散，建議先行觀望。"
     if score >= 6:
-        base_comment = f"🔥 【強勢噴發】籌碼面極度優異 (積分: {score})！多個法人與大戶榜單同步共振做多，具備強大的波段上攻潛力。"
-        if "大增" in b5_trend_400 or "大增" in b5_trend_1000: base_comment += " 大股東籌碼大幅集中，是極佳的防守標的。"
+        base_comment = f"🔥 【強勢噴發】籌碼極度優異 (積分: {score})！法人與大戶同步共振做多，具波段上攻潛力。"
+        if "大增" in b5_trend_400 or "大增" in b5_trend_1000: base_comment += "大股東籌碼大幅集中，是極佳防守標的。"
         return base_comment
     elif score >= 3: 
-        return f"📈 【偏多佈局】主力籌碼持續進駐 (積分: {score})，法人與券資數據給予支撐。具備穩健的波段潛力。"
+        return f"📈 【偏多佈局】主力籌碼進駐 (積分: {score})，法人與券資數據給予支撐。具備穩健的波段潛力。"
     elif score >= 1: 
-        return f"🔄 【中性觀望】籌碼表現較為平淡 (積分: {score})，雖有零星榜單出現，但缺乏明確連續性。建議多看少做。"
+        return f"🔄 【中性觀望】籌碼表現較為平淡 (積分: {score})，缺乏連續性。建議多看少做。"
     else: 
-        return "❄️ 【弱勢整理】目前未進入任何核心法人與大戶買超榜單，籌碼處於流失或無主力認養狀態。建議暫不考量。"
+        return "❄️ 【弱勢整理】未進入任何核心法人與大戶買超榜單，籌碼流失或無主力認養。建議暫不考量。"
 
-# 🤖 [AI 技術型態訊號] 判斷
 def generate_technical_signals(df_sig):
     signals = []
     if df_sig is None or df_sig.empty or len(df_sig) < 20: return signals
@@ -286,15 +263,14 @@ def generate_technical_signals(df_sig):
         if len(df_sig) >= period:
             ma_val = df_sig['Close'].rolling(window=period).mean().iloc[-1]
             if 0 < (latest_close - ma_val) / ma_val < 0.015:
-                signals.append(f"🎯 回測支撐：股價目前極度貼近 {ma_name} ({ma_val:.2f}) 關鍵支撐線。")
+                signals.append(f"🎯 回測支撐：股價極度貼近 {ma_name} ({ma_val:.2f}) 關鍵支撐線。")
 
     if len(df_sig) >= 60:
         highest_60d = df_sig['High'].iloc[-60:].max()
         if df_sig['High'].iloc[-1] >= highest_60d:
-            signals.append("🚀 波段創高：今日股價突破 60 日 (約一季) 以來新高點，上攻動能極強！")
+            signals.append("🚀 波段創高：突破 60 日 (一季) 以來新高點，上攻動能強！")
     return signals
 
-#=========
 def render_b4_panorama(view_title, keys_and_labels, query, stock_name="-"):
     st.markdown(f"<h5 style='color: #E2E8F0; margin-bottom: 5px;'>{view_title}</h5>", unsafe_allow_html=True)
     
@@ -303,7 +279,6 @@ def render_b4_panorama(view_title, keys_and_labels, query, stock_name="-"):
         if not df.empty:
             res = robust_search_engine(df, query)
             if not res.empty:
-                # 🚀 命中訊號：顯示專屬標題，並畫出單行小表格
                 st.markdown(f"<div style='font-size:14px; font-weight:bold; color:#38BDF8; margin-top:8px; margin-bottom:4px;'>{label}</div>", unsafe_allow_html=True)
                 
                 row_data = res.iloc[[0]].copy()
@@ -315,12 +290,10 @@ def render_b4_panorama(view_title, keys_and_labels, query, stock_name="-"):
                     
                 st.dataframe(row_data, use_container_width=True, hide_index=True)
             else:
-                # 🚀 沒進榜：拒絕畫空表格，僅用一行乾淨文字帶過
                 st.markdown(f"<div style='font-size:13px; color:#94a3b8; margin-top:4px; margin-bottom:4px;'>{label}： <span style='color:#E2E8F0;'>⚪ 未進榜</span></div>", unsafe_allow_html=True)
         else:
             st.markdown(f"<div style='font-size:13px; color:#94a3b8; margin-top:4px; margin-bottom:4px;'>{label}： <span style='color:#f59e0b;'>⚠️ 尚未載入</span></div>", unsafe_allow_html=True)
 
-#=========補載券商分點資料
 def render_sidebar_broker_tracking(query, display_name):
     df_raw = get_sidebar_df('broker_history')
     if df_raw.empty:
@@ -338,9 +311,6 @@ def render_sidebar_broker_tracking(query, display_name):
     available_dates = sorted(stock_raw['trade_date'].unique(), reverse=True)
     if not available_dates: return
     
-    # ==========================================
-    # 🌟 新增：取得並顯示整體「淨買超(張)」與「集中度」歷史
-    # ==========================================
     try:
         from utils.data_utils import calculate_chip_concentration
         remote_csv_url = "https://raw.githubusercontent.com/goodinfo3583/tw-broker-data/main/data/broker/broker_history.csv"
@@ -348,30 +318,19 @@ def render_sidebar_broker_tracking(query, display_name):
         
         if not df_trend.empty:
             latest_data = df_trend.iloc[-1]
-            
-            # 使用兩欄設計，讓數字看起來更緊湊美觀
             m_col1, m_col2 = st.columns(2)
             with m_col1:
-                st.metric(
-                    label=f"最新集中度 ({latest_data['trade_date']})", 
-                    value=f"{latest_data['concentration_%']}%"
-                )
+                st.metric(label=f"最新集中度 ({latest_data['trade_date']})", value=f"{latest_data['concentration_%']}%")
             with m_col2:
-                # 判斷淨買超正負來決定顏色字串
                 net_buy_val = latest_data['net_buy']
                 net_str = f"+{net_buy_val:,}" if net_buy_val > 0 else f"{net_buy_val:,}"
-                st.metric(
-                    label="主體淨買賣超", 
-                    value=f"{net_str} 張"
-                )
+                st.metric(label="主體淨買賣超", value=f"{net_str} 張")
             
-            # 展開查看 60 日歷史
             with st.expander("📅 展開查看：近 60 日集中度與淨買超", expanded=False):
                 df_trend_disp = df_trend.sort_values('trade_date', ascending=False).head(60).copy()
                 df_trend_disp = df_trend_disp[['trade_date', 'net_buy', 'concentration_%']]
                 df_trend_disp.columns = ['交易日期', '淨買超(張)', '集中度(%)']
                 
-                # 套用顏色樣式
                 def color_trend(val):
                     try:
                         v = float(val)
@@ -389,11 +348,8 @@ def render_sidebar_broker_tracking(query, display_name):
             
             st.markdown("<hr style='border-color: rgba(56, 189, 248, 0.3); margin: 10px 0px;'>", unsafe_allow_html=True)
     except Exception as e:
-        pass # 如果集中度計算失敗，就靜默跳過，繼續顯示下方分點
+        pass 
 
-    # ==========================================
-    # 1. 計算近 60 日囤貨前 5 名
-    # ==========================================
     recent_dates = available_dates[:60]
     recent_raw = stock_raw[stock_raw['trade_date'].isin(recent_dates)].copy()
     recent_raw['real_net_vol'] = recent_raw.apply(
@@ -411,18 +367,12 @@ def render_sidebar_broker_tracking(query, display_name):
         
     top_5_names = top_5_hoarders[broker_col].tolist()
     
-    # ==========================================
-    # 2. 顯示區間囤貨追蹤 (前5名)
-    # ==========================================
     st.markdown("<h6 style='color: #E2E8F0; margin-top: 5px; margin-bottom: 5px;'>📈 近 60 日囤貨分點 (前 5 名)</h6>", unsafe_allow_html=True)
     styled_hoard = top_5_hoarders.copy()
     styled_hoard.columns = ['中文券商分點', '淨買超(張)']
     styled_hoard = styled_hoard.style.format({'淨買超(張)': "{:,.0f}"})
     st.dataframe(styled_hoard, use_container_width=True, hide_index=True)
     
-    # ==========================================
-    # 3. 提取前 5 名的「全歷史」來計算連買，並顯示近 15 日矩陣
-    # ==========================================
     st.markdown("<h6 style='color: #E2E8F0; margin-top: 10px; margin-bottom: 5px;'>🗺️ 囤貨分點進出矩陣 (近 15 日)</h6>", unsafe_allow_html=True)
     
     matrix_raw = stock_raw[stock_raw[broker_col].isin(top_5_names)].copy()
@@ -430,14 +380,11 @@ def render_sidebar_broker_tracking(query, display_name):
         lambda x: abs(x['net_vol']) if x['side'] == 'buy' else -abs(x['net_vol']), axis=1
     )
     
-    # 全歷史日資料樞紐，用來算連買
     full_pivot = matrix_raw.pivot_table(index=broker_col, columns='trade_date', values='signed_vol', aggfunc='sum')
     all_dates_sorted = sorted(full_pivot.columns, reverse=True)
     
-    # 畫面只顯示近 15 日
     display_dates = available_dates[:15]
     display_dates = [d for d in display_dates if d in full_pivot.columns]
-    
     pivot_df = full_pivot[display_dates].copy()
     
     def calc_daily_streak(row_name):
@@ -461,7 +408,7 @@ def render_sidebar_broker_tracking(query, display_name):
         else: return "-"
 
     pivot_df['日連買動態'] = pivot_df.index.to_series().apply(calc_daily_streak)
-    pivot_df = pivot_df.reindex(top_5_names) # 依照囤貨名次排序
+    pivot_df = pivot_df.reindex(top_5_names) 
     pivot_df[display_dates] = pivot_df[display_dates].fillna("-")
     pivot_df.index.name = "中文券商分點"
     
@@ -490,7 +437,8 @@ def render_sidebar_broker_tracking(query, display_name):
 # ==========================================
 # 📈 側邊雙視窗 K 線圖與技術分析引擎
 # ==========================================
-@st.cache_data(ttl=900)
+# 💡 效能優化：加入 show_spinner=False，避免畫面卡頓跳動
+@st.cache_data(show_spinner=False, ttl=900)
 def fetch_yfinance_data(ticker, period="3y"):
     import yfinance as yf
     try:
@@ -909,7 +857,8 @@ def render_options_dashboard():
     html_opt += "</table>"
     st.markdown(html_opt, unsafe_allow_html=True)
 
-@st.cache_data(ttl=300) 
+# 💡 效能優化：加入 show_spinner=False，避免背景讀取時畫面跳動
+@st.cache_data(show_spinner=False, ttl=300) 
 def fetch_macro_indicators():
     data = {
         "vix": {"value": None, "pct": None},
@@ -997,13 +946,12 @@ def fetch_macro_indicators():
 # 🎨 自訂圖片轉換引擎：讓標題輕鬆鑲嵌本地圖片
 # =======================================================
 def get_img_html(filename, height="28px"):
-    """將 static 資料夾內的圖片轉為可鑲嵌的 HTML 標籤"""
     img_path = f"./static/{filename}"
     if os.path.exists(img_path):
         with open(img_path, "rb") as f:
             img_b64 = base64.b64encode(f.read()).decode("utf-8")
         return f'<img src="data:image/png;base64,{img_b64}" style="height: {height}; vertical-align: text-bottom; margin-right: 8px;">'
-    return "" # 找不到圖片就不顯示，避免破圖
+    return "" 
 
 # =======================================================
 # 🚀 終極局部渲染魔法：將整個側邊視窗獨立為「不閃爍區塊」
@@ -1020,12 +968,9 @@ def render_sidebar_war_room(STOCK_DICT, DATA_DIR="data"):
         if selected_stock:
             st.markdown(f"### 🎯 焦點標的：{selected_stock}")
             
-            # 萃取出純數字代號
             stock_code_match = re.search(r'\d+', selected_stock)
             if stock_code_match:
                 stock_code = stock_code_match.group()
-                
-                # 建立各大財經網站的快速連結 (使用 columns 橫排，節省空間)
                 col_l1, col_l2, col_l3 = st.columns(3)
                 with col_l1: 
                     st.markdown(f"[🔗Goodinfo](https://goodinfo.tw/tw/StockDetail.asp?STOCK_ID={stock_code})")
@@ -1036,15 +981,13 @@ def render_sidebar_war_room(STOCK_DICT, DATA_DIR="data"):
             else:
                 st.info("無法解析股票代碼，請確認追蹤名稱中包含數字代號。")
             
-            # 關閉焦點標的的按鈕 (加上 key 避免與其他按鈕衝突)
-            st.write("") # 空一行
+            st.write("") 
             if st.button("❌ 關閉焦點", use_container_width=True, key="close_focus_btn"):
                 st.session_state["selected_watch_stock"] = None
                 st.session_state["global_search_final"] = ""
                 st.rerun()
                 
             st.markdown("<hr style='border-color: #38BDF8; margin: 15px 0px;'>", unsafe_allow_html=True)
-    # ==========================================
 
     st.markdown("""
     <div style="background: linear-gradient(90deg, rgba(15,23,42,1) 0%, rgba(14,165,233,0.3) 50%, rgba(15,23,42,1) 100%); 
@@ -1065,7 +1008,6 @@ def render_sidebar_war_room(STOCK_DICT, DATA_DIR="data"):
         
         c_search, c_btn_go, c_btn_clear = st.columns([6, 1.5, 1.5])
         
-        # 🚀 升級：利用 set (集合 {}) 自動剃除雙胞胎，並使用 sorted 排序
         stock_options = []
         if STOCK_DICT:
             unique_options = {f"{v['id']} {v['name']}" for v in STOCK_DICT.values() if len(str(v['id'])) <= 4}
@@ -1090,7 +1032,6 @@ def render_sidebar_war_room(STOCK_DICT, DATA_DIR="data"):
         industry_label = "未分類"
         
         if search_query:
-            # 🚀 智慧拆解：將下拉選單的 "5443 均豪" 拆解為純數字 "5443"
             query_clean = search_query.strip()
             match_code = re.search(r'^[A-Za-z0-9]{2,4}', query_clean)
             
@@ -1110,7 +1051,6 @@ def render_sidebar_war_room(STOCK_DICT, DATA_DIR="data"):
                 else:
                     display_name = search_query
 
-            # 將純粹的代號 (例如 5443) 指派給 target_query，交給 B1~B7 的引擎去跑！
             target_query = pure_stock_id if pure_stock_id else search_query
 
             st.markdown(f"### 🎯 綜合診斷標的：<span style='color: #00D2FF;'>{display_name}</span> <span style='font-size:16px; background-color:#1E293B; padding:4px 10px; border-radius:6px; color:#38BDF8; border: 1px solid #38BDF8; margin-left:10px;'>🏷️ {industry_label}</span>", unsafe_allow_html=True)
@@ -1179,12 +1119,11 @@ def render_sidebar_war_room(STOCK_DICT, DATA_DIR="data"):
                     st.warning("⚠️ 技術 K 線圖目前僅支援代號查詢。")
 
             # ==========================================
-            # 👑 區塊 1 ~ 7：數據庫展演 (對接萬能變數雷達)
+            # 👑 區塊 1 ~ 7：數據庫展演
             # ==========================================
             st.markdown("<hr style='border-color: #334155;'>", unsafe_allow_html=True)
             
-            # 👑 區塊 1
-            icon_b1 = get_img_html("magicbookleaf.png") # 替換為你的圖片名稱
+            icon_b1 = get_img_html("magicbookleaf.png") 
             st.markdown(f"<h4 style='color: #FCD34D;'>{icon_b1}法人動向</h4>", unsafe_allow_html=True)
             
             df_b1 = get_sidebar_df('b1_final_df')
@@ -1202,7 +1141,6 @@ def render_sidebar_war_room(STOCK_DICT, DATA_DIR="data"):
                     if is_all_unranked:
                         st.write("⚪ 未進榜")
                     else:
-                        # --- 👇 新增：獨立抓取並美化最新動態、上榜與△ 👇 ---
                         row = res_b1.iloc[0]
                         dyn_str = str(row.get('最新動態', '-'))
                         tag_str = str(row.get('今日上榜', ''))
@@ -1224,12 +1162,10 @@ def render_sidebar_war_room(STOCK_DICT, DATA_DIR="data"):
                             <div style='color: #E2E8F0;'>📊 <b>單日△：</b> <span style='color:{delta_color}; font-weight:bold;'>{delta_str}</span></div>
                         </div>
                         """, unsafe_allow_html=True)
-                        # --- 👆 新增結束 👆 ---
                         hide_keywords = ['_區塊', '排序', '上榜數量', '原始上榜', '精準單日']
                         clean_cols = [c for c in res_b1.columns if not any(k in c for k in hide_keywords)]
                         st.dataframe(res_b1[clean_cols], use_container_width=True, hide_index=True)
                         
-                        row = res_b1.iloc[0]
                         stock_name = row.get('股票名稱', display_name)
                         raw_x_vals = date_cols[::-1]
                         clean_x_labels = [c.replace('持股%', '')[-4:] for c in raw_x_vals]
@@ -1258,7 +1194,6 @@ def render_sidebar_war_room(STOCK_DICT, DATA_DIR="data"):
                 else: st.write("⚪ 未進榜")
             else: st.info("⚪ 尚未載入資料表")
 
-            #新載入法人提款
             # ------------------------------------------
             # 📉 新增：法人提款機 (衰退追蹤) 區塊
             # ------------------------------------------
@@ -1278,7 +1213,6 @@ def render_sidebar_war_room(STOCK_DICT, DATA_DIR="data"):
                     if is_all_unranked_down:
                         st.write("⚪ 未進榜")
                     else:
-                        # --- 👇 新增：獨立抓取並美化衰退上榜與單日△ 👇 ---
                         row_down = res_b1_down.iloc[0]
                         tag_down_str = str(row_down.get('今日衰退上榜', ''))
                         if not tag_down_str.strip(): tag_down_str = "未上榜"
@@ -1298,20 +1232,16 @@ def render_sidebar_war_room(STOCK_DICT, DATA_DIR="data"):
                             <div style='color: #E2E8F0;'>📊 <b>單日△：</b> <span style='color:{delta_down_color}; font-weight:bold;'>{delta_down_str}</span></div>
                         </div>
                         """, unsafe_allow_html=True)
-                        # --- 👆 新增結束 👆 ---
                         
                         hide_keywords_down = ['_區塊', '排序', '上榜數量', '原始上榜', '精準單日']
                         clean_cols_down = [c for c in res_b1_down.columns if not any(k in c for k in hide_keywords_down)]
                         
-                        # 幫衰退表格加上淺綠色警示底色
                         st.dataframe(
                             res_b1_down[clean_cols_down].style.apply(lambda x: ['background-color: rgba(0, 230, 118, 0.1)'] * len(x), axis=1), 
                             use_container_width=True, 
                             hide_index=True
                         )
 
-                        # 繪製負向衰退追蹤的波段圖
-                        row_down = res_b1_down.iloc[0]
                         stock_name_down = row_down.get('股票名稱', display_name)
                         raw_x_vals_down = date_cols_down[::-1]
                         clean_x_labels_down = [c.replace('持股%', '')[-4:] for c in raw_x_vals_down]
@@ -1339,6 +1269,7 @@ def render_sidebar_war_room(STOCK_DICT, DATA_DIR="data"):
                         st.plotly_chart(fig_b1_down, use_container_width=True, config={'displayModeBar': False})
                 else:st.write("⚪ 未進榜")
             else:st.info("⚪ 尚未載入資料表")
+
             # ------------------------------------------
             # 🌎 新增：外資大腿 20日軌跡 區塊
             # ------------------------------------------
@@ -1368,13 +1299,11 @@ def render_sidebar_war_room(STOCK_DICT, DATA_DIR="data"):
                                 else:
                                     y_vals_for.append(0.0)
                                         
-                            # 建立精簡 DataFrame 顯示
                             display_for_dict = {d[-4:]: [row_for[f'外資持股_{d}']] for d in common_dates if f'外資持股_{d}' in row_for}
                             if display_for_dict:
                                 display_for_df = pd.DataFrame(display_for_dict)
                                 st.dataframe(display_for_df, use_container_width=True, hide_index=True)
                                         
-                            # 繪製圖表
                             fig_for = go.Figure()
                             fig_for.add_trace(go.Bar(
                                 x=clean_x_for[::-1], y=y_vals_for[::-1],
@@ -1396,12 +1325,11 @@ def render_sidebar_war_room(STOCK_DICT, DATA_DIR="data"):
                     st.write("⚪ 未進榜外資持股資料")
             else:
                 st.info("⚪ 尚未載入外資資料表")
-            #外資持股新增結束
 
             st.markdown("<hr style='border-color: #334155;'>", unsafe_allow_html=True)
             
             # 🎯 區塊 2
-            icon_b2 = get_img_html("magicbookwind.png") # 替換為你的圖片名稱
+            icon_b2 = get_img_html("magicbookwind.png")
             st.markdown(f"<h4 style='color: #FCD34D;'>{icon_b2}法人掃貨</h4>", unsafe_allow_html=True)
             c1, c2 = st.columns(2)
             with c1: scan_and_display("🌐 外資 5 日淨買佔成交量", 'b2_1', target_query)
@@ -1413,17 +1341,14 @@ def render_sidebar_war_room(STOCK_DICT, DATA_DIR="data"):
             st.markdown("<hr style='border-color: #334155;'>", unsafe_allow_html=True)
             
             # 📅 區塊 3
-            icon_b3 = get_img_html("magicbookwater.png") # 替換為你的圖片名稱
+            icon_b3 = get_img_html("magicbookwater.png") 
             st.markdown(f"<h4 style='color: #FCD34D;'>{icon_b3}法人連買</h4>", unsafe_allow_html=True)
             df_b3 = get_sidebar_df('b3_main')
             if not df_b3.empty:
                 res_b3 = robust_search_engine(df_b3, target_query)
-                
-                # 🚀 智能收納：如果 4 個連買榜單都沒進，直接給一句乾淨的未進榜！
                 if res_b3.empty:
                     st.write("⚪ 未進榜")
                 else:
-                    # 如果有進榜，原生 DataFrame 就只會包含「真正有進榜」的那幾列，完全不用手動補空殼！
                     st.dataframe(res_b3, use_container_width=True, hide_index=True)
             else: 
                 st.info("⚪ 區塊 3：尚未載入資料表")
@@ -1431,9 +1356,8 @@ def render_sidebar_war_room(STOCK_DICT, DATA_DIR="data"):
             st.markdown("<hr style='border-color: #334155;'>", unsafe_allow_html=True)
             
             # 🔄 區塊 4
-            icon_b4 = get_img_html("magicbookground.png") # 替換為你的圖片名稱
+            icon_b4 = get_img_html("magicbookground.png") 
             st.markdown(f"<h4 style='color: #FCD34D;'>{icon_b4}資券動向</h4>", unsafe_allow_html=True)
-            # 🚀 萃取出純名稱 (例如把 "5443 均豪" 變成 "均豪") 傳給 B4
             just_name = display_name.replace(pure_stock_id, "").strip() if pure_stock_id else display_name
             
             render_b4_panorama("5日幅度變動排名", [('📉 融資減少', 'b4_margin_pct'), ('📉 借券減少', 'b4_short_pct'), ('📈 融券增加', 'b4_margin_plus_pct')], target_query, just_name)
@@ -1443,7 +1367,7 @@ def render_sidebar_war_room(STOCK_DICT, DATA_DIR="data"):
             st.markdown("<hr style='border-color: #334155;'>", unsafe_allow_html=True)
             
             # 💰 區塊 5
-            icon_b5 = get_img_html("wirtleg.png") # 這是你的大腿圖片！
+            icon_b5 = get_img_html("wirtleg.png") 
             st.markdown(f"<h4 style='color: #FCD34D;'>{icon_b5}大腿動向</h4>", unsafe_allow_html=True)
             
             col_400, col_1000 = st.columns(2)
@@ -1453,15 +1377,15 @@ def render_sidebar_war_room(STOCK_DICT, DATA_DIR="data"):
             st.markdown("<hr style='border-color: #334155;'>", unsafe_allow_html=True)
             
             # 👔 區塊 7
-            icon_b7 = get_img_html("magicbookboss.png") # 替換為你的圖片名稱
+            icon_b7 = get_img_html("magicbookboss.png") 
             st.markdown(f"<h4 style='color: #FCD34D;'>{icon_b7}董監動向</h4>", unsafe_allow_html=True)
             scan_and_display("🔹 董監最新質押比", 'b7_pledge', target_query)
             scan_and_display("🔹 董監質押歷史趨勢", 'b7_pledge_history', target_query)
             scan_and_display("🔹 董監持股比增減", 'b7_main', target_query)
 
-            # 👇 新增：區塊 8 券商分點追蹤 往下新增補載頁面
+            # 👇 新增：區塊 8 券商分點追蹤 
             st.markdown("<hr style='border-color: #334155;'>", unsafe_allow_html=True)
-            icon_broker = get_img_html("icon-building.png") # 可以換成適合的圖示
+            icon_broker = get_img_html("icon-building.png") 
             st.markdown(f"<h4 style='color: #FCD34D;'>{icon_broker}分點追蹤</h4>", unsafe_allow_html=True)
             render_sidebar_broker_tracking(target_query, display_name)
             
@@ -1540,19 +1464,14 @@ def render_sidebar_war_room(STOCK_DICT, DATA_DIR="data"):
                 </div>
                 """, unsafe_allow_html=True)
 
-
     # ==========================================
     # 🚀 快速回到頂部按鈕 (Google Material Icons 版)
     # ==========================================
-    # 1. 載入 Google Material Icons 的字型庫
     st.markdown(
         '<link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined" rel="stylesheet" />',
         unsafe_allow_html=True
     )
 
-    # 2. 渲染回到頂部按鈕
-    # 注意 gap: 6px 是用來讓圖案跟文字中間有點空隙
-    # <span class="material-symbols-outlined"> 裡面包的就是你在 Google 網頁上看到的 Icon 名稱
     st.markdown(
         """
         <a href="#section-search" target="_self" 
