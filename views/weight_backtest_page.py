@@ -83,7 +83,306 @@ def clean_stock_id(df):
 
 
 # ==========================================
-# 🌟 主程式
+# 🚀 局部渲染魔法 1：除錯透視鏡 (避免龐大合併卡死畫面)
+# ==========================================
+@st.fragment
+def render_debug_panel(filtered_df, any_filter_applied, dynamic_price_col_b6):
+    if any_filter_applied:
+        st.success(f"✅ 過濾完成！共有 **{len(filtered_df)}** 檔標的符合您的跨模組條件。")
+        debug_mode = st.checkbox("🔬 展開過濾名單", key="debug_mode_chk")
+        if debug_mode:
+            df_b0_debug = clean_stock_id(get_df('b0_price')).drop_duplicates(subset=['統一代號'])
+            debug_df = filtered_df.copy()
+            if not df_b0_debug.empty:
+                if '成交額(百萬)' in df_b0_debug.columns and '5日均額' in df_b0_debug.columns:
+                    safe_avg = pd.to_numeric(df_b0_debug['5日均額'].astype(str).str.replace(',', ''), errors='coerce').fillna(0).replace(0, 0.01)
+                    today_amt = pd.to_numeric(df_b0_debug['成交額(百萬)'].astype(str).str.replace(',', ''), errors='coerce').fillna(0)
+                    df_b0_debug['今日爆發倍數'] = (today_amt / safe_avg).round(2)
+
+                b0_cols = ['統一代號']
+                rename_dict = {}
+                
+                check_b0_cols = ['股價日期', '成交', '漲跌幅', '成交張數', '成交額(百萬)', 'PER', '5日均量', '5日均額', 'B0_量價狀態', '成交金額日變化率', '今日爆發倍數', '資金延續趨勢']
+                
+                for col in check_b0_cols:
+                    if col in df_b0_debug.columns:
+                        b0_cols.append(col)
+                        if col == '5日均額': rename_dict[col] = 'B0_5日均額(百萬)'
+                        elif col == '成交金額日變化率': rename_dict[col] = 'B0_金額日變化率(%)'
+                        elif col == '今日爆發倍數': rename_dict[col] = 'B0_爆發倍數(X)'
+                        else: rename_dict[col] = f'B0_{col}' if not col.startswith('B0_') else col
+                            
+                debug_df = pd.merge(debug_df, df_b0_debug[b0_cols].rename(columns=rename_dict), on='統一代號', how='left')
+
+            check_cols = ['統一代號', '今日上榜', '△', '法人持股', '最新動態', '5日ΔChange', '20日ΔChange', '60日ΔChange', '120日ΔChange']
+            df_b1_debug = clean_stock_id(get_df('b1_final_df'))
+            if not df_b1_debug.empty:
+                df_b1_debug = df_b1_debug[[c for c in check_cols if c in df_b1_debug.columns]].drop_duplicates(subset=['統一代號'])
+                debug_df = pd.merge(debug_df, df_b1_debug, on='統一代號', how='left')
+            
+            b2_labels = zip(['b2_1', 'b2_2', 'b2_3', 'b2_4'], ['外資成交動態', '投信成交動態', '外資發行動態', '投信發行動態'])
+            for b2_key, col_name in b2_labels:
+                df_b2_tmp = clean_stock_id(get_df(b2_key)).drop_duplicates(subset=['統一代號'])
+                if not df_b2_tmp.empty and '今日短動態' in df_b2_tmp.columns: debug_df = pd.merge(debug_df, df_b2_tmp[['統一代號', '今日短動態']].rename(columns={'今日短動態': f'B2_{col_name}'}), on='統一代號', how='left')
+
+            df_b3_main = get_df('b3_main')
+            if not df_b3_main.empty:
+                df_b3_main = clean_stock_id(df_b3_main).drop_duplicates(subset=['統一代號', '連買類型']) 
+                df_b3_main['B3_組合狀態'] = df_b3_main['連買類型'] + "(" + df_b3_main['連買週期數'].astype(str) + ")-" + df_b3_main['狀態動態']
+                b3_summary = df_b3_main.groupby('統一代號')['B3_組合狀態'].apply(lambda x: " | ".join(x)).reset_index()
+                debug_df = pd.merge(debug_df, b3_summary.rename(columns={'B3_組合狀態': 'B3_連買狀態'}), on='統一代號', how='left')
+
+            sq_df_debug = clean_stock_id(st.session_state.get('b4_squeeze_radar', {}).get('df', pd.DataFrame())).drop_duplicates(subset=['統一代號'])
+            rk_df_debug = clean_stock_id(st.session_state.get('b4_risk_radar', {}).get('df', pd.DataFrame())).drop_duplicates(subset=['統一代號'])
+            if not sq_df_debug.empty: debug_df = pd.merge(debug_df, sq_df_debug[['統一代號', '軋空評估']], on='統一代號', how='left')
+            if not rk_df_debug.empty: debug_df = pd.merge(debug_df, rk_df_debug[['統一代號', '套牢評估']], on='統一代號', how='left')
+                
+            b4_debug_keys = {'b4_margin_pct': '融資減幅', 'b4_margin_vol': '融資減張', 'b4_short_pct': '借券減幅', 'b4_short_vol': '借券減張', 'b4_margin_plus_pct': '融券增幅', 'b4_margin_plus_vol': '融券增張', 'b4_margin_inc_pct': '融資增幅', 'b4_short_inc_pct': '借券增幅', 'b4_margin_inc_vol': '融資增張', 'b4_short_inc_vol': '借券增張', 'b4_short_dec_amt': '借券實際減額', 'b4_short_inc_amt': '借券實際增額'}
+            for k, label in b4_debug_keys.items():
+                df_tmp = clean_stock_id(get_df(k)).drop_duplicates(subset=['統一代號'])
+                if not df_tmp.empty:
+                    col_today = next((c for c in df_tmp.columns if '當日' in c and ('%' in c or '張' in c)), next((c for c in df_tmp.columns if '當日' in c), None))
+                    col_5d = next((c for c in df_tmp.columns if '5日' in c and ('%' in c or '張' in c)), next((c for c in df_tmp.columns if '5日' in c), None))
+                    extract_cols = ['統一代號']
+                    rename_dict = {}
+                    if col_today:
+                        extract_cols.append(col_today)
+                        rename_dict[col_today] = f"B4_{label}_當日"
+                    if col_5d:
+                        extract_cols.append(col_5d)
+                        rename_dict[col_5d] = f"B4_{label}_5日"
+                    if '張' in label and '成交' in df_tmp.columns and col_today:
+                        df_tmp['num_today_calc'] = pd.to_numeric(df_tmp[col_today].astype(str).str.replace(',', '', regex=False), errors='coerce').fillna(0)
+                        df_tmp['price_calc'] = pd.to_numeric(df_tmp['成交'].astype(str).str.replace(',', '', regex=False), errors='coerce').fillna(0)
+                        df_tmp[f"B4_{label}_當日估算(萬)"] = (df_tmp['num_today_calc'] * df_tmp['price_calc'] * 1000 / 10000).round(1)
+                        extract_cols.append(f"B4_{label}_當日估算(萬)")
+                    if len(extract_cols) > 1: debug_df = pd.merge(debug_df, df_tmp[extract_cols].rename(columns=rename_dict), on='統一代號', how='left')
+
+            b5_debug_keys = {'b5_1000': 'B5_1000張', 'b5_800': 'B5_800張', 'b5_600': 'B5_600張', 'b5_400': 'B5_400張'}
+            for df_key, label in b5_debug_keys.items():
+                df_b5_tmp = clean_stock_id(get_df(df_key)).drop_duplicates(subset=['統一代號'])
+                if not df_b5_tmp.empty:
+                    latest_col = next((c for c in df_b5_tmp.columns if c.startswith('▼') and '6周' not in c), None)
+                    extract_cols = ['統一代號']
+                    rename_dict = {}
+                    if '週動態' in df_b5_tmp.columns:
+                        extract_cols.append('週動態')
+                        rename_dict['週動態'] = f"{label}_週動態"
+                    if latest_col:
+                        extract_cols.append(latest_col)
+                        rename_dict[latest_col] = f"{label}_最新週"
+                    if '▼6周增減' in df_b5_tmp.columns:
+                        extract_cols.append('▼6周增減')
+                        rename_dict['▼6周增減'] = f"{label}_6周"
+                    if len(extract_cols) > 1: debug_df = pd.merge(debug_df, df_b5_tmp[extract_cols].rename(columns=rename_dict), on='統一代號', how='left')
+            
+            if 'B5_1000張_週動態' in debug_df.columns and 'B5_400張_週動態' in debug_df.columns:
+                def check_resonance(row):
+                    res = []
+                    inc_1k = "增" in str(row.get('B5_1000張_週動態', ''))
+                    inc_400 = "增" in str(row.get('B5_400張_週動態', ''))
+                    if inc_1k and inc_400: res.append("雙引擎")
+                    try:
+                        v1k_wk = float(str(row.get('B5_1000張_最新週', '0')).replace('%','').replace('+',''))
+                        v1k_6wk = float(str(row.get('B5_1000張_6周', '0')).replace('%','').replace('+',''))
+                        v400_wk = float(str(row.get('B5_400張_最新週', '0')).replace('%','').replace('+',''))
+                        v400_6wk = float(str(row.get('B5_400張_6周', '0')).replace('%','').replace('+',''))
+                        if v1k_wk > 0 and v1k_6wk > 0 and v400_wk > 0 and v400_6wk > 0: res.append("長短線")
+                    except: pass
+                    return " | ".join(res) if res else ""
+                debug_df['B5_共振狀態'] = debug_df.apply(check_resonance, axis=1)
+
+            df_b6_debug = clean_stock_id(get_df('b6_today')).drop_duplicates(subset=['統一代號'])
+            if not df_b6_debug.empty:
+                b6_cols = ['統一代號', '總額(億)']
+                if dynamic_price_col_b6 and dynamic_price_col_b6 in df_b6_debug.columns and '▼收盤價' in df_b6_debug.columns:
+                    def get_debug_b6_status(row):
+                        try:
+                            prices = [float(p) for p in str(row[dynamic_price_col_b6]).split(' / ')]
+                            avg_p = sum(prices) / len(prices)
+                            c_p = float(str(row['▼收盤價']).replace(',', ''))
+                            return "🛡️ 防守成功" if c_p >= avg_p else "🚨 跌破防線"
+                        except: return "未知"
+                    df_b6_debug['B6_防守狀態'] = df_b6_debug.apply(get_debug_b6_status, axis=1)
+                    b6_cols.extend([dynamic_price_col_b6, '▼收盤價', 'B6_防守狀態'])
+                elif dynamic_price_col_b6 and dynamic_price_col_b6 in df_b6_debug.columns: b6_cols.append(dynamic_price_col_b6)
+                elif '▼收盤價' in df_b6_debug.columns: b6_cols.append('▼收盤價')
+                debug_df = pd.merge(debug_df, df_b6_debug[b6_cols].rename(columns={'總額(億)': 'B6_總額(億)', dynamic_price_col_b6: 'B6_成交均價' if dynamic_price_col_b6 else 'B6_成交均價', '▼收盤價': 'B6_收盤價'}), on='統一代號', how='left')
+
+            df_b7_pledge = clean_stock_id(get_df('b7_pledge')).drop_duplicates(subset=['統一代號'])
+            if not df_b7_pledge.empty:
+                cols = ['統一代號']
+                rename_dict = {}
+                if '全體 董監 持股 (%)' in df_b7_pledge.columns:
+                    cols.append('全體 董監 持股 (%)')
+                    rename_dict['全體 董監 持股 (%)'] = 'B7_董監持股%'
+                if '全體 董監 質押 (%)' in df_b7_pledge.columns:
+                    cols.append('全體 董監 質押 (%)')
+                    rename_dict['全體 董監 質押 (%)'] = 'B7_董監質押%'
+                debug_df = pd.merge(debug_df, df_b7_pledge[cols].rename(columns=rename_dict), on='統一代號', how='left')
+
+            df_b7_main = clean_stock_id(get_df('b7_main')).drop_duplicates(subset=['統一代號'])
+            if not df_b7_main.empty and '動態' in df_b7_main.columns:
+                b7_main_cols = ['統一代號', '近月增減%', '動態']
+                b7_main_rename = {'近月增減%': 'B7_持股近月增減%', '動態': 'B7_持股動態'}
+                if '▼近半年增減%' in df_b7_main.columns:
+                    b7_main_cols.append('▼近半年增減%')
+                    b7_main_rename['▼近半年增減%'] = 'B7_持股近半年增減%'
+                debug_df = pd.merge(debug_df, df_b7_main[b7_main_cols].rename(columns=b7_main_rename), on='統一代號', how='left')
+            df_b7_hist = clean_stock_id(get_df('b7_pledge_history')).drop_duplicates(subset=['統一代號'])
+            if not df_b7_hist.empty and '動態' in df_b7_hist.columns: debug_df = pd.merge(debug_df, df_b7_hist[['統一代號', '近月質押增減(%)', '動態']].rename(columns={'近月質押增減(%)': 'B7_質押近月增減%', '動態': 'B7_質押動態'}), on='統一代號', how='left')
+            
+            st.write(f"🔍 檢核明細 (共 {len(debug_df)} 筆)：")
+            st.dataframe(debug_df, use_container_width=True, hide_index=True)
+            st.session_state['debug_df'] = debug_df 
+    else:
+        st.info("👆 請在上方展開模組中至少設定一項條件，目前預設顯示全市場標的。")
+
+
+# ==========================================
+# 🚀 局部渲染魔法 2：計分展示與寫入功能 (避免打勾時全頁重整)
+# ==========================================
+@st.fragment
+def render_result_and_save_panel():
+    if st.session_state.get('score_calculated', False) and 'scored_result' in st.session_state:
+        result_df = st.session_state['scored_result']
+
+        st.write("---")
+        st.markdown(f"### 🏆 策略計分結果 (共 {len(result_df)} 檔獲取分數)")
+        
+        if not result_df.empty:
+            display_df = result_df[['統一代號', '股票名稱', '產業別', '總分', '得分明細']].rename(columns={'統一代號': '股票代號'})
+            display_df.insert(0, '寫入追蹤 (本週上限5檔)', False)
+            
+            st.caption("💡 勾選下方『寫入追蹤』，即可將該檔標的存入歷史模型庫中，並在「建立名單」中觀察。")
+            
+            # 💡 被 Fragment 保護的互動表格，打勾瞬間完成！
+            edited_df = st.data_editor(
+                display_df,
+                column_config={
+                    "寫入追蹤 (本週上限5檔)": st.column_config.CheckboxColumn(
+                        "寫入追蹤",
+                        help="勾選欲寫入追蹤系統的標的",
+                        default=False,
+                    ),
+                    "總分": st.column_config.NumberColumn(
+                        "總分",
+                        help="策略加權總分",
+                        format="%.1f",
+                    )
+                },
+                disabled=["股票代號", "股票名稱", "產業別", "總分", "得分明細"],
+                hide_index=True,
+                use_container_width=True,
+                key="editor_save_track"
+            )
+            
+            selected_rows = edited_df[edited_df['寫入追蹤 (本週上限5檔)'] == True]
+            
+            st.write("---")
+            col_save1, col_save2 = st.columns([1, 1])
+            with col_save1:
+                st.markdown(f"#### 💾 儲存今日策略模型 (已勾選 {len(selected_rows)} 檔)")
+            
+            with col_save2:
+                if st.button("寫入模擬追蹤 (導覽登入)", icon=":material/database:", use_container_width=True, type="primary"):
+                    if not st.session_state.get("logged_in", False):
+                        st.error("⚠️ 守衛：「寫入追蹤清單需要綁定帳號！正在為您導向登入頁面...」")
+                        import time
+                        time.sleep(1.5) 
+                        st.query_params["page"] = "login"
+                        st.rerun()
+                    else:
+                        username = st.session_state.get("username", "guest")
+                        with st.spinner("寫入中..."):
+                            try:
+                                from streamlit_gsheets import GSheetsConnection
+                                conn = st.connection("gsheets", type=GSheetsConnection)
+                                SHEET_URL = "https://docs.google.com/spreadsheets/d/1TxHDahg8ul6lmUtDN-7X75cBXbkU0jaZ3M9zg6exBgU/edit?gid=687268023#gid=687268023"                                 
+
+                                track_date = datetime.datetime.now().strftime("%Y-%m-%d")
+                                today_obj = datetime.datetime.now()
+                                monday_obj = today_obj - datetime.timedelta(days=today_obj.weekday())
+                                monday_str = monday_obj.strftime("%Y-%m-%d")
+                                
+                                try: 
+                                    old_track = conn.read(spreadsheet=SHEET_URL, worksheet="實驗室模型追蹤", ttl=0).dropna(how="all")
+                                except: 
+                                    old_track = pd.DataFrame(columns=['鎖定日期', '代號', '名稱', '鎖定收盤價', '總分', '得分明細', '當下策略特徵', '追蹤狀態', '帳號'])
+                                
+                                if '帳號' not in old_track.columns:
+                                    old_track['帳號'] = ""
+                                
+                                this_week_count = 0
+                                if not old_track.empty and '鎖定日期' in old_track.columns and '帳號' in old_track.columns:
+                                    user_mask = old_track['帳號'].astype(str).str.replace(r'\.0$', '', regex=True).str.strip().str.lower() == str(username).strip().lower()
+                                    old_track['date_obj'] = pd.to_datetime(old_track['鎖定日期'], errors='coerce')
+                                    this_week_data = old_track[(old_track['date_obj'] >= pd.to_datetime(monday_str)) & user_mask]
+                                    this_week_count = len(this_week_data)
+                                    old_track = old_track.drop(columns=['date_obj'])
+                                    
+                                if this_week_count + len(selected_rows) > 5:
+                                    st.error(f"❌ 寫入失敗：每週最多只能存取 5 檔標的。您本週已存取 {this_week_count} 檔，本次勾選 {len(selected_rows)} 檔，已達上限。")
+                                else:
+                                    save_targets = selected_rows.copy()
+                                    save_targets['鎖定日期'] = track_date
+                                    save_targets['帳號'] = username 
+                                    
+                                    df_b0_price = get_df('b0_price')
+                                    price_dict = {}
+                                    if not df_b0_price.empty and '成交' in df_b0_price.columns:
+                                        for _, row in df_b0_price.iterrows():
+                                            try: price_dict[str(row['統一代號'])] = float(str(row['成交']).replace(',', ''))
+                                            except: pass
+                                            
+                                    save_targets['鎖定收盤價'] = save_targets['股票代號'].map(price_dict).fillna(0.0)
+                                    save_targets['追蹤狀態'] = "追蹤中"
+                                    
+                                    debug_df_global = st.session_state.get('debug_df', pd.DataFrame())
+                                    save_targets['當下策略特徵'] = ""
+                                    
+                                    if not debug_df_global.empty:
+                                        debug_cols_to_keep = [c for c in debug_df_global.columns if c not in ['統一代號', '股票名稱', '產業別', '總分', '得分明細']]
+                                        for idx, row in save_targets.iterrows():
+                                            matched = debug_df_global[debug_df_global['統一代號'] == row['股票代號']]
+                                            if not matched.empty:
+                                                features = []
+                                                for col in debug_cols_to_keep:
+                                                    val = str(matched[col].iloc[0])
+                                                    if val != 'nan' and val != 'None' and val != '':
+                                                        features.append(f"{col}:{val}")
+                                                save_targets.at[idx, '當下策略特徵'] = " | ".join(features)[:1000]
+                                    else:
+                                        save_targets['當下策略特徵'] = "無詳細特徵紀錄 (未開啟除錯透視鏡)"
+                                        
+                                    final_save_df = save_targets[['鎖定日期', '股票代號', '股票名稱', '鎖定收盤價', '總分', '得分明細', '當下策略特徵', '追蹤狀態', '帳號']].rename(columns={'股票代號': '代號', '股票名稱': '名稱'})
+                                    
+                                    if not old_track.empty and '鎖定日期' in old_track.columns and '代號' in old_track.columns and '帳號' in old_track.columns:
+                                        for _, row in final_save_df.iterrows():
+                                            user_match = old_track['帳號'].astype(str).str.replace(r'\.0$', '', regex=True).str.strip().str.lower() == str(username).strip().lower()
+                                            mask = (old_track['鎖定日期'] == row['鎖定日期']) & (old_track['代號'] == row['代號']) & user_match
+                                            old_track = old_track[~mask]
+                                            
+                                    new_track = pd.concat([old_track, final_save_df], ignore_index=True)
+                                    conn.update(spreadsheet=SHEET_URL, worksheet="實驗室模型追蹤", data=new_track)
+                                    st.cache_data.clear() # 💡 寫入後清除快取，保證下次讀取最新狀態
+                                    
+                                    if 'pending_watchlist_adds' not in st.session_state:
+                                        st.session_state['pending_watchlist_adds'] = []
+                                    for _, row in final_save_df.iterrows():
+                                        item = f"{row['代號']} {row['名稱']}"
+                                        if item not in st.session_state['pending_watchlist_adds']:
+                                            st.session_state['pending_watchlist_adds'].append(item)
+                                            
+                                    st.success(f"✅ 成功將 {len(selected_rows)} 檔標的寫入模型驗證庫！(本週已使用 {this_week_count + len(selected_rows)}/5 扣打)")
+                                    st.info("💡 寫入成功！請前往「建立名單(Watchlist)」頁面查看您的專屬追蹤標的。")
+                                    
+                            except Exception as e:
+                                st.error(f"❌ 寫入失敗：{e}。請確認 Google Sheets 連線是否正常。")
+
+
+# ==========================================
+# 🌟 主程式 Entry Point
 # ==========================================
 def show_weight_backtest_page(STOCK_DICT, DATA_DIR="data"):
     if 'b0_price' not in st.session_state: sync_b0_data(DATA_DIR)
@@ -142,7 +441,6 @@ def show_weight_backtest_page(STOCK_DICT, DATA_DIR="data"):
             st.session_state['filter_b0_per'] = 0.0
             st.session_state['filter_b0_exclude_loss'] = False
             st.session_state['filter_b0_vp_status'] = []
-            # 👇 新增兩個變數
             st.session_state['filter_b0_fund_trend'] = [] 
             st.session_state['filter_b0_explode_ratio'] = 0.0
             
@@ -213,7 +511,6 @@ def show_weight_backtest_page(STOCK_DICT, DATA_DIR="data"):
     df_b0 = get_df('b0_price')
     if not df_b0.empty and '股價日期' in df_b0.columns:
         date_raw = str(df_b0['股價日期'].iloc[0])
-        # 【精準修正】針對完整的 8 碼日期 (如 20260828) 進行準確切片
         if len(date_raw) >= 8:
             b0_latest_date_str = f"{date_raw[:4]}/{date_raw[4:6]}/{date_raw[6:8]}"
         elif len(date_raw) >= 4:
@@ -249,13 +546,13 @@ def show_weight_backtest_page(STOCK_DICT, DATA_DIR="data"):
         ]
         b0_vp_status = st.multiselect("🎯 可複選您想尋找的量價型態：", vp_options, key="filter_b0_vp_status")
 
-        # 👇 在 B0 展開區塊的最下方，加入新指標
         st.markdown("**🔹 5. 資金動能與趨勢 (尋找異常點火)**")
         c_b0_7, c_b0_8 = st.columns(2)
         b0_explode_ratio = c_b0_7.number_input("🚀 今日成交額大於【5日均額】的倍數：", min_value=0.0, value=0.0, step=0.5, key="filter_b0_explode_ratio", help="設定 1.5 代表今日成交額是 5 日均額的 1.5 倍以上")
         
         fund_trend_options = ["🔥 資金湧入 (延續性強)", "⚡ 單日點火 (需觀察)", "💧 資金退潮 (動能弱)", "⚖️ 震盪換手"]
         b0_fund_trend = c_b0_8.multiselect("📈 資金延續狀態 (均額多頭排列)：", fund_trend_options, key="filter_b0_fund_trend")
+    
     # --- 模組 B1 ---
     b1_sorted_dates = st.session_state.get('b1_sorted_dates', [])
     b1_latest_date_str = "未知日期"
@@ -500,19 +797,15 @@ def show_weight_backtest_page(STOCK_DICT, DATA_DIR="data"):
         valid_b0_codes = df_b0[b0_mask]['統一代號'].unique()
         filtered_df = filtered_df[filtered_df['統一代號'].isin(valid_b0_codes)]
         
-    # === 原本的 B0 過濾邏輯 ===
-    # ... 前略 ...
     if b0_vp_status and not df_b0.empty and 'B0_量價狀態' in df_b0.columns:
         any_filter_applied = True
         valid_vp_codes = df_b0[df_b0['B0_量價狀態'].isin(b0_vp_status)]['統一代號'].unique()
         filtered_df = filtered_df[filtered_df['統一代號'].isin(valid_vp_codes)]
 
-    # 👇 新增：爆發倍數與資金趨勢的過濾邏輯
     if not df_b0.empty:
         if b0_explode_ratio > 0.0:
             if '成交額(百萬)' in df_b0.columns and '5日均額' in df_b0.columns:
                 any_filter_applied = True
-                # 為了避免除以 0，將 5日均額為 0 的設為 0.01
                 safe_avg = pd.to_numeric(df_b0['5日均額'].astype(str).str.replace(',', ''), errors='coerce').fillna(0).replace(0, 0.01)
                 today_amt = pd.to_numeric(df_b0['成交額(百萬)'].astype(str).str.replace(',', ''), errors='coerce').fillna(0)
                 df_b0['temp_ratio'] = today_amt / safe_avg
@@ -747,165 +1040,11 @@ def show_weight_backtest_page(STOCK_DICT, DATA_DIR="data"):
             any_filter_applied = True
             filtered_df = filtered_df[filtered_df['統一代號'].isin(df_b7_main[pd.to_numeric(df_b7_main['▼近半年增減%'], errors='coerce').fillna(0) > 0]['統一代號'].unique())]
 
+
     # ==========================================
-    # 過濾結果結算與 除錯透視鏡 檢核
+    # 🌟 呼叫 Fragment 1：除錯透視鏡
     # ==========================================
-    if any_filter_applied:
-        st.success(f"✅ 過濾完成！共有 **{len(filtered_df)}** 檔標的符合您的跨模組條件。")
-        debug_mode = st.checkbox("🔬 展開過濾名單")
-        if debug_mode:
-            df_b0_debug = clean_stock_id(get_df('b0_price')).drop_duplicates(subset=['統一代號'])
-            debug_df = filtered_df.copy()
-            if not df_b0_debug.empty:
-                # 👇 1. 動態計算「爆發倍數」供透視鏡核對
-                if '成交額(百萬)' in df_b0_debug.columns and '5日均額' in df_b0_debug.columns:
-                    safe_avg = pd.to_numeric(df_b0_debug['5日均額'].astype(str).str.replace(',', ''), errors='coerce').fillna(0).replace(0, 0.01)
-                    today_amt = pd.to_numeric(df_b0_debug['成交額(百萬)'].astype(str).str.replace(',', ''), errors='coerce').fillna(0)
-                    df_b0_debug['今日爆發倍數'] = (today_amt / safe_avg).round(2)
-
-                b0_cols = ['統一代號']
-                rename_dict = {}
-                
-                # 👇 2. 擴充檢核欄位：加入 '成交金額日變化率', '今日爆發倍數', '資金延續趨勢'
-                check_b0_cols = ['股價日期', '成交', '漲跌幅', '成交張數', '成交額(百萬)', 'PER', '5日均量', '5日均額', 'B0_量價狀態', '成交金額日變化率', '今日爆發倍數', '資金延續趨勢']
-                
-                for col in check_b0_cols:
-                    if col in df_b0_debug.columns:
-                        b0_cols.append(col)
-                        # 客製化名稱，讓表格更好看
-                        if col == '5日均額':
-                            rename_dict[col] = 'B0_5日均額(百萬)'
-                        elif col == '成交金額日變化率':
-                            rename_dict[col] = 'B0_金額日變化率(%)'
-                        elif col == '今日爆發倍數':
-                            rename_dict[col] = 'B0_爆發倍數(X)'
-                        else:
-                            rename_dict[col] = f'B0_{col}' if not col.startswith('B0_') else col
-                            
-                debug_df = pd.merge(debug_df, df_b0_debug[b0_cols].rename(columns=rename_dict), on='統一代號', how='left')
-
-            check_cols = ['統一代號', '今日上榜', '△', '法人持股', '最新動態', '5日ΔChange', '20日ΔChange', '60日ΔChange', '120日ΔChange']
-            df_b1_debug = df_b1_raw[[c for c in check_cols if c in df_b1_raw.columns]].drop_duplicates(subset=['統一代號'])
-            debug_df = pd.merge(debug_df, df_b1_debug, on='統一代號', how='left')
-            
-            b2_labels = zip(['b2_1', 'b2_2', 'b2_3', 'b2_4'], ['外資成交動態', '投信成交動態', '外資發行動態', '投信發行動態'])
-            for b2_key, col_name in b2_labels:
-                df_b2_tmp = clean_stock_id(get_df(b2_key)).drop_duplicates(subset=['統一代號'])
-                if not df_b2_tmp.empty and '今日短動態' in df_b2_tmp.columns: debug_df = pd.merge(debug_df, df_b2_tmp[['統一代號', '今日短動態']].rename(columns={'今日短動態': f'B2_{col_name}'}), on='統一代號', how='left')
-
-            df_b3_main = get_df('b3_main')
-            if not df_b3_main.empty:
-                df_b3_main = clean_stock_id(df_b3_main).drop_duplicates(subset=['統一代號', '連買類型']) 
-                df_b3_main['B3_組合狀態'] = df_b3_main['連買類型'] + "(" + df_b3_main['連買週期數'].astype(str) + ")-" + df_b3_main['狀態動態']
-                b3_summary = df_b3_main.groupby('統一代號')['B3_組合狀態'].apply(lambda x: " | ".join(x)).reset_index()
-                debug_df = pd.merge(debug_df, b3_summary.rename(columns={'B3_組合狀態': 'B3_連買狀態'}), on='統一代號', how='left')
-
-            sq_df_debug = clean_stock_id(st.session_state.get('b4_squeeze_radar', {}).get('df', pd.DataFrame())).drop_duplicates(subset=['統一代號'])
-            rk_df_debug = clean_stock_id(st.session_state.get('b4_risk_radar', {}).get('df', pd.DataFrame())).drop_duplicates(subset=['統一代號'])
-            if not sq_df_debug.empty: debug_df = pd.merge(debug_df, sq_df_debug[['統一代號', '軋空評估']], on='統一代號', how='left')
-            if not rk_df_debug.empty: debug_df = pd.merge(debug_df, rk_df_debug[['統一代號', '套牢評估']], on='統一代號', how='left')
-                
-            b4_debug_keys = {'b4_margin_pct': '融資減幅', 'b4_margin_vol': '融資減張', 'b4_short_pct': '借券減幅', 'b4_short_vol': '借券減張', 'b4_margin_plus_pct': '融券增幅', 'b4_margin_plus_vol': '融券增張', 'b4_margin_inc_pct': '融資增幅', 'b4_short_inc_pct': '借券增幅', 'b4_margin_inc_vol': '融資增張', 'b4_short_inc_vol': '借券增張', 'b4_short_dec_amt': '借券實際減額', 'b4_short_inc_amt': '借券實際增額'}
-            for k, label in b4_debug_keys.items():
-                df_tmp = clean_stock_id(get_df(k)).drop_duplicates(subset=['統一代號'])
-                if not df_tmp.empty:
-                    col_today = next((c for c in df_tmp.columns if '當日' in c and ('%' in c or '張' in c)), next((c for c in df_tmp.columns if '當日' in c), None))
-                    col_5d = next((c for c in df_tmp.columns if '5日' in c and ('%' in c or '張' in c)), next((c for c in df_tmp.columns if '5日' in c), None))
-                    extract_cols = ['統一代號']
-                    rename_dict = {}
-                    if col_today:
-                        extract_cols.append(col_today)
-                        rename_dict[col_today] = f"B4_{label}_當日"
-                    if col_5d:
-                        extract_cols.append(col_5d)
-                        rename_dict[col_5d] = f"B4_{label}_5日"
-                    if '張' in label and '成交' in df_tmp.columns and col_today:
-                        df_tmp['num_today_calc'] = pd.to_numeric(df_tmp[col_today].astype(str).str.replace(',', '', regex=False), errors='coerce').fillna(0)
-                        df_tmp['price_calc'] = pd.to_numeric(df_tmp['成交'].astype(str).str.replace(',', '', regex=False), errors='coerce').fillna(0)
-                        df_tmp[f"B4_{label}_當日估算(萬)"] = (df_tmp['num_today_calc'] * df_tmp['price_calc'] * 1000 / 10000).round(1)
-                        extract_cols.append(f"B4_{label}_當日估算(萬)")
-                    if len(extract_cols) > 1: debug_df = pd.merge(debug_df, df_tmp[extract_cols].rename(columns=rename_dict), on='統一代號', how='left')
-
-            b5_debug_keys = {'b5_1000': 'B5_1000張', 'b5_800': 'B5_800張', 'b5_600': 'B5_600張', 'b5_400': 'B5_400張'}
-            for df_key, label in b5_debug_keys.items():
-                df_b5_tmp = clean_stock_id(get_df(df_key)).drop_duplicates(subset=['統一代號'])
-                if not df_b5_tmp.empty:
-                    latest_col = next((c for c in df_b5_tmp.columns if c.startswith('▼') and '6周' not in c), None)
-                    extract_cols = ['統一代號']
-                    rename_dict = {}
-                    if '週動態' in df_b5_tmp.columns:
-                        extract_cols.append('週動態')
-                        rename_dict['週動態'] = f"{label}_週動態"
-                    if latest_col:
-                        extract_cols.append(latest_col)
-                        rename_dict[latest_col] = f"{label}_最新週"
-                    if '▼6周增減' in df_b5_tmp.columns:
-                        extract_cols.append('▼6周增減')
-                        rename_dict['▼6周增減'] = f"{label}_6周"
-                    if len(extract_cols) > 1: debug_df = pd.merge(debug_df, df_b5_tmp[extract_cols].rename(columns=rename_dict), on='統一代號', how='left')
-            
-            if 'B5_1000張_週動態' in debug_df.columns and 'B5_400張_週動態' in debug_df.columns:
-                def check_resonance(row):
-                    res = []
-                    inc_1k = "增" in str(row.get('B5_1000張_週動態', ''))
-                    inc_400 = "增" in str(row.get('B5_400張_週動態', ''))
-                    if inc_1k and inc_400: res.append("雙引擎")
-                    try:
-                        v1k_wk = float(str(row.get('B5_1000張_最新週', '0')).replace('%','').replace('+',''))
-                        v1k_6wk = float(str(row.get('B5_1000張_6周', '0')).replace('%','').replace('+',''))
-                        v400_wk = float(str(row.get('B5_400張_最新週', '0')).replace('%','').replace('+',''))
-                        v400_6wk = float(str(row.get('B5_400張_6周', '0')).replace('%','').replace('+',''))
-                        if v1k_wk > 0 and v1k_6wk > 0 and v400_wk > 0 and v400_6wk > 0: res.append("長短線")
-                    except: pass
-                    return " | ".join(res) if res else ""
-                debug_df['B5_共振狀態'] = debug_df.apply(check_resonance, axis=1)
-
-            df_b6_debug = clean_stock_id(get_df('b6_today')).drop_duplicates(subset=['統一代號'])
-            if not df_b6_debug.empty:
-                b6_cols = ['統一代號', '總額(億)']
-                dynamic_col = st.session_state.get('b6_dynamic_price_col')
-                if dynamic_col and dynamic_col in df_b6_debug.columns and '▼收盤價' in df_b6_debug.columns:
-                    def get_debug_b6_status(row):
-                        try:
-                            prices = [float(p) for p in str(row[dynamic_col]).split(' / ')]
-                            avg_p = sum(prices) / len(prices)
-                            c_p = float(str(row['▼收盤價']).replace(',', ''))
-                            return "🛡️ 防守成功" if c_p >= avg_p else "🚨 跌破防線"
-                        except: return "未知"
-                    df_b6_debug['B6_防守狀態'] = df_b6_debug.apply(get_debug_b6_status, axis=1)
-                    b6_cols.extend([dynamic_col, '▼收盤價', 'B6_防守狀態'])
-                elif dynamic_col and dynamic_col in df_b6_debug.columns: b6_cols.append(dynamic_col)
-                elif '▼收盤價' in df_b6_debug.columns: b6_cols.append('▼收盤價')
-                debug_df = pd.merge(debug_df, df_b6_debug[b6_cols].rename(columns={'總額(億)': 'B6_總額(億)', dynamic_col: 'B6_成交均價' if dynamic_col else 'B6_成交均價', '▼收盤價': 'B6_收盤價'}), on='統一代號', how='left')
-
-            df_b7_pledge = clean_stock_id(get_df('b7_pledge')).drop_duplicates(subset=['統一代號'])
-            if not df_b7_pledge.empty:
-                cols = ['統一代號']
-                rename_dict = {}
-                if '全體 董監 持股 (%)' in df_b7_pledge.columns:
-                    cols.append('全體 董監 持股 (%)')
-                    rename_dict['全體 董監 持股 (%)'] = 'B7_董監持股%'
-                if '全體 董監 質押 (%)' in df_b7_pledge.columns:
-                    cols.append('全體 董監 質押 (%)')
-                    rename_dict['全體 董監 質押 (%)'] = 'B7_董監質押%'
-                debug_df = pd.merge(debug_df, df_b7_pledge[cols].rename(columns=rename_dict), on='統一代號', how='left')
-
-            df_b7_main = clean_stock_id(get_df('b7_main')).drop_duplicates(subset=['統一代號'])
-            if not df_b7_main.empty and '動態' in df_b7_main.columns:
-                b7_main_cols = ['統一代號', '近月增減%', '動態']
-                b7_main_rename = {'近月增減%': 'B7_持股近月增減%', '動態': 'B7_持股動態'}
-                if '▼近半年增減%' in df_b7_main.columns:
-                    b7_main_cols.append('▼近半年增減%')
-                    b7_main_rename['▼近半年增減%'] = 'B7_持股近半年增減%'
-                debug_df = pd.merge(debug_df, df_b7_main[b7_main_cols].rename(columns=b7_main_rename), on='統一代號', how='left')
-            df_b7_hist = clean_stock_id(get_df('b7_pledge_history')).drop_duplicates(subset=['統一代號'])
-            if not df_b7_hist.empty and '動態' in df_b7_hist.columns: debug_df = pd.merge(debug_df, df_b7_hist[['統一代號', '近月質押增減(%)', '動態']].rename(columns={'近月質押增減(%)': 'B7_質押近月增減%', '動態': 'B7_質押動態'}), on='統一代號', how='left')
-            
-            st.write(f"🔍 檢核明細 (共 {len(debug_df)} 筆)：")
-            st.dataframe(debug_df, use_container_width=True, hide_index=True)
-            st.session_state['debug_df'] = debug_df 
-    else:
-        st.info("👆 請在上方展開模組中至少設定一項條件，目前預設顯示全市場標的。")
+    render_debug_panel(filtered_df, any_filter_applied, dynamic_price_col_b6)
 
     st.write("---")
 
@@ -941,7 +1080,7 @@ def show_weight_backtest_page(STOCK_DICT, DATA_DIR="data"):
             w_b7 = st.number_input("董監增持/質押降", value=1.5, step=0.5)
 
     # ==========================================
-    # 3. 執行計分運算 (Scoring Engine) - 修正互動按鈕狀態流失
+    # 3. 執行計分運算 (Scoring Engine)
     # ==========================================
     if st.button("🚀 開始計算籌碼火力分數", type="primary", use_container_width=True):
         with st.spinner("🧠 籌碼大數據融合計算中..."):
@@ -1025,155 +1164,11 @@ def show_weight_backtest_page(STOCK_DICT, DATA_DIR="data"):
                     sign = "+" if w_b7 > 0 else ""
                     score_df.loc[mask, '得分明細'] += f"[質押下降 {sign}{w_b7}] "
 
-            # 將結果鎖定到 session_state，避免互動時表格消失
             score_df = score_df.sort_values(by='總分', ascending=False).reset_index(drop=True)
             st.session_state['scored_result'] = score_df[score_df['總分'] != 0].copy()
             st.session_state['score_calculated'] = True
 
-# ==========================================
-    # 4. 結果展示 (隱藏歷史追蹤 Tab，保留寫入功能)
     # ==========================================
-    if st.session_state.get('score_calculated', False) and 'scored_result' in st.session_state:
-        result_df = st.session_state['scored_result']
-
-        st.write("---")
-        st.markdown(f"### 🏆 策略計分結果 (共 {len(result_df)} 檔獲取分數)")
-        
-        if not result_df.empty:
-            display_df = result_df[['統一代號', '股票名稱', '產業別', '總分', '得分明細']].rename(columns={'統一代號': '股票代號'})
-            display_df.insert(0, '寫入追蹤 (本週上限5檔)', False)
-            
-            st.caption("💡 勾選下方『寫入追蹤』，即可將該檔標的存入歷史模型庫中，並在「建立名單」中觀察。")
-            
-            # 互動表格
-            edited_df = st.data_editor(
-                display_df,
-                column_config={
-                    "寫入追蹤 (本週上限5檔)": st.column_config.CheckboxColumn(
-                        "寫入追蹤",
-                        help="勾選欲寫入追蹤系統的標的",
-                        default=False,
-                    ),
-                    "總分": st.column_config.NumberColumn(
-                        "總分",
-                        help="策略加權總分",
-                        format="%.1f",
-                    )
-                },
-                disabled=["股票代號", "股票名稱", "產業別", "總分", "得分明細"],
-                hide_index=True,
-                use_container_width=True,
-                key="editor_save_track"
-            )
-            
-            selected_rows = edited_df[edited_df['寫入追蹤 (本週上限5檔)'] == True]
-            
-            st.write("---")
-            col_save1, col_save2 = st.columns([1, 1])
-            with col_save1:
-                st.markdown(f"#### 💾 儲存今日策略模型 (已勾選 {len(selected_rows)} 檔)")
-            
-            with col_save2:
-                # 🎯 按下按鈕時檢查登入狀態
-                if st.button("寫入模擬追蹤 (導覽登入)", icon=":material/database:", use_container_width=True, type="primary"):
-                                    
-                    # 1. 檢查登入狀態
-                    if not st.session_state.get("logged_in", False):
-                        st.error("⚠️ 守衛：「寫入追蹤清單需要綁定帳號！正在為您導向登入頁面...」")
-                        import time
-                        time.sleep(1.5) # 稍微停頓讓使用者看到提示
-                        st.query_params["page"] = "login"
-                        st.rerun()
-                    else:
-                        # 2. 已登入才執行寫入邏輯
-                        username = st.session_state.get("username", "guest")
-                        with st.spinner("寫入中..."):
-                            try:
-                                from streamlit_gsheets import GSheetsConnection
-                                conn = st.connection("gsheets", type=GSheetsConnection)
-                                # 🎯 您的專屬 Google Sheets 網址
-                                SHEET_URL = "https://docs.google.com/spreadsheets/d/1TxHDahg8ul6lmUtDN-7X75cBXbkU0jaZ3M9zg6exBgU/edit?gid=687268023#gid=687268023"                                 
-
-                                track_date = datetime.datetime.now().strftime("%Y-%m-%d")
-                                today_obj = datetime.datetime.now()
-                                monday_obj = today_obj - datetime.timedelta(days=today_obj.weekday())
-                                monday_str = monday_obj.strftime("%Y-%m-%d")
-                                
-                                try: 
-                                    old_track = conn.read(spreadsheet=SHEET_URL, worksheet="實驗室模型追蹤", ttl=0).dropna(how="all")
-                                except: 
-                                    old_track = pd.DataFrame(columns=['鎖定日期', '代號', '名稱', '鎖定收盤價', '總分', '得分明細', '當下策略特徵', '追蹤狀態', '帳號'])
-                                
-                                # 加入自動補上 '帳號' 欄位防呆機制
-                                if '帳號' not in old_track.columns:
-                                    old_track['帳號'] = ""
-                                
-                                this_week_count = 0
-                                if not old_track.empty and '鎖定日期' in old_track.columns and '帳號' in old_track.columns:
-                                    # 只計算該使用者的本週額度
-                                    user_mask = old_track['帳號'].astype(str).str.replace(r'\.0$', '', regex=True).str.strip().str.lower() == str(username).strip().lower()
-                                    old_track['date_obj'] = pd.to_datetime(old_track['鎖定日期'], errors='coerce')
-                                    this_week_data = old_track[(old_track['date_obj'] >= pd.to_datetime(monday_str)) & user_mask]
-                                    this_week_count = len(this_week_data)
-                                    old_track = old_track.drop(columns=['date_obj'])
-                                    
-                                if this_week_count + len(selected_rows) > 5:
-                                    st.error(f"❌ 寫入失敗：每週最多只能存取 5 檔標的。您本週已存取 {this_week_count} 檔，本次勾選 {len(selected_rows)} 檔，已達上限。")
-                                else:
-                                    save_targets = selected_rows.copy()
-                                    save_targets['鎖定日期'] = track_date
-                                    save_targets['帳號'] = username # 🎯 確保把帳號寫進去！
-                                    
-                                    df_b0_price = get_df('b0_price')
-                                    price_dict = {}
-                                    if not df_b0_price.empty and '成交' in df_b0_price.columns:
-                                        for _, row in df_b0_price.iterrows():
-                                            try: price_dict[str(row['統一代號'])] = float(str(row['成交']).replace(',', ''))
-                                            except: pass
-                                            
-                                    save_targets['鎖定收盤價'] = save_targets['股票代號'].map(price_dict).fillna(0.0)
-                                    save_targets['追蹤狀態'] = "追蹤中"
-                                    
-                                    debug_df_global = st.session_state.get('debug_df', pd.DataFrame())
-                                    save_targets['當下策略特徵'] = ""
-                                    
-                                    if not debug_df_global.empty:
-                                        debug_cols_to_keep = [c for c in debug_df_global.columns if c not in ['統一代號', '股票名稱', '產業別', '總分', '得分明細']]
-                                        for idx, row in save_targets.iterrows():
-                                            matched = debug_df_global[debug_df_global['統一代號'] == row['股票代號']]
-                                            if not matched.empty:
-                                                features = []
-                                                for col in debug_cols_to_keep:
-                                                    val = str(matched[col].iloc[0])
-                                                    if val != 'nan' and val != 'None' and val != '':
-                                                        features.append(f"{col}:{val}")
-                                                save_targets.at[idx, '當下策略特徵'] = " | ".join(features)[:1000]
-                                    else:
-                                        save_targets['當下策略特徵'] = "無詳細特徵紀錄 (未開啟除錯透視鏡)"
-                                        
-                                    final_save_df = save_targets[['鎖定日期', '股票代號', '股票名稱', '鎖定收盤價', '總分', '得分明細', '當下策略特徵', '追蹤狀態', '帳號']].rename(columns={'股票代號': '代號', '股票名稱': '名稱'})
-                                    
-                                    # 避免重複寫入同一天同一檔標的 (針對該使用者)
-                                    if not old_track.empty and '鎖定日期' in old_track.columns and '代號' in old_track.columns and '帳號' in old_track.columns:
-                                        for _, row in final_save_df.iterrows():
-                                            user_match = old_track['帳號'].astype(str).str.replace(r'\.0$', '', regex=True).str.strip().str.lower() == str(username).strip().lower()
-                                            mask = (old_track['鎖定日期'] == row['鎖定日期']) & (old_track['代號'] == row['代號']) & user_match
-                                            old_track = old_track[~mask]
-                                            
-                                    new_track = pd.concat([old_track, final_save_df], ignore_index=True)
-                                    conn.update(spreadsheet=SHEET_URL, worksheet="實驗室模型追蹤", data=new_track)
-                                    
-                                    if 'pending_watchlist_adds' not in st.session_state:
-                                        st.session_state['pending_watchlist_adds'] = []
-                                    for _, row in final_save_df.iterrows():
-                                        item = f"{row['代號']} {row['名稱']}"
-                                        if item not in st.session_state['pending_watchlist_adds']:
-                                            st.session_state['pending_watchlist_adds'].append(item)
-                                            
-                                    st.success(f"✅ 成功將 {len(selected_rows)} 檔標的寫入模型驗證庫！(本週已使用 {this_week_count + len(selected_rows)}/5 扣打)")
-                                    st.info("💡 寫入成功！請前往「建立名單(Watchlist)」頁面查看您的專屬追蹤標的。")
-                                    
-                            except Exception as e:
-                                st.error(f"❌ 寫入失敗：{e}。請確認 Google Sheets 連線是否正常。")
-        else:
-            st.warning("名單中沒有標的符合您的嚴格過濾條件，或得分為 0。")
+    # 🌟 呼叫 Fragment 2：結果展示與存檔按鈕
+    # ==========================================
+    render_result_and_save_panel()
