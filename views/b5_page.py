@@ -10,6 +10,9 @@ import plotly.express as px
 # ==========================================
 # 🌟 區塊 5 專屬工具函數區 (純運算，無 UI)
 # ==========================================
+
+# 💡 效能救星 1：快取最新日期掃描，避免每次換頁重新讀硬碟
+@st.cache_data(show_spinner=False, ttl=600)
 def get_b5_latest_date(DATA_DIR):
     """掃描最新檔案日期以供標題基準日顯示"""
     global_latest = "0605"
@@ -22,9 +25,11 @@ def get_b5_latest_date(DATA_DIR):
                 global_latest = date_str
     return global_latest
 
+# 💡 效能救星 2：把 6 個級距的龐大合併與運算徹底快取
+@st.cache_data(show_spinner=False, ttl=600)
 def process_major_shareholders(DATA_DIR, target_level):
     """通用大戶資料產生器 (純後台版) - 統一處理 1000/800/600/400/200/100 張
-       特色：自動將下載的「X張以下」轉換為「X張以上」的大戶視角"""
+        特色：自動將下載的「X張以下」轉換為「X張以上」的大戶視角"""
     files = []
     for ext in ('*.csv', '*.CSV'):
         files.extend(glob.glob(os.path.join(DATA_DIR, f"*大股東*{ext}")))
@@ -149,20 +154,22 @@ def process_major_shareholders(DATA_DIR, target_level):
         
     return pd.DataFrame()
 
+
 # ==========================================
-# ⚙️ 後台資料引擎 (Data Engine)
+# ⚙️ 後台資料引擎 (Data Engine) 橋接
 # ==========================================
 def sync_b5_data(DATA_DIR):
-    """計算所有級距資料"""
+    """計算所有級距資料，並寫入 session_state"""
     st.session_state['b5_1000'] = process_major_shareholders(DATA_DIR, '1千')
     st.session_state['b5_800'] = process_major_shareholders(DATA_DIR, '800')
     st.session_state['b5_600'] = process_major_shareholders(DATA_DIR, '600')
     st.session_state['b5_400'] = process_major_shareholders(DATA_DIR, '400')
-    st.session_state['b5_200'] = process_major_shareholders(DATA_DIR, '200') # 新增
-    st.session_state['b5_100'] = process_major_shareholders(DATA_DIR, '100') # 新增
+    st.session_state['b5_200'] = process_major_shareholders(DATA_DIR, '200')
+    st.session_state['b5_100'] = process_major_shareholders(DATA_DIR, '100')
+
 
 # ==========================================
-# 🖼️ 前台畫面渲染 (Views)
+# 🖼️ 局部渲染魔法：UI 與表格的結界
 # ==========================================
 def apply_b5_market_filters(df, show_etf, show_bond):
     """前端專用過濾器"""
@@ -174,30 +181,9 @@ def apply_b5_market_filters(df, show_etf, show_bond):
     if not show_bond: mask = mask & ~is_bond
     return df[mask].copy()
 
-def show_b5_page(DATA_DIR, STOCK_DICT):
-    """B5 專屬頁面 UI 渲染"""
-    if 'b5_1000' not in st.session_state:
-        with st.spinner("⏳ 載入大股東籌碼數據中..."):
-            sync_b5_data(DATA_DIR)
-
-    st.write("---")
-    st.markdown("<div id='section-5'></div>", unsafe_allow_html=True)
-    
-    global_latest_date = get_b5_latest_date(DATA_DIR)
-
-    st.markdown(f"""
-    <div style="background: linear-gradient(90deg, rgba(15,23,42,1) 0%, rgba(14,165,233,0.3) 50%, rgba(15,23,42,1) 100%); 
-                border-top: 1px solid #38bdf8; border-bottom: 1px solid #38bdf8; padding: 15px 20px; 
-                border-radius: 10px; text-align: center; box-shadow: 0px 0px 20px rgba(56, 189, 248, 0.2); margin-bottom: 20px;">
-        <h2 style="color: #e0f2fe; margin: 0; letter-spacing: 2px; text-shadow: 0 0 15px rgba(56, 189, 248, 0.8);">
-            大腿動向
-        </h2>
-        <div style='font-size:13px; color:#00D2FF; font-weight:500; margin-top:8px;'>
-            基準日 : {global_latest_date[:2]}/{global_latest_date[2:]} 
-        </div>
-    </div>
-    """, unsafe_allow_html=True)
-
+# 💡 效能救星 3：將所有勾選與切換 Tab 封裝入 Fragment，杜絕整頁閃爍！
+@st.fragment
+def render_b5_dashboard(STOCK_DICT):
     filter_c1, filter_c2, _ = st.columns([2, 3, 5])
     show_etf = filter_c1.checkbox("顯示 ETF", value=True, key="b5_global_etf")
     show_bond = filter_c2.checkbox("顯示 債券 / 債券 ETF", value=True, key="b5_global_bond")
@@ -209,7 +195,6 @@ def show_b5_page(DATA_DIR, STOCK_DICT):
     filtered_200_df = apply_b5_market_filters(st.session_state.get('b5_200', pd.DataFrame()), show_etf, show_bond)
     filtered_100_df = apply_b5_market_filters(st.session_state.get('b5_100', pd.DataFrame()), show_etf, show_bond)
 
-    # 修改 Tabs 順序，並加入 200 與 100
     tab_long_short, tab_resonance, tab_1000, tab_800, tab_600, tab_400, tab_200, tab_100 = st.tabs([
         "🔹 長短線共振",  
         "🔹 雙引擎共振",
@@ -446,3 +431,34 @@ def show_b5_page(DATA_DIR, STOCK_DICT):
     with tab_100:
         if not filtered_100_df.empty: st.dataframe(filtered_100_df, use_container_width=True, hide_index=True)
         else: st.info("⚪ 暫無 100張大戶資料。")
+
+
+# ==========================================
+# 🖼️ 主頁面渲染入口
+# ==========================================
+def show_b5_page(DATA_DIR, STOCK_DICT):
+    """B5 專屬頁面 UI 渲染"""
+    if 'b5_1000' not in st.session_state:
+        with st.spinner("⏳ 載入大股東籌碼數據中..."):
+            sync_b5_data(DATA_DIR)
+
+    st.write("---")
+    st.markdown("<div id='section-5'></div>", unsafe_allow_html=True)
+    
+    global_latest_date = get_b5_latest_date(DATA_DIR)
+
+    st.markdown(f"""
+    <div style="background: linear-gradient(90deg, rgba(15,23,42,1) 0%, rgba(14,165,233,0.3) 50%, rgba(15,23,42,1) 100%); 
+                border-top: 1px solid #38bdf8; border-bottom: 1px solid #38bdf8; padding: 15px 20px; 
+                border-radius: 10px; text-align: center; box-shadow: 0px 0px 20px rgba(56, 189, 248, 0.2); margin-bottom: 20px;">
+        <h2 style="color: #e0f2fe; margin: 0; letter-spacing: 2px; text-shadow: 0 0 15px rgba(56, 189, 248, 0.8);">
+            大腿動向
+        </h2>
+        <div style='font-size:13px; color:#00D2FF; font-weight:500; margin-top:8px;'>
+            基準日 : {global_latest_date[:2]}/{global_latest_date[2:]} 
+        </div>
+    </div>
+    """, unsafe_allow_html=True)
+
+    # 💡 呼叫被 Fragment 保護的互動區塊
+    render_b5_dashboard(STOCK_DICT)
