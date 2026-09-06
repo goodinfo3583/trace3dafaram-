@@ -72,8 +72,6 @@ def process_margin_df(df, type_name):
     if sort_col:
         df = df.rename(columns={sort_col: '漲跌幅%'}) 
         df['漲跌幅%'] = pd.to_numeric(df['漲跌幅%'], errors='coerce').fillna(0)
-        # 移除強制用漲跌幅排序，保持原始 CSV 依靠「資券增減」排好的順序
-        # df = df.sort_values(by='漲跌幅%', ascending=False)  <-- 兇手已移除
 
     df = df.reset_index(drop=True)
     df.index = df.index + 1
@@ -82,7 +80,6 @@ def process_margin_df(df, type_name):
 def build_squeeze_radar(DATA_DIR):
     """軋空雷達運算引擎"""
     buy_pattern = os.path.join(DATA_DIR, "*三大法人買超佔成交比*.csv")
-    # 🔥 全面改採「張數」或「實際金額」檔案，杜絕 % 數雜訊
     margin_dec_pattern = os.path.join(DATA_DIR, "*融資減少張數*.csv")       
     sbl_dec_pattern = os.path.join(DATA_DIR, "*借券賣出減少金額*.csv")   
     short_inc_pattern = os.path.join(DATA_DIR, "*融券增加張數*.csv")      
@@ -141,7 +138,6 @@ def build_squeeze_radar(DATA_DIR):
                 if pd.api.types.is_float_dtype(df_squeeze[col]):
                     df_squeeze[col] = df_squeeze[col].round(2)
         
-        # 🔥 嚴格定義軋空：當日必須上漲 (漲跌幅 > 0)
         df_squeeze = df_squeeze[df_squeeze['漲跌幅'] > 0] 
     except Exception as e:
         return pd.DataFrame(), f"讀取買超母表失敗: {str(e)}", "", False
@@ -155,20 +151,16 @@ def build_squeeze_radar(DATA_DIR):
                 if t_id_col:
                     df_temp[t_id_col] = df_temp[t_id_col].astype(str).str.replace(r'\D', '', regex=True)
                     
-                    # 抓取 5日 欄位與成交價
                     col_5d = next((c for c in df_temp.columns if '5日' in c), None)
                     col_price = next((c for c in df_temp.columns if '成交' in c and '買賣' not in c), None)
                     
                     if col_5d:
-                        # 加上 abs() 取絕對值，無論原始檔案減幅是正號還是負號，只比較動能大小
                         df_temp['num_5d'] = pd.to_numeric(df_temp[col_5d].astype(str).str.replace(',', '', regex=False), errors='coerce').fillna(0).abs()
                         
                         if data_type == 'amt':
-                            # 借券金額表單位是萬元，門檻設為 1000 萬元 (一千萬)
                             valid_df = df_temp[df_temp['num_5d'] >= 1000]
                             danger_ids = set(valid_df[t_id_col])
                         elif data_type == 'vol' and col_price:
-                            # 張數表需估算金額 = 張數 * 股價 * 1000，門檻設為 10,000,000 元
                             df_temp['price'] = pd.to_numeric(df_temp[col_price].astype(str).str.replace(',', '', regex=False), errors='coerce').fillna(0)
                             valid_df = df_temp[(df_temp['num_5d'] * df_temp['price'] * 1000) >= 10000000]
                             danger_ids = set(valid_df[t_id_col])
@@ -196,7 +188,6 @@ def build_squeeze_radar(DATA_DIR):
 def build_risk_radar(DATA_DIR):
     """避險雷達運算引擎"""
     sell_pattern = os.path.join(DATA_DIR, "*三大法人賣超佔成交比*.csv")
-    # 🔥 全面改採「張數」或「實際金額」檔案
     margin_pattern = os.path.join(DATA_DIR, "*融資增加張數*.csv")
     short_pattern = os.path.join(DATA_DIR, "*借券賣出增加金額*.csv")
     
@@ -248,7 +239,6 @@ def build_risk_radar(DATA_DIR):
                 if pd.api.types.is_float_dtype(df_risk[col]):
                     df_risk[col] = df_risk[col].round(2)
         
-        # 🔥 嚴格定義套牢：當日必須下跌收黑 (漲跌幅 < 0)
         df_risk = df_risk[df_risk['漲跌幅'] < 0] 
     except Exception as e:
         return pd.DataFrame(), f"讀取賣超母表失敗: {str(e)}", "", False
@@ -269,11 +259,9 @@ def build_risk_radar(DATA_DIR):
                         df_temp['num_5d'] = pd.to_numeric(df_temp[col_5d].astype(str).str.replace(',', '', regex=False), errors='coerce').fillna(0).abs()
                         
                         if data_type == 'amt':
-                            # 借券金額表單位是萬元，門檻設為 1000 萬元 (一千萬)
                             valid_df = df_temp[df_temp['num_5d'] >= 1000]
                             danger_ids = set(valid_df[t_id_col])
                         elif data_type == 'vol' and col_price:
-                            # 張數表需估算金額 = 張數 * 股價 * 1000，門檻設為 10,000,000 元
                             df_temp['price'] = pd.to_numeric(df_temp[col_price].astype(str).str.replace(',', '', regex=False), errors='coerce').fillna(0)
                             valid_df = df_temp[(df_temp['num_5d'] * df_temp['price'] * 1000) >= 10000000]
                             danger_ids = set(valid_df[t_id_col])
@@ -299,58 +287,76 @@ def build_risk_radar(DATA_DIR):
     
     return df_risk, "Success", display_date, is_sync
 
+
 # ==========================================
-# ⚙️ 後台資料引擎 (Data Engine)：專責寫入 Session
+# 💡 效能救星 1：將複雜運算加上快取保護
 # ==========================================
-def sync_b4_data(DATA_DIR):
-    """只在背景讀取 B4 資料並寫入 session_state (完整包含 ETF/債券)"""
+@st.cache_data(show_spinner=False, ttl=300)
+def get_cached_b4_data(DATA_DIR):
+    """一次性讀取所有資券資料與雷達，並回傳字典 (Dict) 結構"""
     
     # 4-1
     df_41_pct, _ = get_specific_margin_data(DATA_DIR, "融資減少幅度")
     df_41_vol, _ = get_specific_margin_data(DATA_DIR, "融資減少張數")
-    st.session_state['df_margin_pct'] = process_margin_df(df_41_pct, "幅度")
-    st.session_state['df_margin_vol'] = process_margin_df(df_41_vol, "張數")
     
     # 4-2
     df_42_pct, _ = get_specific_margin_data(DATA_DIR, "借券賣出減少幅度")
     df_42_vol, _ = get_specific_margin_data(DATA_DIR, "借券賣出減少張數")
-    st.session_state['df_short_pct'] = process_margin_df(df_42_pct, "幅度")
-    st.session_state['df_short_vol'] = process_margin_df(df_42_vol, "張數")
 
     # 4-3
     df_43_pct, _ = get_specific_margin_data(DATA_DIR, "融券增加幅度")
     df_43_vol, _ = get_specific_margin_data(DATA_DIR, "融券增加張數")
-    st.session_state['df_margin_plus_pct'] = process_margin_df(df_43_pct, "幅度")
-    st.session_state['df_margin_plus_vol'] = process_margin_df(df_43_vol, "張數")
 
-    # 解鎖額外的增幅數據供策略實驗室使用
+    # 回測隱藏版
     df_inc_margin_pct, _ = get_specific_margin_data(DATA_DIR, "融資增加幅度")
-    st.session_state['df_margin_inc_pct'] = process_margin_df(df_inc_margin_pct, "幅度")
     df_inc_margin_vol, _ = get_specific_margin_data(DATA_DIR, "融資增加張數")
-    st.session_state['df_margin_inc_vol'] = process_margin_df(df_inc_margin_vol, "張數")
-    
     df_inc_short_pct, _ = get_specific_margin_data(DATA_DIR, "借券賣出增加幅度")
-    st.session_state['df_short_inc_pct'] = process_margin_df(df_inc_short_pct, "幅度")
     df_inc_short_vol, _ = get_specific_margin_data(DATA_DIR, "借券賣出增加張數")
-    st.session_state['df_short_inc_vol'] = process_margin_df(df_inc_short_vol, "張數")
-    # 解鎖借券實際金額資料
     df_inc_short_amt, _ = get_specific_margin_data(DATA_DIR, "借券賣出增加金額")
-    st.session_state['df_short_inc_amt'] = process_margin_df(df_inc_short_amt, "金額")
     df_dec_short_amt, _ = get_specific_margin_data(DATA_DIR, "借券賣出減少金額")
-    st.session_state['df_short_dec_amt'] = process_margin_df(df_dec_short_amt, "金額")
     
-    # 4-4, 4-5
+    # 雷達
     df_squeeze, _, date_sq, sync_sq = build_squeeze_radar(DATA_DIR)
-    st.session_state['b4_squeeze_radar'] = {'df': df_squeeze, 'date': date_sq, 'sync': sync_sq}
-    
     df_risk, _, date_rk, sync_rk = build_risk_radar(DATA_DIR)
-    st.session_state['b4_risk_radar'] = {'df': df_risk, 'date': date_rk, 'sync': sync_rk}
+
+    return {
+        'df_margin_pct': process_margin_df(df_41_pct, "幅度"),
+        'df_margin_vol': process_margin_df(df_41_vol, "張數"),
+        'df_short_pct': process_margin_df(df_42_pct, "幅度"),
+        'df_short_vol': process_margin_df(df_42_vol, "張數"),
+        'df_margin_plus_pct': process_margin_df(df_43_pct, "幅度"),
+        'df_margin_plus_vol': process_margin_df(df_43_vol, "張數"),
+        
+        # 供權重回測使用的隱藏資券資料
+        'df_margin_inc_pct': process_margin_df(df_inc_margin_pct, "幅度"),
+        'df_margin_inc_vol': process_margin_df(df_inc_margin_vol, "張數"),
+        'df_short_inc_pct': process_margin_df(df_inc_short_pct, "幅度"),
+        'df_short_inc_vol': process_margin_df(df_inc_short_vol, "張數"),
+        'df_short_inc_amt': process_margin_df(df_inc_short_amt, "金額"),
+        'df_short_dec_amt': process_margin_df(df_dec_short_amt, "金額"),
+        
+        # 雷達
+        'b4_squeeze_radar': {'df': df_squeeze, 'date': date_sq, 'sync': sync_sq},
+        'b4_risk_radar': {'df': df_risk, 'date': date_rk, 'sync': sync_rk}
+    }
+
 
 # ==========================================
-# 🖼️ 前台畫面渲染 (Views)
+# ⚙️ 後台資料引擎 (橋接函式)
 # ==========================================
+def sync_b4_data(DATA_DIR):
+    """將快取的結果寫入 session_state，完美相容權重回測與側邊欄"""
+    cached_data = get_cached_b4_data(DATA_DIR)
+    for k, v in cached_data.items():
+        st.session_state[k] = v
+
+
+# ==========================================
+# 🖼️ 局部渲染魔法區域 (Fragments)
+# ==========================================
+
 def apply_ui_filter(df, show_etf, show_bond):
-    """前端專用過濾器，確保 UI 勾選不影響底層計分"""
+    """前端專用過濾器"""
     if df is None or df.empty: return df
     mask = (df['股票代號'].str.len() == 4)
     if show_etf: mask |= ((df['股票代號'].str.len() >= 5) & (~df['股票代號'].str.endswith('B')))
@@ -360,7 +366,6 @@ def apply_ui_filter(df, show_etf, show_bond):
     return res_df
 
 def render_styled_margin_table(clean_df):
-    """重新封裝的 st.dataframe 原生表格渲染器"""
     if clean_df.empty:
         st.warning("⚠️ 無相符資料")
         return
@@ -392,20 +397,10 @@ def render_styled_margin_table(clean_df):
     }
     st.dataframe(styled_df, use_container_width=True, hide_index=True, column_config=col_config)
 
-def show_b4_page(DATA_DIR):
-    """B4 專屬頁面 UI 渲染"""
-    if 'b4_squeeze_radar' not in st.session_state:
-        with st.spinner("⏳ 載入資券數據與雷達中..."):
-            sync_b4_data(DATA_DIR)
 
-    st.write("---")
-    st.markdown("<div id='section-4'></div>", unsafe_allow_html=True)
-    st.header("資券動向與雷達偵測")
-
-    # ==================== 4-4 軋空雷達 (移至首位) ====================
-    sq_data = st.session_state['b4_squeeze_radar']
+@st.fragment
+def render_b4_squeeze_radar(sq_data):
     df_squeeze = sq_data['df']
-    
     header_html = "可能軋空雷達 "
     if sq_data['date']:
         header_html += f"<span style='color: #00D2FF; font-size: 0.7em;'>({sq_data['date']})</span>"
@@ -415,7 +410,7 @@ def show_b4_page(DATA_DIR):
     st.write("💡 觀察法人們買超，且伴隨融資退場、借券回補或融券逆勢增加的潛在軋空標的。")
 
     if not df_squeeze.empty:
-        show_all_sq = st.checkbox("顯示榜內被法人買超的上漲標的，但籌碼未見軋空特徵", value=False)
+        show_all_sq = st.checkbox("顯示榜內被法人買超的上漲標的，但籌碼未見軋空特徵", value=False, key="b4_sq_chk")
         df_sq_display = df_squeeze.copy()
         
         if not show_all_sq:
@@ -424,7 +419,6 @@ def show_b4_page(DATA_DIR):
         if df_sq_display.empty:
             st.success("🎉 目前沒有同時出現法人買超與軋空特徵的強勢名單！")
         else:
-            # 轉換為原生 st.dataframe 支援的 Pandas Style
             def highlight_squeeze(row):
                 return ['color: #ff4b4b;' if c in ['成交', '漲跌價', '漲跌幅'] else '' for c in row.index]
             
@@ -433,12 +427,10 @@ def show_b4_page(DATA_DIR):
     else:
         st.warning("軋空雷達載入失敗或無資料。")
 
-    st.write("---")
 
-    # ==================== 4-5 套牢名單 (移至第二位) ====================
-    rk_data = st.session_state['b4_risk_radar']
+@st.fragment
+def render_b4_risk_radar(rk_data):
     df_risk = rk_data['df']
-    
     header_html = "短線套牢名單 "
     if rk_data['date']:
         header_html += f"<span style='color: #00D2FF; font-size: 0.7em;'>({rk_data['date']})</span>"
@@ -448,7 +440,7 @@ def show_b4_page(DATA_DIR):
     st.write("💡 法人們賣超，且股價下跌融資套牢或借券增加的籌碼惡化標的。")
 
     if not df_risk.empty:
-        show_all_rk = st.checkbox("顯示榜內被法人賣超的下跌/持平標的但融資借券未上榜", value=False)
+        show_all_rk = st.checkbox("顯示榜內被法人賣超的下跌/持平標的但融資借券未上榜", value=False, key="b4_rk_chk")
         df_rk_display = df_risk.copy()
         
         if not show_all_rk:
@@ -470,8 +462,9 @@ def show_b4_page(DATA_DIR):
     else:
         st.warning("避險雷達載入失敗或無資料。")
 
-    # ==================== 4-1 融資減少 ====================
-    st.write("---")
+
+@st.fragment
+def render_b4_margin_dec(df_pct, df_vol):
     st.markdown(f"### 融資減少動向", unsafe_allow_html=True)
     f_col1, f_col2, _ = st.columns([1, 1, 2])
     with f_col1: show_etf_41 = st.checkbox("顯示 ETF", value=True, key="margin_show_etf")
@@ -480,13 +473,14 @@ def show_b4_page(DATA_DIR):
     c1, c2 = st.columns(2)
     with c1:
         st.markdown("<h3 style='margin-top: 0; margin-bottom: 10px;'>📉 融資減少比例排名</h3>", unsafe_allow_html=True)
-        render_styled_margin_table(apply_ui_filter(st.session_state['df_margin_pct'], show_etf_41, show_bond_41))
+        render_styled_margin_table(apply_ui_filter(df_pct, show_etf_41, show_bond_41))
     with c2:
         st.markdown("<h3 style='margin-top: 0; margin-bottom: 10px;'>📉 融資減少張數排名</h3>", unsafe_allow_html=True)
-        render_styled_margin_table(apply_ui_filter(st.session_state['df_margin_vol'], show_etf_41, show_bond_41))
+        render_styled_margin_table(apply_ui_filter(df_vol, show_etf_41, show_bond_41))
 
-    # ==================== 4-2 借券賣出減少 ====================
-    st.write("---")
+
+@st.fragment
+def render_b4_sbl_dec(df_pct, df_vol):
     st.markdown(f"### 借券賣出減少動向", unsafe_allow_html=True)
     f_col1, f_col2, _ = st.columns([1, 1, 2])
     with f_col1: show_etf_42 = st.checkbox("顯示 ETF", value=True, key="stock_show_etf_42")
@@ -495,13 +489,14 @@ def show_b4_page(DATA_DIR):
     c1, c2 = st.columns(2)
     with c1:
         st.markdown("<h3 style='margin-top: 0; margin-bottom: 10px;'>📉 借券賣出減少比例排名</h3>", unsafe_allow_html=True)
-        render_styled_margin_table(apply_ui_filter(st.session_state['df_short_pct'], show_etf_42, show_bond_42))
+        render_styled_margin_table(apply_ui_filter(df_pct, show_etf_42, show_bond_42))
     with c2:
         st.markdown("<h3 style='margin-top: 0; margin-bottom: 10px;'>📉 借券賣出減少張數排名</h3>", unsafe_allow_html=True)
-        render_styled_margin_table(apply_ui_filter(st.session_state['df_short_vol'], show_etf_42, show_bond_42))
+        render_styled_margin_table(apply_ui_filter(df_vol, show_etf_42, show_bond_42))
 
-    # ==================== 4-3 融券增加 ====================
-    st.write("---")
+
+@st.fragment
+def render_b4_short_inc(df_pct, df_vol):
     st.markdown(f"### 融券增加動向", unsafe_allow_html=True)
     f_col1, f_col2, _ = st.columns([1, 1, 2])
     with f_col1: show_etf_43 = st.checkbox("顯示 ETF", value=True, key="stock_show_etf_43")
@@ -510,7 +505,44 @@ def show_b4_page(DATA_DIR):
     c1, c2 = st.columns(2)
     with c1:
         st.markdown("<h3 style='margin-top: 0; margin-bottom: 10px;'>📈 融券增加比例排名</h3>", unsafe_allow_html=True)
-        render_styled_margin_table(apply_ui_filter(st.session_state['df_margin_plus_pct'], show_etf_43, show_bond_43))
+        render_styled_margin_table(apply_ui_filter(df_pct, show_etf_43, show_bond_43))
     with c2:
         st.markdown("<h3 style='margin-top: 0; margin-bottom: 10px;'>📈 融券增加張數排名</h3>", unsafe_allow_html=True)
-        render_styled_margin_table(apply_ui_filter(st.session_state['df_margin_plus_vol'], show_etf_43, show_bond_43))
+        render_styled_margin_table(apply_ui_filter(df_vol, show_etf_43, show_bond_43))
+
+
+# ==========================================
+# 🖼️ 主渲染入口
+# ==========================================
+def show_b4_page(DATA_DIR):
+    """B4 專屬頁面 UI 渲染"""
+    
+    # 💡 效能救星啟動：直接呼叫快取取得資料
+    cached_data = get_cached_b4_data(DATA_DIR)
+    
+    # 將需要提供給側邊欄或權重回測的資料，同步回 session_state
+    for k, v in cached_data.items():
+        st.session_state[k] = v
+
+    st.write("---")
+    st.markdown("<div id='section-4'></div>", unsafe_allow_html=True)
+    st.header("資券動向與雷達偵測")
+
+    # ==================== 4-4 軋空雷達 ====================
+    render_b4_squeeze_radar(cached_data['b4_squeeze_radar'])
+    st.write("---")
+    
+    # ==================== 4-5 套牢名單 ====================
+    render_b4_risk_radar(cached_data['b4_risk_radar'])
+    st.write("---")
+    
+    # ==================== 4-1 融資減少 ====================
+    render_b4_margin_dec(cached_data['df_margin_pct'], cached_data['df_margin_vol'])
+    st.write("---")
+    
+    # ==================== 4-2 借券賣出減少 ====================
+    render_b4_sbl_dec(cached_data['df_short_pct'], cached_data['df_short_vol'])
+    st.write("---")
+    
+    # ==================== 4-3 融券增加 ====================
+    render_b4_short_inc(cached_data['df_margin_plus_pct'], cached_data['df_margin_plus_vol'])
