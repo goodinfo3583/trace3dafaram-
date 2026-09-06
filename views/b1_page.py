@@ -849,20 +849,35 @@ def show_b1_page(DATA_DIR, STOCK_DICT):
     
     down_final_df = st.session_state.get('b1_down_final_df', pd.DataFrame())
     down_date_cols = st.session_state.get('b1_down_date_cols', [])
-
+    #頁面標題
     st.write("---")
     st.markdown("<div id='section-1'></div>", unsafe_allow_html=True)
-
     if sorted_dates:
         latest_d = sorted_dates[0]
         fmt_date = f"{latest_d[:4]}/{latest_d[4:6]}/{latest_d[6:]}"
-        st.markdown(
-            f"<h2 style='margin-bottom: 0px;'>法人動向：三大法人短中長線持股比追蹤 "
-            f"<span style='color:#00D2FF; font-size:16px; font-weight:500; margin-left:12px;'>基準日：{fmt_date}</span></h2>", 
-            unsafe_allow_html=True
-        )
+        
+        # 有日期資料時，將 fmt_date 塞入 f-string 組合的 HTML 中
+        st.markdown(f"""
+        <div style="background: linear-gradient(90deg, rgba(15,23,42,1) 0%, rgba(14,165,233,0.3) 50%, rgba(15,23,42,1) 100%); 
+                    border-top: 1px solid #38bdf8; border-bottom: 1px solid #38bdf8; padding: 15px 20px; 
+                    border-radius: 10px; text-align: center; box-shadow: 0px 0px 20px rgba(56, 189, 248, 0.2); margin-bottom: 30px;">
+            <h2 style="color: #e0f2fe; margin: 0; letter-spacing: 2px; text-shadow: 0 0 15px rgba(56, 189, 248, 0.8);">
+                法人動向：三大法人短中長線持股比追蹤
+                <span style="color:#00D2FF; font-size:16px; font-weight:500; margin-left:12px; text-shadow: none;">基準日：{fmt_date}</span>
+            </h2>
+        </div>
+        """, unsafe_allow_html=True)
     else:
-        st.markdown("<h2 style='margin-bottom: 0px;'>👑 區塊1：三大法人短中長線持股比追蹤</h2>", unsafe_allow_html=True)
+        # 沒有日期資料時，純顯示大標題
+        st.markdown("""
+        <div style="background: linear-gradient(90deg, rgba(15,23,42,1) 0%, rgba(14,165,233,0.3) 50%, rgba(15,23,42,1) 100%); 
+                    border-top: 1px solid #38bdf8; border-bottom: 1px solid #38bdf8; padding: 15px 20px; 
+                    border-radius: 10px; text-align: center; box-shadow: 0px 0px 20px rgba(56, 189, 248, 0.2); margin-bottom: 30px;">
+            <h2 style="color: #e0f2fe; margin: 0; letter-spacing: 2px; text-shadow: 0 0 15px rgba(56, 189, 248, 0.8);">
+                法人動向：三大法人短中長線持股比追蹤
+            </h2>
+        </div>
+        """, unsafe_allow_html=True)
 
     # 1. 站長快照專區
     local_latest_date = "無紀錄"
