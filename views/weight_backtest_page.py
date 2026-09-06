@@ -520,21 +520,34 @@ def show_weight_backtest_page(STOCK_DICT, DATA_DIR="data"):
     b0_latest_date_str = "未知日期"
     df_b0 = get_df('b0_price')
     if not df_b0.empty and '股價日期' in df_b0.columns:
-        date_raw = str(df_b0['股價日期'].iloc[0])
+        # 確保取出來的資料是字串，並去掉頭尾多餘空白
+        date_raw = str(df_b0['股價日期'].iloc[0]).strip()
         try:
-            # 💡 直接使用 pd，因為已經在檔案最上方 import 過了
-            b0_latest_date_str = pd.to_datetime(date_raw).strftime("%Y/%m/%d")
+            # 1. 先處理「只有 月/日」的格式 (例如 "09/04")
+            parts = date_raw.replace("-", "/").split("/")
+            if len(parts) == 2:
+                # 發現只有兩段，手動補上 2026 年
+                b0_latest_date_str = f"2026/{parts[0].zfill(2)}/{parts[1].zfill(2)}"
+            else:
+                # 2. 交給 pandas 解析完整日期
+                dt = pd.to_datetime(date_raw)
+                # 如果年份解析出來異常 (例如被當作 0001 年或 1900 年)，強制校正為 2026
+                if dt.year < 2000:
+                    b0_latest_date_str = f"2026/{dt.month:02d}/{dt.day:02d}"
+                else:
+                    b0_latest_date_str = dt.strftime("%Y/%m/%d")
         except Exception:
-            # 備用方案 (防止非標準日期格式報錯，保留你的防呆機制)
+            # 3. 備用方案 (針對完全無法被 pd.to_datetime 解析的特殊字串，如 "1150904" 或 "0904")
             clean_date = date_raw.replace("-", "").replace("/", "").split(" ")[0]
             if len(clean_date) >= 8:
                 b0_latest_date_str = f"{clean_date[:4]}/{clean_date[4:6]}/{clean_date[6:8]}"
             elif len(clean_date) >= 4:
                 b0_latest_date_str = f"2026/{clean_date[-4:-2]}/{clean_date[-2:]}"
             else:
-                b0_latest_date_str = date_raw   
-                
+                b0_latest_date_str = date_raw
+
     with st.expander(f"💰 B0 量價掃描過濾 (資料基準日: {b0_latest_date_str})", expanded=False):
+
         st.markdown("**🔹 1. 流動性過濾 (剔除冷門股/殭屍股)**")
         c_b0_1, c_b0_2 = st.columns(2)
         b0_vol_min = c_b0_1.number_input("📈 當日成交張數大於 (張)：", min_value=0, value=0, step=500, key="filter_b0_vol")
