@@ -81,23 +81,66 @@ def apply_global_theme(image_path="./image/派對盛宴邀請.png"):
         window.parent.window.customDragDelegated = true;
         const doc = window.parent.document;
         
-        // --- 1. 一鍵收合邏輯 ---
+        // --- 1. 一鍵收合邏輯 (展開 -> 最小化 -> 隱藏 -> 展開 3階段循環) ---
         doc.addEventListener('click', (e) => {
             let isIconCard = false;
             let t = e.target;
+            
+            // 判斷點擊的是否為 Icon Card
             if (t.tagName === 'IMG' && ((t.src && t.src.includes('icon-card')) || (t.alt && t.alt.includes('icon-card')))) { isIconCard = true; } 
             else if (t.closest) {
                 let parentImg = t.closest('div[data-testid="stImage"]')?.querySelector('img');
                 if (parentImg && ((parentImg.src && parentImg.src.includes('icon-card')) || (parentImg.alt && parentImg.alt.includes('icon-card')))) { isIconCard = true; }
             }
+            
             if (isIconCard) {
                 e.preventDefault(); e.stopPropagation();
-                let cb2 = doc.getElementById('min-b2-card'), cb3 = doc.getElementById('min-card'), cb4 = doc.getElementById('min-b4-card'), cb5 = doc.getElementById('min-b5-card');
-                let anyOpen = (cb2 && !cb2.checked) || (cb3 && !cb3.checked) || (cb4 && !cb4.checked) || (cb5 && !cb5.checked);
-                if (cb2) cb2.checked = anyOpen; if (cb3) cb3.checked = anyOpen; if (cb4) cb4.checked = anyOpen; if (cb5) cb5.checked = anyOpen;
+                
+                // 取得 4 個卡片的最小化 (min) 與 關閉 (close) Checkbox
+                const getCb = (id) => doc.getElementById(id);
+                // B2, B3(min-card, close-card), B4, B5
+                const minCbs = [getCb('min-b2-card'), getCb('min-card'), getCb('min-b4-card'), getCb('min-b5-card')];
+                const closeCbs = [getCb('close-b2-card'), getCb('close-card'), getCb('close-b4-card'), getCb('close-b5-card')];
+                
+                // 判斷當前 4 張卡片的整體狀態
+                let isAnyOpen = false;
+                let isAnyMinimized = false;
+                
+                for (let i = 0; i < 4; i++) {
+                    let minCb = minCbs[i];
+                    let closeCb = closeCbs[i];
+                    if (minCb && closeCb) {
+                        // 如果沒有被關閉，且沒有被最小化，代表目前有卡片是「完全展開」的
+                        if (!closeCb.checked && !minCb.checked) isAnyOpen = true;
+                        // 如果沒有被關閉，但是被最小化了，代表目前有卡片是「最小化」的
+                        if (!closeCb.checked && minCb.checked) isAnyMinimized = true;
+                    }
+                }
+                
+                // 決定下一個循環狀態
+                let nextMin = false;
+                let nextClose = false;
+                
+                if (isAnyOpen) {
+                    // 點擊第 1 次：只要有卡片是展開的 -> 全部轉為「最小化」
+                    nextMin = true;
+                    nextClose = false;
+                } else if (isAnyMinimized) {
+                    // 點擊第 2 次：已經是最小化了 -> 全部轉為「完全隱藏」
+                    nextMin = false;  // 將最小化狀態取消
+                    nextClose = true; // 開啟隱藏狀態
+                } else {
+                    // 點擊第 3 次：已經完全隱藏 -> 全部轉為「展開」
+                    nextMin = false;
+                    nextClose = false;
+                }
+                
+                // 套用新狀態到所有 Checkbox，同步覆蓋掉先前可能出錯的狀態 (徹底解決喚醒失敗)
+                minCbs.forEach(cb => { if (cb) cb.checked = nextMin; });
+                closeCbs.forEach(cb => { if (cb) cb.checked = nextClose; });
             }
         }, true);
-
+        
         // --- 2. 拖曳引擎 ---
         let isDragging = false, currentEl = null, startX, startY, initialX, initialY;
         const onDown = (e) => {
