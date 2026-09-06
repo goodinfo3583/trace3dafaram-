@@ -32,6 +32,7 @@ def apply_global_theme(image_path="./image/派對盛宴邀請.png"):
         'green':  {'rgb': '0, 54, 16',    'img': './image/翡翠林鎮.png'},
         'purple': {'rgb': '87, 99, 158',  'img': './image/月下綠洲城.png'},
         'brown':  {'rgb': '161, 115, 0',  'img': './image/沙漠衛星都市.png'},
+        'blue':  {'rgb': '135, 206, 235',  'img': './image/漂浮之都藍晶港.png'},
         'dark':   {'rgb': '15, 23, 42',   'img': image_path}
     }
     

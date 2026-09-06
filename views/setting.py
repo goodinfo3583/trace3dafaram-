@@ -18,11 +18,11 @@ def render():
     # 🔥 讀取效能模式
     current_perf_mode = st.session_state.get('performance_mode', False)
     
-    theme_options = ['dark', 'pink', 'green', 'purple','brown']
+    theme_options = ['dark', 'pink', 'green', 'purple','brown','blue']
     theme_choice = st.radio(
         "選擇背景主題 (將同步切換圖片)：", 
         options=theme_options, 
-        format_func=lambda x: {'dark': "暗黑(預設)", 'pink': "鋼鐵褐", 'green': "翡翠綠", 'purple': "月影紫", 'brown':"沙漠棕"}[x], 
+        format_func=lambda x: {'dark': "暗黑(預設)", 'pink': "鋼鐵褐", 'green': "翡翠綠", 'purple': "月影紫", 'brown':"沙漠棕",'blue': "天空藍"}[x], 
         index=theme_options.index(current_theme) if current_theme in theme_options else 0, 
         horizontal=True
     )
