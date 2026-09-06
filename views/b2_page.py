@@ -198,7 +198,18 @@ def sync_b2_data(DATA_DIR):
 # ==========================================
 # 🚀 局部渲染魔法：四個獨立的 Fragment (避免勾選時畫面跳動)
 # ==========================================
-
+    st.write("---")
+    st.markdown("<div id='section-2'></div>", unsafe_allow_html=True)
+    st.markdown("""
+    <div style="background: linear-gradient(90deg, rgba(15,23,42,1) 0%, rgba(14,165,233,0.3) 50%, rgba(15,23,42,1) 100%); 
+                border-top: 1px solid #38bdf8; border-bottom: 1px solid #38bdf8; padding: 15px 20px; 
+                border-radius: 10px; text-align: center; box-shadow: 0px 0px 20px rgba(56, 189, 248, 0.2); margin-bottom: 20px;">
+        <h2 style="color: #e0f2fe; margin: 0; letter-spacing: 2px; text-shadow: 0 0 15px rgba(56, 189, 248, 0.8);">
+            法人掃貨
+        </h2>
+    </div>
+    """, unsafe_allow_html=True)
+    
 @st.fragment
 def render_b2_1(df_21):
     st.write("---")
