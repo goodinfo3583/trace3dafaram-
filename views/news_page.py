@@ -125,7 +125,15 @@ def render_news_dashboard():
 # ==========================================
 def show_news_page():
     """市場消息頁面 UI 渲染"""
-    st.title("市場消息")
+    st.markdown("""
+    <div style="background: linear-gradient(90deg, rgba(15,23,42,1) 0%, rgba(14,165,233,0.3) 50%, rgba(15,23,42,1) 100%); 
+                border-top: 1px solid #38bdf8; border-bottom: 1px solid #38bdf8; padding: 15px 20px; 
+                border-radius: 10px; text-align: center; box-shadow: 0px 0px 20px rgba(56, 189, 248, 0.2); margin-bottom: 20px;">
+        <h2 style="color: #e0f2fe; margin: 0; letter-spacing: 2px; text-shadow: 0 0 15px rgba(56, 189, 248, 0.8);">
+            市場消息
+        </h2>
+    </div>
+    """, unsafe_allow_html=True)
     
     # 💡 呼叫被 Fragment 隔離的互動區塊
     render_news_dashboard()

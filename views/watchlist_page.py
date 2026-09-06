@@ -675,7 +675,15 @@ def render_tab_custom(username, conn, SHEET_URL, STOCK_DICT):
 # 🎨 畫面渲染主程式 (裝載所有 Fragment)
 # ==========================================
 def show_watchlist_page(STOCK_DICT=None, conn=None, SHEET_URL=None):
-    st.title("冒險者專屬追蹤名單")
+    st.markdown("""
+    <div style="background: linear-gradient(90deg, rgba(15,23,42,1) 0%, rgba(14,165,233,0.3) 50%, rgba(15,23,42,1) 100%); 
+                border-top: 1px solid #38bdf8; border-bottom: 1px solid #38bdf8; padding: 15px 20px; 
+                border-radius: 10px; text-align: center; box-shadow: 0px 0px 20px rgba(56, 189, 248, 0.2); margin-bottom: 20px;">
+        <h2 style="color: #e0f2fe; margin: 0; letter-spacing: 2px; text-shadow: 0 0 15px rgba(56, 189, 248, 0.8);">
+            自選名單
+        </h2>
+    </div>
+    """, unsafe_allow_html=True)
 
     # 🔒 門禁系統
     if not st.session_state.get("logged_in", False):
