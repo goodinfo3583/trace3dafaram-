@@ -1,5 +1,6 @@
 # components/style_manager.py
 import streamlit as st
+import pandas as pd
 import base64
 import os
 import random
@@ -7,7 +8,6 @@ import streamlit.components.v1 as components
 
 # ==========================================
 # 💡 效能救星：全域快取 Base64 圖片編碼
-# 這樣每次點擊按鈕時，就不會重新讀取硬碟跟消耗 CPU 運算
 # ==========================================
 @st.cache_data(show_spinner=False)
 def get_cached_base64_image(image_path):
@@ -193,7 +193,6 @@ def render_marquee():
     image_tags, delay_css = "", ""
     for i, img_name in enumerate(image_files):
         img_path = os.path.join(image_folder, img_name)
-        # 💡 使用快取讀取跑馬燈圖片，避免每次點擊重複編碼拖垮效能
         img_base64 = get_cached_base64_image(img_path)
         if img_base64:
             image_tags += f'<img class="slide slide-{i}" src="{img_base64}">'
@@ -214,8 +213,6 @@ def render_marquee():
 #跑馬燈懸浮卡片
 #B2法人掃貨
 def render_b2_top10_glass_card():
-    import pandas as pd
-    import streamlit as st
     if 'df_blk2_1' not in st.session_state: return
     try:
         raw_df_21 = st.session_state.get('df_blk2_1', pd.DataFrame()) 
@@ -243,7 +240,7 @@ def render_b2_top10_glass_card():
             html = "<ul style='padding-left: 0; margin: 0; list-style-type: none;'>"
             for i, row in enumerate(df.to_dict('records')):
                 val = row.get(val_col, 0)
-                cs = row.get('今日短動態', '').split('(')[0].strip()             
+                cs = row.get('今日短動態', '').split('(')[0].strip()              
                 if "轉賣反轉" in cs: short_status = "🚨轉賣"
                 elif "卡位" in cs: short_status = "🆕卡位"
                 elif "加碼" in cs: short_status = "🔥加碼"
@@ -281,7 +278,6 @@ def render_b2_top10_glass_card():
 #pause-b2-card:checked ~ #b2-top10-card .pause-icon-b2::after {{ content: '▶'; font-size: 11px; color: #FFD700; }}
 #pause-b2-card:not(:checked) ~ #b2-top10-card .pause-icon-b2::after {{ content: '⏸'; font-size: 11px; }}
 @keyframes slideInDownB2 {{ from {{ transform: translateY(-50%); opacity: 0; }} to {{ transform: translateY(0); opacity: 1; }} }}
-/* 💡 將 top: 75px 改為 top: 100px */
 .glass-panel-b2 {{position: fixed; top: 85px; left: 84.5vw; width: 15.5vw; min-width: 220px; background: rgba(30, 20, 20, 0.88); backdrop-filter: blur(12px); -webkit-backdrop-filter: blur(12px); border: 1px solid rgba(255, 76, 76, 0.35); border-radius: 0 12px 12px 0; padding: 10px 12px; z-index: 999998; color: #E2E8F0; animation: slideInDownB2 0.9s cubic-bezier(0.25, 0.8, 0.25, 1); transition: all 0.3s ease; box-sizing: border-box; }}
 .header-bar-b2 {{ display: flex; justify-content: space-between; align-items: center; border-bottom: 1px solid rgba(255,255,255,0.1); padding-bottom: 6px; margin-bottom: 8px; cursor: default; }}
 .header-title-b2 {{ font-size: 13px; font-weight: bold; color: #FF7676; white-space:nowrap; }}
@@ -318,8 +314,6 @@ def render_b2_top10_glass_card():
 
 #B3法人連買
 def render_top10_glass_card():
-    import pandas as pd
-    import streamlit as st
     if 'b3_data' not in st.session_state: return
     try:
         raw_fo_day_df, date_fo_day = st.session_state['b3_data']['fo_day']
@@ -410,8 +404,6 @@ def render_top10_glass_card():
 
 #b4 資券玻璃卡片
 def render_b4_top10_glass_card():
-    import pandas as pd
-    import streamlit as st
     if 'b4_squeeze_radar' not in st.session_state or 'b4_risk_radar' not in st.session_state: return
     try:
         sq_data, rk_data = st.session_state['b4_squeeze_radar'], st.session_state['b4_risk_radar']
@@ -431,7 +423,7 @@ def render_b4_top10_glass_card():
                 status = row.get('軋空評估', '') if theme == 'sq' else row.get('套牢評估', '')
                 pct = row.get('漲跌幅', 0.0)
                 short_status = status[:7] if len(status) > 7 else status
-                pct_color = "#FF4C4C" if theme == 'sq' else "#00e676"               
+                pct_color = "#FF4C4C" if theme == 'sq' else "#00e676"                
                 html += (
                     f"<li style='display: flex; align-items: center; justify-content: space-between; margin-bottom: 6px; font-size: 13.5px; line-height: 1.4;'>"
                     f"  <div style='display: flex; align-items: center; width: 55%; overflow: hidden;'>"
@@ -500,8 +492,6 @@ def render_b4_top10_glass_card():
 
 #B5 大腿動向玻璃卡片
 def render_b5_top10_glass_card():
-    import pandas as pd
-    import streamlit as st
     if 'b5_1000' not in st.session_state or 'b5_400' not in st.session_state: return
     try:
         df_1000, df_400 = st.session_state['b5_1000'], st.session_state['b5_400']
@@ -612,10 +602,9 @@ def render_b5_top10_glass_card():
 # ==========================================
 # 🎓 課程 NPC 懸浮對話框 
 # ==========================================
+# 💡 效能救星：讓按鈕與課程選單變成獨立的網頁，完全不干擾 B1~B7 的運作！
+@st.fragment
 def render_course_npc():
-    import streamlit as st
-    import streamlit.components.v1 as components  
-    
     if not st.session_state.get('show_course_npc', False): return
     if 'course_view' not in st.session_state:
         st.session_state['course_view'] = 'list'
@@ -880,7 +869,6 @@ def render_course_npc():
         st.session_state['course_view'] = view_name
 
     # 💡 將實體按鈕放入 st.empty() 裡面，確保它們在最後被渲染
-    # 這樣就算有閃爍，也會是在畫面最底部，不會干擾使用者的視線
     hidden_btn_container = st.empty()
     with hidden_btn_container.container():
         cols = st.columns(12)
@@ -897,7 +885,7 @@ def render_course_npc():
         with cols[10]: st.button("OpenCourse10", key="npc_btn_c10", on_click=switch_view_action, args=('detail_10',))
         with cols[11]: st.button("BackToList", key="npc_btn_back", on_click=switch_view_action, args=('list',))
         
-    # 💡 加速版的 JS：將隱藏速度從 300ms 大幅縮短至 15ms，讓肉眼完全看不見閃爍
+    # 💡 使用 onclick 覆寫事件，確保不會綁定到無效的死按鈕，這在切換頁面時特別關鍵
     bind_js = """<script>
     setInterval(() => {
         const doc = window.parent.document;
@@ -929,7 +917,6 @@ def render_course_npc():
             }
         });
 
-        // 💡 使用 onclick 覆寫，確保不會綁定到已經死掉的舊按鈕 (解決←返回失效)
         const bindEvent = (uiId, stBtn) => {
             const uiEl = doc.getElementById(uiId);
             if(uiEl && stBtn) {
@@ -956,7 +943,7 @@ def render_course_npc():
         bindEvent('btn-open-course-9', btnOpen9);
         bindEvent('btn-open-course-10', btnOpen10);
 
-    }, 15); // 💡 從原本的 300ms 降至 15ms，確保按鈕隱藏與綁定的速度比肉眼反應還快！
+    }, 15);
     </script>"""
 
     components.html(bind_js, height=0, width=0)
