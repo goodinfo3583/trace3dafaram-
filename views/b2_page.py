@@ -198,8 +198,11 @@ def sync_b2_data(DATA_DIR):
 # ==========================================
 # 🚀 局部渲染魔法：四個獨立的 Fragment (避免勾選時畫面跳動)
 # ==========================================
+    
+@st.fragment
+def render_b2_1(df_21):
     st.write("---")
-    st.markdown("<div id='section-2'></div>", unsafe_allow_html=True)
+    st.markdown("<div id='section-2-1'></div>", unsafe_allow_html=True)
     st.markdown("""
     <div style="background: linear-gradient(90deg, rgba(15,23,42,1) 0%, rgba(14,165,233,0.3) 50%, rgba(15,23,42,1) 100%); 
                 border-top: 1px solid #38bdf8; border-bottom: 1px solid #38bdf8; padding: 15px 20px; 
@@ -209,11 +212,6 @@ def sync_b2_data(DATA_DIR):
         </h2>
     </div>
     """, unsafe_allow_html=True)
-    
-@st.fragment
-def render_b2_1(df_21):
-    st.write("---")
-    st.markdown("<div id='section-2-1'></div>", unsafe_allow_html=True)
     st.header("法人掃貨：外資 5 日 買超佔標的成交量")
     
     if df_21 is not None and not df_21.empty:
