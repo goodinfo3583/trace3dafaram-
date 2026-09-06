@@ -1,6 +1,6 @@
 # views/weight_backtest_page.py
-import streamlit as st
 import pandas as pd
+import streamlit as st
 import re
 import os
 import glob
@@ -522,8 +522,7 @@ def show_weight_backtest_page(STOCK_DICT, DATA_DIR="data"):
     if not df_b0.empty and '股價日期' in df_b0.columns:
         date_raw = str(df_b0['股價日期'].iloc[0])
         try:
-            # 💡 最佳解：交給 pandas 自動解析日期，並強制格式化為 YYYY/MM/DD (自動補零)
-            import pandas as pd
+            # 💡 直接使用 pd，因為已經在檔案最上方 import 過了
             b0_latest_date_str = pd.to_datetime(date_raw).strftime("%Y/%m/%d")
         except Exception:
             # 備用方案 (防止非標準日期格式報錯，保留你的防呆機制)
@@ -534,6 +533,7 @@ def show_weight_backtest_page(STOCK_DICT, DATA_DIR="data"):
                 b0_latest_date_str = f"2026/{clean_date[-4:-2]}/{clean_date[-2:]}"
             else:
                 b0_latest_date_str = date_raw   
+                
     with st.expander(f"💰 B0 量價掃描過濾 (資料基準日: {b0_latest_date_str})", expanded=False):
         st.markdown("**🔹 1. 流動性過濾 (剔除冷門股/殭屍股)**")
         c_b0_1, c_b0_2 = st.columns(2)
