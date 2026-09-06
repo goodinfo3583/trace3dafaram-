@@ -26,7 +26,9 @@ def clean_number_for_display(val):
         f = float(str(val).replace(',', ''))
         return str(int(f)) if f.is_integer() else str(f).rstrip('0').rstrip('.')
     except: return str(val)
-
+    
+# 💡 效能救星 1：快取歷史鉅額交易的檔案合併 (10分鐘更新一次)
+@st.cache_data(show_spinner=False, ttl=600)
 def build_historical_block_matrix(DATA_DIR):
     """歷史矩陣建立器"""
     if not os.path.exists(DATA_DIR): return None, []
@@ -85,6 +87,8 @@ def build_historical_block_matrix(DATA_DIR):
 # ==========================================
 # ⚙️ 後台資料引擎 (Data Engine)：包含 yfinance 爬取
 # ==========================================
+# 💡 效能救星 2：把 yfinance 報價跟今日鉅額交易計算快取起來 (5 分鐘更新一次)
+@st.cache_data(show_spinner=False, ttl=300)
 def sync_b6_data(DATA_DIR):
     """在背景計算歷史矩陣與今日最新鉅額交易，並抓取即時收盤價"""
     
@@ -178,8 +182,7 @@ def sync_b6_data(DATA_DIR):
             display_df = grouped_block[['代號', '股票名稱', '交易別', '成交價', '▼收盤價', '成交張數', '總額(億)']].copy()
             display_df = display_df.rename(columns={'成交價': dynamic_price_col})
 
-    st.session_state['b6_today_df'] = display_df
-    st.session_state['b6_dynamic_price_col'] = dynamic_price_col
+    return display_df, dynamic_price_col
 
 # ==========================================
 # 🖼️ 前台畫面渲染 (Views)
@@ -192,7 +195,16 @@ def show_b6_page(DATA_DIR):
 
     st.write("---")
     st.markdown("<div id='section-6'></div>", unsafe_allow_html=True)
-    st.markdown("### 鉅額交易動向", unsafe_allow_html=True)
+    
+    st.markdown("""
+    <div style="background: linear-gradient(90deg, rgba(15,23,42,1) 0%, rgba(14,165,233,0.3) 50%, rgba(15,23,42,1) 100%); 
+                border-top: 1px solid #38bdf8; border-bottom: 1px solid #38bdf8; padding: 15px 20px; 
+                border-radius: 10px; text-align: center; box-shadow: 0px 0px 20px rgba(56, 189, 248, 0.2); margin-bottom: 20px;">
+        <h2 style="color: #e0f2fe; margin: 0; letter-spacing: 2px; text-shadow: 0 0 15px rgba(56, 189, 248, 0.8);">
+            鉅額交易動向
+        </h2>
+    </div>
+    """, unsafe_allow_html=True)
     st.write("💡 鉅額交易有時為大戶私下換手籌碼，成交價可作為「支撐/壓力」的防守線；如果短線跌破建議嚴設停損。")
 
     tab_today, tab_hist = st.tabs(["🔹 今日最新鉅額交易", "🔹 歷史防守價追蹤表"])
