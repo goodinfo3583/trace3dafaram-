@@ -249,7 +249,7 @@ def inject_custom_header(is_logged_in=False):
 
                 <div class="dropdown-item actionable">
                         <a href="#" data-target="NavToWeightBacktest" class="dropdown-title internal-nav">
-                            <img src="app/static/icon-podiumaward.png" class="menu-icon" alt="weight"> 智慧選股
+                            <img src="app/static/icon-chart-set-theory.png" class="menu-icon" alt="weight"> 智慧選股
                             <span style="color:#f20049; font-size:10px; margin-left: 5px; animation: pulse 2s infinite;">(HOT)</span>
                         </a>
                         <p class="dropdown-text">自訂計分籌碼權重與未來勝率回測模擬。</p>
@@ -280,16 +280,16 @@ def inject_custom_header(is_logged_in=False):
                     
                     <div class="dropdown-item actionable">
                         <a href="#" data-target="NavToCourses" class="dropdown-title internal-nav">
-                            <img src="app/static/icon-openbookapple.png" class="menu-icon" alt="courses"> 課程
+                            <img src="app/static/icon-wheat.png" class="menu-icon" alt="courses"> 課程
                         </a>
                         <p class="dropdown-text">增加最大智識，提升能力不求人。</p>
                     </div>                           
                     
                     <div class="dropdown-item actionable">
                         <a href="https://www.facebook.com/DOUBLEE04/?locale=zh_TW" target="_blank" class="dropdown-title" style="text-decoration: none;">
-                            <img src="app/static/icon-malware-shield.png" class="menu-icon" alt="fb-group"> 靠北投顧 3.0 
+                            <img src="app/static/icon-incognito.png" class="menu-icon" alt="fb-group"> 靠北投顧 3.0 
                         </a>
-                        <p class="dropdown-text">分享分析師真實績效，避免受話術白繳學費。</p>
+                        <p class="dropdown-text">加入分析師之前最好看看，避免受話術白繳學費。</p>
                     </div>
                     
                     <div class="dropdown-item locked-item">
