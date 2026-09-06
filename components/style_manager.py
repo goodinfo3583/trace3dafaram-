@@ -716,7 +716,7 @@ def render_course_npc():
     html_code = ""
 
     # =========================
-    # 📜 課程列表 (List View)
+    # 📜 課程選單列表 (List View)
     # =========================
     if current_view == 'list':
         html_code = f"""{common_css}
@@ -744,7 +744,7 @@ def render_course_npc():
 </div>"""
 
     # =========================
-    # 📖 課程詳情字典庫
+    # 📖 課程詳情庫
     # =========================
     elif current_view.startswith('detail_'):
         courses_data = {
@@ -959,22 +959,24 @@ setInterval(() => {
         }
     });
 
+    // 💡 【關鍵修復點】：更改事件綁定邏輯
     const bindEvent = (uiId, stBtn) => {
         const uiEl = doc.getElementById(uiId);
-        if(uiEl && stBtn && !uiEl.dataset.hooked) {
-            uiEl.dataset.hooked = 'true'; 
+        if(uiEl && stBtn) {
             uiEl.style.cursor = 'pointer'; 
-            uiEl.addEventListener('click', (e) => {
+            // 捨棄 addEventListener，直接使用 onclick 覆寫。
+            // 這樣就算 DOM 被 Streamlit 復用，也能直接抹除舊的動作，強制綁上新動作！
+            uiEl.onclick = (e) => {
                 e.preventDefault();
                 e.stopPropagation();
                 stBtn.click(); 
-            });
+            };
         }
     };
 
     bindEvent('btn-close-list', btnClose);
     bindEvent('btn-close-detail', btnClose);
-    bindEvent('btn-back-detail', btnBack);
+    bindEvent('btn-back-detail', btnBack); // 現在這裡會成功覆寫為 BackToList 了
     bindEvent('btn-open-course-1', btnOpen1);
     bindEvent('btn-open-course-2', btnOpen2);
     bindEvent('btn-open-course-3', btnOpen3);
