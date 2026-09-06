@@ -4,33 +4,40 @@ import time
 import os
 import pandas as pd
 import datetime
+import base64
 
-def show_login_page(conn=None, SHEET_URL=None):
-    # ==========================================
-    # 狀態 1：已經登入 -> 顯示解鎖畫面與登出按鈕
-    # ==========================================
-    if st.session_state.get("logged_in", False):
-        st.success(f"歡迎回來，{st.session_state['username']}！您已解鎖最高權限。")
-        st.markdown("如果您想結束這次的探索，請點擊下方按鈕登出：")
-        
-        if st.button("登出系統", use_container_width=True):
-            st.session_state["logged_in"] = False
-            st.session_state["username"] = None
-            st.query_params["page"] = "b1"
-            st.rerun()
-        return
+# ==========================================
+# 💡 效能救星 1：快取 NPC 圖片轉碼，避免每次重繪讀取硬碟
+# ==========================================
+@st.cache_data(show_spinner=False)
+def get_image_base64(image_path):
+    """專屬於此頁面的圖片轉碼微型工具"""
+    if os.path.exists(image_path):
+        with open(image_path, "rb") as image_file:
+            encoded_string = base64.b64encode(image_file.read()).decode()
+            mime_type = "image/jpeg" if image_path.lower().endswith('.jpg') else "image/png"
+            return f"data:{mime_type};base64,{encoded_string}"
+    return ""
 
-    # ==========================================
-    # 狀態 2：尚未登入 -> NPC 守衛登場！
-    # ==========================================
-    st.markdown("<br>", unsafe_allow_html=True) 
-    
+# ==========================================
+# 💡 效能救星 2：把整個登入/註冊表單包裝成 Fragment
+# ==========================================
+@st.fragment
+def render_login_box(conn, SHEET_URL):
     col1, col2 = st.columns([1, 2])
     
     with col1:
         npc_path = "./static/npc_guard1.png"
-        if os.path.exists(npc_path):
-            st.image(npc_path, use_container_width=True)
+        img_base64 = get_image_base64(npc_path)
+        if img_base64:
+            st.markdown(
+                f"""
+                <div style="display: flex; justify-content: center; align-items: center; padding: 10px;">
+                    <img src="{img_base64}" style="width: 100%; max-width: 250px; border-radius: 10px; box-shadow: 0 0 15px rgba(0, 210, 255, 0.3);">
+                </div>
+                """, 
+                unsafe_allow_html=True
+            )
         else:
             st.warning(f"找不到圖片: {npc_path}")
             
@@ -69,7 +76,6 @@ def show_login_page(conn=None, SHEET_URL=None):
                         
                         # 擷取最後一個字母轉大寫，當作性別 (M 或 F)
                         gender_code = lower_user[-1].upper() 
-                        
                         # 擷取真正的帳號名稱 (已經是小寫了)
                         real_user_lower = lower_user[:-2].strip()
                         
@@ -87,7 +93,7 @@ def show_login_page(conn=None, SHEET_URL=None):
                                         st.error("守衛：「大膽！這可是站長的名號，不准冒用！」")
                                         st.stop()
                                         
-                                    # 2. 讀取 Google Sheets 檢查是否重複註冊
+                                    # 2. 讀取 Google Sheets 檢查是否重複註冊 (保持 ttl=0 以防覆蓋)
                                     try:
                                         current_users = conn.read(spreadsheet=SHEET_URL, worksheet="會員名冊", ttl=0)
                                         is_exist = False
@@ -118,6 +124,7 @@ def show_login_page(conn=None, SHEET_URL=None):
                                             final_users = pd.concat([current_users, new_data], ignore_index=True)
                                             
                                         conn.update(spreadsheet=SHEET_URL, worksheet="會員名冊", data=final_users)
+                                        st.cache_data.clear() # 💡 註冊成功後清空快取，讓下次登入能抓到新名冊
                                         
                                         gender_title = "男冒險者" if gender_code == "M" else "女冒險者"
                                         st.success(f"🎉 註冊成功！守衛已經將 {gender_title}『{real_user_lower}』記錄下來。請刪除帳號後面的 /{gender_code} 重新登入！")
@@ -129,8 +136,6 @@ def show_login_page(conn=None, SHEET_URL=None):
                     # ==========================================
                     else:
                         login_success = False
-                        
-                        # 在這裡，使用者的帳號已經確定沒有 /m 或是 /f 了，我們用 lower_user 作為比對基準
                         login_user_target = lower_user
                         
                         # 1. 先查 Secrets 保險箱 (不分大小寫比對)
@@ -139,14 +144,15 @@ def show_login_page(conn=None, SHEET_URL=None):
                             for secret_user, secret_pass in valid_passwords.items():
                                 if str(secret_user).lower() == login_user_target and str(secret_pass) == clean_pass:
                                     login_success = True
-                                    break # 找到就跳出迴圈
+                                    break 
                         except:
                             pass
                             
                         # 2. 去 Google Sheets 查「會員名冊」
                         if not login_success and conn and SHEET_URL:
                             try:
-                                user_df = conn.read(spreadsheet=SHEET_URL, worksheet="會員名冊", ttl=0)
+                                # 💡 效能救星 3：登入驗證加上 ttl=60，短時間內重複輸入錯誤密碼不會再卡死等 Google 回應！
+                                user_df = conn.read(spreadsheet=SHEET_URL, worksheet="會員名冊", ttl=60)
                                 if not user_df.empty and '帳號' in user_df.columns and '密碼' in user_df.columns:
                                     
                                     # 🛑 強制轉字串，剃除莫名其妙產生的小數點(.0)，清除首尾空白，再將帳號轉小寫
@@ -166,7 +172,29 @@ def show_login_page(conn=None, SHEET_URL=None):
                             st.session_state["logged_in"] = True
                             st.session_state["username"] = login_user_target # 顯示統一小寫的帳號
                             st.success("「驗證成功！大門已開啟，請進...」")
-                            time.sleep(1.5)
-                            st.rerun()
+                            time.sleep(1.0)
+                            st.rerun() # 💡 只有登入成功時，才會重新整理全網頁來解鎖側邊欄
                         else:
                             st.error("守衛：「這張邀請函是假的，或者密碼錯誤！請重新確認！」")
+
+# ==========================================
+# 🖼️ 主渲染入口
+# ==========================================
+def show_login_page(conn=None, SHEET_URL=None):
+    # 狀態 1：已經登入 -> 顯示解鎖畫面與登出按鈕
+    if st.session_state.get("logged_in", False):
+        st.success(f"歡迎回來，{st.session_state['username']}！您已解鎖最高權限。")
+        st.markdown("如果您想結束這次的探索，請點擊下方按鈕登出：")
+        
+        if st.button("登出系統", use_container_width=True):
+            st.session_state["logged_in"] = False
+            st.session_state["username"] = None
+            st.query_params["page"] = "b1"
+            st.rerun()
+        return
+
+    # 狀態 2：尚未登入 -> NPC 守衛登場！
+    st.markdown("<br>", unsafe_allow_html=True) 
+    
+    # 💡 呼叫被 Fragment 結界保護的登入框
+    render_login_box(conn, SHEET_URL)
