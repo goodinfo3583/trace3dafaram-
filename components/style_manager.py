@@ -5,13 +5,28 @@ import os
 import random
 import streamlit.components.v1 as components
 
+# ==========================================
+# 💡 效能救星：全域快取 Base64 圖片編碼
+# 這樣每次點擊按鈕時，就不會重新讀取硬碟跟消耗 CPU 運算
+# ==========================================
+@st.cache_data(show_spinner=False)
+def get_cached_base64_image(image_path):
+    try:
+        if os.path.exists(image_path):
+            with open(image_path, "rb") as file:
+                encoded_string = base64.b64encode(file.read()).decode()
+                mime_type = "image/gif" if image_path.lower().endswith('.gif') else "image/png"
+                return f"data:{mime_type};base64,{encoded_string}"
+    except Exception:
+        pass
+    return ""
+
 def apply_global_theme(image_path="./image/派對盛宴邀請.png"):
     """合併原本的 load_global_css 與 set_background，統一管理所有視覺與拖曳引擎"""
     theme = st.session_state.get('theme', 'dark')
     opacity = st.session_state.get('bg_opacity', 88) / 100.0
     block_opacity = opacity * 0.7 
     
-    # 1. 統一使用字典管理顏色與對應的城市圖片，告別落長的 if-else
     theme_settings = {
         'pink':   {'rgb': '139, 109, 98', 'img': './image/鐵風堡.png'},
         'green':  {'rgb': '0, 54, 16',    'img': './image/翡翠林鎮.png'},
@@ -20,31 +35,24 @@ def apply_global_theme(image_path="./image/派對盛宴邀請.png"):
         'dark':   {'rgb': '15, 23, 42',   'img': image_path}
     }
     
-    # 獲取當前設定，找不到就用 dark 預設
     current = theme_settings.get(theme, theme_settings['dark'])
     base_color = f"rgba({current['rgb']}, {opacity})"
     block_bg = f"rgba({current['rgb']}, {block_opacity})"
     actual_image = current['img']
     
-    # 防呆：圖片不存在就用預設的
     if not os.path.exists(actual_image):
         actual_image = image_path
 
-    # 2. 處理背景圖片轉換
-    bg_image_css = ""
-    try:
-        with open(actual_image, "rb") as file:
-            encoded_string = base64.b64encode(file.read()).decode()
-        # 成功讀取圖片：使用漸層濾鏡 + 圖片
+    # 💡 使用快取函數讀取背景圖片，瞬間完成！
+    bg_base64 = get_cached_base64_image(actual_image)
+    if bg_base64:
         bg_image_css = f"""
-            background-image: linear-gradient({base_color}, {base_color}), url(data:image/png;base64,{encoded_string});
+            background-image: linear-gradient({base_color}, {base_color}), url({bg_base64});
             background-size: cover; background-position: center center; background-attachment: fixed;
         """
-    except FileNotFoundError:
-        # 找不到圖片的退路：至少顯示單色背景
+    else:
         bg_image_css = f"background-color: {base_color} !important;"
 
-    # 3. 組合所有 CSS (一次性渲染)
     global_css = f"""
     <style>
     /* 隱藏預設 UI */
@@ -73,7 +81,6 @@ def apply_global_theme(image_path="./image/派對盛宴邀請.png"):
     """
     st.markdown(global_css, unsafe_allow_html=True)
 
-    # 4. 載入全域拖曳與點擊監聽引擎 (保留你原本的 JavaScript)
     drag_engine_js = """
     <script>
     (function() {
@@ -81,61 +88,36 @@ def apply_global_theme(image_path="./image/派對盛宴邀請.png"):
         window.parent.window.customDragDelegated = true;
         const doc = window.parent.document;
         
-        // --- 1. 一鍵收合邏輯 (展開 -> 最小化 -> 隱藏 -> 展開 3階段循環) ---
+        // --- 1. 一鍵收合邏輯 ---
         doc.addEventListener('click', (e) => {
             let isIconCard = false;
             let t = e.target;
-            
-            // 判斷點擊的是否為 Icon Card
             if (t.tagName === 'IMG' && ((t.src && t.src.includes('icon-card')) || (t.alt && t.alt.includes('icon-card')))) { isIconCard = true; } 
             else if (t.closest) {
                 let parentImg = t.closest('div[data-testid="stImage"]')?.querySelector('img');
                 if (parentImg && ((parentImg.src && parentImg.src.includes('icon-card')) || (parentImg.alt && parentImg.alt.includes('icon-card')))) { isIconCard = true; }
             }
-            
             if (isIconCard) {
                 e.preventDefault(); e.stopPropagation();
-                
-                // 取得 4 個卡片的最小化 (min) 與 關閉 (close) Checkbox
                 const getCb = (id) => doc.getElementById(id);
-                // B2, B3(min-card, close-card), B4, B5
                 const minCbs = [getCb('min-b2-card'), getCb('min-card'), getCb('min-b4-card'), getCb('min-b5-card')];
                 const closeCbs = [getCb('close-b2-card'), getCb('close-card'), getCb('close-b4-card'), getCb('close-b5-card')];
                 
-                // 判斷當前 4 張卡片的整體狀態
                 let isAnyOpen = false;
                 let isAnyMinimized = false;
-                
                 for (let i = 0; i < 4; i++) {
-                    let minCb = minCbs[i];
-                    let closeCb = closeCbs[i];
+                    let minCb = minCbs[i]; let closeCb = closeCbs[i];
                     if (minCb && closeCb) {
-                        // 如果沒有被關閉，且沒有被最小化，代表目前有卡片是「完全展開」的
                         if (!closeCb.checked && !minCb.checked) isAnyOpen = true;
-                        // 如果沒有被關閉，但是被最小化了，代表目前有卡片是「最小化」的
                         if (!closeCb.checked && minCb.checked) isAnyMinimized = true;
                     }
                 }
                 
-                // 決定下一個循環狀態
-                let nextMin = false;
-                let nextClose = false;
+                let nextMin = false; let nextClose = false;
+                if (isAnyOpen) { nextMin = true; nextClose = false; } 
+                else if (isAnyMinimized) { nextMin = false; nextClose = true; } 
+                else { nextMin = false; nextClose = false; }
                 
-                if (isAnyOpen) {
-                    // 點擊第 1 次：只要有卡片是展開的 -> 全部轉為「最小化」
-                    nextMin = true;
-                    nextClose = false;
-                } else if (isAnyMinimized) {
-                    // 點擊第 2 次：已經是最小化了 -> 全部轉為「完全隱藏」
-                    nextMin = false;  // 將最小化狀態取消
-                    nextClose = true; // 開啟隱藏狀態
-                } else {
-                    // 點擊第 3 次：已經完全隱藏 -> 全部轉為「展開」
-                    nextMin = false;
-                    nextClose = false;
-                }
-                
-                // 套用新狀態到所有 Checkbox，同步覆蓋掉先前可能出錯的狀態 (徹底解決喚醒失敗)
                 minCbs.forEach(cb => { if (cb) cb.checked = nextMin; });
                 closeCbs.forEach(cb => { if (cb) cb.checked = nextClose; });
             }
@@ -177,7 +159,6 @@ def apply_global_theme(image_path="./image/派對盛宴邀請.png"):
             }
             isDragging = false; currentEl = null;
         };
-        
         doc.addEventListener('mousedown', onDown); doc.addEventListener('touchstart', onDown, {passive: false});
         doc.addEventListener('mousemove', onMove, {passive: false}); doc.addEventListener('touchmove', onMove, {passive: false});
         doc.addEventListener('mouseup', onUp); doc.addEventListener('touchend', onUp);
@@ -191,8 +172,8 @@ def render_fireflies():
     css_rules, html_divs = [], []
     for i in range(num_fireflies):
         size = random.uniform(2, 5)          
-        start_x, start_y = random.uniform(0, 100), random.uniform(0, 100)     
-        move_x, move_y = random.uniform(-20, 20), random.uniform(-20, 20)     
+        start_x, start_y = random.uniform(0, 100), random.uniform(0, 100)      
+        move_x, move_y = random.uniform(-20, 20), random.uniform(-20, 20)      
         duration, delay, pulse_dur = random.uniform(10, 25), random.uniform(0, 10), random.uniform(2, 5)     
         
         css_rules.append(f"""
@@ -205,12 +186,6 @@ def render_fireflies():
     st.markdown(f"<style>.fireflies-container {{ position: fixed; top: 0; left: 0; width: 100vw; height: 100vh; pointer-events: none; z-index: 1000; overflow: hidden; }} {''.join(css_rules)}</style><div class='fireflies-container'>{''.join(html_divs)}</div>", unsafe_allow_html=True)
 
 def render_marquee():
-    def get_image_base64(image_path):
-        with open(image_path, "rb") as image_file:
-            encoded_string = base64.b64encode(image_file.read()).decode()
-            mime_type = "image/gif" if image_path.lower().endswith('.gif') else "image/png"
-        return f"data:{mime_type};base64,{encoded_string}"
-
     image_folder, image_files = "static", ["沙漠之城.png", "法人意向.png", "月影綠洲.png", "組合化學晶礦.png", "鐵風堡b.png"]
     total_images, time_per_slide = len(image_files), 5  
     total_time, visible_percent = total_images * time_per_slide, (1 / total_images) * 100 
@@ -218,10 +193,13 @@ def render_marquee():
     image_tags, delay_css = "", ""
     for i, img_name in enumerate(image_files):
         img_path = os.path.join(image_folder, img_name)
-        if os.path.exists(img_path):
-            image_tags += f'<img class="slide slide-{i}" src="{get_image_base64(img_path)}">'
+        # 💡 使用快取讀取跑馬燈圖片，避免每次點擊重複編碼拖垮效能
+        img_base64 = get_cached_base64_image(img_path)
+        if img_base64:
+            image_tags += f'<img class="slide slide-{i}" src="{img_base64}">'
             delay_css += f"    .slide-{i} {{ animation-delay: {i * time_per_slide}s; }}\n"
-        else: st.error(f"系統找不到圖片：{img_path}")
+        else:
+            if os.path.exists(img_path): st.error(f"系統找不到圖片：{img_path}")
 
     st.markdown(f"""
     <style>
@@ -232,7 +210,7 @@ def render_marquee():
     </style>
     <div class="slideshow-container">{image_tags}</div>
     """, unsafe_allow_html=True)
-
+    
 #跑馬燈懸浮卡片
 #B2法人掃貨
 def render_b2_top10_glass_card():
@@ -632,7 +610,7 @@ def render_b5_top10_glass_card():
     except Exception as e: pass
 
 # ==========================================
-# 🎓 課程 NPC 懸浮對話框 (RWD 響應式 & 修復 Markdown 縮排外洩問題)
+# 🎓 課程 NPC 懸浮對話框 
 # ==========================================
 def render_course_npc():
     import streamlit as st
@@ -644,9 +622,6 @@ def render_course_npc():
         
     current_view = st.session_state['course_view']
     
-    # =========================
-    # 🎨 共用 CSS (注意：HTML/CSS 字串內絕對不能有前導縮排)
-    # =========================
     common_css = """<style>
 /* --- 桌面版預設樣式 --- */
 .npc-overlay {
@@ -715,9 +690,6 @@ def render_course_npc():
 
     html_code = ""
 
-    # =========================
-    # 📜 課程選單列表 (List View)
-    # =========================
     if current_view == 'list':
         html_code = f"""{common_css}
 <div class="npc-overlay">
@@ -743,9 +715,6 @@ def render_course_npc():
 </div>
 </div>"""
 
-    # =========================
-    # 📖 課程詳情庫
-    # =========================
     elif current_view.startswith('detail_'):
         courses_data = {
             'detail_1': {
@@ -881,7 +850,6 @@ def render_course_npc():
             }
         }
         
-        # 讀取當前對應的課程資料，找不到就預設顯示第1課
         data = courses_data.get(current_view, courses_data['detail_1'])
         
         html_code = f"""{common_css}
@@ -902,12 +870,8 @@ def render_course_npc():
 </div>
 </div>"""
 
-    # 渲染畫面
     st.markdown(html_code, unsafe_allow_html=True)     
     
-    # ==========================================
-    # 🚀 按鈕觸發與 JavaScript 綁定機制 (保留原本邏輯)
-    # ==========================================
     def close_npc_action():
         st.session_state['show_course_npc'] = False
         st.session_state['course_view'] = 'list'
@@ -915,80 +879,84 @@ def render_course_npc():
     def switch_view_action(view_name):
         st.session_state['course_view'] = view_name
 
-    cols = st.columns(12)
-    with cols[0]: st.button("CloseNPC", key="npc_btn_close", on_click=close_npc_action)
-    with cols[1]: st.button("OpenCourse1", key="npc_btn_c1", on_click=switch_view_action, args=('detail_1',))
-    with cols[2]: st.button("OpenCourse2", key="npc_btn_c2", on_click=switch_view_action, args=('detail_2',))
-    with cols[3]: st.button("OpenCourse3", key="npc_btn_c3", on_click=switch_view_action, args=('detail_3',))
-    with cols[4]: st.button("OpenCourse4", key="npc_btn_c4", on_click=switch_view_action, args=('detail_4',))
-    with cols[5]: st.button("OpenCourse5", key="npc_btn_c5", on_click=switch_view_action, args=('detail_5',))
-    with cols[6]: st.button("OpenCourse6", key="npc_btn_c6", on_click=switch_view_action, args=('detail_6',))
-    with cols[7]: st.button("OpenCourse7", key="npc_btn_c7", on_click=switch_view_action, args=('detail_7',))
-    with cols[8]: st.button("OpenCourse8", key="npc_btn_c8", on_click=switch_view_action, args=('detail_8',))
-    with cols[9]: st.button("OpenCourse9", key="npc_btn_c9", on_click=switch_view_action, args=('detail_9',))
-    with cols[10]: st.button("OpenCourse10", key="npc_btn_c10", on_click=switch_view_action, args=('detail_10',))
-    with cols[11]: st.button("BackToList", key="npc_btn_back", on_click=switch_view_action, args=('list',))
+    # 💡 將實體按鈕放入 st.empty() 裡面，確保它們在最後被渲染
+    # 這樣就算有閃爍，也會是在畫面最底部，不會干擾使用者的視線
+    hidden_btn_container = st.empty()
+    with hidden_btn_container.container():
+        cols = st.columns(12)
+        with cols[0]: st.button("CloseNPC", key="npc_btn_close", on_click=close_npc_action)
+        with cols[1]: st.button("OpenCourse1", key="npc_btn_c1", on_click=switch_view_action, args=('detail_1',))
+        with cols[2]: st.button("OpenCourse2", key="npc_btn_c2", on_click=switch_view_action, args=('detail_2',))
+        with cols[3]: st.button("OpenCourse3", key="npc_btn_c3", on_click=switch_view_action, args=('detail_3',))
+        with cols[4]: st.button("OpenCourse4", key="npc_btn_c4", on_click=switch_view_action, args=('detail_4',))
+        with cols[5]: st.button("OpenCourse5", key="npc_btn_c5", on_click=switch_view_action, args=('detail_5',))
+        with cols[6]: st.button("OpenCourse6", key="npc_btn_c6", on_click=switch_view_action, args=('detail_6',))
+        with cols[7]: st.button("OpenCourse7", key="npc_btn_c7", on_click=switch_view_action, args=('detail_7',))
+        with cols[8]: st.button("OpenCourse8", key="npc_btn_c8", on_click=switch_view_action, args=('detail_8',))
+        with cols[9]: st.button("OpenCourse9", key="npc_btn_c9", on_click=switch_view_action, args=('detail_9',))
+        with cols[10]: st.button("OpenCourse10", key="npc_btn_c10", on_click=switch_view_action, args=('detail_10',))
+        with cols[11]: st.button("BackToList", key="npc_btn_back", on_click=switch_view_action, args=('list',))
         
+    # 💡 加速版的 JS：將隱藏速度從 300ms 大幅縮短至 15ms，讓肉眼完全看不見閃爍
     bind_js = """<script>
-setInterval(() => {
-    const doc = window.parent.document;
-    if (!doc) return;
+    setInterval(() => {
+        const doc = window.parent.document;
+        if (!doc) return;
 
-    const stBtns = Array.from(doc.querySelectorAll('button'));
-    const btnClose = stBtns.find(b => b.textContent.includes('CloseNPC'));
-    const btnOpen1 = stBtns.find(b => b.textContent.includes('OpenCourse1'));
-    const btnOpen2 = stBtns.find(b => b.textContent.includes('OpenCourse2'));
-    const btnOpen3 = stBtns.find(b => b.textContent.includes('OpenCourse3'));
-    const btnOpen4 = stBtns.find(b => b.textContent.includes('OpenCourse4'));
-    const btnOpen5 = stBtns.find(b => b.textContent.includes('OpenCourse5'));
-    const btnOpen6 = stBtns.find(b => b.textContent.includes('OpenCourse6'));
-    const btnOpen7 = stBtns.find(b => b.textContent.includes('OpenCourse7'));
-    const btnOpen8 = stBtns.find(b => b.textContent.includes('OpenCourse8'));
-    const btnOpen9 = stBtns.find(b => b.textContent.includes('OpenCourse9'));
-    const btnOpen10 = stBtns.find(b => b.textContent.includes('OpenCourse10'));
-    const btnBack = stBtns.find(b => b.textContent.includes('BackToList'));
+        const stBtns = Array.from(doc.querySelectorAll('button'));
+        const btnClose = stBtns.find(b => b.textContent.includes('CloseNPC'));
+        const btnOpen1 = stBtns.find(b => b.textContent.includes('OpenCourse1'));
+        const btnOpen2 = stBtns.find(b => b.textContent.includes('OpenCourse2'));
+        const btnOpen3 = stBtns.find(b => b.textContent.includes('OpenCourse3'));
+        const btnOpen4 = stBtns.find(b => b.textContent.includes('OpenCourse4'));
+        const btnOpen5 = stBtns.find(b => b.textContent.includes('OpenCourse5'));
+        const btnOpen6 = stBtns.find(b => b.textContent.includes('OpenCourse6'));
+        const btnOpen7 = stBtns.find(b => b.textContent.includes('OpenCourse7'));
+        const btnOpen8 = stBtns.find(b => b.textContent.includes('OpenCourse8'));
+        const btnOpen9 = stBtns.find(b => b.textContent.includes('OpenCourse9'));
+        const btnOpen10 = stBtns.find(b => b.textContent.includes('OpenCourse10'));
+        const btnBack = stBtns.find(b => b.textContent.includes('BackToList'));
 
-    [btnClose, btnOpen1, btnOpen2, btnOpen3, btnOpen4, btnOpen5, btnOpen6, btnOpen7, btnOpen8, btnOpen9, btnOpen10, btnBack].forEach(b => {
-        if(b) {
-            const container = b.closest('div[data-testid="stElementContainer"]');
-            if(container) {
-                container.style.position = 'fixed';
-                container.style.top = '-9999px';
-                container.style.left = '-9999px';
+        // 瞬間將按鈕推到畫面之外隱藏
+        [btnClose, btnOpen1, btnOpen2, btnOpen3, btnOpen4, btnOpen5, btnOpen6, btnOpen7, btnOpen8, btnOpen9, btnOpen10, btnBack].forEach(b => {
+            if(b) {
+                const container = b.closest('div[data-testid="stElementContainer"]');
+                if(container) {
+                    container.style.position = 'fixed';
+                    container.style.top = '-9999px';
+                    container.style.left = '-9999px';
+                }
             }
-        }
-    });
+        });
 
-    // 💡 【關鍵修復點】：更改事件綁定邏輯
-    const bindEvent = (uiId, stBtn) => {
-        const uiEl = doc.getElementById(uiId);
-        if(uiEl && stBtn) {
-            uiEl.style.cursor = 'pointer'; 
-            // 捨棄 addEventListener，直接使用 onclick 覆寫。
-            // 這樣就算 DOM 被 Streamlit 復用，也能直接抹除舊的動作，強制綁上新動作！
-            uiEl.onclick = (e) => {
-                e.preventDefault();
-                e.stopPropagation();
-                stBtn.click(); 
-            };
-        }
-    };
+        // 💡 使用 onclick 覆寫，確保不會綁定到已經死掉的舊按鈕 (解決←返回失效)
+        const bindEvent = (uiId, stBtn) => {
+            const uiEl = doc.getElementById(uiId);
+            if(uiEl && stBtn) {
+                uiEl.style.cursor = 'pointer'; 
+                uiEl.onclick = (e) => {
+                    e.preventDefault();
+                    e.stopPropagation();
+                    stBtn.click(); 
+                };
+            }
+        };
 
-    bindEvent('btn-close-list', btnClose);
-    bindEvent('btn-close-detail', btnClose);
-    bindEvent('btn-back-detail', btnBack); // 現在這裡會成功覆寫為 BackToList 了
-    bindEvent('btn-open-course-1', btnOpen1);
-    bindEvent('btn-open-course-2', btnOpen2);
-    bindEvent('btn-open-course-3', btnOpen3);
-    bindEvent('btn-open-course-4', btnOpen4);
-    bindEvent('btn-open-course-5', btnOpen5);
-    bindEvent('btn-open-course-6', btnOpen6);
-    bindEvent('btn-open-course-7', btnOpen7);
-    bindEvent('btn-open-course-8', btnOpen8);
-    bindEvent('btn-open-course-9', btnOpen9);
-    bindEvent('btn-open-course-10', btnOpen10);
+        bindEvent('btn-close-list', btnClose);
+        bindEvent('btn-close-detail', btnClose);
+        bindEvent('btn-back-detail', btnBack);
+        bindEvent('btn-open-course-1', btnOpen1);
+        bindEvent('btn-open-course-2', btnOpen2);
+        bindEvent('btn-open-course-3', btnOpen3);
+        bindEvent('btn-open-course-4', btnOpen4);
+        bindEvent('btn-open-course-5', btnOpen5);
+        bindEvent('btn-open-course-6', btnOpen6);
+        bindEvent('btn-open-course-7', btnOpen7);
+        bindEvent('btn-open-course-8', btnOpen8);
+        bindEvent('btn-open-course-9', btnOpen9);
+        bindEvent('btn-open-course-10', btnOpen10);
 
-}, 300);
-</script>"""
+    }, 15); // 💡 從原本的 300ms 降至 15ms，確保按鈕隱藏與綁定的速度比肉眼反應還快！
+    </script>"""
 
     components.html(bind_js, height=0, width=0)
