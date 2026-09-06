@@ -2,6 +2,9 @@
 import streamlit as st
 import streamlit.components.v1 as components
 
+# 💡 效能救星：使用 Fragment 將整個設定面板包裹起來！
+# 使用者在調整滑桿、切換 Radio 按鈕或輸入快捷鍵時，都不會再觸發全網頁重整，徹底解決閃爍與卡頓。
+@st.fragment
 def render():
     # 💡 移除原本的懸浮 CSS (position: fixed, drag-handle)，改為乾淨的全螢幕排版
     st.markdown("<h2 style='color:#00D2FF; margin-top:10px;'>設置中心</h2>", unsafe_allow_html=True)
@@ -12,7 +15,7 @@ def render():
     current_theme = st.session_state.get('theme', 'dark')
     current_opacity = int(st.session_state.get('bg_opacity', 88))
 
-    # 🔥 新增讀取效能模式
+    # 🔥 讀取效能模式
     current_perf_mode = st.session_state.get('performance_mode', False)
     
     theme_options = ['dark', 'pink', 'green', 'purple','brown']
@@ -26,7 +29,7 @@ def render():
     
     opacity_val = st.slider("背景濾鏡遮罩 (%)", min_value=0, max_value=100, value=current_opacity)
 
-    # 🔥 新增效能模式勾選框
+    # 🔥 效能模式勾選框
     perf_mode_val = st.checkbox("開啟極簡效能模式 (關閉動畫、跑馬燈與基礎動畫提升流暢度)", value=current_perf_mode)
     
     st.markdown("---")
@@ -56,22 +59,21 @@ def render():
     # -----------------------------
     col_ok, col_cancel = st.columns([1, 1])
     with col_ok:
-        if st.button("確認", use_container_width=True):
+        if st.button("確認", use_container_width=True, type="primary"):
             # 寫入 session_state
             st.session_state['theme'] = theme_choice
             st.session_state['bg_opacity'] = opacity_val
             st.session_state['custom_hotkeys'] = {k.strip().lower(): v for v, k in new_hotkeys.items() if k.strip().lower()}
         
-            st.session_state['performance_mode'] = perf_mode_val# 新增：將效能模式的設定存入 session_state
-                   
-            st.toast('設定已成功儲存！')# 使用 toast 顯示右下角輕量提示，不干擾畫面                  
-            st.rerun()# 重新執行一次以立即套用新主題與濾鏡
+            st.session_state['performance_mode'] = perf_mode_val # 新增：將效能模式的設定存入 session_state
+                    
+            st.toast('設定已成功儲存！') # 使用 toast 顯示右下角輕量提示，不干擾畫面                  
+            st.rerun() # 🚀 只有點擊確認時，才會跳出 Fragment 進行全域重整，立即套用新主題與濾鏡
             
     with col_cancel:
         if st.button("取消", use_container_width=True):
-            # 什麼都不做，直接 rerun 就會讀取原本存在 session_state 裡的設定值
             st.toast('已恢復為原本的設定。')
-            st.rerun()
+            st.rerun() # 🚀 放棄修改，強制重刷讀取原本的 Session
             
     # 💡 乾淨的 JS：不再需要尋找 modal 容器，直接綁定頁面上所有的 text input
     keybind_js = """

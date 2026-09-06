@@ -4,6 +4,7 @@ import requests
 import time
 import math
 
+# 💡 效能救星 1：保留快取，並且隱藏轉圈圈避免跳動
 @st.cache_data(ttl=600, show_spinner=False)
 def fetch_historical_news(days_to_load=3):
     """背景快取引擎工具 - 去 GitHub 搬運多天份的資料"""
@@ -31,18 +32,21 @@ def fetch_historical_news(days_to_load=3):
     except Exception as e:
         return [], []
 
-def show_news_page():
-    """市場消息頁面 UI 渲染"""
-    st.title("市場消息")
-    
+# 💡 效能救星 2：把搜尋、過濾、換頁與卡片渲染全部包裝進 Fragment。
+# 這樣打字搜尋或換頁時，畫面絕對不會跳回頂端或閃爍！
+@st.fragment
+def render_news_dashboard():
     col1, col2 = st.columns([1, 2])
     with col1:
-        days_option = st.selectbox("載入歷史天數", [1, 3, 7, 14, 30, 90, 180, 365], index=0)
+        # 加上 key 讓 Streamlit 更好追蹤狀態
+        days_option = st.selectbox("載入歷史天數", [1, 3, 7, 14, 30, 90, 180, 365], index=0, key="news_days_option")
     with col2:
-        search_query = st.text_input("🔍 搜尋市場新聞標題、關鍵字或股票代號...")
+        search_query = st.text_input("🔍 搜尋市場新聞標題、關鍵字或股票代號...", key="news_search_query")
         
     st.markdown("---")
     
+    # 這裡的 spinner 只會在「改變載入天數」去 GitHub 抓新資料時短暫出現，
+    # 只要資料進了快取，之後你打字搜尋或換頁，都不會再轉圈圈了！
     with st.spinner(f"正在從資料庫撈取近 {days_option} 天的新聞..."):
         news_data, loaded_dates = fetch_historical_news(days_option)
         
@@ -82,7 +86,8 @@ def show_news_page():
     with col_p2:
         current_page = st.number_input(
             f"📄 選擇頁數 (共 {total_pages} 頁)", 
-            min_value=1, max_value=total_pages, value=1, step=1
+            min_value=1, max_value=total_pages, value=1, step=1,
+            key="news_current_page"
         )
         
     start_item = (current_page - 1) * ITEMS_PER_PAGE + 1
@@ -113,3 +118,14 @@ def show_news_page():
         </div>
         """
         st.markdown(card_html, unsafe_allow_html=True)
+
+
+# ==========================================
+# 🖼️ 主頁面渲染入口
+# ==========================================
+def show_news_page():
+    """市場消息頁面 UI 渲染"""
+    st.title("市場消息")
+    
+    # 💡 呼叫被 Fragment 隔離的互動區塊
+    render_news_dashboard()
