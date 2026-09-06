@@ -5,18 +5,20 @@ import os
 import glob
 import re
 
-#從GoodInfo萃取檔案外資投信買佔比及買佔發行張數日期
+# 從 GoodInfo 萃取檔案外資投信買佔比及買佔發行張數日期
 def extract_date_from_name(filename):
     """從檔名萃取 8 碼日期 (202XXXXX)"""
     match = re.search(r'(202\d{5})', str(filename))
     return match.group(1) if match else "00000000"
 
 # ==========================================
-# 後台資料引擎 (Data Engine)：專責運算並寫入 Session
+# 💡 效能救星 1：快取所有的檔案讀取、合併與運算
 # ==========================================
-def sync_b2_data(DATA_DIR):
-    """只在背景讀取 B2 資料並寫入 session_state，絕對不繪製任何 UI，確保極速運作"""
-    
+@st.cache_data(show_spinner=False, ttl=300)
+def get_cached_b2_data(DATA_DIR):
+    """將 B2 四大區塊的資料一次性讀取與合併，並存入快取記憶體中"""
+    df_21, df_22, df_23, df_24 = pd.DataFrame(), pd.DataFrame(), pd.DataFrame(), pd.DataFrame()
+
     # --- 2-1：外資 5 日買超 ---
     files_21 = sorted(glob.glob(os.path.join(DATA_DIR, "*外資買超佔成交比*.csv")), reverse=True)[:10]
     if files_21:
@@ -61,8 +63,7 @@ def sync_b2_data(DATA_DIR):
                 
                 csv_display['今日短動態'] = csv_display.apply(eval_cont, axis=1)
                 cols = ["股票代號", "股票名稱", "今日短動態"] + [c for c in csv_display.columns if "成交比%" in c]
-                # 💡 修正 Bug：將「未過濾的完整資料」存入，確保觀察名單能讀到所有標的
-                st.session_state['df_blk2_1'] = csv_display[cols].copy()
+                df_21 = csv_display[cols].copy()
 
     # --- 2-2：投信 5 日買超 ---
     files_22 = sorted(glob.glob(os.path.join(DATA_DIR, "*投信買超佔成交比*.csv")), reverse=True)[:10]
@@ -102,7 +103,7 @@ def sync_b2_data(DATA_DIR):
                     return f"🔄 持平 {val_str}"
                 csv_display['今日短動態'] = csv_display.apply(eval_cont, axis=1)
                 cols = ["股票代號", "股票名稱", "今日短動態"] + [c for c in csv_display.columns if "成交比%" in c]
-                st.session_state['df_blk2_2'] = csv_display[cols].copy()
+                df_22 = csv_display[cols].copy()
 
     # --- 2-3：外資 5 日買超佔發行 ---
     files_23 = sorted(glob.glob(os.path.join(DATA_DIR, "*外資買超佔發行張數*.csv")), key=extract_date_from_name, reverse=True)[:10]
@@ -140,7 +141,7 @@ def sync_b2_data(DATA_DIR):
                     return "🔄 今日量縮持平"
                 csv_display['今日短動態'] = csv_display.apply(judge_alert, axis=1)
                 history_cols = [c for c in csv_display.columns if "發行數%" in c]
-                st.session_state['df_blk2_3'] = csv_display[["股票代號", "股票名稱", "今日短動態"] + history_cols].copy()
+                df_23 = csv_display[["股票代號", "股票名稱", "今日短動態"] + history_cols].copy()
 
     # --- 2-4：投信 5 日買超佔發行 ---
     files_24 = sorted(glob.glob(os.path.join(DATA_DIR, "*投信買超佔發行張數*.csv")), key=extract_date_from_name, reverse=True)[:10]
@@ -178,23 +179,32 @@ def sync_b2_data(DATA_DIR):
                     return "🔄 今日量縮持平"
                 csv_display['今日短動態'] = csv_display.apply(judge_alert, axis=1)
                 history_cols = [c for c in csv_display.columns if "發行數%" in c]
-                st.session_state['df_blk2_4'] = csv_display[["股票代號", "股票名稱", "今日短動態"] + history_cols].copy()
+                df_24 = csv_display[["股票代號", "股票名稱", "今日短動態"] + history_cols].copy()
+
+    return df_21, df_22, df_23, df_24
 
 # ==========================================
-# 🖼️ 前台畫面渲染 (Views)：負責畫圖與 Checkbox
+# ⚙️ 橋接函數：讓舊版程式或背景任務可以無縫運作
 # ==========================================
-def show_b2_page(DATA_DIR):
-    """B2 專屬頁面 UI 渲染"""
-    # 確保記憶體裡有資料 (如果還沒存過，就當場算一次)
-    if 'df_blk2_1' not in st.session_state:
-        sync_b2_data(DATA_DIR)
+def sync_b2_data(DATA_DIR):
+    """將快取的結果寫入 session_state，供側邊欄與其他模組使用"""
+    df_21, df_22, df_23, df_24 = get_cached_b2_data(DATA_DIR)
+    st.session_state['df_blk2_1'] = df_21
+    st.session_state['df_blk2_2'] = df_22
+    st.session_state['df_blk2_3'] = df_23
+    st.session_state['df_blk2_4'] = df_24
 
-    # 2-1 渲染
+
+# ==========================================
+# 🚀 局部渲染魔法：四個獨立的 Fragment (避免勾選時畫面跳動)
+# ==========================================
+
+@st.fragment
+def render_b2_1(df_21):
     st.write("---")
     st.markdown("<div id='section-2-1'></div>", unsafe_allow_html=True)
     st.header("法人掃貨：外資 5 日 買超佔標的成交量")
     
-    df_21 = st.session_state.get('df_blk2_1')
     if df_21 is not None and not df_21.empty:
         st.info("動態 🔥 強延續 (買盤加速) ⚠️ 趨緩 (買盤力道減弱) 🔄 持平 📉 調節洗盤 (微幅調節) 🚨 劇烈倒貨 (強烈賣出)")
         c1, c2 = st.columns(2)
@@ -211,12 +221,12 @@ def show_b2_page(DATA_DIR):
     else:
         st.warning("⚠️ 記憶體中無 2-1 數據。")
 
-    # 2-2 渲染
+@st.fragment
+def render_b2_2(df_22):
     st.write("---")
     st.markdown("<div id='section-2-2'></div>", unsafe_allow_html=True)
     st.header("法人掃貨：投信 5 日 買超佔標的成交量")
     
-    df_22 = st.session_state.get('df_blk2_2')
     if df_22 is not None and not df_22.empty:
         c1, c2 = st.columns(2)
         show_etf = c1.checkbox("顯示 ETF", value=True, key="sitc_etf_v9")
@@ -232,12 +242,12 @@ def show_b2_page(DATA_DIR):
     else:
         st.warning("⚠️ 記憶體中無 2-2 數據。")
 
-    # 2-3 渲染
+@st.fragment
+def render_b2_3(df_23):
     st.write("---")
     st.markdown("<div id='section-2-3'></div>", unsafe_allow_html=True)
     st.header("法人掃貨：外資 5 日 買超佔公司發行張數")
     
-    df_23 = st.session_state.get('df_blk2_3')
     if df_23 is not None and not df_23.empty:
         c1, c2 = st.columns(2)
         show_etf = c1.checkbox("顯示 ETF", value=True, key="foreign_etf_final_v3")
@@ -253,12 +263,12 @@ def show_b2_page(DATA_DIR):
     else:
         st.warning("⚠️ 記憶體中無 2-3 數據。")
 
-    # 2-4 渲染
+@st.fragment
+def render_b2_4(df_24):
     st.write("---")
     st.markdown("<div id='section-2-4'></div>", unsafe_allow_html=True)
     st.header("法人掃貨：投信 5 日 買超佔公司發行張數")
     
-    df_24 = st.session_state.get('df_blk2_4')
     if df_24 is not None and not df_24.empty:
         c1, c2 = st.columns(2)
         show_etf = c1.checkbox("顯示 ETF", value=True, key="sitc_etf_final_v3")
@@ -273,3 +283,25 @@ def show_b2_page(DATA_DIR):
         st.dataframe(display_df, use_container_width=True)
     else:
         st.warning("⚠️ 記憶體中無 2-4 數據。")
+
+
+# ==========================================
+# 🖼️ 前台畫面渲染主程式
+# ==========================================
+def show_b2_page(DATA_DIR):
+    """B2 專屬頁面 UI 渲染"""
+    
+    # 💡 使用快取函數瞬間取得運算結果
+    df_21, df_22, df_23, df_24 = get_cached_b2_data(DATA_DIR)
+    
+    # 同步寫入 session_state 確保上方玻璃卡片或其他頁面有資料可用
+    st.session_state['df_blk2_1'] = df_21
+    st.session_state['df_blk2_2'] = df_22
+    st.session_state['df_blk2_3'] = df_23
+    st.session_state['df_blk2_4'] = df_24
+
+    # 利用 4 個獨立的 Fragment 渲染，確保各別的 ETF / 債券勾選不會互相干擾，且不會讓整頁閃爍！
+    render_b2_1(df_21)
+    render_b2_2(df_22)
+    render_b2_3(df_23)
+    render_b2_4(df_24)
