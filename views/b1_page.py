@@ -14,7 +14,7 @@ from collections import defaultdict
 # 🌟 區塊 1 專屬工具函數區 (純運算，無 UI)
 # ==========================================
 
-@st.cache_data(ttl=3600)
+@st.cache_data(show_spinner=False, ttl=3600)
 def load_foreign_ratio_data(data_dir):
     """掃描資料夾中所有外資持股比例的 CSV 檔案"""
     foreign_csvs = glob.glob(os.path.join(data_dir, "*外資持股比例*.csv"))
@@ -57,7 +57,7 @@ def load_foreign_ratio_data(data_dir):
         
     return final_foreign_df.fillna(0.0)
 
-@st.cache_data(ttl=600)
+@st.cache_data(show_spinner=False, ttl=600)
 def fetch_github_json_all():
     """從 GitHub 取得最新的正向法人籌碼 JSON (維持原版 5/20/60/120)"""
     days_list = [5, 20, 60, 120]
@@ -98,7 +98,7 @@ def extract_date_from_filename(filename):
     if m8: return m8.group(1)
     return None
 
-@st.cache_data(ttl=300)
+@st.cache_data(show_spinner=False, ttl=300)
 def build_block1_master_df(data_dir):
     """合併所有歷史快照與 GitHub 即時數據，產生正向全域母表"""
     date_files = defaultdict(lambda: {'txt': [], 'csv': []})
@@ -212,13 +212,11 @@ def build_block1_master_df(data_dir):
     
     return pd.DataFrame(), [], [], {}, {}
 
-# 抓取持股衰竭
-@st.cache_data(ttl=600)
+@st.cache_data(show_spinner=False, ttl=600)
 def fetch_github_json_down():
     """獨立抓取法人持股衰退(負向)的 JSON 資料"""
     days_list = [5, 10, 20, 30] 
     json_dfs = {}
-    
     account, repo, branch = "voidful", "tw-institutional-stocker", "main"
 
     for d in days_list:
@@ -238,7 +236,6 @@ def fetch_github_json_down():
                     })
                     df['排名'] = (df.index + 1).astype(int) 
                     
-                    # 拿掉 % 符號的動作，保留純數值，才能順利存入 CSV 計算單日歷史△
                     json_dfs[d] = df[['排名', '股票代號', '股票名稱', '法人持股', '累積衰退']]
                 else:
                     json_dfs[d] = pd.DataFrame()
@@ -249,7 +246,7 @@ def fetch_github_json_down():
             
     return json_dfs
 
-@st.cache_data(ttl=300)
+@st.cache_data(show_spinner=False, ttl=300)
 def build_block1_down_master_df(data_dir):
     """合併所有【負向衰退】歷史快照，產生全域母表"""
     date_files = defaultdict(list)
@@ -270,7 +267,6 @@ def build_block1_down_master_df(data_dir):
                 df['股票代號'] = df['股票代號'].apply(lambda x: x.zfill(4) if x.isdigit() else x)
                 df['股票名稱'] = df['股票名稱'].astype(str).str.strip()
                 
-                # 防呆：確保法人持股為數值
                 if df['法人持股'].dtype == object:
                     df['法人持股'] = df['法人持股'].astype(str).str.replace('%', '', regex=False)
                 df['法人持股'] = pd.to_numeric(df['法人持股'], errors='coerce').fillna(0.0)
@@ -304,7 +300,6 @@ def build_block1_down_master_df(data_dir):
 
             f_df['今日衰退上榜'] = f_df[latest_sect_col].fillna("")
 
-            # 計算單日衰退 △
             if len(d_cols) >= 2:
                 f_df['單日△'] = f_df.apply(lambda row: row[d_cols[0]] - row[d_cols[1]] if row[d_cols[1]] > 0.001 else 0.0, axis=1)
             else: 
@@ -313,11 +308,46 @@ def build_block1_down_master_df(data_dir):
             for col in d_cols:
                 f_df[col] = f_df[col].apply(lambda x: "未進榜" if pd.isna(x) or abs(x) < 0.0001 else f"{x:.2f}")
 
-            # 負向表單：依據單日△ 排序 (越負排越前面)
             f_df = f_df.sort_values(by=['單日△'], ascending=True)
             return f_df, sorted_dates, d_cols
 
     return pd.DataFrame(), [], []
+
+# ==========================================
+# 💡 效能救星：深潛實驗室專用快取運算 (避免切換分頁時重算)
+# ==========================================
+@st.cache_data(show_spinner=False, ttl=300)
+def prepare_deep_dive_data(final_df, df_foreign):
+    foreign_dates = {c.replace('外資持股_', '') for c in df_foreign.columns if '外資持股_' in c}
+    total_dates = {c.replace('持股%', '') for c in final_df.columns if '持股%' in c}
+    common_dates = sorted(list(foreign_dates & total_dates), reverse=True)[:20]
+    
+    if not common_dates:
+        return pd.DataFrame(), [], [], []
+        
+    f_need_cols = ['股票代號'] + [f'外資持股_{d}' for d in common_dates]
+    df_calc = pd.merge(final_df, df_foreign[f_need_cols], on='股票代號', how='inner')
+    
+    def clean_pct(val):
+        try: return float(str(val).replace('%', '').replace(',', ''))
+        except: return 0.0
+    
+    dom_display_cols, for_display_cols = [], []
+    
+    for d in common_dates:
+        tot_val, for_val = df_calc[f'{d}持股%'].apply(clean_pct), df_calc[f'外資持股_{d}'].apply(clean_pct)
+        dom_col, for_out_col = f'內資_{d[-4:]}', f'外資_{d[-4:]}'
+        
+        df_calc[f'{dom_col}_raw'] = (tot_val - for_val).clip(lower=0)
+        df_calc[dom_col] = df_calc[f'{dom_col}_raw'].apply(lambda x: f"{x:.2f}%")
+        dom_display_cols.append(dom_col)
+        
+        df_calc[f'{for_out_col}_raw'] = for_val
+        df_calc[for_out_col] = df_calc[f'{for_out_col}_raw'].apply(lambda x: f"{x:.2f}%")
+        for_display_cols.append(for_out_col)
+    
+    df_calc = df_calc[df_calc['今日上榜'].astype(str).str.strip() != ""]
+    return df_calc, common_dates, dom_display_cols, for_display_cols
 
 # ==========================================
 # ⚙️ 後台資料引擎 (Data Engine)
@@ -325,7 +355,6 @@ def build_block1_down_master_df(data_dir):
 def sync_b1_data(data_dir):
     """B1 專屬背景同步引擎"""
     final_df, sorted_dates, date_cols, color_ref, json_dfs = build_block1_master_df(data_dir)
-    # 載入負向母表
     down_final_df, down_sorted_dates, down_date_cols = build_block1_down_master_df(data_dir)
     foreign_df = load_foreign_ratio_data(data_dir)
     
@@ -340,57 +369,14 @@ def sync_b1_data(data_dir):
     st.session_state['b1_down_sorted_dates'] = down_sorted_dates
     st.session_state['b1_down_date_cols'] = down_date_cols
 
+
 # ==========================================
-# 🖼️ 前台畫面渲染 (Views)
+# 🖼️ 局部渲染魔法區域 (Fragments)
 # ==========================================
-def show_b1_page(DATA_DIR, STOCK_DICT):
-    """B1 專屬頁面 UI 渲染"""
-    
-    if 'b1_final_df' not in st.session_state:
-        with st.spinner("⚡ 載入法人籌碼大數據中..."):
-            sync_b1_data(DATA_DIR)
-            
-    final_df = st.session_state.get('b1_final_df', pd.DataFrame())
-    sorted_dates = st.session_state.get('b1_sorted_dates', [])
-    date_cols = st.session_state.get('b1_date_cols', [])
-    color_ref = st.session_state.get('b1_color_ref', {})
-    json_dfs = st.session_state.get('b1_json_dfs', {})
-    df_foreign = st.session_state.get('b1_foreign_df', pd.DataFrame())
-    
-    down_final_df = st.session_state.get('b1_down_final_df', pd.DataFrame())
-    down_date_cols = st.session_state.get('b1_down_date_cols', [])
 
-    st.write("---")
-    st.markdown("<div id='section-1'></div>", unsafe_allow_html=True)
-
-    if sorted_dates:
-        latest_d = sorted_dates[0]
-        fmt_date = f"{latest_d[:4]}/{latest_d[4:6]}/{latest_d[6:]}"
-        st.markdown(
-            f"<h2 style='margin-bottom: 0px;'>法人動向：三大法人短中長線持股比追蹤 "
-            f"<span style='color:#00D2FF; font-size:16px; font-weight:500; margin-left:12px;'>基準日：{fmt_date}</span></h2>", 
-            unsafe_allow_html=True
-        )
-    else:
-        st.markdown("<h2 style='margin-bottom: 0px;'>👑 區塊1：三大法人短中長線持股比追蹤</h2>", unsafe_allow_html=True)
-
-    # ------------------------------------------
-    # 💾 站長專屬：JSON 200名快照存檔區
-    # ------------------------------------------
-    all_json_csvs = glob.glob(os.path.join(DATA_DIR, "*JSON_History.csv"))
-    local_latest_date = "無紀錄"
-    if all_json_csvs:
-        dates = [m.group(1) for f in all_json_csvs if (m := re.search(r'(202\d{5})', os.path.basename(f)))]
-        if dates: local_latest_date = max(dates)
-
-    today_str = datetime.datetime.now().strftime("%Y%m%d")
-    is_updated_today = (local_latest_date == today_str)
-    status_icon = "✅" if is_updated_today else "⚠️"
-    status_text = f"{status_icon} 目前基準日: {local_latest_date}"
-
-    st.write("") 
+@st.fragment
+def render_admin_panel(DATA_DIR, local_latest_date, is_updated_today, status_text, json_dfs):
     c_btn1, c_btn2 = st.columns(2)
-
     with c_btn1: 
         st.link_button("📊  台股法人籌碼追蹤 (50名)", "https://goodinfo3583.github.io/DDong_tw-institutional-stocker/", use_container_width=True)
 
@@ -403,8 +389,7 @@ def show_b1_page(DATA_DIR, STOCK_DICT):
             else: st.warning(f" 資料夾中最新快照停留在基準日 `{local_latest_date}`")
                 
             admin_pw = st.text_input("解鎖功能", type="password", key="admin_pw_input")
-            
-            expected_pw = st.secrets["passwords"]["b1_admin"]# 從 secrets 中讀取密碼
+            expected_pw = st.secrets["passwords"]["b1_admin"]
             
             if admin_pw == expected_pw: 
                 st.success("🔓 驗證成功！請執行快照封存。")
@@ -438,10 +423,8 @@ def show_b1_page(DATA_DIR, STOCK_DICT):
                             '法人持股': 'max', '上榜區塊': lambda x: ",".join(set(x))
                         }).reset_index()
                         
-                        # 儲存於伺服器供系統讀取
                         snap_grouped_up.to_csv(save_path_up, index=False, encoding='utf-8-sig')
                         
-                        # 🌟 寫入 session_state，為了稍後給真正的下載按鈕使用
                         st.session_state['dl_csv_up'] = snap_grouped_up.to_csv(index=False).encode('utf-8-sig')
                         st.session_state['dl_name_up'] = f"{date_str}_JSON_History.csv"
                         st.success(f"✅ 成功生成【正向】歷史快照 ({len(snap_grouped_up)} 檔)！")
@@ -467,21 +450,17 @@ def show_b1_page(DATA_DIR, STOCK_DICT):
                             '累積衰退': 'first'
                         }).reset_index()
                         
-                        # 儲存於伺服器供系統讀取
                         snap_grouped_down.to_csv(save_path_down, index=False, encoding='utf-8-sig')
                         
-                        # 🌟 寫入 session_state
                         st.session_state['dl_csv_down'] = snap_grouped_down.to_csv(index=False).encode('utf-8-sig')
                         st.session_state['dl_name_down'] = f"{date_str}_Down_History.csv"
                         st.success(f"✅ 成功生成【負向衰退】歷史快照 ({len(snap_grouped_down)} 檔)！")
                     else: 
                         st.error("❌ 尚未獲取到 GitHub 負向數據，封存失敗。")
                         
-                    # 清空快取重新載入母表
                     build_block1_master_df.clear() 
                     build_block1_down_master_df.clear()
                     
-                # 🌟 實體的下載按鈕區塊：必須放在 st.button() 外，這樣點擊下載時按鈕才不會因為重整而消失！
                 if 'dl_csv_up' in st.session_state and 'dl_csv_down' in st.session_state:
                     st.info("💡 系統已成功將歷史紀錄儲存於背景！若需保存實體檔案至電腦，請點擊下方按鈕下載：")
                     c_dl1, c_dl2 = st.columns(2)
@@ -504,9 +483,8 @@ def show_b1_page(DATA_DIR, STOCK_DICT):
                 st.error("❌ 密碼錯誤，無法使用此功能。")
 
 
-    # ==========================================
-    # 🔧 UI 數據渲染 (四大榜單)
-    # ==========================================
+@st.fragment
+def render_b1_main_tables(final_df, color_ref, date_cols):
     c1, c2, c3 = st.columns([1, 1, 2])
     show_etf = c1.checkbox("顯示 ETF", value=True, key="blk1_etf_sync")
     show_bond = c2.checkbox("顯示 債券/債券ETF", value=True, key="blk1_bond_sync")
@@ -596,7 +574,7 @@ def show_b1_page(DATA_DIR, STOCK_DICT):
                 elif cnt == 3: bg = 'background-color: rgba(255, 165, 0, 0.25)'    
                 elif cnt == 2: bg = 'background-color: rgba(80, 200, 120, 0.25)'    
                 elif cnt == 1: bg = 'background-color: rgba(0, 127, 255, 0.25)'    
-                else: bg = 'background-color: #111622; color: #E2E8F0'                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                     
+                else: bg = 'background-color: #111622; color: #E2E8F0'                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                          
                 return [bg] * len(row)
                 
             all_display_cols = ['股票代號', '股票名稱', '今日上榜', '最新動態', '△'] + date_cols
@@ -605,9 +583,9 @@ def show_b1_page(DATA_DIR, STOCK_DICT):
     st.write("")
     st.info("💡 △是單日的法人持股增減(如果最新基準日未進前200榜，△會直接以歸0計算)；5/20/60/120日ΔChange為5/20/60/120期間的累積變化，我們可以試著短線與長線一起觀察。")
 
-    # ==========================================
-    # 📊 繪製區塊 ：產業聚落與資金輪動板塊 (Treemap)
-    # ==========================================
+
+@st.fragment
+def render_b1_treemap(final_df, STOCK_DICT):
     st.write("---")
     st.markdown("### 🧩 資金聚落板塊：三大法人進榜產業分佈")
     st.caption("透過區塊面積大小，觀察法人資金集中攻擊哪些產業。")
@@ -710,7 +688,7 @@ def show_b1_page(DATA_DIR, STOCK_DICT):
         with t_120: render_period_treemap(120)
         with t_all: render_period_treemap("all")
 
-        # 🗑️ ETF 與債券懸停與變色模塊 (單行 HTML)
+        # 🗑️ ETF 與債券懸停與變色模塊
         is_etf = final_df['股票代號'].astype(str).apply(lambda sid: STOCK_DICT.get(sid, {}).get("industry", "ETF / 債券 / 其他") in ["ETF / 債券 / 其他", ""])
         on_list = final_df['今日上榜'].astype(str).str.strip() != ""
         excluded_etfs = final_df[is_etf & on_list].sort_values(by='股票代號')
@@ -743,9 +721,9 @@ def show_b1_page(DATA_DIR, STOCK_DICT):
     else:
         st.info("⚪ 尚無全市場大數據或找不到產業字典，請確認背景掃描引擎已啟動。")
 
-    # ==========================================
-    # 📉 法人提款機：持股衰退 (負向) 追蹤區塊
-    # ==========================================
+
+@st.fragment
+def render_b1_down_trend(DATA_DIR, down_final_df, down_date_cols):
     st.write("---")
     st.markdown("### 📉 法人提款機：持股持續衰退追蹤 (負向)")
     st.caption("觀察法人資金撤出的標的，這些通常是被法人連日賣超、持股比例下降的清單。")
@@ -802,7 +780,6 @@ def show_b1_page(DATA_DIR, STOCK_DICT):
         else:
             st.info("⚪ 目前尚未儲存任何歷史衰退紀錄。站長可以透過上方快照功能每天存檔！")
 
-    # 全能池歷史軌跡 (負向專用)
     with t_down_all:
         if not down_final_df.empty:
              display_cols = ['股票代號', '股票名稱', '今日衰退上榜', '單日△'] + down_date_cols
@@ -822,41 +799,17 @@ def show_b1_page(DATA_DIR, STOCK_DICT):
              st.info("⚪ 目前尚未累積足夠的歷史衰退快照。請確認站長快照有成功封存負向資料，累積多日後即可觀察軌跡。")
 
 
-    # ==========================================
-    # 🕵️‍♂️ [深潛實驗室] 雙引擎籌碼歷史軌跡
-    # ==========================================
+@st.fragment
+def render_b1_deep_dive(final_df, df_foreign):
     st.write("---")
     if not df_foreign.empty and not final_df.empty:
         with st.expander("🕵️‍♂️ [深潛實驗室] 籌碼 20 日歷史軌跡透視鏡 (內資推估 vs 外資)", expanded=False):
             st.caption("透過 20 日的持股比例變化，精準透視法人是在「短線洗盤」還是「長線階梯式建倉」。")
             
-            foreign_dates = {c.replace('外資持股_', '') for c in df_foreign.columns if '外資持股_' in c}
-            total_dates = {c.replace('持股%', '') for c in final_df.columns if '持股%' in c}
-            common_dates = sorted(list(foreign_dates & total_dates), reverse=True)[:20]
+            # 呼叫已經快取好的引擎，運算瞬間完成！
+            df_calc, common_dates, dom_display_cols, for_display_cols = prepare_deep_dive_data(final_df, df_foreign)
             
-            if common_dates:
-                f_need_cols = ['股票代號'] + [f'外資持股_{d}' for d in common_dates]
-                df_calc = pd.merge(final_df, df_foreign[f_need_cols], on='股票代號', how='inner')
-                
-                def clean_pct(val):
-                    try: return float(str(val).replace('%', '').replace(',', ''))
-                    except: return 0.0
-                
-                dom_display_cols, for_display_cols = [], []
-                
-                for d in common_dates:
-                    tot_val, for_val = df_calc[f'{d}持股%'].apply(clean_pct), df_calc[f'外資持股_{d}'].apply(clean_pct)
-                    dom_col, for_out_col = f'內資_{d[-4:]}', f'外資_{d[-4:]}'
-                    
-                    df_calc[f'{dom_col}_raw'] = (tot_val - for_val).clip(lower=0)
-                    df_calc[dom_col] = df_calc[f'{dom_col}_raw'].apply(lambda x: f"{x:.2f}%")
-                    dom_display_cols.append(dom_col)
-                    
-                    df_calc[f'{for_out_col}_raw'] = for_val
-                    df_calc[for_out_col] = df_calc[f'{for_out_col}_raw'].apply(lambda x: f"{x:.2f}%")
-                    for_display_cols.append(for_out_col)
-                
-                df_calc = df_calc[df_calc['今日上榜'].astype(str).str.strip() != ""]
+            if not df_calc.empty and common_dates:
                 tab_dom, tab_for = st.tabs(["🕵️‍♂️ 內資 (投信+自營) 20日軌跡", "🌎 外資大腿 20日軌跡"])
                 base_cols = ['股票代號', '股票名稱', '今日上榜', '△']
                 
@@ -875,3 +828,64 @@ def show_b1_page(DATA_DIR, STOCK_DICT):
                     st.dataframe(df_for_sorted[base_cols + for_display_cols], use_container_width=True, hide_index=True)
             else:
                 st.warning("⚠️ 找不到主表與外資表的共通日期，請確認資料是否已同步。")
+
+
+# ==========================================
+# 🖼️ 主渲染入口
+# ==========================================
+def show_b1_page(DATA_DIR, STOCK_DICT):
+    """B1 專屬頁面 UI 渲染"""
+    
+    if 'b1_final_df' not in st.session_state:
+        with st.spinner("⚡ 載入法人籌碼大數據中..."):
+            sync_b1_data(DATA_DIR)
+            
+    final_df = st.session_state.get('b1_final_df', pd.DataFrame())
+    sorted_dates = st.session_state.get('b1_sorted_dates', [])
+    date_cols = st.session_state.get('b1_date_cols', [])
+    color_ref = st.session_state.get('b1_color_ref', {})
+    json_dfs = st.session_state.get('b1_json_dfs', {})
+    df_foreign = st.session_state.get('b1_foreign_df', pd.DataFrame())
+    
+    down_final_df = st.session_state.get('b1_down_final_df', pd.DataFrame())
+    down_date_cols = st.session_state.get('b1_down_date_cols', [])
+
+    st.write("---")
+    st.markdown("<div id='section-1'></div>", unsafe_allow_html=True)
+
+    if sorted_dates:
+        latest_d = sorted_dates[0]
+        fmt_date = f"{latest_d[:4]}/{latest_d[4:6]}/{latest_d[6:]}"
+        st.markdown(
+            f"<h2 style='margin-bottom: 0px;'>法人動向：三大法人短中長線持股比追蹤 "
+            f"<span style='color:#00D2FF; font-size:16px; font-weight:500; margin-left:12px;'>基準日：{fmt_date}</span></h2>", 
+            unsafe_allow_html=True
+        )
+    else:
+        st.markdown("<h2 style='margin-bottom: 0px;'>👑 區塊1：三大法人短中長線持股比追蹤</h2>", unsafe_allow_html=True)
+
+    # 1. 站長快照專區
+    local_latest_date = "無紀錄"
+    all_json_csvs = glob.glob(os.path.join(DATA_DIR, "*JSON_History.csv"))
+    if all_json_csvs:
+        dates = [m.group(1) for f in all_json_csvs if (m := re.search(r'(202\d{5})', os.path.basename(f)))]
+        if dates: local_latest_date = max(dates)
+
+    today_str = datetime.datetime.now().strftime("%Y%m%d")
+    is_updated_today = (local_latest_date == today_str)
+    status_icon = "✅" if is_updated_today else "⚠️"
+    status_text = f"{status_icon} 目前基準日: {local_latest_date}"
+    st.write("") 
+    render_admin_panel(DATA_DIR, local_latest_date, is_updated_today, status_text, json_dfs)
+
+    # 2. 核心多週期排行與搜尋
+    render_b1_main_tables(final_df, color_ref, date_cols)
+
+    # 3. 資金聚落板塊 (Treemap)
+    render_b1_treemap(final_df, STOCK_DICT)
+
+    # 4. 法人提款機 (衰退追蹤)
+    render_b1_down_trend(DATA_DIR, down_final_df, down_date_cols)
+
+    # 5. 深潛實驗室
+    render_b1_deep_dive(final_df, df_foreign)
