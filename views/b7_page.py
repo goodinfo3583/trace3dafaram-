@@ -364,8 +364,7 @@ def show_b7_page(DATA_DIR, STOCK_DICT):
         sync_pledge_history_data(DATA_DIR)
             
     st.write("---")
-    st.markdown("<div id='section-7'></div>", unsafe_allow_html=True)
-    
+    st.markdown("<div id='section-7'></div>", unsafe_allow_html=True) 
     st.markdown("""
     <div style="background: linear-gradient(90deg, rgba(15,23,42,1) 0%, rgba(14,165,233,0.3) 50%, rgba(15,23,42,1) 100%); 
                 border-top: 1px solid #38bdf8; border-bottom: 1px solid #38bdf8; padding: 15px 20px; 
