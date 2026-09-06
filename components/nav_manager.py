@@ -506,7 +506,7 @@ def inject_custom_header(is_logged_in=False):
     inject_js = inject_js.replace("__LOGIN_TEXT__", login_btn_text)
     inject_js = inject_js.replace("__HOTKEYS_JSON__", hotkeys_json)
     components.html(inject_js, height=0, width=0)
-
+#代理按鈕區塊
 def render_proxy_buttons():
     def change_page(page_name):
         st.query_params["page"] = page_name 
@@ -518,32 +518,23 @@ def render_proxy_buttons():
         st.session_state.clear()
         st.query_params["page"] = "b1" 
         
-    with st.container():
-        # 💡 這個隱形魔法已經非常完美，我們保留它並移除會佔用資源的 setInterval
-        st.markdown("""
-            <style>
-            div[data-testid="stElementContainer"]:has(#hidden-nav-anchor) ~ div[data-testid="stElementContainer"] {
-                display: none !important;
-            }
-            </style>
-            <div id="hidden-nav-anchor"></div>
-        """, unsafe_allow_html=True)
-        
-        st.button("登入", on_click=change_page, args=("login",))
-        st.button("登出", on_click=handle_logout)
-        st.button("NavToContact", on_click=change_page, args=("contact",))
-        st.button("NavToCourses", on_click=toggle_course_npc)
-        st.button("NavToNews", on_click=change_page, args=("news",))
-        st.button("NavToPool", on_click=change_page, args=("pool",))
-        st.button("NavToB0", on_click=change_page, args=("b0",))
-        st.button("NavToB1", on_click=change_page, args=("b1",))
-        st.button("NavToB2", on_click=change_page, args=("b2",))
-        st.button("NavToB3", on_click=change_page, args=("b3",))
-        st.button("NavToB4", on_click=change_page, args=("b4",))
-        st.button("NavToB5", on_click=change_page, args=("b5",))
-        st.button("NavToB6", on_click=change_page, args=("b6",))
-        st.button("NavToB7", on_click=change_page, args=("b7",))
-        st.button("NavToBroker", on_click=change_page, args=("broker",))
-        st.button("NavToSettings", on_click=change_page, args=("setting",))
-        st.button("NavToWatchlist", on_click=change_page, args=("watchlist",))
-        st.button("NavToWeightBacktest", on_click=change_page, args=("weight_backtest",))
+    # 💡 直接放置隱藏錨點，配合 style_manager.py 的全域 CSS，按鈕出生即隱形！
+    st.markdown('<span id="hidden-nav-anchor"></span>', unsafe_allow_html=True)
+    st.button("登入", on_click=change_page, args=("login",))
+    st.button("登出", on_click=handle_logout)
+    st.button("NavToContact", on_click=change_page, args=("contact",))
+    st.button("NavToCourses", on_click=toggle_course_npc)
+    st.button("NavToNews", on_click=change_page, args=("news",))
+    st.button("NavToPool", on_click=change_page, args=("pool",))
+    st.button("NavToB0", on_click=change_page, args=("b0",))
+    st.button("NavToB1", on_click=change_page, args=("b1",))
+    st.button("NavToB2", on_click=change_page, args=("b2",))
+    st.button("NavToB3", on_click=change_page, args=("b3",))
+    st.button("NavToB4", on_click=change_page, args=("b4",))
+    st.button("NavToB5", on_click=change_page, args=("b5",))
+    st.button("NavToB6", on_click=change_page, args=("b6",))
+    st.button("NavToB7", on_click=change_page, args=("b7",))
+    st.button("NavToBroker", on_click=change_page, args=("broker",))
+    st.button("NavToSettings", on_click=change_page, args=("setting",))
+    st.button("NavToWatchlist", on_click=change_page, args=("watchlist",))
+    st.button("NavToWeightBacktest", on_click=change_page, args=("weight_backtest",))

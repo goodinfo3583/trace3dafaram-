@@ -60,7 +60,13 @@ def apply_global_theme(image_path="./image/派對盛宴邀請.png"):
     .block-container {{ padding-top: 0rem; }}
     
     /* 懸浮視窗縮放與圖示特效 */
-    .glass-panel, .glass-panel-b2, .glass-panel-b4, .glass-panel-b5, .npc-overlay, .settings-modal-active {{ resize: both !important; overflow: auto !important; }}
+    .glass-panel, .glass-panel-b2, .glass-panel-b4, .glass-panel-b5, .npc-overlay, .settings-modal-active { resize: both !important; overflow: auto !important; }
+    
+    /* 👇 加入這段：全域預先隱藏代理按鈕，徹底消滅 0.5 秒閃爍 */
+    div[data-testid="stElementContainer"]:has(#hidden-nav-anchor),
+    div[data-testid="stElementContainer"]:has(#hidden-nav-anchor) ~ div[data-testid="stElementContainer"] {
+        display: none !important;
+    }
     img[src*="icon-card"], img[alt*="icon-card"] {{ cursor: pointer !important; transition: all 0.2s ease !important; }}
     img[src*="icon-card"]:hover, img[alt*="icon-card"]:hover {{ transform: scale(1.08) !important; filter: drop-shadow(0 0 8px rgba(0, 210, 255, 0.6)) !important; }}
     img[src*="icon-card"]:active, img[alt*="icon-card"]:active {{ transform: scale(0.95) !important; }}
