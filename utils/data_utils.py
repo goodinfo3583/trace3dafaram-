@@ -1,4 +1,4 @@
-# utils/data_utils.py工具箱
+# utils/data_utils.py 工具箱
 import os
 import glob
 import re
@@ -13,6 +13,8 @@ def extract_date_from_name(filename):
     match = re.search(r'\d{8}', os.path.basename(filename))
     return match.group(0) if match else "00000000"
 
+# 💡 優化 1：本機讀檔加入快取 (TTL=300，5分鐘內重複讀取瞬間完成)
+@st.cache_data(show_spinner=False, ttl=300)
 def robust_read_csv(file_path):
     """強硬讀取法：解決各種中文編碼亂碼問題"""
     for encoding in ['cp950', 'utf-8-sig', 'utf-8']:
@@ -25,8 +27,10 @@ def robust_read_csv(file_path):
             continue
     return pd.read_csv(file_path, encoding='cp950', errors='ignore')
 
-# 避免excel最前方0消失 
+# 💡 優化 2：針對有資料清洗處理的 CSV 讀取加上快取
+@st.cache_data(show_spinner=False, ttl=300)
 def parse_json_history_csv(file_path, date_label):
+    """避免excel最前方0消失，並處理欄位名稱"""
     try:
         df = pd.read_csv(file_path, encoding='utf-8-sig')
         df['股票代號'] = df['股票代號'].astype(str).str.replace(r'\.0$', '', regex=True).str.strip()
@@ -45,7 +49,8 @@ def agg_sections_func(x):
                 valid_x.add(p.strip())
     return ",".join([s for s in ['5日', '20日', '60日', '120日'] if s in valid_x])
 
-@st.cache_data(ttl=60) 
+# 💡 優化 3：加入 show_spinner=False，避免背景讀取時畫面閃爍轉圈圈
+@st.cache_data(show_spinner=False, ttl=60) 
 def get_latest_csv(keyword):
     if not os.path.exists(DATA_DIR): return None, "未知"
     files = glob.glob(os.path.join(DATA_DIR, f"*{keyword}*csv"))
@@ -60,7 +65,7 @@ def get_latest_csv(keyword):
         return df, os.path.basename(files[0])[:8]
     except: return None, "未知"
 
-@st.cache_data(ttl=60)
+@st.cache_data(show_spinner=False, ttl=60)
 def get_prev_csv(keyword, current_date):
     if not os.path.exists(DATA_DIR): return None
     files = glob.glob(os.path.join(DATA_DIR, f"*{keyword}*csv"))
@@ -86,17 +91,11 @@ def get_diff_ui(today_val, prev_val):
         return f"<br><span style='color:{color}; font-size:11px;'>({sign}{diff:,})</span>"
     except: return ""
 
-
+# 💡 優化 4：遠端資料讀取「極度消耗網路資源」，設定 1 小時快取 (ttl=3600)
+@st.cache_data(show_spinner=False, ttl=3600)
 def calculate_chip_concentration(csv_path: str, target_stock: str) -> pd.DataFrame:
     """
     計算指定股票的每日籌碼集中度
-    
-    Args:
-        csv_path: 你的 broker_history.csv 檔案路徑 (或 GitHub 遠端 Raw 網址)
-        target_stock: 股票代碼，例如 "1709"
-        
-    Returns:
-        DataFrame 包含每日的：日期、買超張數、賣超張數、淨買超張數、集中度(%)
     """
     # 1. 讀取資料庫 (支援 GitHub Raw 網址)
     try:
@@ -117,17 +116,13 @@ def calculate_chip_concentration(csv_path: str, target_stock: str) -> pd.DataFra
     
     # 4. 依照「交易日期」進行分組運算
     for date, group in stock_df.groupby('trade_date'):
-        # 分別抓出買方與賣方的資料
         buy_side = group[group['side'] == 'buy']
         sell_side = group[group['side'] == 'sell']
         
-        # 計算前 15 大總買超與總賣超張數 (把 net_vol 加總)
-        # 注意：賣方的 net_vol 已經是負數，所以我們直接相加即可看出淨流向
         top15_buy_vol = buy_side['net_vol'].sum()
         top15_sell_vol = sell_side['net_vol'].sum() 
         daily_net_vol = top15_buy_vol + top15_sell_vol
         
-        # 計算集中度 (買方佔比總和 - 賣方佔比總和)
         concentration_pct = round(buy_side['pct'].sum() - sell_side['pct'].sum(), 2)
         
         results.append({
@@ -142,29 +137,8 @@ def calculate_chip_concentration(csv_path: str, target_stock: str) -> pd.DataFra
     result_df = pd.DataFrame(results).sort_values('trade_date')
     return result_df
 
-# ==========================================
-# 測試區塊 (你可以直接執行這支檔案看看結果)
-# ==========================================
-if __name__ == "__main__":
-    # 使用你剛建立的 GitHub 遠端資料庫 Raw 網址
-    # 注意：如果你的 Repo 設定為 Private (私密)，這裡會讀不到，必須設為 Public
-    remote_csv_url = "https://raw.githubusercontent.com/goodinfo3583/tw-broker-data/main/data/broker/broker_history.csv"
-    
-    print("開始透過遠端資料庫計算 1709 和益 的籌碼集中度...")
-    try:
-        # 直接把網址餵給我們的函式
-        df_1709 = calculate_chip_concentration(remote_csv_url, "1709")
-        if not df_1709.empty:
-            print("\n計算成功！以下是每日集中度：")
-            print(df_1709)
-        else:
-            print("計算完成，但找不到 1709 的資料。(可能是 HOT_STOCKS 沒抓到，或遠端還沒更新)")
-    except Exception as e:
-        print(f"讀取遠端檔案發生錯誤：{e}")
-#
-
-#台股代號與名稱產業類別 萬用字典引擎 (後台靜默運作)
-@st.cache_data(ttl=3600)
+# 台股代號與名稱產業類別 萬用字典引擎
+@st.cache_data(show_spinner=False, ttl=3600)
 def get_stock_dictionary():
     """讀取證交所 ISIN 檔案，支援同時讀取上市、上櫃、興櫃多個檔案"""
     mapping = {}
@@ -200,9 +174,7 @@ def get_stock_dictionary():
                     sid = tokens[0].strip()
                     sname = tokens[1].strip()
                     
-                    # 🛡️ 權證與重複過濾：只加入 4 碼純數字/英數，並且用 sid 作為主要防重鑰匙
                     if sid.isalnum() and len(sid) <= 4: 
-                        # 如果字典已經有這檔股票了，就不再重複寫入
                         if sid not in mapping:
                             mapping[sname] = {"id": sid, "name": sname, "industry": industry}
                             mapping[sid] = {"id": sid, "name": sname, "industry": industry}

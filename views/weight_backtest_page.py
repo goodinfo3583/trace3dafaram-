@@ -93,8 +93,8 @@ def show_weight_backtest_page(STOCK_DICT, DATA_DIR="data"):
     if 'b7_pledge' not in st.session_state: sync_pledge_data(DATA_DIR)
     if 'b7_pledge_history' not in st.session_state: sync_pledge_history_data(DATA_DIR)
 
-    st.markdown("<h2 style='color: #38BDF8;'>權重自訂與勝率回測寶庫</h2>", unsafe_allow_html=True)
-    st.caption("打造專屬於您的選股邏輯，透過多重條件交集與大數據計分，找出最具爆發力的潛力股。")
+    st.markdown("<h2 style='color: #38BDF8;'>籌碼選股過濾與勝率回測寶庫</h2>", unsafe_allow_html=True)
+    st.caption("打造專屬於自己的選股邏輯，透過多重條件交集或聯集與大數據計分，找出最具爆發力的潛力股。")
     st.write("---")
 
     # 0. 建立完美全市場候選池
@@ -204,7 +204,7 @@ def show_weight_backtest_page(STOCK_DICT, DATA_DIR="data"):
             st.session_state['filter_b7_pledge_trend'] = []
             st.session_state['filter_b7_6m_inc'] = False
 
-        st.button("清空所有篩選條件", icon=":material/ink_eraser:", on_click=reset_filters, use_container_width=True)
+        st.button("清空過濾條件", icon=":material/ink_eraser:", on_click=reset_filters, use_container_width=True)
 
     filtered_df = base_df.copy()
     any_filter_applied = False
@@ -263,7 +263,7 @@ def show_weight_backtest_page(STOCK_DICT, DATA_DIR="data"):
         d_str = str(b1_sorted_dates[0])
         b1_latest_date_str = f"{d_str[:4]}/{d_str[4:6]}/{d_str[6:]}"
     
-    with st.expander(f"📈 B1 法人動向 (資料基準日: {b1_latest_date_str})", expanded=False):
+    with st.expander(f"📈 B1 法人動向過濾 (資料基準日: {b1_latest_date_str})", expanded=False):
         st.markdown("**🔹 1. 近期進榜天數與變化**")
         c1, c2, c3, c4, c5 = st.columns(5)
         b1_delta = c1.checkbox("當日△上升 (>0)", key="filter_b1_delta")
@@ -306,7 +306,7 @@ def show_weight_backtest_page(STOCK_DICT, DATA_DIR="data"):
                 else: b2_latest_date_str = raw_date
                 break
 
-    with st.expander(f"🚀 B2 法人掃貨 (資料基準日: {b2_latest_date_str})", expanded=False):
+    with st.expander(f"🚀 B2 法人掃貨過濾 (資料基準日: {b2_latest_date_str})", expanded=False):
         st.markdown("**🔹 1. 掃貨榜單**")
         b2_top_n = st.slider("👑 排名過濾：設定最新進榜的擷取範圍 (名次)", min_value=10, max_value=300, value=50, step=10, key="filter_b2_top_n")
         c_b2_1, c_b2_2 = st.columns(2)
@@ -334,7 +334,7 @@ def show_weight_backtest_page(STOCK_DICT, DATA_DIR="data"):
         dates = [d for _, d in st.session_state['b3_data'].values() if d and d != "00000000"]
         if dates: b3_latest_date_str = f"2026/{max(dates)[4:6]}/{max(dates)[6:]}"
 
-    with st.expander(f"🔥 B3 法人連買 (資料基準日: {b3_latest_date_str})", expanded=False):
+    with st.expander(f"🔥 B3 法人連買過濾 (資料基準日: {b3_latest_date_str})", expanded=False):
         st.markdown("**🔹 1. 連買榜單**")
         col_b3_1, col_b3_1_s, col_b3_2, col_b3_2_s = st.columns([1.2, 1, 1.2, 1])
         with col_b3_1: b3_fo_day_chk = st.checkbox("🌐 外資日連買", key="filter_b3_fo_day")
@@ -362,7 +362,7 @@ def show_weight_backtest_page(STOCK_DICT, DATA_DIR="data"):
     if 'b4_squeeze_radar' in st.session_state and st.session_state['b4_squeeze_radar']['date']:
         b4_latest_date_str = st.session_state['b4_squeeze_radar']['date']
 
-    with st.expander(f"⚔️ B4 資券動向 (資料基準日: {b4_latest_date_str})", expanded=False):
+    with st.expander(f"⚔️ B4 資券動向過濾 (資料基準日: {b4_latest_date_str})", expanded=False):
         st.markdown("**🔹 1. 資券榜單**")
         b4_top_n = st.slider("👑 排名過濾：設定最新進榜的擷取範圍 (名次)", min_value=10, max_value=300, value=50, step=10, key="filter_b4_top_n")
         c_b4_1, c_b4_2 = st.columns(2)
@@ -406,7 +406,7 @@ def show_weight_backtest_page(STOCK_DICT, DATA_DIR="data"):
         col_latest = next((c for c in df_b5_tmp.columns if c.startswith('▼') and '6周' not in c), None)
         if col_latest: b5_latest_date_str = f"2026/{col_latest.replace('▼', '')[:2]}/{col_latest.replace('▼', '')[2:]}"
 
-    with st.expander(f"🐳 B5 大腿動向 (資料基準日: {b5_latest_date_str})", expanded=False):
+    with st.expander(f"🐳 B5 大腿動向過濾 (資料基準日: {b5_latest_date_str})", expanded=False):
         st.markdown("**🔹 1. 共振榜單過濾**")
         c_b5_1, c_b5_2 = st.columns(2)
         b5_long_short = c_b5_1.checkbox("🎯 長短線共振 (1000張與400張波段+本週皆同步加碼)", key="filter_b5_long_short")
@@ -435,7 +435,7 @@ def show_weight_backtest_page(STOCK_DICT, DATA_DIR="data"):
         date_part = dynamic_price_col_b6.split(' ')[0].replace('▼', '')
         if len(date_part) == 4: b6_latest_date_str = f"2026/{date_part[:2]}/{date_part[2:]}"
 
-    with st.expander(f"💎 B6 鉅額交易 (資料基準日: {b6_latest_date_str})", expanded=False):
+    with st.expander(f"💎 B6 鉅額交易過濾 (資料基準日: {b6_latest_date_str})", expanded=False):
         st.markdown("**🔹 1. 今日鉅額交易過濾**")
         b6_today_chk = st.checkbox("🎯 今日有發生鉅額交易", key="filter_b6_today")
         st.markdown("**🔹 2. 資金規模過濾**")
@@ -455,7 +455,7 @@ def show_weight_backtest_page(STOCK_DICT, DATA_DIR="data"):
             if 'M' in best_m: b7_latest_date_str = f"20{best_m.split('M')[0]}/{best_m.split('M')[1]}"
             elif len(best_m) == 6: b7_latest_date_str = f"{best_m[:4]}/{best_m[4:]}"
 
-    with st.expander(f"👔 B7 董監動向 (資料基準月: {b7_latest_date_str})", expanded=False):
+    with st.expander(f"👔 B7 董監動向過濾 (資料基準月: {b7_latest_date_str})", expanded=False):
         st.markdown("**🔹 1. 最新董監持股與質押比例 (%)**")
         c_b7_1, c_b7_2 = st.columns(2)
         b7_hold_pct = c_b7_1.slider("🛡️ 董監持股比例區間：", 0.0, 100.0, (0.0, 100.0), 0.5, key="filter_b7_hold_pct")

@@ -249,7 +249,7 @@ def inject_custom_header(is_logged_in=False):
 
                 <div class="dropdown-item actionable">
                         <a href="#" data-target="NavToWeightBacktest" class="dropdown-title internal-nav">
-                            <img src="app/static/icon-chart-set-theory.png" class="menu-icon" alt="weight"> 智慧選股
+                            <img src="app/static/icon-chart-set-theory.png" class="menu-icon" alt="weight"> 籌碼選股
                             <span style="color:#f20049; font-size:10px; margin-left: 5px; animation: pulse 2s infinite;">(HOT)</span>
                         </a>
                         <p class="dropdown-text">自訂計分籌碼權重與未來勝率回測模擬。</p>
