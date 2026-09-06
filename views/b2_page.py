@@ -212,7 +212,8 @@ def render_b2_1(df_21):
         </h2>
     </div>
     """, unsafe_allow_html=True)
-    st.header("法人掃貨：外資 5 日 買超佔標的成交量")
+    
+    st.write("外資 5 日 買超佔標的成交量")
     
     if df_21 is not None and not df_21.empty:
         st.info("動態 🔥 強延續 (買盤加速) ⚠️ 趨緩 (買盤力道減弱) 🔄 持平 📉 調節洗盤 (微幅調節) 🚨 劇烈倒貨 (強烈賣出)")
