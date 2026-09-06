@@ -14,6 +14,32 @@ import yfinance as yf
 from utils.data_utils import robust_read_csv
 
 # ==========================================
+# ⚡ 效能救星：全域股價快取引擎 (快取 1 小時)
+# ==========================================
+@st.cache_data(show_spinner=False, ttl=3600)
+def get_cached_stock_price(sid, start_str=None, end_str=None):
+    """將 yfinance 抓取價格的動作快取起來，避免迴圈重複呼叫拖垮效能"""
+    ticker_tw = f"{sid}.TW"
+    ticker_two = f"{sid}.TWO"
+    try:
+        if start_str and end_str:
+            p_df = yf.download(ticker_tw, start=start_str, end=end_str, progress=False)
+            if p_df.empty: p_df = yf.download(ticker_two, start=start_str, end=end_str, progress=False)
+            if not p_df.empty:
+                val = p_df['Close'].iloc[0]
+                return round(float(val.iloc[0] if isinstance(val, pd.Series) else val), 2)
+        else:
+            p_df = yf.download(ticker_tw, period="1d", progress=False)
+            if p_df.empty: p_df = yf.download(ticker_two, period="1d", progress=False)
+            if not p_df.empty:
+                val = p_df['Close'].iloc[-1]
+                return round(float(val.iloc[0] if isinstance(val, pd.Series) else val), 2)
+    except:
+        pass
+    return 0.0
+
+
+# ==========================================
 # 🌟 "觀察名單"專屬工具函數區 
 # ==========================================
 def get_df_safe(*keys): 
@@ -37,7 +63,6 @@ def get_b3_score(df, sid, type_keyword):
     if df is None or df.empty or '股票代號' not in df.columns: 
         return 0, ""
     
-    # 模糊比對尋找「類型」與「天數」欄位
     type_col = next((c for c in df.columns if '類型' in str(c) or '連買' in str(c)), None)
     days_col = next((c for c in df.columns if '週期' in str(c) or '天數' in str(c) or '日' in str(c)), None)
     
@@ -73,15 +98,10 @@ def get_today_ratio(df, stock_id, col_name):
 # 🚀 觀察名單主畫面渲染函數
 # ==========================================
 def show_pool_page(conn, SHEET_URL, DATA_DIR, STOCK_DICT):
-    """
-    🔥 觀察名單專屬頁面
-    接收來自 main.py 的資料庫連線(conn)、路徑(DATA_DIR)與字典(STOCK_DICT)
-    """
     with st.container():
         st.write("---")
         st.markdown("<div id='section-top-pool'></div>", unsafe_allow_html=True)
 
-        # 🚀 統一對接新版 B1 ~ B6 的變數名稱 (同時向下相容舊版變數名)
         df_b1 = get_df_safe('b1_final_df', 'my_final_df')
         df_b5_1000 = get_df_safe('b5_1000', 'df_blk5_1000')
         df_b5_400 = get_df_safe('b5_400', 'df_blk5')
@@ -97,7 +117,6 @@ def show_pool_page(conn, SHEET_URL, DATA_DIR, STOCK_DICT):
         df_b4_mp_pct = get_df_safe('b4_margin_plus_pct', 'df_margin_plus_pct')
         df_b4_mp_vol = get_df_safe('b4_margin_plus_vol', 'df_margin_plus_vol')
         
-        # 🚀 掃描最新日期邏輯
         all_files = glob.glob(os.path.join(DATA_DIR, "*"))
         anchor_date_str = "00000000"
         d_b1_inst, d_b23_chip, d_b4_margin, d_b5_share = "00000000", "00000000", "00000000", "00000000"
@@ -123,7 +142,6 @@ def show_pool_page(conn, SHEET_URL, DATA_DIR, STOCK_DICT):
                 return f"{date_str[4:6]}/{date_str[6:8]}"
             return "--/--"
 
-        # 渲染橫幅標題
         st.markdown(f"""
         <div style="background: linear-gradient(90deg, rgba(15,23,42,1) 0%, rgba(14,165,233,0.3) 50%, rgba(15,23,42,1) 100%); 
                     border-top: 1px solid #38bdf8; border-bottom: 1px solid #38bdf8; padding: 15px 20px; border-radius: 10px;
@@ -140,7 +158,6 @@ def show_pool_page(conn, SHEET_URL, DATA_DIR, STOCK_DICT):
         with st.container(border=True):
             st.info("💡 我們試著觀察近5/20/60/120日法人動向持股上升的變化前段班且當天持續買入的標的...")
 
-            # 🚨 關鍵阻斷器 (改為偵測新版主表 B1 與 B5 是否為空)
             if df_b1.empty or df_b5_1000.empty:
                 st.warning("⚠️ 記憶體中尚無最新數據 (或尚未載入大股東資料)，請點擊下方按鈕啟動全市場掃描引擎。")
                 c_btn1, c_btn2, c_btn3 = st.columns([1, 2, 1])
@@ -149,7 +166,7 @@ def show_pool_page(conn, SHEET_URL, DATA_DIR, STOCK_DICT):
                         st.session_state.current_page = "all" 
                         st.query_params["page"] = "all"
                         st.rerun()
-                return # 使用 return 提早結束渲染
+                return 
 
             # ---------------- 開始正式運算數據分析觀察名單打底及積分 ----------------
             dyn_col = next((c for c in df_b1.columns if '動態' in c or '動能' in c), None)
@@ -196,16 +213,11 @@ def show_pool_page(conn, SHEET_URL, DATA_DIR, STOCK_DICT):
                             block_sids = set(temp_block['證券代號'].astype(str).str.replace(r'\D', '', regex=True))
                 except: pass
 
-                # ==========================================
-                # 🚀 代號清洗與「動態欄位」智慧轉換引擎
-                # ==========================================
                 def ultra_clean_id(val):
-                    """將任何奇怪型別或夾帶小數點、空白的代號，全部扒光剩下純數字字串"""
                     v = str(val).strip().replace('.0', '')
                     return re.sub(r'\D', '', v)
 
                 def raw_delta_to_trend(val):
-                    """把原始 CSV 的數字增減，當場轉換為大戶動態文字"""
                     try:
                         v = float(str(val).replace('+', '').replace('%', '').strip())
                         if v >= 1.5: return "🔥 大增"
@@ -218,9 +230,6 @@ def show_pool_page(conn, SHEET_URL, DATA_DIR, STOCK_DICT):
 
                 dict_1000, dict_400 = {}, {}
                 
-                # ------------------------------------------
-                # 🎯 處理 1000 張大戶字典
-                # ------------------------------------------
                 if not df_b5_1000.empty and '股票代號' in df_b5_1000.columns:
                     if '週動態' in df_b5_1000.columns:
                         dict_1000 = {ultra_clean_id(k): str(v) for k, v in zip(df_b5_1000['股票代號'], df_b5_1000['週動態'])}
@@ -229,9 +238,6 @@ def show_pool_page(conn, SHEET_URL, DATA_DIR, STOCK_DICT):
                         if delta_col:
                             dict_1000 = {ultra_clean_id(k): raw_delta_to_trend(v) for k, v in zip(df_b5_1000['股票代號'], df_b5_1000[delta_col])}
 
-                # ------------------------------------------
-                # 🎯 處理 400 張大戶字典
-                # ------------------------------------------
                 if not df_b5_400.empty and '股票代號' in df_b5_400.columns:
                     if '週動態' in df_b5_400.columns:
                         dict_400 = {ultra_clean_id(k): str(v) for k, v in zip(df_b5_400['股票代號'], df_b5_400['週動態'])}
@@ -239,7 +245,6 @@ def show_pool_page(conn, SHEET_URL, DATA_DIR, STOCK_DICT):
                         delta_col = next((c for c in df_b5_400.columns if '400張增減' in c or '總增減' in c or '增減' in c), None)
                         if delta_col:
                             dict_400 = {ultra_clean_id(k): raw_delta_to_trend(v) for k, v in zip(df_b5_400['股票代號'], df_b5_400[delta_col])}
-                # ==========================================
 
                 results = []
                 for _, row in pool_df.iterrows():
@@ -310,12 +315,8 @@ def show_pool_page(conn, SHEET_URL, DATA_DIR, STOCK_DICT):
                                 except: pass
                         if abs(short_decrease_val) >= 1: score += 1.2; details.append("空頭認輸(借券減>1%): +1.2")
 
-                    # ==========================================
-                    # 🚀 動態捕捉
-                    # ==========================================
+                    # 動態捕捉
                     r_b5_1000, r_b5_400 = "-", "-"
-                    
-                    # 取出 1000 張動態
                     trend_1000_val = dict_1000.get(sid, "")
                     if trend_1000_val:
                         if '大增' in trend_1000_val: score += 2.0; r_b5_1000 = "🔥千張大增(+2)"; details.append("千張大增: +2")
@@ -325,7 +326,6 @@ def show_pool_page(conn, SHEET_URL, DATA_DIR, STOCK_DICT):
                         elif '減' in trend_1000_val: score -= 0.5; r_b5_1000 = "📉千減(-0.5)"; details.append("千張減: -0.5")
                         else: r_b5_1000 = f"千{trend_1000_val}"
 
-                    # 取出 400 張動態
                     trend_400_val = dict_400.get(sid, "")
                     if trend_400_val:
                         if '大增' in trend_400_val: score += 1.0; r_b5_400 = "🔥四百大增(+1)"; details.append("四百大增: +1")
@@ -335,7 +335,6 @@ def show_pool_page(conn, SHEET_URL, DATA_DIR, STOCK_DICT):
                         elif '減' in trend_400_val: score -= 0.0; r_b5_400 = "📉四百減(0)"
                         else: r_b5_400 = f"四百{trend_400_val}"
 
-                    # 雙引擎共振加分
                     if ('增' in trend_1000_val and '減' in trend_400_val):
                         score += 1.0; details.append("🌟籌碼極集中: +1"); r_b5_1000 = f"{r_b5_1000}🌟"
 
@@ -358,12 +357,13 @@ def show_pool_page(conn, SHEET_URL, DATA_DIR, STOCK_DICT):
                 res_df = pd.DataFrame(results).sort_values(by='總分', ascending=False).drop_duplicates(subset=['代號']).reset_index(drop=True)
                 
                 # ==========================================
-                # 🔥 Delta (▼變量) 計算引擎與存檔防禦網
+                # 🔥 Delta 計算與 Google Sheets (使用 TTL=60 避免連續讀取)
                 # ==========================================
                 prev_scores_dict = {}
                 hist_combined = pd.DataFrame() 
                 try:
-                    gs_history = conn.read(spreadsheet=SHEET_URL, worksheet="選股歷史", ttl=10)
+                    # 💡 把 ttl 從 10 延長至 60 秒，避免頁面互動時連續卡住
+                    gs_history = conn.read(spreadsheet=SHEET_URL, worksheet="選股歷史", ttl=60)
                     gs_history = gs_history.dropna(how="all")
                     if not gs_history.empty and '紀錄日期' in gs_history.columns:
                         gs_history['紀錄日期'] = gs_history['紀錄日期'].astype(str).str.replace(r'\.0$', '', regex=True).str.zfill(8)
@@ -400,7 +400,6 @@ def show_pool_page(conn, SHEET_URL, DATA_DIR, STOCK_DICT):
                 res_df = res_df[cols]
                 st.session_state['top_pool_df'] = res_df
                 
-                # 🛑 終極防呆鎖死機制：絕對不准存 0 分進去！
                 valid_calc = False
                 if not res_df.empty and '總分' in res_df.columns:
                     valid_calc = (res_df['總分'] > 0).sum() >= 5 
@@ -410,6 +409,7 @@ def show_pool_page(conn, SHEET_URL, DATA_DIR, STOCK_DICT):
                     save_df.insert(0, '紀錄日期', anchor_date_str)
                     if st.session_state.get('last_gsheet_save_date') != anchor_date_str:
                         try:
+                            # 💡 寫入前清除快取確保拿到最新，寫完後會重新刷新
                             old_df = conn.read(spreadsheet=SHEET_URL, worksheet="選股歷史", ttl=0).dropna(how="all")
                             if not old_df.empty and '紀錄日期' in old_df.columns:
                                 old_df['紀錄日期'] = old_df['紀錄日期'].astype(str).str.replace(r'\.0$', '', regex=True).str.zfill(8)
@@ -667,7 +667,6 @@ def show_pool_page(conn, SHEET_URL, DATA_DIR, STOCK_DICT):
                                     with st.expander("🔐 站長用寫入追蹤名單", expanded=True):
                                         track_pw = st.text_input("密碼", type="password", key="track_pw")
                                         
-                                        # 從 secrets 中讀取預期密碼
                                         expected_pw = st.secrets["passwords"]["pool_admin"]
                                         
                                         if track_pw == expected_pw:
@@ -682,16 +681,10 @@ def show_pool_page(conn, SHEET_URL, DATA_DIR, STOCK_DICT):
                                                     import datetime
                                                     track_date = datetime.datetime.now().strftime("%Y-%m-%d")
                                                     current_prices = {}
-                                                    import yfinance as yf
+                                                    
+                                                    # 💡 效能救星：改呼叫我們自己寫的快取函數
                                                     for sid in top5_df['代號']:
-                                                        try:
-                                                            p_df = yf.download(f"{sid}.TW", period="1d", progress=False)
-                                                            if p_df.empty: p_df = yf.download(f"{sid}.TWO", period="1d", progress=False)
-                                                            if not p_df.empty:
-                                                                val = p_df['Close'].iloc[-1]
-                                                                current_prices[sid] = round(float(val.iloc[0] if isinstance(val, pd.Series) else val), 2)
-                                                            else: current_prices[sid] = 0.0
-                                                        except: current_prices[sid] = 0.0
+                                                        current_prices[sid] = get_cached_stock_price(sid)
                                                     
                                                     top5_df['鎖定日期'] = track_date
                                                     top5_df['鎖定收盤價'] = top5_df['代號'].astype(str).map(current_prices)
@@ -708,7 +701,8 @@ def show_pool_page(conn, SHEET_URL, DATA_DIR, STOCK_DICT):
                                             
                         st.markdown("### 📊 歷史名單回測觀察")
                         try:
-                            history_track_df = conn.read(spreadsheet=SHEET_URL, worksheet="歷史名單回測觀察", ttl=0).dropna(how="all")
+                            # 💡 效能救星：將 ttl 從 0 提升到 60 秒，避免頁面稍有互動就一直去讀取 Google Sheets 導致卡死
+                            history_track_df = conn.read(spreadsheet=SHEET_URL, worksheet="歷史名單回測觀察", ttl=60).dropna(how="all")
                             if not history_track_df.empty:
                                 selected_week = st.selectbox("選擇要回顧的鎖定日期", sorted(history_track_df['鎖定日期'].unique(), reverse=True))
                                 week_df = history_track_df[history_track_df['鎖定日期'] == selected_week].copy()
@@ -733,27 +727,13 @@ def show_pool_page(conn, SHEET_URL, DATA_DIR, STOCK_DICT):
                                 st.markdown(f"**目前狀態：** `{status_tag}` ｜ **已鎖定：** `{days_passed} 天`")
 
                                 with st.spinner("正在連線抓取檢測價格..."):
-                                    import yfinance as yf
                                     latest_prices = {}
                                     for sid in week_df['代號'].astype(str).str.replace(r'\.0$', '', regex=True):
-                                        try:
-                                            ticker_tw = f"{sid}.TW"
-                                            ticker_two = f"{sid}.TWO"
-                                            if start_str: 
-                                                p_df = yf.download(ticker_tw, start=start_str, end=end_str, progress=False)
-                                                if p_df.empty: p_df = yf.download(ticker_two, start=start_str, end=end_str, progress=False)
-                                                if not p_df.empty:
-                                                    val = p_df['Close'].iloc[0] 
-                                                    latest_prices[sid] = round(float(val.iloc[0] if isinstance(val, pd.Series) else val), 2)
-                                                else: latest_prices[sid] = 0.0
-                                            else: 
-                                                p_df = yf.download(ticker_tw, period="1d", progress=False)
-                                                if p_df.empty: p_df = yf.download(ticker_two, period="1d", progress=False)
-                                                if not p_df.empty:
-                                                    val = p_df['Close'].iloc[-1]
-                                                    latest_prices[sid] = round(float(val.iloc[0] if isinstance(val, pd.Series) else val), 2)
-                                                else: latest_prices[sid] = 0.0
-                                        except: latest_prices[sid] = 0.0
+                                        # 💡 效能救星：改呼叫快取，抓過一次就秒出
+                                        if start_str: 
+                                            latest_prices[sid] = get_cached_stock_price(sid, start_str, end_str)
+                                        else: 
+                                            latest_prices[sid] = get_cached_stock_price(sid)
 
                                 col_price_name = "結案價格" if is_expired else "最新價格"
                                 week_df[col_price_name] = week_df['代號'].astype(str).str.replace(r'\.0$', '', regex=True).map(latest_prices)
