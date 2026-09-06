@@ -6,16 +6,6 @@ import glob
 import yfinance as yf
 from utils.data_utils import robust_read_csv
 
-# 登入鎖
-def show_b6_page(DATA_DIR):
-    # 👇 這是你要的「鎖頭指令」，請放在函式最上方
-    if not st.session_state.get("logged_in", False):
-        st.warning("🔒 這是 VIP 專屬的「鉅額交易」包廂，請先進行身分驗證！")
-        if st.button("🔑 前往登入專區", use_container_width=True):
-            st.query_params["page"] = "login"
-            st.rerun()
-        st.stop()  # 🚨 關鍵指令：強制停止執行後面的程式碼，資料不會外洩！
-
 # ==========================================
 # 🌟 區塊 6 專屬工具函數區 (純運算，無 UI)
 # ==========================================
@@ -27,6 +17,8 @@ def clean_number_for_display(val):
         return str(int(f)) if f.is_integer() else str(f).rstrip('0').rstrip('.')
     except: return str(val)
 
+# 💡 效能救星 1：快取歷史鉅額交易的檔案合併 (10分鐘更新一次)
+@st.cache_data(show_spinner=False, ttl=600)
 def build_historical_block_matrix(DATA_DIR):
     """歷史矩陣建立器"""
     if not os.path.exists(DATA_DIR): return None, []
@@ -82,22 +74,13 @@ def build_historical_block_matrix(DATA_DIR):
             
     return master_df, [os.path.basename(f) for f in target_files]
 
-# ==========================================
-# ⚙️ 後台資料引擎 (Data Engine)：包含 yfinance 爬取
-# ==========================================
-def sync_b6_data(DATA_DIR):
-    """在背景計算歷史矩陣與今日最新鉅額交易，並抓取即時收盤價"""
-    
-    # 1. 歷史矩陣處理
-    hist_matrix, detected_files = build_historical_block_matrix(DATA_DIR)
-    st.session_state['b6_hist_matrix'] = hist_matrix
-    st.session_state['b6_hist_files'] = detected_files
-
-    # 2. 今日鉅額交易處理
+# 💡 效能救星 2：把 yfinance 報價跟今日鉅額交易計算快取起來 (5 分鐘更新一次)
+@st.cache_data(show_spinner=False, ttl=300)
+def get_cached_b6_today(DATA_DIR):
+    """處理今日鉅額交易，並抓取即時收盤價"""
     files = sorted(glob.glob(os.path.join(DATA_DIR, "*鉅額*.csv")), reverse=True)
     if not files:
-        st.session_state['b6_today_df'] = None
-        return
+        return None, None
         
     latest_file = files[0]
     block_date = os.path.basename(latest_file).replace('-', '').replace('_', '')[:8]
@@ -178,29 +161,32 @@ def sync_b6_data(DATA_DIR):
             display_df = grouped_block[['代號', '股票名稱', '交易別', '成交價', '▼收盤價', '成交張數', '總額(億)']].copy()
             display_df = display_df.rename(columns={'成交價': dynamic_price_col})
 
+    return display_df, dynamic_price_col
+
+# ==========================================
+# ⚙️ 後台資料引擎 (Data Engine)：寫入 Session
+# ==========================================
+def sync_b6_data(DATA_DIR):
+    """在背景計算歷史矩陣與今日最新鉅額交易，並寫入 Session State 給其它元件存取"""
+    # 1. 歷史矩陣處理
+    hist_matrix, detected_files = build_historical_block_matrix(DATA_DIR)
+    st.session_state['b6_hist_matrix'] = hist_matrix
+    st.session_state['b6_hist_files'] = detected_files
+
+    # 2. 今日鉅額交易處理
+    display_df, dynamic_price_col = get_cached_b6_today(DATA_DIR)
     st.session_state['b6_today_df'] = display_df
     st.session_state['b6_dynamic_price_col'] = dynamic_price_col
 
-# ==========================================
-# 🖼️ 前台畫面渲染 (Views)
-# ==========================================
-def show_b6_page(DATA_DIR):
-    """B6 專屬頁面 UI 渲染"""
-    if 'b6_today_df' not in st.session_state:
-        with st.spinner("⏳ 載入鉅額交易與即時收盤價中..."):
-            sync_b6_data(DATA_DIR)
 
-    st.write("---")
-    st.markdown("<div id='section-6'></div>", unsafe_allow_html=True)
-    st.markdown("### 鉅額交易動向", unsafe_allow_html=True)
-    st.write("💡 鉅額交易有時為大戶私下換手籌碼，成交價可作為「支撐/壓力」的防守線；如果短線跌破建議嚴設停損。")
-
+# ==========================================
+# 🚀 局部渲染魔法：UI 與表格的結界
+# ==========================================
+@st.fragment
+def render_b6_dashboard(display_df, dynamic_price_col, hist_matrix, detected_files):
     tab_today, tab_hist = st.tabs(["🔹 今日最新鉅額交易", "🔹 歷史防守價追蹤表"])
 
     with tab_today:
-        display_df = st.session_state.get('b6_today_df')
-        dynamic_price_col = st.session_state.get('b6_dynamic_price_col')
-        
         if display_df is not None and not display_df.empty:
             def highlight_price(row):
                 styles = [''] * len(row)
@@ -221,9 +207,6 @@ def show_b6_page(DATA_DIR):
             st.info("🕒 目前查無今日鉅額交易資料，請確認資料夾中是否有對應的 CSV 檔案。")
 
     with tab_hist:
-        hist_matrix = st.session_state.get('b6_hist_matrix')
-        detected_files = st.session_state.get('b6_hist_files', [])
-        
         if detected_files:
             st.caption(f"📡 已自動讀取 {len(detected_files)} 天的歷史檔案，組合中...")
             
@@ -231,3 +214,33 @@ def show_b6_page(DATA_DIR):
             st.dataframe(hist_matrix, use_container_width=True, hide_index=True)
         else:
             st.info("📂 資料夾內尚無足夠的歷史交易紀錄，請確認檔名包含「鉅額」字樣。")
+
+# ==========================================
+# 🖼️ 畫面渲染主程式
+# ==========================================
+def show_b6_page(DATA_DIR):
+    # 👇 這是鎖頭指令
+    if not st.session_state.get("logged_in", False):
+        st.warning("🔒 這是 VIP 專屬的「鉅額交易」包廂，請先進行身分驗證！")
+        if st.button("🔑 前往登入專區", use_container_width=True):
+            st.query_params["page"] = "login"
+            st.rerun()
+        st.stop()  # 🚨 關鍵指令：強制停止執行後面的程式碼
+
+    """B6 專屬頁面 UI 渲染"""
+    if 'b6_today_df' not in st.session_state:
+        with st.spinner("⏳ 載入鉅額交易與即時收盤價中..."):
+            sync_b6_data(DATA_DIR)
+
+    st.write("---")
+    st.markdown("<div id='section-6'></div>", unsafe_allow_html=True)
+    st.markdown("### 鉅額交易動向", unsafe_allow_html=True)
+    st.write("💡 鉅額交易有時為大戶私下換手籌碼，成交價可作為「支撐/壓力」的防守線；如果短線跌破建議嚴設停損。")
+
+    # 💡 呼叫被 Fragment 保護的互動區塊，傳入 Session state 的資料
+    render_b6_dashboard(
+        st.session_state.get('b6_today_df'),
+        st.session_state.get('b6_dynamic_price_col'),
+        st.session_state.get('b6_hist_matrix'),
+        st.session_state.get('b6_hist_files', [])
+    )
