@@ -218,14 +218,7 @@ def render_b6_dashboard(display_df, dynamic_price_col, hist_matrix, detected_fil
 # ==========================================
 # 🖼️ 畫面渲染主程式
 # ==========================================
-def show_b6_page(DATA_DIR):
-    # 👇 這是鎖頭指令
-    if not st.session_state.get("logged_in", False):
-        st.warning("🔒 這是 VIP 專屬的「鉅額交易」包廂，請先進行身分驗證！")
-        if st.button("🔑 前往登入專區", use_container_width=True):
-            st.query_params["page"] = "login"
-            st.rerun()
-        st.stop()  # 🚨 關鍵指令：強制停止執行後面的程式碼
+
 
     """B6 專屬頁面 UI 渲染"""
     if 'b6_today_df' not in st.session_state:
