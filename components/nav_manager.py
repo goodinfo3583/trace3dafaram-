@@ -312,7 +312,7 @@ def inject_custom_header(is_logged_in=False):
             </div>
             
             <div id="custom-sidebar-toggle" class="system-menu" title="搜尋與側欄功能">
-                <img src="app/static/icon-search.png" class="system-icon" alt="搜尋">
+                <img src="app/static/icon-globalresearch.png" class="system-icon" alt="搜尋">
             </div>
 
             <div style="flex-grow: 1;"></div>
