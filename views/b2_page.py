@@ -235,7 +235,7 @@ def render_b2_1(df_21):
 def render_b2_2(df_22):
     st.write("---")
     st.markdown("<div id='section-2-2'></div>", unsafe_allow_html=True)
-    st.header("法人掃貨：投信 5 日 買超佔標的成交量")
+    st.header("投信 5 日 買超佔標的成交量")
     
     if df_22 is not None and not df_22.empty:
         c1, c2 = st.columns(2)
@@ -256,7 +256,7 @@ def render_b2_2(df_22):
 def render_b2_3(df_23):
     st.write("---")
     st.markdown("<div id='section-2-3'></div>", unsafe_allow_html=True)
-    st.header("法人掃貨：外資 5 日 買超佔公司發行張數")
+    st.header("外資 5 日 買超佔公司發行張數")
     
     if df_23 is not None and not df_23.empty:
         c1, c2 = st.columns(2)
@@ -277,7 +277,7 @@ def render_b2_3(df_23):
 def render_b2_4(df_24):
     st.write("---")
     st.markdown("<div id='section-2-4'></div>", unsafe_allow_html=True)
-    st.header("法人掃貨：投信 5 日 買超佔公司發行張數")
+    st.header("投信 5 日 買超佔公司發行張數")
     
     if df_24 is not None and not df_24.empty:
         c1, c2 = st.columns(2)
