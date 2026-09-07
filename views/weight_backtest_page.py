@@ -1110,7 +1110,7 @@ def show_weight_backtest_page(STOCK_DICT, DATA_DIR="data"):
     # ==========================================
     # 3. 執行計分運算 (Scoring Engine)
     # ==========================================
-    if st.button("🚀 開始計算籌碼火力分數", type="primary", use_container_width=True):
+    if st.button("開始計算權重分數", icon=":material/vital_signs:", on_click=reset_filters, use_container_width=True):
         with st.spinner("🧠 籌碼大數據融合計算中..."):
             score_df = filtered_df.copy()
             score_df['總分'] = 0.0
