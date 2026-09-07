@@ -1093,15 +1093,15 @@ def show_weight_backtest_page(STOCK_DICT, DATA_DIR="data"):
         with c2:
             st.markdown("**資券籌碼變化**")
             w_b4_good = st.number_input("融資減/融券增", value=1.0, step=0.5)
-            w_b4_short_dec = st.number_input("借券賣出減少", value=1.5, step=0.5) 
+            w_b4_short_dec = st.number_input("借券賣出減少", value=2.0, step=0.5) 
             w_b4_short_inc = st.number_input("借券賣出增加", value=-1.5, step=0.5) 
-            w_b4_price_up = st.number_input("今日大漲(>3%)", value=0.0, step=0.5) 
+            w_b4_price_up = st.number_input("今日大漲(>3%)", value=1.0, step=0.5) 
         with c3:
             st.markdown("**大戶波段防線**")
-            w_b5 = st.number_input("千張大戶持股增加", value=3.0, step=0.5)
+            w_b5 = st.number_input("千張大戶持股增加", value=2.0, step=0.5)
             w_b5_800 = st.number_input("800張大戶持股增加", value=2.0, step=0.5) 
             w_b5_600 = st.number_input("600張大戶持股增加", value=1.5, step=0.5) 
-            w_b5_400 = st.number_input("400張大戶持股增加", value=1.0, step=0.5) 
+            w_b5_400 = st.number_input("400張大戶持股增加", value=1.5, step=0.5) 
         with c4:
             st.markdown("**特定資金與董監防線**")
             w_b6 = st.number_input("鉅額防守成功", value=1.5, step=0.5)
@@ -1110,7 +1110,7 @@ def show_weight_backtest_page(STOCK_DICT, DATA_DIR="data"):
     # ==========================================
     # 3. 執行計分運算 (Scoring Engine)
     # ==========================================
-    if st.button("🚀 開始計算籌碼火力分數", type="primary", use_container_width=True):
+    if st.button("開始計算權重分數", icon=":material/vital_signs:", on_click=reset_filters, use_container_width=True):
         with st.spinner("🧠 籌碼大數據融合計算中..."):
             score_df = filtered_df.copy()
             score_df['總分'] = 0.0
