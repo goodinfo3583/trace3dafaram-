@@ -283,8 +283,20 @@ def show_b6_page(DATA_DIR):
 
     st.write("---")
     st.markdown("<div id='section-6'></div>", unsafe_allow_html=True)
-    st.markdown("### 鉅額交易動向", unsafe_allow_html=True)
-    st.write("💡 鉅額交易有時為大戶私下換手籌碼，成交價可作為「支撐/壓力」的防守線；如果短線跌破建議嚴設停損。")
+    
+    # 🌟 替換成與其他頁面相同的發光大標題
+    st.markdown("""
+    <div style="background: linear-gradient(90deg, rgba(15,23,42,1) 0%, rgba(14,165,233,0.3) 50%, rgba(15,23,42,1) 100%); 
+                border-top: 1px solid #38bdf8; border-bottom: 1px solid #38bdf8; padding: 15px 20px; 
+                border-radius: 10px; text-align: center; box-shadow: 0px 0px 20px rgba(56, 189, 248, 0.2); margin-bottom: 20px;">
+        <h2 style="color: #e0f2fe; margin: 0; letter-spacing: 2px; text-shadow: 0 0 15px rgba(56, 189, 248, 0.8);">
+            鉅額交易動向
+        </h2>
+    </div>
+    """, unsafe_allow_html=True)
+    
+    # 原本的提示語保持不變 (如果你想要更漂亮的提示框，也可以把 st.write 改成 st.info)
+    st.info("💡 鉅額交易有時為大戶私下換手籌碼，成交價可作為「支撐/壓力」的防守線；如果短線跌破建議嚴設停損。")
 
     render_b6_dashboard(
         st.session_state.get('b6_today_df'),
