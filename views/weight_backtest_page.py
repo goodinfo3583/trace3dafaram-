@@ -325,7 +325,7 @@ def render_result_and_save_panel():
                                     
                                 #  每周上限3檔
                                 if this_week_count + len(selected_rows) > 3:
-                                    st.error(f"❌ 寫入失敗：每週最多只能存取 3 檔標的。您本週已存取 {this_week_count} 檔，本次勾選 {len(selected_rows)} 檔，已達上限。")
+                                    st.error(f"冒險者：每週最多只能存取 3 檔標的！您本週已存取 {this_week_count} 檔，本次勾選 {len(selected_rows)} 檔，已達上限。")
                                 else:
                                     save_targets = selected_rows.copy()
                                     save_targets['鎖定日期'] = track_date
@@ -1124,7 +1124,8 @@ def show_weight_backtest_page(STOCK_DICT, DATA_DIR="data"):
     # ==========================================
     # 3. 執行計分運算 (Scoring Engine)
     # ==========================================
-    if st.button("開始計算權重分數", icon=":material/vital_signs:", on_click=reset_filters, use_container_width=True):
+    # 💡 移除 on_click 參數，保留過濾條件
+    if st.button("開始計算權重分數", icon=":material/vital_signs:", use_container_width=True):
         with st.spinner("🧠 籌碼大數據融合計算中..."):
             score_df = filtered_df.copy()
             score_df['總分'] = 0.0
