@@ -252,15 +252,16 @@ def render_result_and_save_panel():
         
         if not result_df.empty:
             display_df = result_df[['統一代號', '股票名稱', '產業別', '總分', '得分明細']].rename(columns={'統一代號': '股票代號'})
-            display_df.insert(0, '寫入追蹤 (本週上限5檔)', False)
+            # 👉 將文字修改為上限 3 檔
+            display_df.insert(0, '寫入追蹤 (本週上限3檔)', False)
             
             st.caption("💡 勾選下方『寫入追蹤』，即可將該檔標的存入歷史模型庫中，並在「建立名單」中觀察。")
             
-            # 💡 被 Fragment 保護的互動表格，打勾瞬間完成！
             edited_df = st.data_editor(
                 display_df,
                 column_config={
-                    "寫入追蹤 (本週上限5檔)": st.column_config.CheckboxColumn(
+                    # 👉 將文字修改為上限 3 檔
+                    "寫入追蹤 (本週上限3檔)": st.column_config.CheckboxColumn(
                         "寫入追蹤",
                         help="勾選欲寫入追蹤系統的標的",
                         default=False,
@@ -277,7 +278,8 @@ def render_result_and_save_panel():
                 key="editor_save_track"
             )
             
-            selected_rows = edited_df[edited_df['寫入追蹤 (本週上限5檔)'] == True]
+            # 👉 將文字修改為上限 3 檔
+            selected_rows = edited_df[edited_df['寫入追蹤 (本週上限3檔)'] == True]
             
             st.write("---")
             col_save1, col_save2 = st.columns([1, 1])
@@ -321,8 +323,9 @@ def render_result_and_save_panel():
                                     this_week_count = len(this_week_data)
                                     old_track = old_track.drop(columns=['date_obj'])
                                     
-                                if this_week_count + len(selected_rows) > 5:
-                                    st.error(f"❌ 寫入失敗：每週最多只能存取 5 檔標的。您本週已存取 {this_week_count} 檔，本次勾選 {len(selected_rows)} 檔，已達上限。")
+                                #  每周上限3檔
+                                if this_week_count + len(selected_rows) > 3:
+                                    st.error(f"❌ 寫入失敗：每週最多只能存取 3 檔標的。您本週已存取 {this_week_count} 檔，本次勾選 {len(selected_rows)} 檔，已達上限。")
                                 else:
                                     save_targets = selected_rows.copy()
                                     save_targets['鎖定日期'] = track_date
@@ -357,10 +360,21 @@ def render_result_and_save_panel():
                                         
                                     final_save_df = save_targets[['鎖定日期', '股票代號', '股票名稱', '鎖定收盤價', '總分', '得分明細', '當下策略特徵', '追蹤狀態', '帳號']].rename(columns={'股票代號': '代號', '股票名稱': '名稱'})
                                     
+                                    # 💡 防呆機制 1：先剃除本次勾選清單中可能出現的重複標的 (避免計分系統產出重複)
+                                    final_save_df = final_save_df.drop_duplicates(subset=['鎖定日期', '代號', '帳號'])
+                                    
                                     if not old_track.empty and '鎖定日期' in old_track.columns and '代號' in old_track.columns and '帳號' in old_track.columns:
                                         for _, row in final_save_df.iterrows():
-                                            user_match = old_track['帳號'].astype(str).str.replace(r'\.0$', '', regex=True).str.strip().str.lower() == str(username).strip().lower()
-                                            mask = (old_track['鎖定日期'] == row['鎖定日期']) & (old_track['代號'] == row['代號']) & user_match
+                                            # 💡 防呆機制 2：使用更嚴謹的型別轉換 (一律轉字串、去小數點、去空白)，避免 3711.0 和 3711 比對失敗
+                                            curr_account = old_track['帳號'].astype(str).str.replace(r'\.0$', '', regex=True).str.strip().str.lower()
+                                            curr_date = old_track['鎖定日期'].astype(str).str.strip()
+                                            curr_code = old_track['代號'].astype(str).str.replace(r'\.0$', '', regex=True).str.strip()
+                                            
+                                            target_account = str(username).strip().lower()
+                                            target_date = str(row['鎖定日期']).strip()
+                                            target_code = str(row['代號']).strip()
+                                            
+                                            mask = (curr_date == target_date) & (curr_code == target_code) & (curr_account == target_account)
                                             old_track = old_track[~mask]
                                             
                                     new_track = pd.concat([old_track, final_save_df], ignore_index=True)
