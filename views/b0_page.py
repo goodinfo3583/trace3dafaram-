@@ -89,12 +89,23 @@ def get_cached_b0_data(DATA_DIR):
     # ==========================================
     # 多週期均量與動能運算
     # ==========================================
-    # 🛡️ 關鍵防呆：強制將日期轉為純字串，並剔除合併產生的隱藏空值 (NaN/NaT)
-    combined_df['標準日期'] = combined_df['標準日期'].astype(str)
-    combined_df = combined_df[~combined_df['標準日期'].str.lower().isin(['nan', 'nat', 'none', ''])]
+    # 🛡️ 關鍵防呆：強制將日期轉為純字串，並剔除合併產生的隱藏空值 (NaN/NaT/pd.NA)
+    # 1. 針對 Parquet 格式產生的 pd.NA，需先 fillna("") 再轉字串
+    if '統一代號' in combined_df.columns:
+        combined_df['統一代號'] = combined_df['統一代號'].fillna("").astype(str)
+    combined_df['標準日期'] = combined_df['標準日期'].fillna("").astype(str)
+    
+    # 2. 擴充過濾條件，加入 '' 以防 pandas 轉型殘留
+    invalid_dates = ['nan', 'nat', 'none', '', '']
+    combined_df = combined_df[~combined_df['標準日期'].str.lower().str.strip().isin(invalid_dates)]
 
+    # 3. 執行 Pandas 內部排序
     combined_df = combined_df.sort_values(by=['統一代號', '標準日期', '成交張數_num'], ascending=[True, True, False])
-    unique_dates = sorted(combined_df['標準日期'].unique(), reverse=True)
+    
+    # 4. 終極防呆：強制轉為原生 Python 字串後再排序，徹底杜絕 TypeError
+    valid_dates = [str(d) for d in combined_df['標準日期'].unique()]
+    unique_dates = sorted(valid_dates, reverse=True)
+    
     if not unique_dates: return None
     latest_date = unique_dates[0]
     
