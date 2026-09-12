@@ -102,7 +102,8 @@ def process_major_shareholders(DATA_DIR, target_level):
         
         if chunks:
             comb = pd.concat(chunks, ignore_index=True)
-            comb = comb.drop_duplicates(subset=['股票代號', '股票名稱'], keep='first').reset_index(drop=True)
+            # 移除 '股票名稱'，僅依賴 '股票代號' 去重
+            comb = comb.drop_duplicates(subset=['股票代號'], keep='first').reset_index(drop=True)
             
             date_4 = detected_date if detected_date else prefix[-4:]
             comb = comb.rename(columns={'持股%': f"{date_4}持有%", '增減%': f"DELTA_{date_4}"})
@@ -116,7 +117,13 @@ def process_major_shareholders(DATA_DIR, target_level):
 
     if merged:
         master = merged[0]
-        for m in merged[1:]: master = pd.merge(master, m, on=['股票代號', '股票名稱'], how='outer')
+        for m in merged[1:]: 
+            # 僅使用 '股票代號' 進行合併，並動態補齊舊股票名稱
+            master = pd.merge(master, m, on='股票代號', how='outer', suffixes=('', '_old'))
+            if '股票名稱_old' in master.columns:
+                master['股票名稱'] = master['股票名稱'].fillna(master['股票名稱_old'])
+                master = master.drop(columns=['股票名稱_old'])
+                
         sorted_dates_4 = sorted(all_dates_4, reverse=True)
         latest_date_4 = sorted_dates_4[0]
         
