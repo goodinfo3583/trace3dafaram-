@@ -47,8 +47,8 @@ def render_login_box(conn, SHEET_URL):
             <h3 style='color: #FFD700; margin-top: 0;'>親愛的冒險者：</h3>
             <p style='color: #E2E8F0; font-size: 18px; line-height: 1.6;'>
                 「請出示你的 <b>邀請函序號</b> ！」<br>
-                <span style='font-size: 14px; color: #A0AEC0;'>*(守衛悄悄說：如果是新來的，在名字後面加上 <b>/M (男)</b> 或 <b>/F (女)</b> 並輸入密碼，我就會幫你自動造冊...)*</span><br>
-                <span style='font-size: 12px; color: #A0AEC0;'>*(帳號不分大小寫，密碼有分大小寫)*</span>
+                <span style='font-size: 14px; color: #A0AEC0;'>如果是新來的，在名字後面加上 <b>/M (男)</b> 或 <b>/F (女)</b> 並輸入密碼，我就會幫你自動造冊...</span><br>
+                <span style='font-size: 12px; color: #A0AEC0;'>帳號不分大小寫，密碼有分大小寫</span>
             </p>
         </div>
         """, unsafe_allow_html=True)
