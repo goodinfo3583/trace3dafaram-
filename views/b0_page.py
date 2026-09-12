@@ -183,6 +183,10 @@ def sync_b0_data(DATA_DIR):
 # ==========================================
 @st.fragment
 def render_b0_interactive_dashboard(df_b0):
+    # 🌟 關鍵修改：先在頁面最上方建立一個「佔位容器」，保留給盤面結構使用
+    top_container = st.container()
+
+    # 接著顯示篩選器 UI
     with st.expander("🛠️ 全域條件篩選 (點擊展開/收合)", expanded=True):
         col1, col2, col3, col4 = st.columns([1.5, 1, 1.5, 1])
         with col1:
@@ -200,7 +204,7 @@ def render_b0_interactive_dashboard(df_b0):
         special_opts = [opt for opt in df_b0['B0_特殊型態'].unique() if opt != "-"]
         sel_special = st.multiselect("🕵️ 特殊洗盤與窒息量篩選 (高勝率買點)", special_opts, placeholder="未選擇則顯示全部")
 
-    # 執行全域過濾邏輯
+    # 執行全域過濾邏輯 (根據上面的輸入計算 filtered_df)
     filtered_df = df_b0.copy()
     if search_kw:
         filtered_df = filtered_df[filtered_df['統一代號'].str.contains(search_kw) | filtered_df['股票名稱'].str.contains(search_kw)]
@@ -220,38 +224,42 @@ def render_b0_interactive_dashboard(df_b0):
         filtered_df = filtered_df[filtered_df['B0_特殊型態'].isin(sel_special)]
 
     # ==========================================
-    # 動態計算與呈現盤面結構 (漲跌家數與漲停明細)
+    # 🌟 關鍵修改：利用 `with top_container:` 將計算完的盤面結構，塞回最上方！
     # ==========================================
-    st.markdown("### 📊 盤面結構 (基於當前篩選條件)")
-    
-    # 計算漲跌家數，並以 9.5% 作為漲跌停的容錯門檻
-    up_count = (filtered_df['漲跌幅'] > 0).sum()
-    down_count = (filtered_df['漲跌幅'] < 0).sum()
-    flat_count = (filtered_df['漲跌幅'] == 0).sum()
-    
-    limit_up_df = filtered_df[filtered_df['漲跌幅'] >= 9.5]
-    limit_down_df = filtered_df[filtered_df['漲跌幅'] <= -9.5]
-    
-    m1, m2, m3, m4, m5 = st.columns(5)
-    m1.metric("漲家數 📈", f"{up_count} 家")
-    m2.metric("跌家數 📉", f"{down_count} 家")
-    m3.metric("平盤數 ➖", f"{flat_count} 家")
-    m4.metric("漲停數 🚀", f"{len(limit_up_df)} 家")
-    m5.metric("跌停數 ☠️", f"{len(limit_down_df)} 家")
-    
-    if not limit_up_df.empty:
-        with st.expander(f"✨ 查看 {len(limit_up_df)} 檔漲停標的"):
-            # 組合代號與名稱呈現
-            lu_list = (limit_up_df['統一代號'] + " " + limit_up_df['股票名稱']).tolist()
-            st.write("、".join(lu_list))
-            
-    if not limit_down_df.empty:
-        with st.expander(f"⚠️ 查看 {len(limit_down_df)} 檔跌停標的"):
-            ld_list = (limit_down_df['統一代號'] + " " + limit_down_df['股票名稱']).tolist()
-            st.write("、".join(ld_list))
-            
-    st.markdown("---")
+    with top_container:
+        st.markdown("### 📊 盤面結構 (基於當前篩選條件)")
+        
+        # 計算漲跌家數，並以 9.5% 作為漲跌停的容錯門檻
+        up_count = (filtered_df['漲跌幅'] > 0).sum()
+        down_count = (filtered_df['漲跌幅'] < 0).sum()
+        flat_count = (filtered_df['漲跌幅'] == 0).sum()
+        
+        limit_up_df = filtered_df[filtered_df['漲跌幅'] >= 9.5]
+        limit_down_df = filtered_df[filtered_df['漲跌幅'] <= -9.5]
+        
+        m1, m2, m3, m4, m5 = st.columns(5)
+        m1.metric("漲家數 📈", f"{up_count} 家")
+        m2.metric("跌家數 📉", f"{down_count} 家")
+        m3.metric("平盤數 ➖", f"{flat_count} 家")
+        m4.metric("漲停數 🚀", f"{len(limit_up_df)} 家")
+        m5.metric("跌停數 ☠️", f"{len(limit_down_df)} 家")
+        
+        if not limit_up_df.empty:
+            with st.expander(f"✨ 查看 {len(limit_up_df)} 檔漲停標的"):
+                # 組合代號與名稱呈現
+                lu_list = (limit_up_df['統一代號'] + " " + limit_up_df['股票名稱']).tolist()
+                st.write("、".join(lu_list))
+                
+        if not limit_down_df.empty:
+            with st.expander(f"⚠️ 查看 {len(limit_down_df)} 檔跌停標的"):
+                ld_list = (limit_down_df['統一代號'] + " " + limit_down_df['股票名稱']).tolist()
+                st.write("、".join(ld_list))
+                
+        st.markdown("---")
 
+    # ==========================================
+    # 繼續繪製下方的頁籤區塊
+    # ==========================================
     tab_basic, tab_momentum = st.tabs(["🔹 全市場基礎量價", "🔹 資金動能雷達"])
 
     with tab_basic:
