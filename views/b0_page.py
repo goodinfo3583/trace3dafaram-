@@ -102,6 +102,9 @@ def get_cached_b0_data(DATA_DIR):
     # 3. 執行 Pandas 內部排序
     combined_df = combined_df.sort_values(by=['統一代號', '標準日期', '成交張數_num'], ascending=[True, True, False])
     
+    # 👇 關鍵修正：加入這行！強制剔除同一天同時讀取到 Parquet 與 CSV 造成的雙胞胎資料
+    combined_df = combined_df.drop_duplicates(subset=['統一代號', '標準日期'], keep='first')
+    
     # 4. 終極防呆：強制轉為原生 Python 字串後再排序，徹底杜絕 TypeError
     valid_dates = [str(d) for d in combined_df['標準日期'].unique()]
     unique_dates = sorted(valid_dates, reverse=True)
