@@ -41,6 +41,10 @@ def get_cached_b0_data(DATA_DIR):
             
         if df is not None and not df.empty:
             df.columns = [re.sub(r'[\s\n\r\t\u3000\ufeff]+', '', str(c)) for c in df.columns]
+            
+            # 👇 強制剔除重複的同名欄位，防止 Parquet 讀取崩潰 👇
+            df = df.loc[:, ~df.columns.duplicated()]
+            
             c_code = next((c for c in df.columns if '代號' in c), None)
             date_col = next((c for c in df.columns if '日期' in c), None)
             name_col = next((c for c in df.columns if c in ['名稱', '股票名稱', '證券名稱']), None)
