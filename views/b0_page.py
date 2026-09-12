@@ -85,6 +85,11 @@ def get_cached_b0_data(DATA_DIR):
     if not all_dfs: return None
     
     combined_df = pd.concat(all_dfs, ignore_index=True)
+    
+    # 👇 新增這兩行：強制轉為字串並過濾掉空值，徹底解決 Float/String 排序衝突 👇
+    combined_df['標準日期'] = combined_df['標準日期'].astype(str)
+    combined_df = combined_df[combined_df['標準日期'].str.lower() != 'nan']
+    
     combined_df = combined_df.sort_values(by=['統一代號', '標準日期', '成交張數_num'], ascending=[True, True, False])
     combined_df = combined_df.drop_duplicates(subset=['統一代號', '標準日期'], keep='first')
     
