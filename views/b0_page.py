@@ -7,11 +7,15 @@ import glob
 import re
 
 # ==========================================
-# 💡 效能救星 1：將耗時的 CSV 讀取、清洗、合併、多週期計算全部快取起來
+# 💡 效能救星 1：將耗時的檔案讀取、清洗、合併快取起來 (已支援 Parquet)
 # ==========================================
 @st.cache_data(show_spinner=False, ttl=300)
 def get_cached_b0_data(DATA_DIR):
-    search_patterns = [os.path.join(DATA_DIR, "*成交價*.csv")]
+    # 修改 1：同時搜尋 Parquet 與 CSV 檔案，優先讀取 Parquet
+    search_patterns = [
+        os.path.join(DATA_DIR, "*成交價*.parquet"),
+        os.path.join(DATA_DIR, "*成交價*.csv")
+    ]
     files = []
     for pattern in search_patterns:
         files.extend(glob.glob(pattern))
@@ -22,11 +26,18 @@ def get_cached_b0_data(DATA_DIR):
     all_dfs = []
     for f in files:
         df = None 
-        for enc in ['utf-8-sig', 'big5', 'cp950', 'utf-8']:
+        # 根據副檔名選擇讀取引擎
+        if f.endswith('.parquet'):
             try:
-                df = pd.read_csv(f, encoding=enc, header=0, dtype=str)
-                break
-            except: pass
+                df = pd.read_parquet(f)
+            except Exception as e:
+                print(f"Parquet 讀取失敗: {f}, 錯誤: {e}")
+        else:
+            for enc in ['utf-8-sig', 'big5', 'cp950', 'utf-8']:
+                try:
+                    df = pd.read_csv(f, encoding=enc, header=0, dtype=str)
+                    break
+                except: pass
             
         if df is not None and not df.empty:
             df.columns = [re.sub(r'[\s\n\r\t\u3000\ufeff]+', '', str(c)) for c in df.columns]
@@ -161,7 +172,6 @@ def get_cached_b0_data(DATA_DIR):
     
     return df_today
 
-# 橋接函數：確保舊版其他頁面使用 sync_b0_data 時依然正常運作
 def sync_b0_data(DATA_DIR):
     df = get_cached_b0_data(DATA_DIR)
     if df is not None:
@@ -209,6 +219,39 @@ def render_b0_interactive_dashboard(df_b0):
     if sel_special:
         filtered_df = filtered_df[filtered_df['B0_特殊型態'].isin(sel_special)]
 
+    # ==========================================
+    # 修改 2：動態計算與呈現盤面結構 (漲跌家數與漲停明細)
+    # ==========================================
+    st.markdown("### 📊 盤面結構 (基於當前篩選條件)")
+    
+    # 計算漲跌家數，並以 9.5% 作為漲跌停的容錯門檻
+    up_count = (filtered_df['漲跌幅'] > 0).sum()
+    down_count = (filtered_df['漲跌幅'] < 0).sum()
+    flat_count = (filtered_df['漲跌幅'] == 0).sum()
+    
+    limit_up_df = filtered_df[filtered_df['漲跌幅'] >= 9.5]
+    limit_down_df = filtered_df[filtered_df['漲跌幅'] <= -9.5]
+    
+    m1, m2, m3, m4, m5 = st.columns(5)
+    m1.metric("漲家數 📈", f"{up_count} 家")
+    m2.metric("跌家數 📉", f"{down_count} 家")
+    m3.metric("平盤數 ➖", f"{flat_count} 家")
+    m4.metric("漲停數 🚀", f"{len(limit_up_df)} 家")
+    m5.metric("跌停數 ☠️", f"{len(limit_down_df)} 家")
+    
+    if not limit_up_df.empty:
+        with st.expander(f"✨ 查看 {len(limit_up_df)} 檔漲停標的"):
+            # 組合代號與名稱呈現
+            lu_list = (limit_up_df['統一代號'] + " " + limit_up_df['股票名稱']).tolist()
+            st.write("、".join(lu_list))
+            
+    if not limit_down_df.empty:
+        with st.expander(f"⚠️ 查看 {len(limit_down_df)} 檔跌停標的"):
+            ld_list = (limit_down_df['統一代號'] + " " + limit_down_df['股票名稱']).tolist()
+            st.write("、".join(ld_list))
+            
+    st.markdown("---")
+
     tab_basic, tab_momentum = st.tabs(["🔹 全市場基礎量價", "🔹 資金動能雷達"])
 
     with tab_basic:
@@ -246,7 +289,7 @@ def render_b0_interactive_dashboard(df_b0):
             (filtered_df.get('5日均額', 0) > 10) 
         ].copy()
         
-        momentum_df['額度增加絕對值'] = momentum_df['成交額(百萬)'] - momentum_df['5日均額']
+        momentum_df['額度增加絕對值'] = momentum_df['成交額(百萬)'] - momentum_df.get('5日均額', 0)
         
         st.markdown("---")
         st.markdown("##### 🏆 成交額大熱鍋(8/12起算)")
@@ -320,164 +363,4 @@ def render_b0_interactive_dashboard(df_b0):
                     st.warning(f"目前資料庫中尚未累積滿 {p} 日的歷史成交資料。")
 
 
-        st.markdown("<br>", unsafe_allow_html=True)
-        st.markdown("##### 🚀 出量點火器 (8/12起算)")
-        st.caption("看相較5日均額最敏感，找看看突然異常放量的股票 (可能突破第一根，或波段重新發動，須留意延續性)")
-        
-        for p in periods:
-            avg_col = f'{p}日均額'
-            if avg_col in momentum_df.columns:
-                safe_avg = momentum_df[avg_col].replace(0, 0.01)
-                momentum_df[f'{p}日爆發倍數'] = (momentum_df['成交額(百萬)'] / safe_avg).fillna(0)
-        
-        tab_names = ["🔥 異常點火短中長趨勢"] + [f"🔹相較 {p} 日均額" for p in periods]
-        ignition_tabs = st.tabs(tab_names)
-        
-        with ignition_tabs[0]:
-            summary_cols = ['統一代號', '股票名稱', '成交金額日變化率', '成交額(百萬)']
-            summary_col_config = {
-                "統一代號": st.column_config.TextColumn("代號"),
-                "股票名稱": st.column_config.TextColumn("名稱"),
-                "成交金額日變化率": st.column_config.NumberColumn("日變化率(%)", format="%+.1f %%"),
-                "成交額(百萬)": st.column_config.NumberColumn("今日成交額", format="%.0f"),
-            }
-            
-            for p in periods:
-                if f'{p}日爆發倍數' in momentum_df.columns:
-                    summary_cols.append(f'{p}日爆發倍數')
-                    summary_col_config[f'{p}日爆發倍數'] = st.column_config.NumberColumn(f"{p}日倍數", format="%.1fx")
-                    
-            if '5日爆發倍數' in momentum_df.columns:
-                top_summary = momentum_df.sort_values('5日爆發倍數', ascending=False).head(50)
-            else:
-                top_summary = momentum_df.sort_values('成交額(百萬)', ascending=False).head(50)
-                
-            st.dataframe(
-                top_summary[summary_cols],
-                use_container_width=True, hide_index=True, height=500,
-                column_config=summary_col_config
-            )
-
-        for idx, p in enumerate(periods):
-            with ignition_tabs[idx + 1]: 
-                if f'{p}日爆發倍數' in momentum_df.columns:
-                    top_ratio = momentum_df.sort_values(f'{p}日爆發倍數', ascending=False).head(30)
-                    
-                    display_cols_ratio = [
-                        '統一代號', 
-                        '股票名稱', 
-                        f'{p}日爆發倍數', 
-                        '成交額(百萬)', 
-                        f'{p}日均額', 
-                        '成交金額日變化率', 
-                        '漲跌幅'
-                    ]
-                    
-                    st.dataframe(
-                        top_ratio[display_cols_ratio],
-                        use_container_width=True, hide_index=True, height=400,
-                        column_config={
-                            "統一代號": st.column_config.TextColumn("代號"),
-                            "股票名稱": st.column_config.TextColumn("名稱"),
-                            f'{p}日爆發倍數': st.column_config.NumberColumn("🚀爆發倍數", format="%.1fx"),
-                            "成交額(百萬)": st.column_config.NumberColumn("今日成交額", format="%.0f"),
-                            f'{p}日均額': st.column_config.NumberColumn(f"{p}日均額", format="%.0f"),
-                            "成交金額日變化率": st.column_config.NumberColumn("日變化率(%)", format="%+.1f %%"),
-                            "漲跌幅": st.column_config.NumberColumn("漲跌幅%", format="%.2f")
-                        }
-                    )
-                else:
-                    st.warning(f"目前資料庫中尚未累積滿 {p} 日的歷史成交資料。")
-        
-        st.markdown("---")
-        st.markdown("##### 📈 持續資金水龍頭 (8/12起算)")
-        st.caption("若是短大於長週期 代表成交金額持續擴張，而不是單日爆量，這裡只看成交金額，不看籌碼流向何處")
-        
-        def get_fund_trend(row):
-            try:
-                today = float(row.get('成交額(百萬)', 0))
-                ma5 = float(row.get('5日均額', 0))
-                ma10 = float(row.get('10日均額', 0))
-                ma20 = float(row.get('20日均額', 0))
-                
-                if ma5 > 0 and ma10 > 0 and ma20 > 0:
-                    if ma5 > ma10 and ma10 > ma20:
-                        return "🔥 資金湧入 (延續性強)"
-                    elif today > ma5 and ma5 <= ma10:
-                        return "⚡ 單日點火 (需觀察)"
-                    elif ma5 < ma10 and ma10 < ma20:
-                        return "💧 資金退潮 (動能弱)"
-                    else:
-                        return "⚖️ 震盪換手"
-                return "⚪ 資料不足"
-            except:
-                return "-"
-                
-        momentum_df['資金延續趨勢'] = momentum_df.apply(get_fund_trend, axis=1)
-        
-        trend_df = momentum_df.sort_values('成交額(百萬)', ascending=False).head(150)
-        trend_cols = ['統一代號', '股票名稱', '資金延續趨勢', '成交額(百萬)', '5日均額', '10日均額', '20日均額', '30日均額']
-        display_trend_cols = [c for c in trend_cols if c in trend_df.columns]
-        
-        st.dataframe(
-            trend_df[display_trend_cols],
-            use_container_width=True, hide_index=True, height=600,
-            column_config={
-                "統一代號": st.column_config.TextColumn("代號"),
-                "股票名稱": st.column_config.TextColumn("名稱"),
-                "資金延續趨勢": st.column_config.TextColumn("資金延續狀態", width="medium"),
-                "成交額(百萬)": st.column_config.NumberColumn("今日成交", format="%.0f"),
-                "5日均額": st.column_config.NumberColumn("5日均", format="%.0f"),
-                "10日均額": st.column_config.NumberColumn("10日均", format="%.0f"),
-                "20日均額": st.column_config.NumberColumn("20日均", format="%.0f"),
-                "30日均額": st.column_config.NumberColumn("30日均", format="%.0f"),
-            }
-        )
-
-# ==========================================
-# 🌟 主渲染入口
-# ==========================================
-def show_b0_page(DATA_DIR, STOCK_DICT):
-    # 💡 瞬間讀取！再也不會卡住
-    df_b0 = get_cached_b0_data(DATA_DIR)
-    
-    if df_b0 is None or df_b0.empty:
-        st.warning("⚠️ 目前資料庫中無任何有效的成交價檔案，請確認 `data` 資料夾狀態。")
-        return
-
-    date_raw = str(df_b0['股價日期'].iloc[0])
-    b0_latest_date_str = date_raw
-    if len(date_raw) >= 8:
-        b0_latest_date_str = f"{date_raw[:4]}/{date_raw[4:6]}/{date_raw[6:8]}"
-    elif len(date_raw) == 4:
-        b0_latest_date_str = f"2026/{date_raw[:2]}/{date_raw[2:]}"
-
-
-    st.markdown("""
-    <div style="background: linear-gradient(90deg, rgba(15,23,42,1) 0%, rgba(14,165,233,0.3) 50%, rgba(15,23,42,1) 100%); 
-                border-top: 1px solid #38bdf8; border-bottom: 1px solid #38bdf8; padding: 15px 20px; 
-                border-radius: 10px; text-align: center; box-shadow: 0px 0px 20px rgba(56, 189, 248, 0.2); margin-bottom: 20px;">
-        <h2 style="color: #e0f2fe; margin: 0; letter-spacing: 2px; text-shadow: 0 0 15px rgba(56, 189, 248, 0.8);">
-            量價與估值掃描
-        </h2>
-    </div>
-    """, unsafe_allow_html=True)
-    
-    st.caption(f"資料基準日: **{b0_latest_date_str}** ｜ 透視全市場資金動能與主力控盤狀態。")
-    st.write("---")
-    
-    def resolve_stock_name(row):
-        raw_name = str(row.get('B0_原始名稱', '')).strip()
-        if raw_name and raw_name.lower() != 'nan' and raw_name != 'none':
-            return raw_name
-        code = str(row.get('統一代號', ''))
-        if STOCK_DICT:
-            dict_name = STOCK_DICT.get(code, {}).get("name", "")
-            if dict_name: 
-                return dict_name
-        return ""
-        
-    df_b0['股票名稱'] = df_b0.apply(resolve_stock_name, axis=1)
-
-    # 💡 呼叫 Fragment 隔離渲染區塊，這行以下的動作都不會讓上面的標題閃爍！
-    render_b0_interactive_dashboard(df_b0)
+        st.markdown("
