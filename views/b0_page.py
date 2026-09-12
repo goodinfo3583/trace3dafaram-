@@ -249,7 +249,7 @@ def render_b0_interactive_dashboard(df_b0):
         momentum_df['額度增加絕對值'] = momentum_df['成交額(百萬)'] - momentum_df['5日均額']
         
         st.markdown("---")
-        st.markdown("##### 🏆 成交額大熱鍋(各週期暴增倍數8/12起算)")
+        st.markdown("##### 🏆 成交額大熱鍋(8/12起算)")
         st.caption("市場資金總量增加最多，代表用錢和量砸出來的活絡程度，也可看族群性 (主升段發動或大型法人調倉，已排除流動性過差標的，也不看籌碼流向何處)")
         
         periods = [5, 10, 20, 30, 45]
@@ -321,7 +321,7 @@ def render_b0_interactive_dashboard(df_b0):
 
 
         st.markdown("<br>", unsafe_allow_html=True)
-        st.markdown("##### 🚀 出量點火器 (各週期暴增倍數8/12起算)")
+        st.markdown("##### 🚀 出量點火器 (8/12起算)")
         st.caption("看相較5日均額最敏感，找看看突然異常放量的股票 (可能突破第一根，或波段重新發動，須留意延續性)")
         
         for p in periods:
@@ -390,7 +390,7 @@ def render_b0_interactive_dashboard(df_b0):
                     st.warning(f"目前資料庫中尚未累積滿 {p} 日的歷史成交資料。")
         
         st.markdown("---")
-        st.markdown("##### 📈 持續資金水龍頭 (各週期暴增倍數8/12起算)")
+        st.markdown("##### 📈 持續資金水龍頭 (8/12起算)")
         st.caption("若是短大於長週期 代表成交金額持續擴張，而不是單日爆量，這裡只看成交金額，不看籌碼流向何處")
         
         def get_fund_trend(row):
