@@ -31,7 +31,8 @@ def process_major_shareholders(DATA_DIR, target_level):
     """通用大戶資料產生器 (純後台版) - 統一處理 1000/800/600/400/200/100 張
         特色：自動將下載的「X張以下」轉換為「X張以上」的大戶視角"""
     files = []
-    for ext in ('*.csv', '*.CSV'):
+    # 👇 擴充：加入 *.parquet 雙軌搜尋支援
+    for ext in ('*.parquet', '*.csv', '*.CSV'):
         files.extend(glob.glob(os.path.join(DATA_DIR, f"*大股東*{ext}")))
     if not files: return pd.DataFrame()
     
@@ -51,15 +52,23 @@ def process_major_shareholders(DATA_DIR, target_level):
         
         for f in fs:
             df = None
-            for enc in ['utf-8-sig', 'big5', 'cp950', 'utf-8']:
+            # 👇 根據副檔名判斷讀取引擎
+            if f.endswith('.parquet'):
                 try:
-                    df = pd.read_csv(f, encoding=enc)
-                    break 
-                except: pass
+                    df = pd.read_parquet(f)
+                except Exception: pass
+            else:
+                for enc in ['utf-8-sig', 'big5', 'cp950', 'utf-8']:
+                    try:
+                        df = pd.read_csv(f, encoding=enc)
+                        break 
+                    except: pass
             
             if df is None or df.empty: continue
             
-            df.columns = [re.sub(r'\s+', '', str(c)).replace('\ufeff', '') for c in df.columns]
+            # 👇 統一的欄位清洗，並加入「剔除重複同名欄位」防呆機制
+            df.columns = [re.sub(r'[\s\n\r\t\u3000\ufeff]+', '', str(c)) for c in df.columns]
+            df = df.loc[:, ~df.columns.duplicated()]
             c_code = next((c for c in df.columns if '代號' in c or '代碼' in c), None)
             c_name = next((c for c in df.columns if '名稱' in c), None)
             c_date = next((c for c in df.columns if '日期' in c), None)
