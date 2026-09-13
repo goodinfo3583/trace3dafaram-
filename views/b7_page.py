@@ -12,7 +12,7 @@ import re
 @st.cache_data(show_spinner=False, ttl=600)
 def process_directors_data(DATA_DIR):
     """統一讀取 Goodinfo 質押比檔案，並萃取「持股比例」進行多月份動態比較"""
-    # 支援 Parquet 與 CSV 雙軌讀取，並擴充檔名關鍵字包含董監與質押
+    # 支援 Parquet 與 CSV 雙軌讀取，並擴充檔名關鍵字
     search_patterns = [
         os.path.join(DATA_DIR, "*質押*.parquet"),
         os.path.join(DATA_DIR, "*董監*.parquet"),
@@ -35,15 +35,13 @@ def process_directors_data(DATA_DIR):
         else:
             for enc in ['utf-8-sig', 'big5', 'cp950', 'utf-8']:
                 try:
-                    # CSV 強制以字串讀取，避免型態推測出錯
                     df = pd.read_csv(f, encoding=enc, header=0, dtype=str)
                     break
                 except: pass
             
         if df is not None and not df.empty:
-            # 統一清洗欄位名稱，並加上剔除重複欄位的防呆機制
             df.columns = [re.sub(r'[\s\n\r\t\u3000\ufeff]+', '', str(c)) for c in df.columns]
-            df = df.loc[:, ~df.columns.duplicated()]            
+            df = df.loc[:, ~df.columns.duplicated()]            df = df.loc[:, ~df.columns.duplicated()]            
             # 鎖定 Goodinfo 的欄位
             c_code = next((c for c in df.columns if "代號" in c), None)
             c_name = next((c for c in df.columns if "名稱" in c), None)
@@ -131,27 +129,36 @@ def process_directors_data(DATA_DIR):
 @st.cache_data(show_spinner=False, ttl=600)
 def process_pledge_data(DATA_DIR):
     """讀取並自動堆疊所有檔案，動態過濾並僅保留最新月份資料"""
+    # 支援 Parquet 與 CSV 雙軌讀取，並擴充檔名關鍵字
     search_patterns = [
-        os.path.join(DATA_DIR, "*質押比*.csv*"),
-        os.path.join(DATA_DIR, "*質押*.csv*")
+        os.path.join(DATA_DIR, "*質押*.parquet"),
+        os.path.join(DATA_DIR, "*董監*.parquet"),
+        os.path.join(DATA_DIR, "*質押*.csv"),
+        os.path.join(DATA_DIR, "*董監*.csv")
     ]
     files = set()
     for pattern in search_patterns:
         files.update(glob.glob(pattern))
-    
+        
     if not files: return pd.DataFrame()
     
     df_list = []
     for f in list(files):
         df = None
-        for enc in ['utf-8-sig', 'big5', 'cp950', 'utf-8']:
+        if f.endswith('.parquet'):
             try:
-                df = pd.read_csv(f, encoding=enc, header=0)
-                break
-            except: pass
+                df = pd.read_parquet(f)
+            except Exception: pass
+        else:
+            for enc in ['utf-8-sig', 'big5', 'cp950', 'utf-8']:
+                try:
+                    df = pd.read_csv(f, encoding=enc, header=0, dtype=str)
+                    break
+                except: pass
             
         if df is not None and not df.empty:
-            df.columns = [str(c).replace(' ', '').replace('\u3000', '').replace('\ufeff', '').replace('\xa0', '') for c in df.columns]
+            df.columns = [re.sub(r'[\s\n\r\t\u3000\ufeff]+', '', str(c)) for c in df.columns]
+            df = df.loc[:, ~df.columns.duplicated()]
             df_list.append(df)
             
     if not df_list: return pd.DataFrame()
@@ -212,9 +219,12 @@ def process_pledge_history_data(DATA_DIR):
     不管未來累積了多少個月的檔案，系統自動降冪排好後，
     永遠只擷取「最新的 5 個月份」，並加入視覺化的質押增減「動態」判斷。
     """
+    # 支援 Parquet 與 CSV 雙軌讀取，並擴充檔名關鍵字
     search_patterns = [
-        os.path.join(DATA_DIR, "*質押比*.csv*"), 
-        os.path.join(DATA_DIR, "*質押*.csv*")
+        os.path.join(DATA_DIR, "*質押*.parquet"),
+        os.path.join(DATA_DIR, "*董監*.parquet"),
+        os.path.join(DATA_DIR, "*質押*.csv"),
+        os.path.join(DATA_DIR, "*董監*.csv")
     ]
     files = set()
     for pattern in search_patterns:
@@ -225,15 +235,20 @@ def process_pledge_history_data(DATA_DIR):
     df_list = []
     for f in list(files):
         df = None
-        for enc in ['utf-8-sig', 'big5', 'cp950', 'utf-8']:
+        if f.endswith('.parquet'):
             try:
-                df = pd.read_csv(f, encoding=enc, header=0)
-                break
-            except: pass
+                df = pd.read_parquet(f)
+            except Exception: pass
+        else:
+            for enc in ['utf-8-sig', 'big5', 'cp950', 'utf-8']:
+                try:
+                    df = pd.read_csv(f, encoding=enc, header=0, dtype=str)
+                    break
+                except: pass
             
         if df is not None and not df.empty:
-            df.columns = [str(c).replace(' ', '').replace('\u3000', '').replace('\ufeff', '').replace('\xa0', '') for c in df.columns]
-            
+            df.columns = [re.sub(r'[\s\n\r\t\u3000\ufeff]+', '', str(c)) for c in df.columns]
+            df = df.loc[:, ~df.columns.duplicated()]            
             c_code = next((c for c in df.columns if "代號" in c), None)
             c_name = next((c for c in df.columns if "名稱" in c), None)
             c_month = next((c for c in df.columns if "持股資料月份" in c), None)
