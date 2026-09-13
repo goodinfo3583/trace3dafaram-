@@ -1134,6 +1134,13 @@ def render_sidebar_war_room(STOCK_DICT, DATA_DIR="data"):
                         vol = row_b0.get('成交張數_num', 0)
                         amt = row_b0.get('成交額(百萬)', 0)
                         
+                        # 👇 1. 新增：提取本益比並做防呆處理
+                        per_val = row_b0.get('PER', 0)
+                        try:
+                            per_str = f"{float(per_val):.2f}" if float(per_val) > 0 else "虧損或無"
+                        except:
+                            per_str = "-"
+                        
                         # 動態雷達提取
                         status = row_b0.get('B0_量價狀態', '-')
                         special = row_b0.get('B0_特殊型態', '-')
@@ -1159,10 +1166,11 @@ def render_sidebar_war_room(STOCK_DICT, DATA_DIR="data"):
                         # 顏色判定
                         pct_color = "#FF4B4B" if pct > 0 else ("#00E272" if pct < 0 else "#E2E8F0")
                         
-                        # 渲染 UI 卡片
+                        # 👇 2. 新增：在 UI 卡片中插入本益比 (⚖️ 估值狀態)
                         st.markdown(f"""
                         <div style='background-color: rgba(255,255,255,0.05); border-left: 3px solid #F59E0B; padding: 10px 12px; border-radius: 4px; margin-bottom: 12px; font-size: 13.5px; line-height: 1.6;'>
                             <div style='color: #E2E8F0;'>💰 <b>收盤報價：</b> <span style='color:{pct_color}; font-weight:bold;'>{price} ({pct:+.2f}%)</span></div>
+                            <div style='color: #E2E8F0;'>⚖️ <b>本 益 比 ：</b> <span style='color:#E2E8F0;'>{per_str}</span></div>
                             <div style='color: #E2E8F0;'>📊 <b>今日成交：</b> <span style='color:#38BDF8;'>{int(vol):,} 張 / {amt:,.0f} 百萬</span></div>
                             <div style='color: #E2E8F0;'>🔮 <b>量價狀態：</b> <span style='color:#FCD34D;'>{status}</span></div>
                             <div style='color: #E2E8F0;'>🕵️ <b>特殊型態：</b> <span style='color:#A78BFA;'>{special}</span></div>
