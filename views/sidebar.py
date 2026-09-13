@@ -1057,10 +1057,8 @@ def render_sidebar_war_room(STOCK_DICT, DATA_DIR="data"):
             st.markdown(f"### 🎯 綜合診斷標的：<span style='color: #00D2FF;'>{display_name}</span> <span style='font-size:16px; background-color:#1E293B; padding:4px 10px; border-radius:6px; color:#38BDF8; border: 1px solid #38BDF8; margin-left:10px;'>🏷️ {industry_label}</span>", unsafe_allow_html=True)
 
             # ==========================================
-            # 🚀 融合 AI 訊號區
+            # 🚀 技術面 AI 訊號區 (已移除籌碼積分，保留均線回測等技術訊號)
             # ==========================================
-            old_ai_msg = generate_stock_commentary(target_query)
-
             new_ai_msgs = []
             if pure_stock_id:
                 with st.spinner("🧠 AI 雷達掃描中..."):
@@ -1074,24 +1072,17 @@ def render_sidebar_war_room(STOCK_DICT, DATA_DIR="data"):
                         df_tech = df_tech.loc[:, ~df_tech.columns.duplicated()]
                         new_ai_msgs = generate_technical_signals(df_tech)
 
-            if old_ai_msg or new_ai_msgs:
+            if new_ai_msgs:
                 signal_html = "<div style='background-color: rgba(0, 210, 255, 0.05); border-left: 4px solid #00D2FF; padding: 12px; border-radius: 5px; margin: 10px 0px;'>"
-                signal_html += "<h5 style='color: #00D2FF; margin-top:0px; margin-bottom: 10px;'>📡 AI 綜合籌碼與技術雷達</h5>"
+                signal_html += "<h5 style='color: #00D2FF; margin-top:0px; margin-bottom: 10px;'>📡 技術雷達訊號</h5>"
                 
-                if old_ai_msg:
-                    signal_html += f"<p style='color: #FCD34D; margin: 5px 0px; font-size: 15px; font-weight: bold;'>{old_ai_msg}</p>"
-                
-                if old_ai_msg and new_ai_msgs:
-                    signal_html += "<hr style='border-color: rgba(0, 210, 255, 0.15); margin: 8px 0px;'>"
-                    
-                if new_ai_msgs:
-                    for sig in new_ai_msgs:
-                        signal_html += f"<p style='color: #E2E8F0; margin: 5px 0px; font-size: 14.5px;'>{sig}</p>"
+                for sig in new_ai_msgs:
+                    signal_html += f"<p style='color: #E2E8F0; margin: 5px 0px; font-size: 14.5px;'>{sig}</p>"
                     
                 signal_html += "</div>"
                 st.markdown(signal_html, unsafe_allow_html=True)
             elif pure_stock_id:
-                st.info("📡 AI 雷達：目前尚無強烈技術或籌碼訊號。")
+                st.info("📡 AI 雷達：目前尚無強烈技術訊號。")
 
             st.markdown("<hr style='border-color: #334155;'>", unsafe_allow_html=True)
 
