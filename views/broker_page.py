@@ -63,6 +63,10 @@ def render_broker_dashboard(target_stock, display_name, df_raw_all, df_trend):
         def format_daily_table(df, is_buy):
             if df.empty: return None
             df = df.copy()
+            
+            # 以「券商名稱」為基準去除重複的資料列，保留第一筆即可，避免重複爬蟲出現2次
+            df = df.drop_duplicates(subset=[broker_col])
+            
             if not is_buy: df['net_vol'] = df['net_vol'].abs()
             df = df.sort_values('net_vol', ascending=False).head(15)
             df = df[[broker_col, 'net_vol']]
