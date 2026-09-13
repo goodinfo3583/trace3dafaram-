@@ -1111,8 +1111,76 @@ def render_sidebar_war_room(STOCK_DICT, DATA_DIR="data"):
                     st.warning("⚠️ 技術 K 線圖目前僅支援代號查詢。")
 
             # ==========================================
-            # 👑 區塊 1 ~ 7：數據庫展演
+            # 👑 區塊 0 ~ 7：數據庫展演
             # ==========================================
+            # 區塊 0
+            st.markdown("<hr style='border-color: #334155;'>", unsafe_allow_html=True)
+            st.markdown("<h4 style='color: #FCD34D;'>⚡ 量價與動能雷達</h4>", unsafe_allow_html=True)
+            
+            try:
+                from views.b0_page import get_cached_b0_data
+                b0_cache = get_cached_b0_data(DATA_DIR)
+                if b0_cache is not None:
+                    df_b0_today, _ = b0_cache
+                    # 利用純代號過濾出該股資料
+                    b0_res = df_b0_today[df_b0_today['統一代號'] == pure_stock_id]
+                    
+                    if not b0_res.empty:
+                        row_b0 = b0_res.iloc[0]
+                        
+                        # 基礎資料提取
+                        price = row_b0.get('成交', 0)
+                        pct = row_b0.get('漲跌幅', 0)
+                        vol = row_b0.get('成交張數_num', 0)
+                        amt = row_b0.get('成交額(百萬)', 0)
+                        
+                        # 動態雷達提取
+                        status = row_b0.get('B0_量價狀態', '-')
+                        special = row_b0.get('B0_特殊型態', '-')
+                        ma5_amt = row_b0.get('5日均額', 0)
+                        ma10_amt = row_b0.get('10日均額', 0)
+                        ma20_amt = row_b0.get('20日均額', 0)
+                        
+                        # 計算資金延續趨勢 (仿照 b0_page 邏輯)
+                        fund_trend = "⚪ 資料不足"
+                        if ma5_amt > 0 and ma10_amt > 0 and ma20_amt > 0:
+                            if ma5_amt > ma10_amt and ma10_amt > ma20_amt:
+                                fund_trend = "🔥 資金湧入 (延續性強)"
+                            elif amt > ma5_amt and ma5_amt <= ma10_amt:
+                                fund_trend = "⚡ 單日點火 (需觀察)"
+                            elif ma5_amt < ma10_amt and ma10_amt < ma20_amt:
+                                fund_trend = "💧 資金退潮 (動能弱)"
+                            else:
+                                fund_trend = "⚖️ 震盪換手"
+                                
+                        # 計算 5日爆發倍數
+                        burst_ratio = (amt / ma5_amt) if ma5_amt > 0 else 0
+                        
+                        # 顏色判定
+                        pct_color = "#FF4B4B" if pct > 0 else ("#00E272" if pct < 0 else "#E2E8F0")
+                        
+                        # 渲染 UI 卡片
+                        st.markdown(f"""
+                        <div style='background-color: rgba(255,255,255,0.05); border-left: 3px solid #F59E0B; padding: 10px 12px; border-radius: 4px; margin-bottom: 12px; font-size: 13.5px; line-height: 1.6;'>
+                            <div style='color: #E2E8F0;'>💰 <b>收盤報價：</b> <span style='color:{pct_color}; font-weight:bold;'>{price} ({pct:+.2f}%)</span></div>
+                            <div style='color: #E2E8F0;'>📊 <b>今日成交：</b> <span style='color:#38BDF8;'>{int(vol):,} 張 / {amt:,.0f} 百萬</span></div>
+                            <div style='color: #E2E8F0;'>🔮 <b>量價狀態：</b> <span style='color:#FCD34D;'>{status}</span></div>
+                            <div style='color: #E2E8F0;'>🕵️ <b>特殊型態：</b> <span style='color:#A78BFA;'>{special}</span></div>
+                            <hr style='border-color: rgba(255,255,255,0.1); margin: 6px 0px;'>
+                            <div style='color: #E2E8F0;'>🚀 <b>5日爆發倍數：</b> <span style='color:#FF4B4B;'>{burst_ratio:.1f}x</span></div>
+                            <div style='color: #E2E8F0;'>🌊 <b>資金水龍頭：</b> <span style='color:#10B981;'>{fund_trend}</span></div>
+                        </div>
+                        """, unsafe_allow_html=True)
+                        
+                    else:
+                        st.write("⚪ 查無此標的當日量價資料")
+                else:
+                    st.write("⚪ 尚未載入量價資料庫")
+            except Exception as e:
+                st.write(f"⚪ 量價模組載入異常: {e}")
+
+            # b1
+
             st.markdown("<hr style='border-color: #334155;'>", unsafe_allow_html=True)
             
             icon_b1 = get_img_html("magicbookleaf.png") 
