@@ -262,7 +262,7 @@ def inject_custom_header(is_logged_in=False):
                         </div>
                         <div class="dropdown-item actionable">
                             <a href="#" data-target="NavToBroker" class="dropdown-title internal-nav">
-                                <img src="app/static/icon-building.png" class="menu-icon" alt="broker"> 券商分點
+                                <img src="app/static/icon-building.png" class="menu-icon" alt="broker"> 主力券商
                                 <span style="color:#FFD700; font-size:10px; margin-left: 5px; animation: pulse 2s infinite;">(NEW)</span>
                             </a>
                             <p class="dropdown-text">追蹤特定券商分點進出動向。</p>

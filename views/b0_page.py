@@ -194,19 +194,20 @@ def get_cached_b0_data(DATA_DIR):
 
     df_today['B0_量價狀態'] = df_today.apply(get_vp_status, axis=1)
     
-    return df_today
+    # 👇 改成同時回傳「今日資料」與「完整歷史資料」
+    return df_today, combined_df
 
 def sync_b0_data(DATA_DIR):
-    df = get_cached_b0_data(DATA_DIR)
-    if df is not None:
-        st.session_state['b0_price'] = df
+    cache_result = get_cached_b0_data(DATA_DIR)
+    if cache_result is not None:
+        st.session_state['b0_price'] = cache_result[0]
 
 
 # ==========================================
 # 🚀 效能救星 2：把篩選器與圖表包裝成 Fragment，避免拉動滑桿時整頁重整
 # ==========================================
 @st.fragment
-def render_b0_interactive_dashboard(df_b0):
+def render_b0_interactive_dashboard(df_b0, df_history):
     # 🌟 關鍵修改：先在頁面最上方建立一個「佔位容器」，保留給盤面結構使用
     top_container = st.container()
 
@@ -248,29 +249,60 @@ def render_b0_interactive_dashboard(df_b0):
         filtered_df = filtered_df[filtered_df['B0_特殊型態'].isin(sel_special)]
 
     # ==========================================
-    # 🌟 關鍵修改：利用 `with top_container:` 將計算完的盤面結構，塞回最上方！
+    # 🌟 利用 `with top_container:` 將計算完的盤面結構塞回最上方
     # ==========================================
     with top_container:
         st.markdown("### 📊 盤面結構 (基於當前篩選條件)")
         
-        # 計算漲跌家數，並以 9.5% 作為漲跌停的容錯門檻
-        up_count = (filtered_df['漲跌幅'] > 0).sum()
-        down_count = (filtered_df['漲跌幅'] < 0).sum()
-        flat_count = (filtered_df['漲跌幅'] == 0).sum()
+        # 1. 取得當前篩選後的「合格標的清單」
+        valid_codes = filtered_df['統一代號'].unique()
         
+        # 2. 從歷史資料中提取這些合格標的，並依日期分組計算各項數量
+        hist_filtered = df_history[df_history['統一代號'].isin(valid_codes)]
+        breadth_history = hist_filtered.groupby('標準日期').agg(
+            漲家數=('漲跌幅', lambda x: (x > 0).sum()),
+            跌家數=('漲跌幅', lambda x: (x < 0).sum()),
+            平盤數=('漲跌幅', lambda x: (x == 0).sum()),
+            漲停數=('漲跌幅', lambda x: (x >= 9.5).sum()),
+            跌停數=('漲跌幅', lambda x: (x <= -9.5).sum())
+        ).reset_index()
+        
+        # 確保日期由新到舊排列
+        breadth_history = breadth_history.sort_values('標準日期', ascending=False)
+        
+        # 3. 取得「今日」與「昨日」的數據來計算 Delta (變化量箭頭)
+        up_count = down_count = flat_count = limit_up_count = limit_down_count = 0
+        prev_up = prev_down = prev_flat = prev_l_up = prev_l_down = None
+        
+        if len(breadth_history) > 0:
+            up_count = breadth_history.iloc[0]['漲家數']
+            down_count = breadth_history.iloc[0]['跌家數']
+            flat_count = breadth_history.iloc[0]['平盤數']
+            limit_up_count = breadth_history.iloc[0]['漲停數']
+            limit_down_count = breadth_history.iloc[0]['跌停數']
+            
+        if len(breadth_history) > 1:
+            prev_up = breadth_history.iloc[1]['漲家數']
+            prev_down = breadth_history.iloc[1]['跌家數']
+            prev_flat = breadth_history.iloc[1]['平盤數']
+            prev_l_up = breadth_history.iloc[1]['漲停數']
+            prev_l_down = breadth_history.iloc[1]['跌停數']
+        
+        # 4. 繪製帶有 Delta 比較箭頭的 Metrics UI
+        # delta_color="inverse" 會讓「數值增加時變成紅色(負面)」，符合跌停數變多是壞事的情境！
+        m1, m2, m3, m4, m5 = st.columns(5)
+        m1.metric("漲家數 📈", f"{up_count} 家", delta=None if prev_up is None else f"{int(up_count - prev_up)} 家")
+        m2.metric("跌家數 📉", f"{down_count} 家", delta=None if prev_down is None else f"{int(down_count - prev_down)} 家", delta_color="inverse")
+        m3.metric("平盤數 ➖", f"{flat_count} 家", delta=None if prev_flat is None else f"{int(flat_count - prev_flat)} 家", delta_color="off")
+        m4.metric("漲停數 🚀", f"{limit_up_count} 家", delta=None if prev_l_up is None else f"{int(limit_up_count - prev_l_up)} 家")
+        m5.metric("跌停數 ☠️", f"{limit_down_count} 家", delta=None if prev_l_down is None else f"{int(limit_down_count - prev_l_down)} 家", delta_color="inverse")
+        
+        # 5. 顯示漲跌停的 Expander 細節
         limit_up_df = filtered_df[filtered_df['漲跌幅'] >= 9.5]
         limit_down_df = filtered_df[filtered_df['漲跌幅'] <= -9.5]
         
-        m1, m2, m3, m4, m5 = st.columns(5)
-        m1.metric("漲家數 📈", f"{up_count} 家")
-        m2.metric("跌家數 📉", f"{down_count} 家")
-        m3.metric("平盤數 ➖", f"{flat_count} 家")
-        m4.metric("漲停數 🚀", f"{len(limit_up_df)} 家")
-        m5.metric("跌停數 ☠️", f"{len(limit_down_df)} 家")
-        
         if not limit_up_df.empty:
             with st.expander(f"✨ 查看 {len(limit_up_df)} 檔漲停標的"):
-                # 組合代號與名稱呈現
                 lu_list = (limit_up_df['統一代號'] + " " + limit_up_df['股票名稱']).tolist()
                 st.write("、".join(lu_list))
                 
@@ -278,7 +310,16 @@ def render_b0_interactive_dashboard(df_b0):
             with st.expander(f"⚠️ 查看 {len(limit_down_df)} 檔跌停標的"):
                 ld_list = (limit_down_df['統一代號'] + " " + limit_down_df['股票名稱']).tolist()
                 st.write("、".join(ld_list))
-                
+
+        # 6. 顯示近期歷史趨勢橫向表格
+        if len(breadth_history) > 0:
+            st.markdown("##### 📅 歷史盤面變化")
+            # 把表格轉置 (T) 讓指標變成列、日期變成欄位
+            breadth_table = breadth_history.set_index('標準日期').T
+            # 將 YYYYMMDD 精簡轉換為 MMDD 以利閱讀
+            breadth_table.columns = [str(c)[-4:] for c in breadth_table.columns]
+            st.dataframe(breadth_table, use_container_width=True)
+
         st.markdown("---")
 
     # ==========================================
@@ -513,11 +554,13 @@ def render_b0_interactive_dashboard(df_b0):
 # ==========================================
 def show_b0_page(DATA_DIR, STOCK_DICT):
     # 💡 瞬間讀取！再也不會卡住
-    df_b0 = get_cached_b0_data(DATA_DIR)
+    cache_result = get_cached_b0_data(DATA_DIR)
     
-    if df_b0 is None or df_b0.empty:
+    if cache_result is None or cache_result[0].empty:
         st.warning("⚠️ 目前資料庫中無任何有效的成交價檔案，請確認 `data` 資料夾狀態。")
         return
+        
+    df_b0, df_history = cache_result # 👇 解包取得歷史資料
 
     date_raw = str(df_b0['股價日期'].iloc[0])
     b0_latest_date_str = date_raw
@@ -553,5 +596,5 @@ def show_b0_page(DATA_DIR, STOCK_DICT):
         
     df_b0['股票名稱'] = df_b0.apply(resolve_stock_name, axis=1)
 
-    # 💡 呼叫 Fragment 隔離渲染區塊，這行以下的動作都不會讓上面的標題閃爍！
-    render_b0_interactive_dashboard(df_b0)
+
+    render_b0_interactive_dashboard(df_b0, df_history)
