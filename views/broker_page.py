@@ -253,7 +253,7 @@ def render(STOCK_DICT=None):
                 border-top: 1px solid #38bdf8; border-bottom: 1px solid #38bdf8; padding: 15px 20px; 
                 border-radius: 10px; text-align: center; box-shadow: 0px 0px 20px rgba(56, 189, 248, 0.2); margin-bottom: 20px;">
         <h2 style="color: #e0f2fe; margin: 0; letter-spacing: 2px; text-shadow: 0 0 15px rgba(56, 189, 248, 0.8);">
-            券商分點淨買力與集中度追蹤
+            券商主力淨買力與集中度追蹤
         </h2>
     </div>
     """, unsafe_allow_html=True)
