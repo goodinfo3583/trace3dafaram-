@@ -1141,7 +1141,7 @@ def render_sidebar_war_room(STOCK_DICT, DATA_DIR="data"):
                         ma10_amt = row_b0.get('10日均額', 0)
                         ma20_amt = row_b0.get('20日均額', 0)
                         
-                        # 計算資金延續趨勢 (仿照 b0_page 邏輯)
+                        # 計算資金延續趨勢
                         fund_trend = "⚪ 資料不足"
                         if ma5_amt > 0 and ma10_amt > 0 and ma20_amt > 0:
                             if ma5_amt > ma10_amt and ma10_amt > ma20_amt:
@@ -1159,9 +1159,9 @@ def render_sidebar_war_room(STOCK_DICT, DATA_DIR="data"):
                         # 顏色判定
                         pct_color = "#FF4B4B" if pct > 0 else ("#00E272" if pct < 0 else "#E2E8F0")
                         
-                        # 渲染 UI 卡片
+                        # 1️⃣ 渲染 UI 卡片
                         st.markdown(f"""
-                        <div style='background-color: rgba(255,255,255,0.05); border-left: 3px solid #F59E0B; padding: 10px 12px; border-radius: 4px; margin-bottom: 12px; font-size: 13.5px; line-height: 1.6;'>
+                        <div style='background-color: rgba(255,255,255,0.05); border-left: 3px solid #F59E0B; padding: 10px 12px; border-radius: 4px; margin-bottom: 10px; font-size: 13.5px; line-height: 1.6;'>
                             <div style='color: #E2E8F0;'>💰 <b>收盤報價：</b> <span style='color:{pct_color}; font-weight:bold;'>{price} ({pct:+.2f}%)</span></div>
                             <div style='color: #E2E8F0;'>📊 <b>今日成交：</b> <span style='color:#38BDF8;'>{int(vol):,} 張 / {amt:,.0f} 百萬</span></div>
                             <div style='color: #E2E8F0;'>🔮 <b>量價狀態：</b> <span style='color:#FCD34D;'>{status}</span></div>
@@ -1172,12 +1172,20 @@ def render_sidebar_war_room(STOCK_DICT, DATA_DIR="data"):
                         </div>
                         """, unsafe_allow_html=True)
                         
+                        # 2️⃣ 👇 新增：專屬的跳轉按鈕
+                        if st.button(f"👉 前往查看 {display_name} 完整量價分析", key=f"btn_nav_b0_{pure_stock_id}", use_container_width=True):
+                            # 確保搜尋欄位保持這檔股票
+                            st.session_state['global_search_final'] = pure_stock_id
+                            
+                            # ⚠️ 重要提示：請把這裡的 'current_page' 與 'B0_量價動能' 
+                            # 替換成您主程式 (main.py 或 app.py) 中用來控制左側選單/主畫面切換的變數名稱！
+                            st.session_state['current_page'] = 'B0_量價動能' 
+                            
+                            # 觸發畫面重整，讓主視窗切換過去
+                            st.rerun()
+                            
                     else:
                         st.write("⚪ 查無此標的當日量價資料")
-                else:
-                    st.write("⚪ 尚未載入量價資料庫")
-            except Exception as e:
-                st.write(f"⚪ 量價模組載入異常: {e}")
 
             # b1
 
