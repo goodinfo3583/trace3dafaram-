@@ -16,12 +16,20 @@ from collections import defaultdict
 
 @st.cache_data(show_spinner=False, ttl=3600)
 def load_foreign_ratio_data(data_dir):
-    """掃描資料夾中所有外資持股比例的 CSV 檔案"""
-    foreign_csvs = glob.glob(os.path.join(data_dir, "*外資持股比例*.csv"))
-    if not foreign_csvs: return pd.DataFrame()
+    """掃描資料夾中所有外資持股比例的 CSV 與 Parquet 檔案"""
+    # 支援 Parquet 與 CSV 雙軌搜尋
+    search_patterns = [
+        os.path.join(data_dir, "*外資持股比例*.parquet"),
+        os.path.join(data_dir, "*外資持股比例*.csv")
+    ]
+    foreign_files = []
+    for pattern in search_patterns:
+        foreign_files.extend(glob.glob(pattern))
+        
+    if not foreign_files: return pd.DataFrame()
         
     files_by_date = defaultdict(list)
-    for f in foreign_csvs:
+    for f in foreign_files:
         date_match = re.search(r'(202\d{5})', os.path.basename(f))
         if date_match: files_by_date[date_match.group(1)].append(f)
             
@@ -29,13 +37,26 @@ def load_foreign_ratio_data(data_dir):
     for date_str, files in files_by_date.items():
         chunks = []
         for f in files:
-            try:
-                temp_df = pd.read_csv(f)
-                temp_df.columns = temp_df.columns.str.replace(r'\s+', '', regex=True)
+            temp_df = None
+            if f.endswith('.parquet'):
+                try:
+                    temp_df = pd.read_parquet(f)
+                except: pass
+            else:
+                for enc in ['utf-8-sig', 'big5', 'cp950', 'utf-8']:
+                    try:
+                        temp_df = pd.read_csv(f, encoding=enc, dtype=str)
+                        break
+                    except: pass
+            
+            if temp_df is not None and not temp_df.empty:
+                # 清洗欄位並防呆同名重複欄位
+                temp_df.columns = [re.sub(r'[\s\n\r\t\u3000\ufeff]+', '', str(c)) for c in temp_df.columns]
+                temp_df = temp_df.loc[:, ~temp_df.columns.duplicated()]
+                
                 cols_to_keep = ['代號', '名稱', '外資持股(%)']
                 temp_df = temp_df[[c for c in cols_to_keep if c in temp_df.columns]]
                 chunks.append(temp_df)
-            except: pass
                 
         if chunks:
             day_df = pd.concat(chunks, ignore_index=True)
@@ -47,6 +68,13 @@ def load_foreign_ratio_data(data_dir):
                 '外資持股(%)': f'外資持股_{date_str}'
             })
             day_df = day_df.drop(columns=['股票名稱'], errors='ignore')
+            
+            # 確保外資持股轉為數字 (處理 Parquet / CSV 帶來的字串 "%" 符號)
+            day_df[f'外資持股_{date_str}'] = pd.to_numeric(
+                day_df[f'外資持股_{date_str}'].astype(str).str.replace('%', '', regex=False).str.replace(',', '', regex=False), 
+                errors='coerce'
+            ).fillna(0.0)
+            
             daily_dfs.append(day_df)
 
     if not daily_dfs: return pd.DataFrame()
@@ -565,8 +593,18 @@ def render_b1_main_tables(final_df, color_ref, date_cols):
                 mask &= (final_df['股票代號'].str.contains(search_kw, na=False)) | (final_df['股票名稱'].str.contains(search_kw, na=False))
                 
             filtered_df = final_df[mask].copy()
+            
+            # 👇 新增：先將 △ 轉為數字進行精準的大小排序 (排除字串排序的問題)
+            filtered_df['△_num'] = pd.to_numeric(filtered_df['△'], errors='coerce').fillna(0)
+            filtered_df = filtered_df.sort_values(by='△_num', ascending=False)
+            
             filtered_df['法人持股'] = filtered_df['法人持股'].apply(lambda x: f"{x:.2f}%")
             filtered_df['△'] = filtered_df['△'].apply(format_delta)
+            
+            # 👇 新增：將 8 碼日期 (YYYYMMDD持股%) 縮減為 4 碼 (MMDD持股%)
+            rename_dict = {c: f"{c[4:8]}持股%" for c in date_cols}
+            filtered_df = filtered_df.rename(columns=rename_dict)
+            new_date_cols = [rename_dict[c] for c in date_cols]
             
             def highlight_row(row):
                 cnt = color_ref.get(row['股票代號'], 0)
@@ -577,7 +615,8 @@ def render_b1_main_tables(final_df, color_ref, date_cols):
                 else: bg = 'background-color: #111622; color: #E2E8F0'                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                          
                 return [bg] * len(row)
                 
-            all_display_cols = ['股票代號', '股票名稱', '今日上榜', '最新動態', '△'] + date_cols
+            # 更新顯示的欄位為剛才縮減後的 4 碼日期欄位
+            all_display_cols = ['股票代號', '股票名稱', '今日上榜', '最新動態', '△'] + new_date_cols
             st.dataframe(filtered_df[all_display_cols].style.apply(highlight_row, axis=1), use_container_width=True)
 
     st.write("")
