@@ -8,11 +8,9 @@ import re
 # ==========================================
 # ⚙️ 區塊 7：董監持股運算引擎 (高效統一版 - 從質押檔提取)
 # ==========================================
-# 💡 效能救星 1：快取所有的檔案讀取與樞紐運算 (10 分鐘更新一次)
 @st.cache_data(show_spinner=False, ttl=600)
 def process_directors_data(DATA_DIR):
     """統一讀取 Goodinfo 質押比檔案，並萃取「持股比例」進行多月份動態比較"""
-    # 支援 Parquet 與 CSV 雙軌讀取，並擴充檔名關鍵字
     search_patterns = [
         os.path.join(DATA_DIR, "*質押*.parquet"),
         os.path.join(DATA_DIR, "*董監*.parquet"),
@@ -41,7 +39,8 @@ def process_directors_data(DATA_DIR):
             
         if df is not None and not df.empty:
             df.columns = [re.sub(r'[\s\n\r\t\u3000\ufeff]+', '', str(c)) for c in df.columns]
-            df = df.loc[:, ~df.columns.duplicated()]            df = df.loc[:, ~df.columns.duplicated()]            
+            df = df.loc[:, ~df.columns.duplicated()]
+            
             # 鎖定 Goodinfo 的欄位
             c_code = next((c for c in df.columns if "代號" in c), None)
             c_name = next((c for c in df.columns if "名稱" in c), None)
@@ -129,7 +128,6 @@ def process_directors_data(DATA_DIR):
 @st.cache_data(show_spinner=False, ttl=600)
 def process_pledge_data(DATA_DIR):
     """讀取並自動堆疊所有檔案，動態過濾並僅保留最新月份資料"""
-    # 支援 Parquet 與 CSV 雙軌讀取，並擴充檔名關鍵字
     search_patterns = [
         os.path.join(DATA_DIR, "*質押*.parquet"),
         os.path.join(DATA_DIR, "*董監*.parquet"),
@@ -219,7 +217,6 @@ def process_pledge_history_data(DATA_DIR):
     不管未來累積了多少個月的檔案，系統自動降冪排好後，
     永遠只擷取「最新的 5 個月份」，並加入視覺化的質押增減「動態」判斷。
     """
-    # 支援 Parquet 與 CSV 雙軌讀取，並擴充檔名關鍵字
     search_patterns = [
         os.path.join(DATA_DIR, "*質押*.parquet"),
         os.path.join(DATA_DIR, "*董監*.parquet"),
@@ -249,6 +246,7 @@ def process_pledge_history_data(DATA_DIR):
         if df is not None and not df.empty:
             df.columns = [re.sub(r'[\s\n\r\t\u3000\ufeff]+', '', str(c)) for c in df.columns]
             df = df.loc[:, ~df.columns.duplicated()]            
+            
             c_code = next((c for c in df.columns if "代號" in c), None)
             c_name = next((c for c in df.columns if "名稱" in c), None)
             c_month = next((c for c in df.columns if "持股資料月份" in c), None)
@@ -279,7 +277,6 @@ def process_pledge_history_data(DATA_DIR):
     
     pivot_df = merged_df.pivot(index=["std_代號", "std_名稱"], columns="std_持股資料月份", values="std_質押比").reset_index()
     
-    # 動態抓出所有被轉成直欄的月份，並由新到舊排好 (reverse=True)
     month_cols = sorted([c for c in pivot_df.columns if c not in ["std_代號", "std_名稱"]], reverse=True)
     
     if not month_cols:
@@ -291,10 +288,8 @@ def process_pledge_history_data(DATA_DIR):
     # 動態計算與視覺化動態判斷
     if len(month_cols) >= 2:
         m1, m2 = month_cols[0], month_cols[1]
-        # 四捨五入到小數點第二位
         pivot_df['近月質押增減(%)'] = (pivot_df[m1] - pivot_df[m2]).round(2)
         
-        # 🎯 質押動態判斷引擎 (質押增加=危險/紅，減少=安全/綠)
         def get_pledge_trend(val):
             if pd.isna(val): return "無"
             if val >= 5.0: return "🚨 暴增"
@@ -307,13 +302,11 @@ def process_pledge_history_data(DATA_DIR):
             
         pivot_df['動態'] = pivot_df['近月質押增減(%)'].apply(get_pledge_trend)
         
-    # 動態重新命名
     rename_dict = {"std_代號": "代號", "std_名稱": "名稱"}
     for m in month_cols:
         rename_dict[m] = f"{m}質押%"
     pivot_df = pivot_df.rename(columns=rename_dict)
     
-    # 動態安排最終的表頭順序 (將動態安插在 名稱 與 增減 之間)
     final_cols = ["代號", "名稱"]
     if '動態' in pivot_df.columns:
         final_cols.append('動態')
@@ -323,10 +316,8 @@ def process_pledge_history_data(DATA_DIR):
     dynamic_pledge_cols = [f"{m}質押%" for m in month_cols]
     final_cols.extend(dynamic_pledge_cols)
     
-    # 篩選欄位，丟棄過舊的月份
     pivot_df = pivot_df[final_cols]
     
-    # 依照最新月份的質押比例由高至低排序
     if dynamic_pledge_cols:
         latest_col = dynamic_pledge_cols[0] 
         if latest_col in pivot_df.columns:
@@ -357,7 +348,7 @@ def render_b7_dashboard(df_pledge, df_history, df_b7):
 
     with tab1:
         if df_pledge.empty:
-            st.warning("⚠️ 找不到董監質押比資料，請確認 data 資料夾中存在相關 CSV 檔案。")
+            st.warning("⚠️ 找不到董監質押比資料，請確認 data 資料夾中存在相關 CSV 或 Parquet 檔案。")
         else:
             st.dataframe(df_pledge, use_container_width=True, hide_index=True)
             
@@ -378,7 +369,6 @@ def render_b7_dashboard(df_pledge, df_history, df_b7):
 # 🖼️ 前台畫面渲染 (三頁籤切換)
 # ==========================================
 def show_b7_page(DATA_DIR, STOCK_DICT):
-    # 💡 移除 spinner 避免載入時畫面往下擠壓閃爍，因為快取函數是瞬間完成的！
     if 'b7_main' not in st.session_state:
         sync_b7_data(DATA_DIR)
             
@@ -389,18 +379,9 @@ def show_b7_page(DATA_DIR, STOCK_DICT):
         sync_pledge_history_data(DATA_DIR)
             
     st.write("---")
-    st.markdown("<div id='section-7'></div>", unsafe_allow_html=True) 
-    st.markdown("""
-    <div style="background: linear-gradient(90deg, rgba(15,23,42,1) 0%, rgba(14,165,233,0.3) 50%, rgba(15,23,42,1) 100%); 
-                border-top: 1px solid #38bdf8; border-bottom: 1px solid #38bdf8; padding: 15px 20px; 
-                border-radius: 10px; text-align: center; box-shadow: 0px 0px 20px rgba(56, 189, 248, 0.2); margin-bottom: 20px;">
-        <h2 style="color: #e0f2fe; margin: 0; letter-spacing: 2px; text-shadow: 0 0 15px rgba(56, 189, 248, 0.8);">
-            董監事籌碼動向
-        </h2>
-    </div>
-    """, unsafe_allow_html=True)
+    st.markdown("", unsafe_allow_html=True)
+    st.markdown("""董監事籌碼動向""", unsafe_allow_html=True)
 
-    # 取出資料傳給 Fragment 渲染
     df_pledge = st.session_state.get('b7_pledge', pd.DataFrame())
     df_history = st.session_state.get('b7_pledge_history', pd.DataFrame())
     df_b7 = st.session_state.get('b7_main', pd.DataFrame())
