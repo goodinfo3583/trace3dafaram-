@@ -339,10 +339,11 @@ def render_sidebar_broker_tracking(query, display_name):
                     except: pass
                     return 'color: #94A3B8;'
                 
+                # '集中度(%)': "{:.2f}" 讓小數點強制鎖定在第二位
                 if hasattr(df_trend_disp.style, 'map'):
-                    styled_trend = df_trend_disp.style.map(color_trend, subset=['淨買超(張)', '集中度(%)']).format({'淨買超(張)': "{:,.0f}"})
+                    styled_trend = df_trend_disp.style.map(color_trend, subset=['淨買超(張)', '集中度(%)']).format({'淨買超(張)': "{:,.0f}", '集中度(%)': "{:.2f}"})
                 else:
-                    styled_trend = df_trend_disp.style.applymap(color_trend, subset=['淨買超(張)', '集中度(%)']).format({'淨買超(張)': "{:,.0f}"})
+                    styled_trend = df_trend_disp.style.applymap(color_trend, subset=['淨買超(張)', '集中度(%)']).format({'淨買超(張)': "{:,.0f}", '集中度(%)': "{:.2f}"})
                 
                 st.dataframe(styled_trend, use_container_width=True, hide_index=True)
             
