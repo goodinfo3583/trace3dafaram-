@@ -51,7 +51,7 @@ def render():
         new_hotkeys["NavToWatchlist"] = st.text_input("自選名單", value=reverse_map.get("NavToWatchlist", "Alt+L"), key="kb_wl")
         new_hotkeys["NavToWeightBacktest"] = st.text_input("籌碼過濾", value=reverse_map.get("NavToWeightBacktest", "Alt+Q"), key="kb_WeightBacktest")
         new_hotkeys["登入"] = st.text_input("登入", value=reverse_map.get("登入", "escape"), key="kb_login")
-        new_hotkeys["設置"] = st.text_input("設置", value=reverse_map.get("設置", "F12"), key="kb_set")
+        new_hotkeys["NavToSettings"] = st.text_input("設置", value=reverse_map.get("NavToSettings", "F12"), key="kb_set")
 
     st.markdown("<br>", unsafe_allow_html=True)
     

@@ -485,7 +485,7 @@ def inject_custom_header(is_logged_in=False):
     components.html(inject_js, height=0, width=0)
 
 # ================================
-# 以下代理按鈕區塊不變
+# 以下代理按鈕區塊不變 也對應快捷鍵setting
 # ================================
 def render_proxy_buttons():
     def change_page(page_name):
