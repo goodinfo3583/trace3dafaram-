@@ -11,7 +11,12 @@ def inject_custom_header(is_logged_in=False):
     default_hotkeys = {
         "f1": "NavToB1", "f2": "NavToB2", "f3": "NavToB3", 
         "f4": "NavToB4", "f5": "NavToB5", "f6": "NavToB6", "f7": "NavToB7",
-        "alt+l": "NavToWatchlist", "escape": "登入"
+        "alt+l": "NavToWatchlist", "escape": "登入",
+        "alt+p": "NavToSettings",         # 設置
+        "alt+q": "NavToWeightBacktest",   # 籌碼過濾
+        "alt+s": "NavToB0",               # 量價掃描 可自訂
+        "alt+b": "NavToBroker",           # 券商主力 可自訂
+        "alt+n": "NavToNews"              # 市場消息 可自訂
     }
     user_hotkeys = st.session_state.get('custom_hotkeys', default_hotkeys)
     hotkeys_json = json.dumps(user_hotkeys)
@@ -472,6 +477,18 @@ def inject_custom_header(is_logged_in=False):
                     if (targetBtn) targetBtn.click();
                 }
             });
+
+            // (7) 隱形斗篷：隱藏所有 Proxy 按鈕
+            setInterval(() => {
+                const allBtns = Array.from(document.querySelectorAll('button'));
+                allBtns.forEach(b => {
+                    const text = b.textContent.trim();
+                    if(text.includes('NavTo') || text === '登入' || text === '登出') { 
+                        const wrapper = b.closest('div[data-testid="stElementContainer"]');
+                        if (wrapper) wrapper.style.display = 'none';
+                    }
+                });
+            }, 100);
         `;
         // 把大腦 (Logic Script) 植入母體
         parentDoc.body.appendChild(logicScript);
