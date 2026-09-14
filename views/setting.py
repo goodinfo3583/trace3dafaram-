@@ -50,8 +50,11 @@ def render():
     with col2:   
         new_hotkeys["NavToWatchlist"] = st.text_input("自選名單", value=reverse_map.get("NavToWatchlist", "Alt+L"), key="kb_wl")
         new_hotkeys["NavToWeightBacktest"] = st.text_input("籌碼過濾", value=reverse_map.get("NavToWeightBacktest", "Alt+Q"), key="kb_WeightBacktest")
+        new_hotkeys["NavToB0"] = st.text_input("量價掃描", value=reverse_map.get("NavToB0", "Alt+S"), key="kb_kb0")
+        new_hotkeys["NavToBroker"] = st.text_input("券商主力", value=reverse_map.get("NavToBroker", "Alt+B"), key="kb_kbroker")
+        new_hotkeys["NavToNews"] = st.text_input("市場消息", value=reverse_map.get("NavToNews", "Alt+N"), key="kb_kbews")
         new_hotkeys["登入"] = st.text_input("登入", value=reverse_map.get("登入", "escape"), key="kb_login")
-        new_hotkeys["NavToSettings"] = st.text_input("設置", value=reverse_map.get("NavToSettings", "F12"), key="kb_set")
+        new_hotkeys["NavToSettings"] = st.text_input("設置", value=reverse_map.get("NavToSettings", "Alt+P"), key="kb_set")
 
     st.markdown("<br>", unsafe_allow_html=True)
     
