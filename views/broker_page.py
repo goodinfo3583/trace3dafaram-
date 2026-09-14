@@ -34,7 +34,7 @@ def render_broker_dashboard(target_stock, display_name, df_raw_all, df_trend):
         st.dataframe(df_trend_disp, use_container_width=True, hide_index=True)
 
     st.markdown("---")
-    st.subheader(f"🔍 {display_name} 券商分點明細與進出矩陣")
+    st.subheader(f"🔍 {display_name} 券商分點進出明細")
     
     stock_raw = df_raw_all[df_raw_all['stock_code'] == target_stock].copy()
     
@@ -50,7 +50,7 @@ def render_broker_dashboard(target_stock, display_name, df_raw_all, df_trend):
 
     available_dates = sorted(stock_raw['trade_date'].unique(), reverse=True)
     
-    tab1, tab2, tab3 = st.tabs(["🔹 單日進出明細", "🔹 區間囤貨追蹤 (近60日)", "🔹 歷史進出矩陣 (近30日)"])
+    tab1, tab2, tab3 = st.tabs(["🔹 單日進出明細", "🔹 區間囤貨 (近60日)", "🔹 歷史進出 (近30日)"])
     
     # --------- 標籤 1: 單日明細 ---------
     with tab1:
