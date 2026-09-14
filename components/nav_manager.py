@@ -253,28 +253,28 @@ def inject_custom_header(is_logged_in=False):
                         </div>
                         <div class="dropdown-item actionable">
                             <a href="#" data-target="NavToWeightBacktest" class="dropdown-title internal-nav">
-                                <img src="app/static/icon-chart-set-theory.png" class="menu-icon" alt="weight"> 籌碼過濾
+                                <img src="app/static/icon-chart-set-theory.png" class="menu-icon" alt="weight"> 籌碼過濾 <span style="color:#64748b; font-size:10px;">(Alt+Q)</span>
                                 <span style="color:#f20049; font-size:10px; margin-left: 5px; animation: pulse 2s infinite;">(HOT)</span>
                             </a>
                             <p class="dropdown-text">自訂計分籌碼權重與未來勝率回測模擬。</p>
                         </div>
                         <div class="dropdown-item actionable">
                             <a href="#" data-target="NavToB0" class="dropdown-title internal-nav">
-                                <img src="app/static/icon-stats.png" class="menu-icon" alt="b0"> 量價掃描
+                                <img src="app/static/icon-stats.png" class="menu-icon" alt="b0"> 量價掃描 <span style="color:#64748b; font-size:10px;">(Alt+S)</span>
                                 <span style="color:#FFD700; font-size:10px; margin-left: 5px; animation: pulse 2s infinite;">(NEW)</span>
                             </a>
                             <p class="dropdown-text">透視全市場資金動能與主力控盤狀態。</p>
                         </div>
                         <div class="dropdown-item actionable">
                             <a href="#" data-target="NavToBroker" class="dropdown-title internal-nav">
-                                <img src="app/static/icon-building.png" class="menu-icon" alt="broker"> 主力券商
+                                <img src="app/static/icon-building.png" class="menu-icon" alt="broker"> 主力券商 <span style="color:#64748b; font-size:10px;">(Alt+B)</span>
                                 <span style="color:#FFD700; font-size:10px; margin-left: 5px; animation: pulse 2s infinite;">(NEW)</span>
                             </a>
-                            <p class="dropdown-text">追蹤特定券商分點進出動向。</p>
+                            <p class="dropdown-text">追蹤券商TOP15分點進出動向及集中度。</p>
                         </div>
                         <div class="dropdown-item actionable">
                             <a href="#" data-target="NavToNews" class="dropdown-title internal-nav">
-                                <img src="app/static/icon-coffee-time.png" class="menu-icon" alt="news"> 市場消息
+                                <img src="app/static/icon-coffee-time.png" class="menu-icon" alt="news"> 市場消息 <span style="color:#64748b; font-size:10px;">(Alt+N)</span>
                             </a>
                             <p class="dropdown-text">掌握最新市場動態與總經快訊。</p>
                         </div>
