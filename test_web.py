@@ -40,7 +40,7 @@ from views.weight_backtest_page import show_weight_backtest_page
 # 1. 網頁基本設定 & 目錄路徑初始化
 # ==========================================
 st.set_page_config(page_title="股市派對-韭菜盒子", layout="wide")
-# 消除側邊欄重新讀取時的反黑閃爍(但沒有移除背景運算的問題)
+# 消除側邊欄重新讀取時的反黑閃爍(但沒有解決背景運算的問題)
 st.markdown(
     """
     <style>
