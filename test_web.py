@@ -40,6 +40,24 @@ from views.weight_backtest_page import show_weight_backtest_page
 # 1. 網頁基本設定 & 目錄路徑初始化
 # ==========================================
 st.set_page_config(page_title="股市派對-韭菜盒子", layout="wide")
+# 消除側邊欄重新讀取時的反黑閃爍(但沒有移除背景運算的問題)
+st.markdown(
+    """
+    <style>
+    /* 停止舊元件變暗 */
+    [data-testid="stStaleNode"] {
+        opacity: 1 !important;
+        transition: none !important;
+        filter: none !important;
+    }
+    /* 隱藏右上角一直轉圈圈的 Running 提示 (選用，讓畫面更乾淨) */
+    [data-testid="stStatusWidget"] {
+        visibility: hidden;
+    }
+    </style>
+    """,
+    unsafe_allow_html=True
+)
 # 集中所有路徑變數
 DATA_DIR = "./data"
 SCORE_HISTORY_DIR = os.path.join(DATA_DIR, "ScoreHistory")
