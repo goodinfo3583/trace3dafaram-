@@ -953,6 +953,56 @@ def get_img_html(filename, height="28px"):
             img_b64 = base64.b64encode(f.read()).decode("utf-8")
         return f'<img src="data:image/png;base64,{img_b64}" style="height: {height}; vertical-align: text-bottom; margin-right: 8px;">'
     return "" 
+# =======================================================
+# 🚀 效能優化快取區塊：將 Plotly 圖表繪製獨立出來並快取
+# =======================================================
+@st.cache_data(show_spinner=False, ttl=300)
+def create_b1_bar_chart(stock_name, clean_x_labels, y_vals):
+    fig = go.Figure()
+    fig.add_trace(go.Bar(
+        x=clean_x_labels, y=y_vals,  
+        marker_color=['#FF4B4B' if i == len(y_vals)-1 else '#4B8BFF' for i in range(len(y_vals))],
+        text=[f"{v}%" if v > 0 else "" for v in y_vals], textposition='outside'
+    ))
+    fig.update_layout(
+        title=dict(text=f"📈 持股波段真實軌跡 ({stock_name})", font=dict(color="#E2E8F0")),
+        height=300, template='plotly_dark', paper_bgcolor='rgba(0,0,0,0)', plot_bgcolor='rgba(0,0,0,0)',
+        margin=dict(l=20, r=20, t=40, b=20),
+        yaxis=dict(title="持股比例 (%)", showgrid=True, gridcolor='#334155'), xaxis=dict(tickangle=45), dragmode='pan'
+    )
+    return fig
+
+@st.cache_data(show_spinner=False, ttl=300)
+def create_b1_down_bar_chart(stock_name_down, clean_x_labels_down, y_vals_down):
+    fig = go.Figure()
+    fig.add_trace(go.Bar(
+        x=clean_x_labels_down, y=y_vals_down,
+        marker_color=['#00E676' if i == len(y_vals_down)-1 else '#0284C7' for i in range(len(y_vals_down))],
+        text=[f"{v}%" if v > 0 else "" for v in y_vals_down], textposition='outside'
+    ))
+    fig.update_layout(
+        title=dict(text=f"📉 衰退波段真實軌跡 ({stock_name_down})", font=dict(color="#E2E8F0")),
+        height=300, template='plotly_dark', paper_bgcolor='rgba(0,0,0,0)', plot_bgcolor='rgba(0,0,0,0)',
+        margin=dict(l=20, r=20, t=40, b=20),
+        yaxis=dict(title="持股比例 (%)", showgrid=True, gridcolor='#334155'), xaxis=dict(tickangle=45), dragmode='pan'
+    )
+    return fig
+
+@st.cache_data(show_spinner=False, ttl=300)
+def create_foreign_bar_chart(clean_x_for, y_vals_for):
+    fig = go.Figure()
+    fig.add_trace(go.Bar(
+        x=clean_x_for, y=y_vals_for,
+        marker_color='#38BDF8',
+        text=[f"{v}%" if v > 0 else "" for v in y_vals_for], textposition='outside'
+    ))
+    fig.update_layout(
+        title=dict(text=f"🌎 外資持股 20日軌跡", font=dict(color="#E2E8F0", size=13)),
+        height=250, template='plotly_dark', paper_bgcolor='rgba(0,0,0,0)', plot_bgcolor='rgba(0,0,0,0)',
+        margin=dict(l=20, r=20, t=30, b=20),
+        yaxis=dict(title="外資持股 (%)", showgrid=True, gridcolor='#334155'), xaxis=dict(tickangle=45), dragmode='pan'
+    )
+    return fig
 
 # =======================================================
 # 🚀 終極局部渲染魔法：將整個側邊視窗獨立為「不閃爍區塊」
@@ -1246,18 +1296,8 @@ def render_sidebar_war_room(STOCK_DICT, DATA_DIR="data"):
                                 try: y_vals.append(float(val))
                                 except: y_vals.append(0.0)
                                     
-                        fig_b1 = go.Figure()
-                        fig_b1.add_trace(go.Bar(
-                            x=clean_x_labels, y=y_vals,  
-                            marker_color=['#FF4B4B' if i == len(y_vals)-1 else '#4B8BFF' for i in range(len(y_vals))],
-                            text=[f"{v}%" if v > 0 else "" for v in y_vals], textposition='outside'
-                        ))
-                        fig_b1.update_layout(
-                            title=dict(text=f"📈 持股波段真實軌跡 ({stock_name})", font=dict(color="#E2E8F0")),
-                            height=300, template='plotly_dark', paper_bgcolor='rgba(0,0,0,0)', plot_bgcolor='rgba(0,0,0,0)',
-                            margin=dict(l=20, r=20, t=40, b=20),
-                            yaxis=dict(title="持股比例 (%)", showgrid=True, gridcolor='#334155'), xaxis=dict(tickangle=45), dragmode='pan'
-                        )
+                        # 配合快取
+                        fig_b1 = create_b1_bar_chart(stock_name, tuple(clean_x_labels), tuple(y_vals))
                         st.plotly_chart(fig_b1, use_container_width=True, config={'displayModeBar': False})
                 else: st.write("⚪ 未進榜")
             else: st.info("⚪ 尚未載入資料表")
@@ -1322,18 +1362,8 @@ def render_sidebar_war_room(STOCK_DICT, DATA_DIR="data"):
                                 try: y_vals_down.append(float(val))
                                 except: y_vals_down.append(0.0)
 
-                        fig_b1_down = go.Figure()
-                        fig_b1_down.add_trace(go.Bar(
-                            x=clean_x_labels_down, y=y_vals_down,
-                            marker_color=['#00E676' if i == len(y_vals_down)-1 else '#0284C7' for i in range(len(y_vals_down))],
-                            text=[f"{v}%" if v > 0 else "" for v in y_vals_down], textposition='outside'
-                        ))
-                        fig_b1_down.update_layout(
-                            title=dict(text=f"📉 衰退波段真實軌跡 ({stock_name_down})", font=dict(color="#E2E8F0")),
-                            height=300, template='plotly_dark', paper_bgcolor='rgba(0,0,0,0)', plot_bgcolor='rgba(0,0,0,0)',
-                            margin=dict(l=20, r=20, t=40, b=20),
-                            yaxis=dict(title="持股比例 (%)", showgrid=True, gridcolor='#334155'), xaxis=dict(tickangle=45), dragmode='pan'
-                        )
+                        # 配合快取
+                        fig_b1_down = create_b1_down_bar_chart(stock_name_down, tuple(clean_x_labels_down), tuple(y_vals_down))
                         st.plotly_chart(fig_b1_down, use_container_width=True, config={'displayModeBar': False})
                 else:st.write("⚪ 未進榜")
             else:st.info("⚪ 尚未載入資料表")
@@ -1372,18 +1402,8 @@ def render_sidebar_war_room(STOCK_DICT, DATA_DIR="data"):
                                 display_for_df = pd.DataFrame(display_for_dict)
                                 st.dataframe(display_for_df, use_container_width=True, hide_index=True)
                                         
-                            fig_for = go.Figure()
-                            fig_for.add_trace(go.Bar(
-                                x=clean_x_for[::-1], y=y_vals_for[::-1],
-                                marker_color='#38BDF8',
-                                text=[f"{v}%" if v > 0 else "" for v in y_vals_for[::-1]], textposition='outside'
-                            ))
-                            fig_for.update_layout(
-                                title=dict(text=f"🌎 外資持股 20日軌跡", font=dict(color="#E2E8F0", size=13)),
-                                height=250, template='plotly_dark', paper_bgcolor='rgba(0,0,0,0)', plot_bgcolor='rgba(0,0,0,0)',
-                                margin=dict(l=20, r=20, t=30, b=20),
-                                yaxis=dict(title="外資持股 (%)", showgrid=True, gridcolor='#334155'), xaxis=dict(tickangle=45), dragmode='pan'
-                            )
+                            # 配合快取
+                            fig_for = create_foreign_bar_chart(tuple(clean_x_for[::-1]), tuple(y_vals_for[::-1]))
                             st.plotly_chart(fig_for, use_container_width=True, config={'displayModeBar': False})
                         else:
                             st.write("⚪ 尚無外資軌跡資料")
