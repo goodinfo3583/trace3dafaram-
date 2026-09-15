@@ -345,7 +345,10 @@ def render(STOCK_DICT=None):
                         
                         if scan_mode == "依日連買排行":
                             # === 日連買全市場運算 ===
-                            all_dates = sorted(scan_df['trade_date'].unique(), reverse=True)
+                            # 💡 修正 1：過濾空值並確保全部轉為字串後再排序，避免 TypeError
+                            valid_dates = scan_df['trade_date'].dropna().astype(str).unique()
+                            all_dates = sorted(valid_dates, reverse=True)
+                            
                             scan_pivot = scan_df.pivot_table(
                                 index=['stock_code', broker_col], 
                                 columns='trade_date', 
@@ -366,7 +369,9 @@ def render(STOCK_DICT=None):
                             
                             # 過濾出有連買的，並計算區間總量
                             result_df = scan_pivot[scan_pivot['連買日數'] >= 2].copy() # 至少連買2日才進榜
-                            result_df['近期買超總張數'] = result_df[all_dates[:20]].sum(axis=1) # 近20日總吃貨量
+                            # 只取 all_dates 裡面有存在於 columns 的部分來加總
+                            valid_sum_cols = [c for c in all_dates[:20] if c in result_df.columns]
+                            result_df['近期買超總張數'] = result_df[valid_sum_cols].sum(axis=1) # 近20日總吃貨量
                             
                             # 整理欄位與排序
                             result_df = result_df.reset_index().sort_values(['連買日數', '近期買超總張數'], ascending=[False, False])
@@ -374,9 +379,13 @@ def render(STOCK_DICT=None):
                             
                         else:
                             # === 週連買全市場運算 ===
-                            scan_df['date_dt'] = pd.to_datetime(scan_df['trade_date'])
-                            scan_df['year_week'] = scan_df['date_dt'].dt.strftime('%Y-%W')
-                            weekly_sum = scan_df.groupby(['stock_code', broker_col, 'year_week'])['signed_vol'].sum().unstack(fill_value=0)
+                            # 過濾無效日期
+                            scan_df_clean = scan_df.dropna(subset=['trade_date']).copy()
+                            scan_df_clean['date_dt'] = pd.to_datetime(scan_df_clean['trade_date'], errors='coerce')
+                            scan_df_clean = scan_df_clean.dropna(subset=['date_dt'])
+                            
+                            scan_df_clean['year_week'] = scan_df_clean['date_dt'].dt.strftime('%Y-%W')
+                            weekly_sum = scan_df_clean.groupby(['stock_code', broker_col, 'year_week'])['signed_vol'].sum().unstack(fill_value=0)
                             all_weeks = sorted(weekly_sum.columns, reverse=True)
                             
                             def calc_global_weekly_streak(row):
@@ -392,28 +401,30 @@ def render(STOCK_DICT=None):
                             
                             # 過濾並計算區間總量
                             result_df = weekly_sum[weekly_sum['連買週數'] >= 2].copy() # 至少連買2週
-                            result_df['近期買超總張數'] = result_df[all_weeks[:4]].sum(axis=1) # 近4週總吃貨量
+                            valid_sum_weeks = [c for c in all_weeks[:4] if c in result_df.columns]
+                            result_df['近期買超總張數'] = result_df[valid_sum_weeks].sum(axis=1) # 近4週總吃貨量
                             
                             result_df = result_df.reset_index().sort_values(['連買週數', '近期買超總張數'], ascending=[False, False])
                             result_df = result_df[['stock_code', broker_col, '連買週數', '近期買超總張數']]
 
                         # --- 映射股票名稱 ---
                         if STOCK_DICT:
-                            result_df['股票名稱'] = result_df['stock_code'].apply(
-                                lambda x: STOCK_DICT.get(str(x), {}).get('name', '-')
+                            result_df['股票名稱'] = result_df['stock_code'].astype(str).apply(
+                                lambda x: STOCK_DICT.get(x, {}).get('name', '-')
                             )
                             # 把名稱移到代號旁邊
-                            cols = result_df.columns.tolist()
-                            cols.insert(1, cols.pop(cols.index('股票名稱')))
-                            result_df = result_df[cols]
+                            if '股票名稱' in result_df.columns:
+                                cols = result_df.columns.tolist()
+                                cols.insert(1, cols.pop(cols.index('股票名稱')))
+                                result_df = result_df[cols]
                         
                         # 改中文欄位名稱
                         result_df.rename(columns={'stock_code': '股票代號', broker_col: '券商分點'}, inplace=True)
                         
                         if not result_df.empty:
                             st.success(f"🎯 掃描完成！共發現 {len(result_df)} 組主力連買特徵。")
-                            # 美化數字顯示
-                            styled_res = result_df.head(100).style.format({'近期買超總張數': "{:,.0f}"}).background_gradient(cmap='Reds', subset=[result_df.columns[3]])
+                            # 💡 修正 2：移除 background_gradient 避免沒有 matplotlib 的環境報錯
+                            styled_res = result_df.head(100).style.format({'近期買超總張數': "{:,.0f}"})
                             st.dataframe(styled_res, use_container_width=True, hide_index=True)
                         else:
                             st.info("目前市場上無明顯的連續買超分點特徵。")
