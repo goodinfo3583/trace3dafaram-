@@ -23,9 +23,8 @@ def render_broker_dashboard(target_stock, display_name, df_raw_all, df_trend):
         value=f"{latest_data['concentration_%']}%",
         delta=f"淨買超 {latest_data['net_buy']:,} 張"
     )
-    
-import plotly.graph_objects as go
-    
+    #集中度繪圖    
+    import plotly.graph_objects as go
     st.subheader(f"📊 {display_name} 分點集中度連續性走勢")
     
     # 處理短日期 (只留 月-日)
