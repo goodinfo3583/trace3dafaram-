@@ -1111,16 +1111,16 @@ def render_sidebar_war_room(STOCK_DICT, DATA_DIR="data"):
             # ==========================================
             new_ai_msgs = []
             if pure_stock_id:
-                with st.spinner("🧠 AI 雷達掃描中..."):
-                    df_tech = fetch_yfinance_data(f"{pure_stock_id}.TW", period="1y")
-                    if df_tech is None or df_tech.empty:
-                        df_tech = fetch_yfinance_data(f"{pure_stock_id}.TWO", period="1y")
+                
+                df_tech = fetch_yfinance_data(f"{pure_stock_id}.TW", period="1y")
+                if df_tech is None or df_tech.empty:
+                    df_tech = fetch_yfinance_data(f"{pure_stock_id}.TWO", period="1y")
                     
-                    if df_tech is not None and not df_tech.empty:
-                        if isinstance(df_tech.columns, pd.MultiIndex):
-                            df_tech.columns = df_tech.columns.get_level_values(0)
-                        df_tech = df_tech.loc[:, ~df_tech.columns.duplicated()]
-                        new_ai_msgs = generate_technical_signals(df_tech)
+                if df_tech is not None and not df_tech.empty:
+                    if isinstance(df_tech.columns, pd.MultiIndex):
+                        df_tech.columns = df_tech.columns.get_level_values(0)
+                    df_tech = df_tech.loc[:, ~df_tech.columns.duplicated()]
+                    new_ai_msgs = generate_technical_signals(df_tech)
 
             if new_ai_msgs:
                 signal_html = "<div style='background-color: rgba(0, 210, 255, 0.05); border-left: 4px solid #00D2FF; padding: 12px; border-radius: 5px; margin: 10px 0px;'>"
@@ -1154,9 +1154,9 @@ def render_sidebar_war_room(STOCK_DICT, DATA_DIR="data"):
                     chk_rsi = ind_c3.checkbox("顯示 RSI (14)", value=False, key="rsi_chk")
                     st.write("") 
                     
-                    with st.spinner(f"正在擷取 {pure_stock_id} 的最新數據..."):
-                        all_mas = ["5MA", "10MA", "20MA", "60MA", "120MA", "240MA"]
-                        render_technical_chart(pure_stock_id, kline_period, all_mas, chk_rsi, chk_macd, chk_kd)
+                    #with st.spinner(f"正在擷取 {pure_stock_id} 的最新數據..."):
+                    all_mas = ["5MA", "10MA", "20MA", "60MA", "120MA", "240MA"]
+                    render_technical_chart(pure_stock_id, kline_period, all_mas, chk_rsi, chk_macd, chk_kd)
                 else:
                     st.warning("⚠️ 技術 K 線圖目前僅支援代號查詢。")
 

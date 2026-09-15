@@ -80,9 +80,39 @@ if 'b4_squeeze_radar' not in st.session_state:
     sync_b4_data(DATA_DIR)
 if 'b5_1000' not in st.session_state:
     sync_b5_data(DATA_DIR)
+
 # 呼叫渲染視覺元件 components
 style_manager.apply_global_theme()
-is_perf_mode = st.session_state.get('performance_mode', False)# 新增：判斷是否開啟效能模式
+
+# 👇 確保放在 style_manager 之後，給予最高權重覆蓋！
+st.markdown(
+    """
+    <style>
+    /* 強制關閉所有舊元素的半透明/變暗特效 */
+    [data-testid="stStaleNode"], 
+    div[data-testid="stStaleNode"] > * {
+        opacity: 1 !important;
+        filter: none !important;
+        transition: none !important;
+        pointer-events: auto !important;
+    }
+    
+    /* 隱藏右上角的 Running 人性化轉圈圈 */
+    [data-testid="stStatusWidget"] {
+        display: none !important;
+    }
+    
+    /* 隱藏底層可能的骨架加載動畫 (Skeleton) */
+    .stSkeleton {
+        display: none !important;
+    }
+    </style>
+    """,
+    unsafe_allow_html=True
+)
+
+is_perf_mode = st.session_state.get('performance_mode', False)
+
 # 只有在「未開啟」效能模式時，才渲染這些高負載的動畫與卡片
 
 if not is_perf_mode:
