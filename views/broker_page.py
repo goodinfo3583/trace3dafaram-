@@ -226,6 +226,38 @@ def render_broker_dashboard(target_stock, display_name, df_raw_all, df_trend):
             
             cols = ['日連買動態', '週連買動態', '區間累計'] + display_dates
             pivot_df = pivot_df[cols]
+
+            #
+            # 👇 新增：加入排序過濾篩選器
+            sort_option = st.radio(
+                "🔍 矩陣排序依據：", 
+                ["依區間累計 (預設)", "🏆 依連買日數排序", "🏆 依連買週數排序"], 
+                horizontal=True,
+                key=f"sort_radio_{target_stock}"
+            )
+            
+            # 建立文字解析函數，把 "連買 5 日" 轉成數字 5 來排序
+            def extract_streak_num(val):
+                if isinstance(val, str) and "連買" in val:
+                    try:
+                        # 擷取出裡面的數字
+                        return int(''.join(filter(str.isdigit, val)))
+                    except: return 0
+                return 0
+
+            # 依據選擇重新排序 pivot_df
+            if sort_option == "🏆 依連買日數排序":
+                pivot_df['sort_key'] = pivot_df['日連買動態'].apply(extract_streak_num)
+                # 遇到連買天數相同時，再依區間累計金額(張數)當作第二排序
+                pivot_df = pivot_df.sort_values(['sort_key', '區間累計'], ascending=[False, False]).drop(columns=['sort_key'])
+            
+            elif sort_option == "🏆 依連買週數排序":
+                pivot_df['sort_key'] = pivot_df['週連買動態'].apply(extract_streak_num)
+                pivot_df = pivot_df.sort_values(['sort_key', '區間累計'], ascending=[False, False]).drop(columns=['sort_key'])
+            
+            # 預設就是依區間累計排序，所以不用特別寫 else
+            # 👆 新增結束
+            #
             
             def color_net_vol(val):
                 if isinstance(val, str):
@@ -271,7 +303,7 @@ def render(STOCK_DICT=None):
     
     default_index = 0
     for idx, opt in enumerate(stock_options):
-        if opt.startswith("1709"):
+        if opt.startswith("2354"):
             default_index = idx + 1
             break
 
