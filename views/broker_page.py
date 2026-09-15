@@ -302,10 +302,10 @@ def render(STOCK_DICT=None):
         stock_options = sorted(list(unique_options))
     
     default_index = 0
-    for idx, opt in enumerate(stock_options):
-        if opt.startswith("2354"):
-            default_index = idx + 1
-            break
+    #for idx, opt in enumerate(stock_options):
+        #if opt.startswith("2354"):
+            #default_index = idx + 1
+            #break
 
     col1, col2 = st.columns([3, 1])
     with col1:
