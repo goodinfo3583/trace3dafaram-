@@ -24,8 +24,43 @@ def render_broker_dashboard(target_stock, display_name, df_raw_all, df_trend):
         delta=f"淨買超 {latest_data['net_buy']:,} 張"
     )
     
+import plotly.graph_objects as go
+    
     st.subheader(f"📊 {display_name} 分點集中度連續性走勢")
-    st.bar_chart(df_trend, x="trade_date", y="concentration_%")
+    
+    # 處理短日期 (只留 月-日)
+    df_trend_plot = df_trend.copy()
+    df_trend_plot['trade_date_short'] = pd.to_datetime(df_trend_plot['trade_date']).dt.strftime('%m-%d')
+    
+    fig_trend = go.Figure()
+    
+    # 根據正負值設定紅綠顏色
+    colors = ['#FF4B4B' if val > 0 else '#00E272' for val in df_trend_plot['concentration_%']]
+    
+    fig_trend.add_trace(go.Bar(
+        x=df_trend_plot['trade_date_short'], 
+        y=df_trend_plot['concentration_%'],
+        marker_color=colors,
+        text=[f"{v:.1f}%" if abs(v)>0 else "" for v in df_trend_plot['concentration_%']],
+        textposition='outside',
+        textfont=dict(size=10, color="#E2E8F0")
+    ))
+    
+    # 💡 畫上數值為 0 的黃色基準線
+    fig_trend.add_hline(y=0, line_color="#FFD700", line_width=1.5, line_dash="dash")
+    
+    fig_trend.update_layout(
+        height=320, 
+        template='plotly_dark', 
+        paper_bgcolor='rgba(0,0,0,0)', 
+        plot_bgcolor='rgba(0,0,0,0)',
+        margin=dict(l=20, r=20, t=20, b=20),
+        yaxis=dict(title="集中度 (%)", showgrid=True, gridcolor='#334155'),
+        xaxis=dict(type='category', tickangle=45), # category 確保字串日期不會亂跳
+        dragmode='pan'
+    )
+    
+    st.plotly_chart(fig_trend, use_container_width=True, config={'displayModeBar': False})
     
     with st.expander("📅 展開查看：近 60 日集中度與淨買超歷史表", expanded=False):
         df_trend_disp = df_trend.sort_values('trade_date', ascending=False).head(60).copy()
