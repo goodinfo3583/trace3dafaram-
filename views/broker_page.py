@@ -315,7 +315,111 @@ def render(STOCK_DICT=None):
             index=default_index,
             key="broker_search_input"
         )
+    # ==========================================
+    # 🌟 新增：全市場分點連買掃描器 (隱藏在折疊面板中，避免佔用平時空間)
+    # ==========================================
+    remote_csv_url = "https://raw.githubusercontent.com/goodinfo3583/tw-broker-data/main/data/broker/broker_history.csv"
     
+    with st.expander("🌍 全市場連買分點快搜 (尋找主力連續吃貨標的)", expanded=False):
+        st.markdown("此功能將掃描資料庫中所有股票，找出當前處於「連續買超」狀態的最高天數/週數分點。", unsafe_allow_html=True)
+
+        scan_mode = st.radio(
+        "請選擇全市場排行方式：", 
+        ["依日連買排行", "依週連買排行"], 
+        horizontal=True,
+        key="global_broker_scan_radio"
+        )
+        
+        if st.button("🚀 開始全市場掃描", use_container_width=True, type="primary"):
+            with st.spinner("正在進行全市場矩陣運算，請稍候..."):
+                df_raw_all = load_raw_broker_history(remote_csv_url)
+                
+                if not df_raw_all.empty:
+                    broker_col = next((c for c in ['broker', 'broker_name', '券商名稱', '券商', 'name'] if c in df_raw_all.columns), None)
+                    if broker_col:
+                        # 將買賣轉為正負淨量
+                        scan_df = df_raw_all.copy()
+                        scan_df['signed_vol'] = scan_df.apply(
+                            lambda x: abs(x['net_vol']) if x['side'] == 'buy' else -abs(x['net_vol']), axis=1
+                        )
+                        
+                        if scan_mode == "依日連買排行":
+                            # === 日連買全市場運算 ===
+                            all_dates = sorted(scan_df['trade_date'].unique(), reverse=True)
+                            scan_pivot = scan_df.pivot_table(
+                                index=['stock_code', broker_col], 
+                                columns='trade_date', 
+                                values='signed_vol', 
+                                aggfunc='sum'
+                            )
+                            
+                            def calc_global_daily_streak(row):
+                                streak = 0
+                                for c in all_dates:
+                                    val = row.get(c, 0)
+                                    if pd.isna(val) or val <= 0: # 只要沒進榜或沒買就中斷
+                                        break
+                                    streak += 1
+                                return streak
+                                
+                            scan_pivot['連買日數'] = scan_pivot.apply(calc_global_daily_streak, axis=1)
+                            
+                            # 過濾出有連買的，並計算區間總量
+                            result_df = scan_pivot[scan_pivot['連買日數'] >= 2].copy() # 至少連買2日才進榜
+                            result_df['近期買超總張數'] = result_df[all_dates[:20]].sum(axis=1) # 近20日總吃貨量
+                            
+                            # 整理欄位與排序
+                            result_df = result_df.reset_index().sort_values(['連買日數', '近期買超總張數'], ascending=[False, False])
+                            result_df = result_df[['stock_code', broker_col, '連買日數', '近期買超總張數']]
+                            
+                        else:
+                            # === 週連買全市場運算 ===
+                            scan_df['date_dt'] = pd.to_datetime(scan_df['trade_date'])
+                            scan_df['year_week'] = scan_df['date_dt'].dt.strftime('%Y-%W')
+                            weekly_sum = scan_df.groupby(['stock_code', broker_col, 'year_week'])['signed_vol'].sum().unstack(fill_value=0)
+                            all_weeks = sorted(weekly_sum.columns, reverse=True)
+                            
+                            def calc_global_weekly_streak(row):
+                                streak = 0
+                                for c in all_weeks:
+                                    val = row.get(c, 0)
+                                    if pd.isna(val) or val <= 0:
+                                        break
+                                    streak += 1
+                                return streak
+                                
+                            weekly_sum['連買週數'] = weekly_sum.apply(calc_global_weekly_streak, axis=1)
+                            
+                            # 過濾並計算區間總量
+                            result_df = weekly_sum[weekly_sum['連買週數'] >= 2].copy() # 至少連買2週
+                            result_df['近期買超總張數'] = result_df[all_weeks[:4]].sum(axis=1) # 近4週總吃貨量
+                            
+                            result_df = result_df.reset_index().sort_values(['連買週數', '近期買超總張數'], ascending=[False, False])
+                            result_df = result_df[['stock_code', broker_col, '連買週數', '近期買超總張數']]
+
+                        # --- 映射股票名稱 ---
+                        if STOCK_DICT:
+                            result_df['股票名稱'] = result_df['stock_code'].apply(
+                                lambda x: STOCK_DICT.get(str(x), {}).get('name', '-')
+                            )
+                            # 把名稱移到代號旁邊
+                            cols = result_df.columns.tolist()
+                            cols.insert(1, cols.pop(cols.index('股票名稱')))
+                            result_df = result_df[cols]
+                        
+                        # 改中文欄位名稱
+                        result_df.rename(columns={'stock_code': '股票代號', broker_col: '券商分點'}, inplace=True)
+                        
+                        if not result_df.empty:
+                            st.success(f"🎯 掃描完成！共發現 {len(result_df)} 組主力連買特徵。")
+                            # 美化數字顯示
+                            styled_res = result_df.head(100).style.format({'近期買超總張數': "{:,.0f}"}).background_gradient(cmap='Reds', subset=[result_df.columns[3]])
+                            st.dataframe(styled_res, use_container_width=True, hide_index=True)
+                        else:
+                            st.info("目前市場上無明顯的連續買超分點特徵。")
+    # ==========================================
+
+          
     if selected_stock_str:
         target_stock = selected_stock_str.split(" ")[0].strip()
         display_name = selected_stock_str
