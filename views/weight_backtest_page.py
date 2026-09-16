@@ -67,7 +67,7 @@ KEY_MAP = {
     'b6_hist': ['b6_hist', 'b6_hist_matrix'],     
     'b7_main': ['b7_main', 'df_blk7_main', 'df_b7_main'],
     'b7_pledge': ['b7_pledge', 'df_pledge', 'df_b7_pledge'],
-    'b7_pledge_history': ['b7_pledge_history', 'df_pledge_history', 'df_b7_pledge_history']
+    'b7_pledge_history': ['b7_pledge_history', 'df_pledge_history', 'df_b7_pledge_history'],
     'b8_summary': ['b8_summary_df']
 }
 
