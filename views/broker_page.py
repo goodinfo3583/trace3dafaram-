@@ -157,7 +157,7 @@ def render_broker_dashboard(target_stock, display_name, df_raw_all, df_trend):
                 st.write("區間內無明顯囤貨分點")
                 
         with col_dump:
-            st.markdown("##### 📉 近 60 日倒貨分點 (全榜)")
+            st.markdown("##### 📉 近 60 日倒貨分點 ")
             dumpers = hoard_df[hoard_df['區間淨買賣'] < 0].sort_values('區間淨買賣', ascending=True).copy()
             if not dumpers.empty:
                 dumpers['區間淨買賣'] = dumpers['區間淨買賣'].abs()
@@ -173,7 +173,7 @@ def render_broker_dashboard(target_stock, display_name, df_raw_all, df_trend):
 
     # --------- 標籤 3: 歷史進出矩陣 (近30日) ---------
     with tab3:
-        st.markdown("##### 🗺️ 分點淨買賣力道矩陣")
+        st.markdown("##### 🗺️ 分點淨買賣力道")
         st.write("橫列為各分點，縱欄顯示**近 30 個交易日**。但「動態連買/連賣」是往前回溯**所有歷史資料**統計而成。")
         st.write("若表格顯示「-」代表當日該分點**未進榜 (前15大)**，中斷則重新計算天數。")
         
@@ -264,8 +264,8 @@ def render_broker_dashboard(target_stock, display_name, df_raw_all, df_trend):
             #
             # 👇 新增：加入排序過濾篩選器
             sort_option = st.radio(
-                "🔍 矩陣排序依據：", 
-                ["依區間累計 (預設)", "🏆 依連買日數排序", "🏆 依連買週數排序"], 
+                "🔍 排序依據：", 
+                ["依區間累計排序(預設)", "依連買日數排序", "依連買週數排序"], 
                 horizontal=True,
                 key=f"sort_radio_{target_stock}"
             )
@@ -280,12 +280,12 @@ def render_broker_dashboard(target_stock, display_name, df_raw_all, df_trend):
                 return 0
 
             # 依據選擇重新排序 pivot_df
-            if sort_option == "🏆 依連買日數排序":
+            if sort_option == "依連買日數排序":
                 pivot_df['sort_key'] = pivot_df['日連買動態'].apply(extract_streak_num)
                 # 遇到連買天數相同時，再依區間累計金額(張數)當作第二排序
                 pivot_df = pivot_df.sort_values(['sort_key', '區間累計'], ascending=[False, False]).drop(columns=['sort_key'])
             
-            elif sort_option == "🏆 依連買週數排序":
+            elif sort_option == "依連買週數排序":
                 pivot_df['sort_key'] = pivot_df['週連買動態'].apply(extract_streak_num)
                 pivot_df = pivot_df.sort_values(['sort_key', '區間累計'], ascending=[False, False]).drop(columns=['sort_key'])
             
@@ -312,7 +312,7 @@ def render_broker_dashboard(target_stock, display_name, df_raw_all, df_trend):
             
             st.dataframe(styled_pivot, use_container_width=True)
         else:
-            st.write("無足夠資料產生矩陣")
+            st.write("無足夠資料產出")
 
 # ==========================================
 # 🖼️ 主渲染入口
@@ -328,7 +328,7 @@ def render(STOCK_DICT=None):
     </div>
     """, unsafe_allow_html=True)
 
-    st.markdown("觀察前 15 大分點買賣力道相抵後的淨流向，追蹤籌碼集中度連續性與券商進出矩陣。(8/25新增功能及數據")
+    st.markdown("觀察前 15 大分點買賣力道相抵後的淨流向，追蹤籌碼集中度連續性與券商進出。(8/25新增功能及數據")
     
     stock_options = []
     if STOCK_DICT:
@@ -367,7 +367,7 @@ def render(STOCK_DICT=None):
         c_scan, c_clear = st.columns([3, 1])
         with c_scan:
             if st.button("🚀 開始全市場掃描", use_container_width=True, type="primary"):
-                with st.spinner("正在進行全市場矩陣運算，請稍候..."):
+                with st.spinner("正在進行市場運算，請稍候..."):
                     df_raw_all = load_raw_broker_history(remote_csv_url)
                     
                     if not df_raw_all.empty:
