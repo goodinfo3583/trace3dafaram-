@@ -12,7 +12,78 @@ def load_raw_broker_history(url):
     except Exception as e:
         st.error(f"載入原始明細失敗: {e}")
         return pd.DataFrame()
+    
+def sync_b8_data():
+    """在背景預先計算好全市場的 B8 券商連買狀態並存入 session_state"""
+    if 'b8_summary_df' in st.session_state:
+        return # 如果已經載入過就跳過，節省效能
 
+    remote_csv_url = "https://raw.githubusercontent.com/goodinfo3583/tw-broker-data/main/data/broker/broker_history.csv"
+    try:
+        df_raw = load_raw_broker_history(remote_csv_url) # 使用你原本寫好的快取讀取函數
+        if df_raw.empty: return
+
+        broker_col = next((c for c in ['broker', 'broker_name', '券商名稱', '券商', 'name'] if c in df_raw.columns), None)
+        if not broker_col: return
+
+        df_raw['signed_vol'] = df_raw.apply(
+            lambda x: abs(x['net_vol']) if x['side'] == 'buy' else -abs(x['net_vol']), axis=1
+        )
+
+        valid_dates = df_raw['trade_date'].dropna().astype(str).unique()
+        all_dates = sorted(valid_dates, reverse=True)
+        latest_date = all_dates[0] if all_dates else "未知日期"
+
+        # 1. 計算日連買與近期張數
+        scan_pivot = df_raw.pivot_table(index=['stock_code', broker_col], columns='trade_date', values='signed_vol', aggfunc='sum')
+        def calc_daily(row):
+            streak = 0
+            for c in all_dates:
+                val = row.get(c, 0)
+                if pd.isna(val) or val <= 0: break
+                streak += 1
+            return streak
+        scan_pivot['連買日數'] = scan_pivot.apply(calc_daily, axis=1)
+        
+        valid_sum_cols = [c for c in all_dates[:20] if c in scan_pivot.columns]
+        scan_pivot['近期買超總張數'] = scan_pivot[valid_sum_cols].sum(axis=1)
+
+        # 2. 計算週連買
+        df_week = df_raw.dropna(subset=['trade_date']).copy()
+        df_week['date_dt'] = pd.to_datetime(df_week['trade_date'], errors='coerce')
+        df_week = df_week.dropna(subset=['date_dt'])
+        df_week['year_week'] = df_week['date_dt'].dt.strftime('%Y-%W')
+        weekly_sum = df_week.groupby(['stock_code', broker_col, 'year_week'])['signed_vol'].sum().unstack(fill_value=0)
+        all_weeks = sorted(weekly_sum.columns, reverse=True)
+        
+        def calc_weekly(row):
+            streak = 0
+            for c in all_weeks:
+                val = row.get(c, 0)
+                if pd.isna(val) or val <= 0: break
+                streak += 1
+            return streak
+        weekly_sum['連買週數'] = weekly_sum.apply(calc_weekly, axis=1)
+
+        # 3. 合併並找出「各檔股票」的最佳分點特徵 (取 Max)
+        df_day = scan_pivot.reset_index()[['stock_code', broker_col, '連買日數', '近期買超總張數']]
+        df_wk = weekly_sum.reset_index()[['stock_code', broker_col, '連買週數']]
+        
+        final_b8 = pd.merge(df_day, df_wk, on=['stock_code', broker_col], how='outer').fillna(0)
+        
+        stock_summary = final_b8.groupby('stock_code').agg({
+            '連買日數': 'max',
+            '連買週數': 'max',
+            '近期買超總張數': 'max'
+        }).reset_index().rename(columns={'stock_code': '統一代號'})
+
+        # 存入全域變數
+        st.session_state['b8_summary_df'] = stock_summary
+        st.session_state['b8_latest_date'] = latest_date
+
+    except Exception as e:
+        print(f"B8 背景載入失敗: {e}")
+        
 # 💡 效能救星 2：將所有圖表與選項封裝在 Fragment 內，避免切換日期時整頁重整
 @st.fragment
 def render_broker_dashboard(target_stock, display_name, df_raw_all, df_trend):
