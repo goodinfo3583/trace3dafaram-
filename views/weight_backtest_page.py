@@ -525,6 +525,11 @@ def show_weight_backtest_page(STOCK_DICT, DATA_DIR="data"):
             st.session_state['filter_b7_pledge_trend'] = []
             st.session_state['filter_b7_6m_inc'] = False
 
+            # B8 券商主力
+            st.session_state['filter_b8_day_streak'] = 0
+            st.session_state['filter_b8_week_streak'] = 0
+            st.session_state['filter_b8_buy_vol_min'] = 0
+
         st.button("清空過濾條件", icon=":material/ink_eraser:", on_click=reset_filters, use_container_width=True)
 
     filtered_df = base_df.copy()
@@ -809,7 +814,19 @@ def show_weight_backtest_page(STOCK_DICT, DATA_DIR="data"):
 
         st.markdown("**🔹 3. 波段持股過濾**")
         b7_6m_inc = st.checkbox("🎯 近半年董監波段持股增加 (> 0)", key="filter_b7_6m_inc")
-        
+
+
+    # 👇 B8 展開面板
+    b8_latest_date_str = "最新交易日" # 後續第二步載入資料時會動態更新這個日期
+    with st.expander(f"🏢 B8 券商主力過濾 (資料基準日: {b8_latest_date_str})", expanded=False):
+        st.markdown("**🔹 1. 分點連續買超天數/週數**")
+        st.caption("過濾出全市場中，有特定券商分點正在「連續吃貨」的標的。")
+        c_b8_1, c_b8_2 = st.columns(2)
+        b8_day_streak = c_b8_1.number_input("🔴 特定分點日連買大於等於 (天)：", min_value=0, value=0, step=1, key="filter_b8_day_streak", help="設定 0 代表不限制。設定 3 代表至少有一家分點連買 3 天。")
+        b8_week_streak = c_b8_2.number_input("🔵 特定分點週連買大於等於 (週)：", min_value=0, value=0, step=1, key="filter_b8_week_streak", help="設定 0 代表不限制。")
+
+        st.markdown("**🔹 2. 區間囤貨量過濾**")
+        b8_buy_vol_min = st.number_input("📦 該分點近期買超總張數大於 (張)：", min_value=0, value=0, step=100, key="filter_b8_buy_vol_min", help="配合上方的連買條件，過濾出不僅連買，且囤貨達一定張數的主力。")
     # ==========================================
     # 執行過濾邏輯
     # ==========================================
