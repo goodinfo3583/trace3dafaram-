@@ -841,7 +841,7 @@ def show_weight_backtest_page(STOCK_DICT, DATA_DIR="data"):
 
 
     # 👇 B8 展開面板
-    b8_latest_date_str = st.session_state.get('b8_latest_date', '最新交易日') # 後續第二步載入資料時會動態更新這個日期
+    latest_date_str = st.session_state.get('b8_latest_date', '最新交易日').replace('-', '/') # 後續第二步載入資料時會動態更新這個日期
     with st.expander(f"🏢 B8 券商主力過濾 (資料基準日: {b8_latest_date_str})", expanded=False):
         st.markdown("**🔹 1. 分點連續買超天數/週數**")
         st.caption("過濾出全市場中，有特定券商分點正在「連續吃貨」的標的。")
