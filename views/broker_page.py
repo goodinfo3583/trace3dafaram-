@@ -26,9 +26,9 @@ def sync_b8_data():
         broker_col = next((c for c in ['broker', 'broker_name', '券商名稱', '券商', 'name'] if c in df_raw.columns), None)
         if not broker_col: return
 
-        df_raw['signed_vol'] = df_raw.apply(
-            lambda x: abs(x['net_vol']) if x['side'] == 'buy' else -abs(x['net_vol']), axis=1
-        )
+#       🚀 從APPLY替換成LOC運算,這三行 (瞬間完成十萬筆運算)
+        df_raw['signed_vol'] = df_raw['net_vol'].abs()
+        df_raw.loc[df_raw['side'] == 'sell', 'signed_vol'] = -df_raw['signed_vol']
 
         valid_dates = df_raw['trade_date'].dropna().astype(str).unique()
         all_dates = sorted(valid_dates, reverse=True)
