@@ -28,7 +28,10 @@ except ImportError:
     def sync_b7_data(DATA_DIR): pass
     def sync_pledge_data(DATA_DIR): pass
     def sync_pledge_history_data(DATA_DIR): pass
-
+try:
+    from views.broker_page import sync_b8_data
+except ImportError:
+    def sync_b8_data(): pass
 # ==========================================
 # 🌟 萬能鑰匙：對接全站暫存變數
 # ==========================================
@@ -65,6 +68,7 @@ KEY_MAP = {
     'b7_main': ['b7_main', 'df_blk7_main', 'df_b7_main'],
     'b7_pledge': ['b7_pledge', 'df_pledge', 'df_b7_pledge'],
     'b7_pledge_history': ['b7_pledge_history', 'df_pledge_history', 'df_b7_pledge_history']
+    'b8_summary': ['b8_summary_df']
 }
 
 def get_df(primary_key):
@@ -405,7 +409,7 @@ def show_weight_backtest_page(STOCK_DICT, DATA_DIR="data"):
     if 'b7_main' not in st.session_state: sync_b7_data(DATA_DIR)
     if 'b7_pledge' not in st.session_state: sync_pledge_data(DATA_DIR)
     if 'b7_pledge_history' not in st.session_state: sync_pledge_history_data(DATA_DIR)
-
+    sync_b8_data() # 喚醒 B8 背景資料
     st.markdown("""
     <div style="background: linear-gradient(90deg, rgba(15,23,42,1) 0%, rgba(14,165,233,0.3) 50%, rgba(15,23,42,1) 100%); 
                 border-top: 1px solid #38bdf8; border-bottom: 1px solid #38bdf8; padding: 15px 20px; 
@@ -817,7 +821,7 @@ def show_weight_backtest_page(STOCK_DICT, DATA_DIR="data"):
 
 
     # 👇 B8 展開面板
-    b8_latest_date_str = "最新交易日" # 後續第二步載入資料時會動態更新這個日期
+    b8_latest_date_str = st.session_state.get('b8_latest_date', '最新交易日') # 後續第二步載入資料時會動態更新這個日期
     with st.expander(f"🏢 B8 券商主力過濾 (資料基準日: {b8_latest_date_str})", expanded=False):
         st.markdown("**🔹 1. 分點連續買超天數/週數**")
         st.caption("過濾出全市場中，有特定券商分點正在「連續吃貨」的標的。")
@@ -1098,7 +1102,25 @@ def show_weight_backtest_page(STOCK_DICT, DATA_DIR="data"):
         if not df_b7_main.empty and '▼近半年增減%' in df_b7_main.columns:
             any_filter_applied = True
             filtered_df = filtered_df[filtered_df['統一代號'].isin(df_b7_main[pd.to_numeric(df_b7_main['▼近半年增減%'], errors='coerce').fillna(0) > 0]['統一代號'].unique())]
+    # B8 執行過濾邏輯
+    b8_day_val = st.session_state.get('filter_b8_day_streak', 0)
+    b8_wk_val = st.session_state.get('filter_b8_week_streak', 0)
+    b8_vol_val = st.session_state.get('filter_b8_buy_vol_min', 0)
 
+    if b8_day_val > 0 or b8_wk_val > 0 or b8_vol_val > 0:
+        df_b8 = clean_stock_id(get_df('b8_summary'))
+        if not df_b8.empty:
+            any_filter_applied = True
+            b8_mask = pd.Series(True, index=df_b8.index)
+            
+            if b8_day_val > 0:
+                b8_mask &= (df_b8['連買日數'] >= b8_day_val)
+            if b8_wk_val > 0:
+                b8_mask &= (df_b8['連買週數'] >= b8_wk_val)
+            if b8_vol_val > 0:
+                b8_mask &= (df_b8['近期買超總張數'] >= b8_vol_val)
+                
+            filtered_df = filtered_df[filtered_df['統一代號'].isin(df_b8[b8_mask]['統一代號'].unique())]
 
     # ==========================================
     # 🌟 呼叫 Fragment 1：除錯透視鏡
