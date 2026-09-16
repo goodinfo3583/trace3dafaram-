@@ -235,6 +235,26 @@ def render_debug_panel(filtered_df, any_filter_applied, dynamic_price_col_b6):
                 debug_df = pd.merge(debug_df, df_b7_main[b7_main_cols].rename(columns=b7_main_rename), on='統一代號', how='left')
             df_b7_hist = clean_stock_id(get_df('b7_pledge_history')).drop_duplicates(subset=['統一代號'])
             if not df_b7_hist.empty and '動態' in df_b7_hist.columns: debug_df = pd.merge(debug_df, df_b7_hist[['統一代號', '近月質押增減(%)', '動態']].rename(columns={'近月質押增減(%)': 'B7_質押近月增減%', '動態': 'B7_質押動態'}), on='統一代號', how='left')
+
+            #把 B8 欄位加入除錯透視鏡 
+            df_b8_debug = clean_stock_id(get_df('b8_summary')).drop_duplicates(subset=['統一代號'])
+            if not df_b8_debug.empty:
+                b8_debug_cols = ['統一代號']
+                b8_rename_dict = {}
+                
+                if '連買日數' in df_b8_debug.columns:
+                    b8_debug_cols.append('連買日數')
+                    b8_rename_dict['連買日數'] = 'B8_日連買'
+                if '連買週數' in df_b8_debug.columns:
+                    b8_debug_cols.append('連買週數')
+                    b8_rename_dict['連買週數'] = 'B8_週連買'
+                if '近期買超總張數' in df_b8_debug.columns:
+                    b8_debug_cols.append('近期買超總張數')
+                    b8_rename_dict['近期買超總張數'] = 'B8_囤貨張數'
+
+                if len(b8_debug_cols) > 1:
+                    debug_df = pd.merge(debug_df, df_b8_debug[b8_debug_cols].rename(columns=b8_rename_dict), on='統一代號', how='left')
+            # 除錯位置結束 
             
             st.write(f"🔍 檢核明細 (共 {len(debug_df)} 筆)：")
             st.dataframe(debug_df, use_container_width=True, hide_index=True)
