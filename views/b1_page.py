@@ -823,22 +823,32 @@ def render_b1_down_trend(DATA_DIR, down_final_df, down_date_cols):
 
     with t_down_all:
         if not down_final_df.empty:
-             display_cols = ['股票代號', '股票名稱', '今日衰退上榜', '單日△'] + down_date_cols
-             
-             down_pool_df = down_final_df.copy()
-             down_pool_df['單日△'] = down_pool_df['單日△'].apply(lambda x: f"{x:.2f}" if x <= 0 else f"+{x:.2f}")
+            down_pool_df = down_final_df.copy()
+            
+            # 1. 處理單日△格式
+            down_pool_df['單日△'] = down_pool_df['單日△'].apply(lambda x: f"{x:.2f}" if x <= 0 else f"+{x:.2f}")
+            
+            # 👇 2. 將 8 碼日期 (YYYYMMDD持股%) 縮減為 4 碼 (MMDD持股%)
+            rename_dict = {c: f"{c[4:8]}持股%" for c in down_date_cols}
+            down_pool_df = down_pool_df.rename(columns=rename_dict)
+            new_down_date_cols = [rename_dict[c] for c in down_date_cols]
+            
+            # 👇 3. 把歷史欄位的 "未進榜" 替換成 None，並加上 % 符號保持排版乾淨一致
+            for c in new_down_date_cols:
+                down_pool_df[c] = down_pool_df[c].apply(lambda x: None if str(x) == "未進榜" else f"{float(x):.2f}%")
+            
+            display_cols = ['股票代號', '股票名稱', '今日衰退上榜', '單日△'] + new_down_date_cols
 
-             def highlight_down_row(row):
-                 return ['background-color: rgba(0, 230, 118, 0.1)'] * len(row)
+            def highlight_down_row(row):
+                return ['background-color: rgba(0, 230, 118, 0.1)'] * len(row)
 
-             st.dataframe(
-                 down_pool_df[display_cols].style.apply(highlight_down_row, axis=1), 
-                 use_container_width=True, 
-                 hide_index=True
-             )
+            st.dataframe(
+                down_pool_df[display_cols].style.apply(highlight_down_row, axis=1), 
+                use_container_width=True, 
+                hide_index=True
+            )
         else:
-             st.info("⚪ 目前尚未累積足夠的歷史衰退快照。請確認站長快照有成功封存負向資料，累積多日後即可觀察軌跡。")
-
+            st.info("⚪ 目前尚未累積足夠的歷史衰退快照。請確認站長快照有成功封存負向資料，累積多日後即可觀察軌跡。")
 
 @st.fragment
 def render_b1_deep_dive(final_df, df_foreign):
