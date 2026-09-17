@@ -366,7 +366,7 @@ def prepare_deep_dive_data(final_df, df_foreign):
         tot_val, for_val = df_calc[f'{d}持股%'].apply(clean_pct), df_calc[f'外資持股_{d}'].apply(clean_pct)
             
         # 👇 1. 將 % 移到欄位標題上
-        dom_col, for_out_col = f'內資_{d[-4:]}(%)', f'外資_{d[-4:]}(%)'
+        dom_col, for_out_col = f'內資_{d[-4:]}%', f'外資_{d[-4:]}%'
             
         df_calc[f'{dom_col}_raw'] = (tot_val - for_val).clip(lower=0)
         # 👇 2. 數值不加 %，且若為 0 則顯示 None (維持版面乾淨)
