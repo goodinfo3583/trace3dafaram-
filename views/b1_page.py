@@ -547,11 +547,13 @@ def render_b1_main_tables(final_df, color_ref, date_cols):
         rank_col = f'{target_day_str}日排名'
         change_col = f'{target_day_str}日ΔChange'
         
-        if rank_col in df.columns:
-            df = df.sort_values(by=rank_col, ascending=True)
-        elif change_col in df.columns:
-            df[change_col] = pd.to_numeric(df[change_col], errors='coerce').fillna(0)
-            df = df.sort_values(by=change_col, ascending=False)
+        # 使用單日 △ 進行排序 (由大到小)
+        df['△_num'] = pd.to_numeric(df['△'], errors='coerce').fillna(0)
+        df = df.sort_values(by='△_num', ascending=False)
+        df = df.drop(columns=['△_num']) # 算完就丟，保持表格乾淨
+        
+        # 確保有排名欄位
+        if rank_col not in df.columns:
             df[f'{target_day_str}日排名'] = range(1, len(df) + 1)
             
         df['法人持股'] = df['法人持股'].apply(lambda x: f"{x:.2f}%" if pd.notna(x) else "0.00%")

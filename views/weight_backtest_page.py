@@ -118,12 +118,31 @@ def render_debug_panel(filtered_df, any_filter_applied, dynamic_price_col_b6):
                             
                 debug_df = pd.merge(debug_df, df_b0_debug[b0_cols].rename(columns=rename_dict), on='統一代號', how='left')
 
+            # 1. 處理 B1 法人主表
             check_cols = ['統一代號', '今日上榜', '△', '法人持股', '最新動態', '5日ΔChange', '20日ΔChange', '60日ΔChange', '120日ΔChange']
             df_b1_debug = clean_stock_id(get_df('b1_final_df'))
             if not df_b1_debug.empty:
                 df_b1_debug = df_b1_debug[[c for c in check_cols if c in df_b1_debug.columns]].drop_duplicates(subset=['統一代號'])
                 debug_df = pd.merge(debug_df, df_b1_debug, on='統一代號', how='left')
             
+            # 2. 處理 B1 外資持股表，並精準安插在特定欄位之間
+            df_b1_foreign = clean_stock_id(get_df('b1_foreign_df')).drop_duplicates(subset=['統一代號'])
+            if not df_b1_foreign.empty:
+                # 自動找出最新日期的「外資持股_YYYYMMDD」欄位
+                foreign_cols = sorted([c for c in df_b1_foreign.columns if c.startswith('外資持股_')], reverse=True)
+                if foreign_cols:
+                    latest_foreign_col = foreign_cols[0]
+                    df_foreign_extract = df_b1_foreign[['統一代號', latest_foreign_col]].rename(columns={latest_foreign_col: '外資持股比'})
+                    debug_df = pd.merge(debug_df, df_foreign_extract, on='統一代號', how='left')
+                    
+                    # 重新排列欄位，把 '外資持股比' 塞到 '法人持股' 和 '最新動態' 中間
+                    if '法人持股' in debug_df.columns and '最新動態' in debug_df.columns:
+                        cols = debug_df.columns.tolist()
+                        cols.remove('外資持股比')
+                        insert_idx = cols.index('最新動態') # 抓取「最新動態」的索引，安插在它前面
+                        cols.insert(insert_idx, '外資持股比')
+                        debug_df = debug_df[cols]
+                        
             b2_labels = zip(['b2_1', 'b2_2', 'b2_3', 'b2_4'], ['外資成交動態', '投信成交動態', '外資發行動態', '投信發行動態'])
             for b2_key, col_name in b2_labels:
                 df_b2_tmp = clean_stock_id(get_df(b2_key)).drop_duplicates(subset=['統一代號'])
