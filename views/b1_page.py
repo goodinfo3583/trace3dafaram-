@@ -850,7 +850,7 @@ def render_b1_deep_dive(final_df, df_foreign):
             # 呼叫已經快取好的引擎，運算瞬間完成！
             df_calc, common_dates, dom_display_cols, for_display_cols = prepare_deep_dive_data(final_df, df_foreign)
             
-                if not df_calc.empty and common_dates:
+            if not df_calc.empty and common_dates:
                 # 👇 新增：將字串格式的 △ 轉換為數字，供後續精準排序使用
                 df_calc['△_num'] = pd.to_numeric(df_calc['△'].astype(str).str.replace('+', '', regex=False), errors='coerce').fillna(0)
                 
