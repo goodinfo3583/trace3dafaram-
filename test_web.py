@@ -33,6 +33,7 @@ from views.b6_page import show_b6_page, sync_b6_data
 from views.b7_page import show_b7_page, sync_b7_data
 from views.broker_page import render as show_broker_page
 from views.sidebar import render_sidebar_war_room
+from views.sidebar_admin import render_global_admin_sidebar
 from views.setting import render as show_setting_page
 from views.watchlist_page import show_watchlist_page
 from views.weight_backtest_page import show_weight_backtest_page
@@ -203,6 +204,7 @@ elif current_page == "weight_backtest":
 # 渲染側邊欄
 with st.sidebar:
     render_sidebar_war_room(STOCK_DICT, DATA_DIR)
+    render_global_admin_sidebar(DATA_DIR)
 
 
 # ==========================================
