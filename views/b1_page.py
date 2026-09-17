@@ -556,7 +556,7 @@ def render_b1_main_tables(final_df, color_ref, date_cols):
         if rank_col not in df.columns:
             df[f'{target_day_str}日排名'] = range(1, len(df) + 1)
             
-        df['法人持股'] = df['法人持股'].apply(lambda x: f"{x:.2f}%" if pd.notna(x) else "0.00%")
+        df['法人持股'] = df['法人持股'].apply(lambda x: f"{float(x):.2f}%" if pd.notna(x) and float(x) != 0.0 else None)
         df['△'] = df['△'].apply(format_delta)
         if change_col in df.columns: 
             df[change_col] = df[change_col].apply(format_delta)
@@ -600,7 +600,7 @@ def render_b1_main_tables(final_df, color_ref, date_cols):
             filtered_df['△_num'] = pd.to_numeric(filtered_df['△'], errors='coerce').fillna(0)
             filtered_df = filtered_df.sort_values(by='△_num', ascending=False)
             
-            filtered_df['法人持股'] = filtered_df['法人持股'].apply(lambda x: f"{x:.2f}%")
+            filtered_df['法人持股'] = filtered_df['法人持股'].apply(lambda x: f"{float(x):.2f}%" if pd.notna(x) and float(x) != 0.0 else None)
             filtered_df['△'] = filtered_df['△'].apply(format_delta)
             
             # 👇 新增：將 8 碼日期 (YYYYMMDD持股%) 縮減為 4 碼 (MMDD持股%)
@@ -850,22 +850,25 @@ def render_b1_deep_dive(final_df, df_foreign):
             # 呼叫已經快取好的引擎，運算瞬間完成！
             df_calc, common_dates, dom_display_cols, for_display_cols = prepare_deep_dive_data(final_df, df_foreign)
             
-            if not df_calc.empty and common_dates:
+                if not df_calc.empty and common_dates:
+                # 👇 新增：將字串格式的 △ 轉換為數字，供後續精準排序使用
+                df_calc['△_num'] = pd.to_numeric(df_calc['△'].astype(str).str.replace('+', '', regex=False), errors='coerce').fillna(0)
+                
                 tab_dom, tab_for = st.tabs(["🕵️‍♂️ 內資 (投信+自營) 20日軌跡", "🌎 外資大腿 20日軌跡"])
                 base_cols = ['股票代號', '股票名稱', '今日上榜', '△']
                 
                 with tab_dom:
                     st.markdown("##### 🔍 尋找「投信/自營商」連續鎖碼股")
                     st.caption("內資常專注於中小型爆發股，若連續多日比例上升，代表投信作帳行情啟動。")
-                    latest_dom_col = f'內資_{common_dates[0][-4:]}_raw'
-                    df_dom_sorted = df_calc.sort_values(by=latest_dom_col, ascending=False).head(40)
+                    # 👇 修改：改為依照單日 △ 排序
+                    df_dom_sorted = df_calc.sort_values(by='△_num', ascending=False).head(40)
                     st.dataframe(df_dom_sorted[base_cols + dom_display_cols], use_container_width=True, hide_index=True)
                     
                 with tab_for:
                     st.markdown("##### 🔍 尋找「外資大腿」長線階梯建倉股")
                     st.caption("外資資金龐大，若發現持股比例連續 1~2 週穩步增長，代表真正的長線資金進駐。")
-                    latest_for_col = f'外資_{common_dates[0][-4:]}_raw'
-                    df_for_sorted = df_calc.sort_values(by=latest_for_col, ascending=False).head(40)
+                    # 👇 修改：改為依照單日 △ 排序
+                    df_for_sorted = df_calc.sort_values(by='△_num', ascending=False).head(40)
                     st.dataframe(df_for_sorted[base_cols + for_display_cols], use_container_width=True, hide_index=True)
             else:
                 st.warning("⚠️ 找不到主表與外資表的共通日期，請確認資料是否已同步。")

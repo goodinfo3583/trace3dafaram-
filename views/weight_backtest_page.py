@@ -128,20 +128,26 @@ def render_debug_panel(filtered_df, any_filter_applied, dynamic_price_col_b6):
             # 2. 處理 B1 外資持股表，並精準安插在特定欄位之間
             df_b1_foreign = clean_stock_id(get_df('b1_foreign_df')).drop_duplicates(subset=['統一代號'])
             if not df_b1_foreign.empty:
-                # 自動找出最新日期的「外資持股_YYYYMMDD」欄位
                 foreign_cols = sorted([c for c in df_b1_foreign.columns if c.startswith('外資持股_')], reverse=True)
                 if foreign_cols:
                     latest_foreign_col = foreign_cols[0]
-                    df_foreign_extract = df_b1_foreign[['統一代號', latest_foreign_col]].rename(columns={latest_foreign_col: '外資持股比'})
+                    df_foreign_extract = df_b1_foreign[['統一代號', latest_foreign_col]].copy()
+                    
+                    # 👇 修正 1：將外資持股比格式化為小數點後兩位
+                    df_foreign_extract[latest_foreign_col] = pd.to_numeric(df_foreign_extract[latest_foreign_col], errors='coerce').apply(lambda x: f"{x:.2f}" if pd.notna(x) else None)
+                    df_foreign_extract = df_foreign_extract.rename(columns={latest_foreign_col: '外資持股比'})
+                    
                     debug_df = pd.merge(debug_df, df_foreign_extract, on='統一代號', how='left')
                     
-                    # 重新排列欄位，把 '外資持股比' 塞到 '法人持股' 和 '最新動態' 中間
                     if '法人持股' in debug_df.columns and '最新動態' in debug_df.columns:
                         cols = debug_df.columns.tolist()
                         cols.remove('外資持股比')
-                        insert_idx = cols.index('最新動態') # 抓取「最新動態」的索引，安插在它前面
+                        insert_idx = cols.index('最新動態') 
                         cols.insert(insert_idx, '外資持股比')
                         debug_df = debug_df[cols]
+                        
+                        # 👇 修正 2：讓除錯透視鏡中，未進榜的「法人持股 0」顯示為 None
+                        debug_df['法人持股'] = debug_df['法人持股'].apply(lambda x: None if pd.isna(x) or str(x).strip() in ['0', '0.0', '0.00', '未進榜'] else x)
                         
             b2_labels = zip(['b2_1', 'b2_2', 'b2_3', 'b2_4'], ['外資成交動態', '投信成交動態', '外資發行動態', '投信發行動態'])
             for b2_key, col_name in b2_labels:
