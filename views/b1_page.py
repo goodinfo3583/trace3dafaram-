@@ -364,14 +364,18 @@ def prepare_deep_dive_data(final_df, df_foreign):
     
     for d in common_dates:
         tot_val, for_val = df_calc[f'{d}持股%'].apply(clean_pct), df_calc[f'外資持股_{d}'].apply(clean_pct)
-        dom_col, for_out_col = f'內資_{d[-4:]}', f'外資_{d[-4:]}'
-        
+            
+        # 👇 1. 將 % 移到欄位標題上
+        dom_col, for_out_col = f'內資_{d[-4:]}(%)', f'外資_{d[-4:]}(%)'
+            
         df_calc[f'{dom_col}_raw'] = (tot_val - for_val).clip(lower=0)
-        df_calc[dom_col] = df_calc[f'{dom_col}_raw'].apply(lambda x: f"{x:.2f}%")
+        # 👇 2. 數值不加 %，且若為 0 則顯示 None (維持版面乾淨)
+        df_calc[dom_col] = df_calc[f'{dom_col}_raw'].apply(lambda x: f"{x:.2f}" if x > 0 else None)
         dom_display_cols.append(dom_col)
-        
+            
         df_calc[f'{for_out_col}_raw'] = for_val
-        df_calc[for_out_col] = df_calc[f'{for_out_col}_raw'].apply(lambda x: f"{x:.2f}%")
+        # 👇 同上處理外資
+        df_calc[for_out_col] = df_calc[f'{for_out_col}_raw'].apply(lambda x: f"{x:.2f}" if x > 0 else None)
         for_display_cols.append(for_out_col)
     
     df_calc = df_calc[df_calc['今日上榜'].astype(str).str.strip() != ""]
