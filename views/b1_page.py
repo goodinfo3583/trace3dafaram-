@@ -854,6 +854,9 @@ def render_b1_deep_dive(final_df, df_foreign):
                 # 👇 新增：將字串格式的 △ 轉換為數字，供後續精準排序使用
                 df_calc['△_num'] = pd.to_numeric(df_calc['△'].astype(str).str.replace('+', '', regex=False), errors='coerce').fillna(0)
                 
+                # 👇 修正：將畫面顯示的 △ 統一格式化為小數點後兩位 (大於 0 會自帶 + 號)
+                df_calc['△'] = df_calc['△_num'].apply(lambda x: f"+{x:.2f}" if x > 0 else f"{x:.2f}")
+                
                 tab_dom, tab_for = st.tabs(["🕵️‍♂️ 內資 (投信+自營) 20日軌跡", "🌎 外資大腿 20日軌跡"])
                 base_cols = ['股票代號', '股票名稱', '今日上榜', '△']
                 
