@@ -30,8 +30,12 @@ def render_global_admin_sidebar(DATA_DIR):
                 
             if master_df is not None and not master_df.empty:
                 st.info(f"📊 記憶體狀態：已捕捉大表 **{len(master_df)}** 檔")
+                
+                # 👇 新增這行：讓系統印出真實的硬碟絕對路徑
+                st.caption(f"📁 後台預計存檔位置： `{os.path.abspath(snapshot_dir)}`")
             else:
                 st.warning("⚠️ 記憶體尚未捕捉大表 (請先至回測頁面產生資料)")
+                
 
             # ==========================================
             # 💾 動作一：寫入後台系統資料庫
