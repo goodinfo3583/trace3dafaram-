@@ -59,9 +59,18 @@ def render_global_admin_sidebar(DATA_DIR):
                         st.success(f"✅ B1 負向封存成功！({len(snap_grouped_down)} 檔)")
 
                     # --- 3. 處理 B0~B8 全市場大表 ---
-                    master_df = st.session_state.get('b8_master_dataframe') 
+                    # 💡 雙重保險：如果 b8_master_dataframe 被清空，就去抓 debug_df
+                    master_df = st.session_state.get('b8_master_dataframe')
+                    if master_df is None or master_df.empty:
+                        master_df = st.session_state.get('debug_df')
                     
                     if master_df is not None and not master_df.empty:
+                        # ⚠️ 防呆機制：將所有欄位轉為字串或數字，避免 Parquet 遇到串列 (List) 格式報錯
+                        for col in master_df.columns:
+                            if master_df[col].dtype == object:
+                                master_df[col] = master_df[col].astype(str)
+                                
+                        pq_path = os.path.join(snapshot_dir, f"Master_Snapshot_{date_str}.parquet")
                         pq_path = os.path.join(snapshot_dir, f"Master_Snapshot_{date_str}.parquet")
                         master_df.to_parquet(pq_path, index=False)
                         
