@@ -97,23 +97,42 @@ def render_global_admin_sidebar(DATA_DIR):
                     st.balloons()
             
             # ==========================================
-            # 📥 動作二：實體下載區 (直接存到你的 Downloads 資料夾)
+            # 📥 動作二：實體下載區 (直接存到你的實體電腦 Downloads 資料夾)
             # ==========================================
             st.markdown("---")
-            st.markdown("<div style='font-size:14px; font-weight:bold; color:#00E272;'>📥 手動下載至個人電腦 (Downloads資料夾)</div>", unsafe_allow_html=True)
+            st.markdown("<div style='font-size:14px; font-weight:bold; color:#00E272;'>📥 手動下載至個人電腦 (雲端專用)</div>", unsafe_allow_html=True)
             
             if master_df is not None and not master_df.empty:
-                # 建立全市場大表的 CSV 下載按鈕
-                csv_buffer = master_df.to_csv(index=False, encoding='utf-8-sig').encode('utf-8-sig')
-                st.download_button(
-                    label=f"💾 下載全市場特徵大表 ({len(master_df)}檔)",
-                    data=csv_buffer,
-                    file_name=f"Master_Snapshot_{date_str}.csv",
-                    mime="text/csv",
-                    use_container_width=True
-                )
+                col_down1, col_down2 = st.columns(2)
+                
+                with col_down1:
+                    # 建立全市場大表的 CSV 下載按鈕
+                    csv_buffer = master_df.to_csv(index=False, encoding='utf-8-sig').encode('utf-8-sig')
+                    st.download_button(
+                        label=f"💾 下載 CSV ({len(master_df)}檔)",
+                        data=csv_buffer,
+                        file_name=f"Master_Snapshot_{date_str}.csv",
+                        mime="text/csv",
+                        use_container_width=True
+                    )
+                    
+                with col_down2:
+                    # 👇 新增：建立全市場大表的 Parquet 下載按鈕
+                    import io
+                    # 防呆：確保欄位為字串，避免 Parquet 轉換失敗
+                    clean_master_df = master_df.copy()
+                    for col in clean_master_df.columns:
+                        if clean_master_df[col].dtype == object:
+                            clean_master_df[col] = clean_master_df[col].astype(str)
+                            
+                    parquet_buffer = io.BytesIO()
+                    clean_master_df.to_parquet(parquet_buffer, index=False)
+                    st.download_button(
+                        label=f"📦 下載 Parquet ({len(master_df)}檔)",
+                        data=parquet_buffer.getvalue(),
+                        file_name=f"Master_Snapshot_{date_str}.parquet",
+                        mime="application/octet-stream",
+                        use_container_width=True
+                    )
             else:
                 st.write("*(尚未產生大表，無法下載)*")
-
-        elif admin_pw != "":
-            st.error("❌ 密碼錯誤")
