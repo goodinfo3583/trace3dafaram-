@@ -562,12 +562,8 @@ def render(STOCK_DICT=None):
         df_raw_all = load_full_blood_broker_history()
         
         if not df_raw_all.empty:
-            # 你原本在 data_utils 裡的 calculate_chip_concentration 也要確認它能吃這包滿血資料喔！
-            # 為了避免那邊壞掉，我們這邊如果算不出 df_trend，可以暫時隱藏最上方的圖表，只顯示下方的 Tab
             try:
-                # 這裡原本你傳 url，現在應該直接傳 target_stock，如果你 data_utils 沒改的話這裡可能需要適配
-                # 我們假設 data_utils 裡面還是在讀取富邦 CSV，如果壞掉你可以直接把上面的 concentration 邏輯搬進來。
-                # 但為了讓你先看到 Tab2 的威力，我們維持原狀。
+                # 這裡傳錯網址了！
                 df_trend = calculate_chip_concentration("https://raw.githubusercontent.com/goodinfo3583/tw-broker-data/main/data/broker/broker_history.csv", target_stock)
             except:
                 df_trend = pd.DataFrame()
@@ -575,7 +571,7 @@ def render(STOCK_DICT=None):
             if not df_trend.empty:
                 render_broker_dashboard(target_stock, display_name, df_raw_all, df_trend)
             else:
-                # 即使上面圖表算不出來，也要確保底下的超強 Tab2 能跑！
+                # 這裡的 '-' 會讓系統崩潰！
                 render_broker_dashboard(target_stock, display_name, df_raw_all, pd.DataFrame({'trade_date': ['-'], 'concentration_%': [0], 'net_buy': [0]}))
                 st.warning("⚠️ 集中度圖表暫時無法顯示，但下方的【囤貨明細】已切換為滿血版。")
         else:
