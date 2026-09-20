@@ -622,16 +622,17 @@ def render(STOCK_DICT=None):
                     if '↓' in val: return 'color: #00E272;'
                 return 'color: #94A3B8;'
 
+            # 🚀 修正：將前綴改為正確的中文名稱對接
             def render_momentum_tab(df, prefix, rank_col_name):
-                # 準備要顯示的欄位
-                cols_to_show = ['股票代號', '股票名稱', '名次變化', f'{prefix}conc', f'{prefix}Δ', '主力買超(萬)', '最新動態', '今日上榜期程']
+                # 準備要顯示的欄位 (修復了找不到欄位的Bug)
+                cols_to_show = ['股票代號', '股票名稱', '名次變化', f'{prefix}集中度(%)', f'{prefix}Δ', '主力買超(萬)', '最新動態', '今日上榜期程']
                 
                 disp_df = df.copy()
                 disp_df['名次變化'] = disp_df[rank_col_name].apply(fmt_rank_chg)
                 disp_df = disp_df.sort_values(f'{prefix}Δ', ascending=False).head(200)
                 
                 # 重新整理顯示用的 DataFrame
-                disp_df = disp_df[cols_to_show].rename(columns={f'{prefix}conc': '當前集中度(%)'})
+                disp_df = disp_df[cols_to_show].rename(columns={f'{prefix}集中度(%)': '當前集中度(%)'})
                 
                 disp_df.reset_index(drop=True, inplace=True)
                 disp_df.index = disp_df.index + 1
@@ -647,13 +648,15 @@ def render(STOCK_DICT=None):
                 except: pass
                 st.dataframe(styled, use_container_width=True)
 
-            with tabs[0]: render_momentum_tab(res_df, "1d_", "5d_rank_chg") # 單日借用5日的升降
-            with tabs[1]: render_momentum_tab(res_df, "5d_", "5d_rank_chg")
+            # 🚀 修正：傳入正確的中文前綴
+            with tabs[0]: render_momentum_tab(res_df, "單日", "5d_rank_chg") # 單日借用5日的升降
+            with tabs[1]: render_momentum_tab(res_df, "5日", "5d_rank_chg")
             if calc_days >= 11:
-                with tabs[2]: render_momentum_tab(res_df, "10d_", "10d_rank_chg")
+                with tabs[2]: render_momentum_tab(res_df, "10日", "10d_rank_chg")
             if calc_days >= 21:
-                with tabs[3]: render_momentum_tab(res_df, "20d_", "20d_rank_chg")
+                with tabs[3]: render_momentum_tab(res_df, "20日", "20d_rank_chg")
 
+    # 🌟 3. 個股查詢器 🌟 (不用動，保留原樣)
     # 🌟 3. 個股查詢器 🌟
     stock_options = []
     if STOCK_DICT:
