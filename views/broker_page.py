@@ -624,28 +624,60 @@ def render(STOCK_DICT=None):
 
             # 🚀 修正：將前綴改為正確的中文名稱對接
             def render_momentum_tab(df, prefix, rank_col_name):
-                # 準備要顯示的欄位 (修復了找不到欄位的Bug)
-                cols_to_show = ['股票代號', '股票名稱', '名次變化', f'{prefix}集中度(%)', f'{prefix}Δ', '主力買超(萬)', '最新動態', '今日上榜期程']
+                # 💡【修復重點 1】：建立英轉中字典，把計算用的欄位名稱對應成我們想要的中文
+                prefix_map = {
+                    "單日": "1d_conc",
+                    "5日": "5d_conc",
+                    "10日": "10d_conc",
+                    "20日": "20d_conc"
+                }
+                eng_conc_col = prefix_map.get(prefix)
                 
                 disp_df = df.copy()
-                disp_df['名次變化'] = disp_df[rank_col_name].apply(fmt_rank_chg)
-                disp_df = disp_df.sort_values(f'{prefix}Δ', ascending=False).head(200)
+                
+                # 💡【修復重點 2】：先把英文的集中度欄位，重新命名為標準中文格式
+                if eng_conc_col in disp_df.columns:
+                    disp_df.rename(columns={eng_conc_col: f'{prefix}集中度(%)'}, inplace=True)
+                
+                # 準備要顯示的欄位
+                cols_to_show = ['股票代號', '股票名稱', '名次變化', f'{prefix}集中度(%)', f'{prefix}Δ', '主力買超(萬)', '最新動態', '今日上榜期程']
+                
+                # 防呆：確保所有要求的欄位都在 df 裡面，避免其他 KeyError
+                valid_cols = [c for c in cols_to_show if c in disp_df.columns]
+                
+                disp_df['名次變化'] = disp_df.get(rank_col_name, pd.Series(dtype=float)).apply(fmt_rank_chg)
+                
+                # 針對 Δ 進行排序，取前 200 名
+                if f'{prefix}Δ' in disp_df.columns:
+                    disp_df = disp_df.sort_values(f'{prefix}Δ', ascending=False).head(200)
                 
                 # 重新整理顯示用的 DataFrame
-                disp_df = disp_df[cols_to_show].rename(columns={f'{prefix}集中度(%)': '當前集中度(%)'})
+                disp_df = disp_df[valid_cols]
+                
+                if f'{prefix}集中度(%)' in disp_df.columns:
+                    disp_df.rename(columns={f'{prefix}集中度(%)': '當前集中度(%)'}, inplace=True)
                 
                 disp_df.reset_index(drop=True, inplace=True)
                 disp_df.index = disp_df.index + 1
                 disp_df.index.name = "名次"
                 
-                styled = disp_df.style.format({
+                format_dict = {
                     '當前集中度(%)': "{:.2f}", 
                     f'{prefix}Δ': "{:.2f}",
                     '主力買超(萬)': "{:,.0f}"
-                }).applymap(color_chg, subset=['名次變化'])
+                }
+                # 確保只有存在的欄位才套用格式化
+                safe_format_dict = {k: v for k, v in format_dict.items() if k in disp_df.columns}
                 
-                try: styled = styled.background_gradient(subset=[f'{prefix}Δ'], cmap='Reds')
+                styled = disp_df.style.format(safe_format_dict)
+                if '名次變化' in disp_df.columns:
+                    styled = styled.applymap(color_chg, subset=['名次變化'])
+                
+                try: 
+                    if f'{prefix}Δ' in disp_df.columns:
+                        styled = styled.background_gradient(subset=[f'{prefix}Δ'], cmap='Reds')
                 except: pass
+                
                 st.dataframe(styled, use_container_width=True)
 
             # 🚀 修正：傳入正確的中文前綴
@@ -656,7 +688,6 @@ def render(STOCK_DICT=None):
             if calc_days >= 21:
                 with tabs[3]: render_momentum_tab(res_df, "20日", "20d_rank_chg")
 
-    # 🌟 3. 個股查詢器 🌟 (不用動，保留原樣)
     # 🌟 3. 個股查詢器 🌟
     stock_options = []
     if STOCK_DICT:
