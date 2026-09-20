@@ -504,20 +504,22 @@ def render(STOCK_DICT=None):
                 with st.spinner("正在進行矩陣運算，提取全市場動能特徵..."):
                     df_raw_all = load_full_blood_broker_history()
                     if not df_raw_all.empty:
-                        scan_df = df_raw_all[['trade_date', 'stock_code', 'net_vol', '總買進股數', '總買進金額']].copy()
+                        scan_df = df_raw_all[['trade_date', 'stock_code', 'net_vol', '總買進股數', '買賣超金額']].copy()
                         valid_dates = scan_df['trade_date'].dropna().unique()
                         all_dates = sorted(valid_dates, reverse=True)
                         
                         max_days = len(all_dates)
                         if max_days >= 6:
-                            # 🚀 自適應天數引擎：超過11天就算10日線，否則只算5日線
-                            calc_days = 11 if max_days >= 11 else 6
+                            calc_days = 21 if max_days >= 21 else (11 if max_days >= 11 else 6)
                             df_calc = scan_df[scan_df['trade_date'].isin(all_dates[:calc_days])]
                             
-                            # 隱形濾網：自動排除冷門股 (平均每日須 > 1000萬)
-                            min_amount = 100000000 if calc_days == 11 else 50000000
-                            market_amt = df_calc.groupby('stock_code')['總買進金額'].sum().reset_index()
-                            valid_stocks = market_amt[market_amt['總買進金額'] >= min_amount]['stock_code']
+                            # 動態隱形濾網：5日需5千萬，10日需1億，20日需2億成交額
+                            min_amount = 50000000
+                            if calc_days >= 11: min_amount = 100000000
+                            if calc_days >= 21: min_amount = 200000000
+                            
+                            market_amt = df_calc.groupby('stock_code')['買賣超金額'].apply(lambda x: x.abs().sum()).reset_index()
+                            valid_stocks = market_amt[market_amt['買賣超金額'] >= min_amount]['stock_code']
                             df_calc = df_calc[df_calc['stock_code'].isin(valid_stocks)]
                             
                             daily_vol = df_calc.groupby(['trade_date', 'stock_code'])['總買進股數'].sum() / 1000
@@ -527,8 +529,11 @@ def render(STOCK_DICT=None):
                             top15_buy = df_buy.sort_values(['trade_date', 'stock_code', 'net_vol'], ascending=[True, True, False]).groupby(['trade_date', 'stock_code']).head(15).groupby(['trade_date', 'stock_code'])['net_vol'].sum()
                             top15_sell = df_sell.sort_values(['trade_date', 'stock_code', 'net_vol'], ascending=[True, True, True]).groupby(['trade_date', 'stock_code']).head(15).groupby(['trade_date', 'stock_code'])['net_vol'].sum()
 
+                            # 抓取主力買超金額(粗估：直接加總前15大買賣超金額)
+                            amt_buy = df_buy.sort_values(['trade_date', 'stock_code', '買賣超金額'], ascending=[True, True, False]).groupby(['trade_date', 'stock_code']).head(15).groupby(['trade_date', 'stock_code'])['買賣超金額'].sum()
+
                             daily_net = top15_buy.fillna(0) - top15_sell.abs().fillna(0)
-                            conc_df = pd.DataFrame({'net_buy': daily_net, 'vol': daily_vol}).reset_index().sort_values(['stock_code', 'trade_date'])
+                            conc_df = pd.DataFrame({'net_buy': daily_net, 'vol': daily_vol, 'net_amt': amt_buy.fillna(0)}).reset_index().sort_values(['stock_code', 'trade_date'])
 
                             conc_df['1d_conc'] = (conc_df['net_buy'] / conc_df['vol'] * 100).fillna(0)
                             conc_df['5d_net'] = conc_df.groupby('stock_code')['net_buy'].transform(lambda x: x.rolling(5, min_periods=1).sum())
@@ -537,17 +542,32 @@ def render(STOCK_DICT=None):
                             
                             conc_df['單日Δ'] = conc_df.groupby('stock_code')['1d_conc'].diff().fillna(0).round(2)
                             conc_df['5日Δ'] = conc_df.groupby('stock_code')['5d_conc'].diff().fillna(0).round(2)
+                            conc_df['主力買超(萬)'] = (conc_df['net_amt'] / 10000).fillna(0).round(0)
                             
-                            conc_df['單日集中度(%)'] = conc_df['1d_conc'].round(2)
-                            conc_df['5日集中度(%)'] = conc_df['5d_conc'].round(2)
+                            # 🎯 新增：計算名次與名次變化 (Shift)
+                            conc_df['5d_rank'] = conc_df.groupby('trade_date')['5日Δ'].rank(ascending=False, method='min')
+                            conc_df['5d_prev_rank'] = conc_df.groupby('stock_code')['5d_rank'].shift(1)
+                            conc_df['5d_rank_chg'] = conc_df['5d_prev_rank'] - conc_df['5d_rank'] # 正數代表名次上升
 
-                            if calc_days == 11:
+                            if calc_days >= 11:
                                 conc_df['10d_net'] = conc_df.groupby('stock_code')['net_buy'].transform(lambda x: x.rolling(10, min_periods=1).sum())
                                 conc_df['10d_vol'] = conc_df.groupby('stock_code')['vol'].transform(lambda x: x.rolling(10, min_periods=1).sum())
                                 conc_df['10d_conc'] = (conc_df['10d_net'] / conc_df['10d_vol'] * 100).fillna(0)
                                 conc_df['10日Δ'] = conc_df.groupby('stock_code')['10d_conc'].diff().fillna(0).round(2)
-                                conc_df['10日集中度(%)'] = conc_df['10d_conc'].round(2)
+                                conc_df['10d_rank'] = conc_df.groupby('trade_date')['10日Δ'].rank(ascending=False, method='min')
+                                conc_df['10d_prev_rank'] = conc_df.groupby('stock_code')['10d_rank'].shift(1)
+                                conc_df['10d_rank_chg'] = conc_df['10d_prev_rank'] - conc_df['10d_rank']
+                            
+                            if calc_days >= 21:
+                                conc_df['20d_net'] = conc_df.groupby('stock_code')['net_buy'].transform(lambda x: x.rolling(20, min_periods=1).sum())
+                                conc_df['20d_vol'] = conc_df.groupby('stock_code')['vol'].transform(lambda x: x.rolling(20, min_periods=1).sum())
+                                conc_df['20d_conc'] = (conc_df['20d_net'] / conc_df['20d_vol'] * 100).fillna(0)
+                                conc_df['20日Δ'] = conc_df.groupby('stock_code')['20d_conc'].diff().fillna(0).round(2)
+                                conc_df['20d_rank'] = conc_df.groupby('trade_date')['20日Δ'].rank(ascending=False, method='min')
+                                conc_df['20d_prev_rank'] = conc_df.groupby('stock_code')['20d_rank'].shift(1)
+                                conc_df['20d_rank_chg'] = conc_df['20d_prev_rank'] - conc_df['20d_rank']
 
+                            # 萃取最新一日資料
                             latest_conc = conc_df[(conc_df['trade_date'] == all_dates[0]) & (conc_df['vol'] > 0)].copy()
                             latest_conc.rename(columns={'stock_code': '股票代號'}, inplace=True)
                             
@@ -555,11 +575,26 @@ def render(STOCK_DICT=None):
                                 latest_conc['股票名稱'] = latest_conc['股票代號'].astype(str).apply(lambda x: STOCK_DICT.get(x, {}).get('name', '-'))
                             else:
                                 latest_conc['股票名稱'] = "-"
-                                
+                            
+                            # 🎯 新增：今日上榜標籤判定
+                            latest_conc['今日上榜期程'] = ""
+                            latest_conc.loc[latest_conc['5d_rank'] <= 200, '今日上榜期程'] += "🔥5日 "
+                            if calc_days >= 11: latest_conc.loc[latest_conc['10d_rank'] <= 200, '今日上榜期程'] += "🔥10日 "
+                            if calc_days >= 21: latest_conc.loc[latest_conc['20d_rank'] <= 200, '今日上榜期程'] += "🔥20日 "
+                            
+                            # 🎯 預留最新動態欄位 (目前先依據 Δ 放基礎判定，後續可串接乖離率等)
+                            def get_basic_status(d_val):
+                                if d_val > 5: return "🚀 籌碼急凍 (強勢吸籌)"
+                                if d_val > 1: return "↗️ 溫和吃貨"
+                                if d_val < -5: return "⚠️ 大戶跳車 (警戒)"
+                                return "➡️ 橫盤震盪"
+                            
+                            latest_conc['最新動態'] = latest_conc['5日Δ'].apply(get_basic_status)
+                            
                             st.session_state['momentum_scan_result'] = latest_conc
                             st.session_state['momentum_calc_days'] = calc_days
                         else:
-                            st.warning("資料庫天數不足 6 天，無法計算 5 日動能。")
+                            st.warning("資料庫天數不足 6 天，無法計算動能。")
         with c_mom_clear:
             if st.button("🗑️ 清除動能暫存", use_container_width=True):
                 st.session_state.pop('momentum_scan_result', None)
@@ -570,23 +605,54 @@ def render(STOCK_DICT=None):
             calc_days = st.session_state.get('momentum_calc_days', 6)
             
             tabs_names = ["單日集中度 Δ", "5日集中度 Δ"]
-            if calc_days == 11: tabs_names.append("10日集中度 Δ")
+            if calc_days >= 11: tabs_names.append("10日集中度 Δ")
+            if calc_days >= 21: tabs_names.append("20日集中度 Δ")
             tabs = st.tabs(tabs_names)
             
-            def render_momentum_tab(df, prefix):
-                disp_df = df[['股票代號', '股票名稱', f'{prefix}集中度(%)', f'{prefix}Δ']].sort_values(f'{prefix}Δ', ascending=False).head(200)
+            # 格式化升降箭頭
+            def fmt_rank_chg(val):
+                if pd.isna(val) or val == 0: return "-"
+                if val > 0: return f"↑ {int(val)}"
+                return f"↓ {int(abs(val))}"
+            
+            # 文字顏色上色邏輯
+            def color_chg(val):
+                if isinstance(val, str):
+                    if '↑' in val: return 'color: #FF4B4B; font-weight: bold;'
+                    if '↓' in val: return 'color: #00E272;'
+                return 'color: #94A3B8;'
+
+            def render_momentum_tab(df, prefix, rank_col_name):
+                # 準備要顯示的欄位
+                cols_to_show = ['股票代號', '股票名稱', '名次變化', f'{prefix}conc', f'{prefix}Δ', '主力買超(萬)', '最新動態', '今日上榜期程']
+                
+                disp_df = df.copy()
+                disp_df['名次變化'] = disp_df[rank_col_name].apply(fmt_rank_chg)
+                disp_df = disp_df.sort_values(f'{prefix}Δ', ascending=False).head(200)
+                
+                # 重新整理顯示用的 DataFrame
+                disp_df = disp_df[cols_to_show].rename(columns={f'{prefix}conc': '當前集中度(%)'})
+                
                 disp_df.reset_index(drop=True, inplace=True)
                 disp_df.index = disp_df.index + 1
                 disp_df.index.name = "名次"
-                styled = disp_df.style.format({f'{prefix}集中度(%)': "{:.2f}", f'{prefix}Δ': "{:.2f}"})
+                
+                styled = disp_df.style.format({
+                    '當前集中度(%)': "{:.2f}", 
+                    f'{prefix}Δ': "{:.2f}",
+                    '主力買超(萬)': "{:,.0f}"
+                }).applymap(color_chg, subset=['名次變化'])
+                
                 try: styled = styled.background_gradient(subset=[f'{prefix}Δ'], cmap='Reds')
                 except: pass
                 st.dataframe(styled, use_container_width=True)
 
-            with tabs[0]: render_momentum_tab(res_df, "單日")
-            with tabs[1]: render_momentum_tab(res_df, "5日")
-            if calc_days == 11:
-                with tabs[2]: render_momentum_tab(res_df, "10日")
+            with tabs[0]: render_momentum_tab(res_df, "1d_", "5d_rank_chg") # 單日借用5日的升降
+            with tabs[1]: render_momentum_tab(res_df, "5d_", "5d_rank_chg")
+            if calc_days >= 11:
+                with tabs[2]: render_momentum_tab(res_df, "10d_", "10d_rank_chg")
+            if calc_days >= 21:
+                with tabs[3]: render_momentum_tab(res_df, "20d_", "20d_rank_chg")
 
     # 🌟 3. 個股查詢器 🌟
     stock_options = []
