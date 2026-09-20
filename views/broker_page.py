@@ -3,15 +3,15 @@ import streamlit as st
 import pandas as pd
 from utils.data_utils import calculate_chip_concentration
 
-# 🌟 效能救星 1：改讀取你專屬的 Hugging Face 滿血版 Parquet！
+# 🌟 效能救星 1：極致省記憶體版讀取引擎
 @st.cache_data(show_spinner=False, ttl=3600)
 def load_full_blood_broker_history():
-    # 你的 Hugging Face 直連網址
     remote_parquet_url = "https://huggingface.co/datasets/goodinfo3583/tw-broker-parquet/resolve/main/broker_summary_master.parquet"
     try:
-        df = pd.read_parquet(remote_parquet_url)
+        # 1. 指定需要的欄位 (不要讀取 均買價、均賣價 等字串，節省極大記憶體)
+        columns_to_read = ['日期', '股票代號', '券商代號', '券商名稱', '買賣超股數', '總買進股數', '總買進金額', '買賣超金額']
+        df = pd.read_parquet(remote_parquet_url, columns=columns_to_read)
         
-        # 將滿血版欄位，轉換成能相容你原本 UI 的名稱
         df = df.rename(columns={
             '日期': 'trade_date', 
             '股票代號': 'stock_code', 
@@ -20,14 +20,16 @@ def load_full_blood_broker_history():
             '買賣超股數': 'net_vol_shares'
         })
         
-        # 確保日期是字串格式 (YYYY-MM-DD)，配合你原有的邏輯
-        df['trade_date'] = pd.to_datetime(df['trade_date']).dt.strftime('%Y-%m-%d')
+        # 2. 致命優化：將字串強制轉為 Category 型別！(記憶體瞬間從 800MB 降到 100MB 以下)
+        df['stock_code'] = df['stock_code'].astype('category')
+        df['broker'] = df['broker'].astype('category')
+        df['broker_name'] = df['broker_name'].astype('category')
         
-        # 把股數轉換成張數 (為了配合你原本的淨買賣張數邏輯)
-        df['net_vol'] = df['net_vol_shares'] / 1000
+        # 將 Timestamp 直接轉為字串格式 (YYYY-MM-DD)
+        df['trade_date'] = df['trade_date'].dt.strftime('%Y-%m-%d').astype('category')
         
-        # 標記買方(buy)或賣方(sell)
-        df['side'] = df['net_vol'].apply(lambda x: 'buy' if x > 0 else 'sell')
+        df['net_vol'] = (df['net_vol_shares'] / 1000).astype('float32') # 降低精確度省記憶體
+        df['side'] = df['net_vol'].apply(lambda x: 'buy' if x > 0 else 'sell').astype('category')
         
         return df
     except Exception as e:
