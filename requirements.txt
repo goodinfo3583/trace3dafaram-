@@ -12,3 +12,4 @@ html5lib
 beautifulsoup4
 pyarrow
 fastparquet
+matplotlib
