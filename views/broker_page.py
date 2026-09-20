@@ -2,7 +2,25 @@
 import streamlit as st
 import pandas as pd
 from utils.data_utils import calculate_chip_concentration
+# 🎯 輕量級分點慣性標籤庫 (你可以隨時擴充)
+BROKER_TAGS = {
+    "凱基台北": "⚠️ 隔日沖",
+    "統一城中": "⚠️ 隔日沖",
+    "元大土城永寧": "⚠️ 隔日沖",
+    "美林": "🌐 外資",
+    "台灣摩根士丹利": "🌐 外資",
+    "美商高盛": "🌐 外資",
+    "摩根大通": "🌐 外資",
+    "新加坡商瑞銀": "🌐 外資",
+    # 地緣券商你可以之後查好地址慢慢加，例如：
+    "富邦嘉義": "📍 嘉義地緣",
+}
 
+def apply_broker_tags(broker_name):
+    """給券商名稱貼上標籤的輕量級小幫手"""
+    name_str = str(broker_name)
+    tag = BROKER_TAGS.get(name_str, "")
+    return f"{name_str} {tag}" if tag else name_str
 # 🌟 效能救星 1：改讀取你專屬的 Hugging Face 滿血版 Parquet！
 @st.cache_data(show_spinner=False, ttl=3600)
 def load_full_blood_broker_history():
@@ -252,10 +270,12 @@ def render_broker_dashboard(target_stock, display_name, df_raw_all, df_trend):
                 df['金額(萬)'] = (df['買賣超金額'] / 10000).round(0)
                 df = df[[broker_col, 'net_vol', '均價', '金額(萬)']]
                 df.columns = ['券商名稱', '張數', '均價', '金額(萬)']
+                df['券商名稱'] = df['券商名稱'].apply(apply_broker_tags)
                 return df.style.format({'張數': "{:,.1f}", '均價': "{:.2f}", '金額(萬)': "{:,.0f}"})
             else:
                 df = df[[broker_col, 'net_vol', '均價']]
                 df.columns = ['券商名稱', '張數', '均價']
+                df['券商名稱'] = df['券商名稱'].apply(apply_broker_tags)
                 return df.style.format({'張數': "{:,.1f}", '均價': "{:.2f}"})
 
         with col_buy:
