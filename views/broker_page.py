@@ -500,8 +500,8 @@ df_raw_all = load_full_blood_broker_history()
 
     # 🌟 2. 新增：籌碼集中動能 (Δ) 排行榜 🌟
     with st.expander("📈 全市場籌碼集中動能 (Δ) 排行榜 (Top 200)", expanded=False):
-        st.markdown("💡 **系統已自動啟動冷門股隱形濾網** (每日總成交額須大於1000萬)。自動根據資料庫天數，比對今日與昨日的集中度變化量 ($\Delta$)，瞬間抓出籌碼急遽集中的飆股黑馬。")
-        
+        st.markdown("💡 **已過濾每日總成交額須小於1000萬標的。比對今日與昨日的集中度變化量 ($\Delta$)，瞬間抓出籌碼急遽集中的飆股黑馬。")
+        st.markdown("集中度 %代表籌碼掌握度需大於"0"，△是加速度，代表發動程度。若集中度高股價低勝率較高")
         c_mom_scan, c_mom_clear = st.columns([3, 1])
         with c_mom_scan:
             if st.button("🚀 開始計算動能排行榜", use_container_width=True, type="primary"):
