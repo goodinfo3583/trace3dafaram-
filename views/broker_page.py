@@ -190,68 +190,54 @@ def render_broker_dashboard(target_stock, display_name, df_raw_all, df_trend):
             if styled_sell is not None: st.dataframe(styled_sell, use_container_width=True, hide_index=True)
             else: st.write("當日無資料")
 
-    # --------- 標籤 2: 區間囤貨 (近60日) 滿血升級版 ---------
+    # --------- 標籤 2: 區間囤貨 (近60日) ---------
     with tab2:
-        st.markdown("##### 🕵️‍♂️ 誰在拿真金白銀連續吃貨？")
+        st.markdown("##### 🕵️‍♂️ 誰在連續吃貨？誰在持續倒貨？")
         recent_dates = available_dates[:60]
         recent_raw = stock_raw[stock_raw['trade_date'].isin(recent_dates)].copy()
         
-        # 🚀 滿血聚合：不只算張數，連金額與均價一起算出來！
-        hoard_df = recent_raw.groupby(broker_col).agg(
-            區間淨買超張數=('net_vol', 'sum'),
-            區間總買進股數=('總買進股數', 'sum'),
-            區間總買進金額=('總買進金額', 'sum'),
-            區間淨買賣金額=('買賣超金額', 'sum')
-        ).reset_index()
+        recent_raw['real_net_vol'] = recent_raw.apply(
+            lambda x: abs(x['net_vol']) if x['side'] == 'buy' else -abs(x['net_vol']), axis=1
+        )
         
-        # 🚀 計算大戶底牌：平均防守成本！
-        hoard_df['主力平均成本'] = (hoard_df['區間總買進金額'] / hoard_df['區間總買進股數']).fillna(0).round(2)
-        # 把金額轉成「萬」或「億」以利閱讀
-        hoard_df['囤貨斥資(億)'] = (hoard_df['區間淨買賣金額'] / 100000000).round(2)
+        hoard_df = recent_raw.groupby(broker_col).agg(
+            買進總計=('real_net_vol', lambda x: x[x > 0].sum()),
+            賣出總計=('real_net_vol', lambda x: abs(x[x < 0].sum())),
+            區間淨買賣=('real_net_vol', 'sum')
+        ).reset_index()
         
         col_hoard, col_dump = st.columns(2)
         
         def fmt_dash(val):
-            if pd.isna(val) or val == 0: return "-"
+            if pd.isna(val) or val == 0: 
+                return "-"
             return "{:,.0f}".format(val)
         
         with col_hoard:
-            st.markdown("##### 📈 近 60 日囤貨分點 (斥資破億榜)")
-            # 篩選真正砸錢買超的主力
-            hoarders = hoard_df[hoard_df['區間淨買超張數'] > 0].sort_values('囤貨斥資(億)', ascending=False)
-            
+            st.markdown("##### 📈 近 60 日囤貨分點 (全榜)")
+            hoarders = hoard_df[hoard_df['區間淨買賣'] > 0].sort_values('區間淨買賣', ascending=False)
             if not hoarders.empty:
-                hoarders_display = hoarders[['券商名稱', '區間淨買超張數', '主力平均成本', '囤貨斥資(億)']]
-                hoarders_display.columns = ['券商名稱', '淨買超(張)', '均買價', '斥資(億)']
-                
-                # 幫均買價與金額上色
-                styled_hoard = hoarders_display.style.format({
-                    '淨買超(張)': fmt_dash, 
-                    '均買價': "{:.2f}",
-                    '斥資(億)': "{:.2f}"
-                }).background_gradient(subset=['斥資(億)'], cmap='Reds')
-                
+                hoarders.columns = ['券商名稱', '總買(張)', '總賣(張)', '淨買超(張)']
+                styled_hoard = hoarders.style.format({
+                    '總買(張)': fmt_dash, 
+                    '總賣(張)': fmt_dash, 
+                    '淨買超(張)': fmt_dash
+                })
                 st.dataframe(styled_hoard, use_container_width=True, hide_index=True)
             else: 
                 st.write("區間內無明顯囤貨分點")
                 
         with col_dump:
-            st.markdown("##### 📉 近 60 日倒貨分點")
-            dumpers = hoard_df[hoard_df['區間淨買超張數'] < 0].sort_values('囤貨斥資(億)', ascending=True).copy()
-            
+            st.markdown("##### 📉 近 60 日倒貨分點 ")
+            dumpers = hoard_df[hoard_df['區間淨買賣'] < 0].sort_values('區間淨買賣', ascending=True).copy()
             if not dumpers.empty:
-                # 倒貨金額取絕對值
-                dumpers['囤貨斥資(億)'] = dumpers['囤貨斥資(億)'].abs()
-                dumpers['區間淨買超張數'] = dumpers['區間淨買超張數'].abs()
-                
-                dumpers_display = dumpers[['券商名稱', '區間淨買超張數', '囤貨斥資(億)']]
-                dumpers_display.columns = ['券商名稱', '淨賣超(張)', '提款(億)']
-                
-                styled_dump = dumpers_display.style.format({
-                    '淨賣超(張)': fmt_dash, 
-                    '提款(億)': "{:.2f}"
-                }).background_gradient(subset=['提款(億)'], cmap='Greens')
-                
+                dumpers['區間淨買賣'] = dumpers['區間淨買賣'].abs()
+                dumpers.columns = ['券商名稱', '總買(張)', '總賣(張)', '淨賣超(張)']
+                styled_dump = dumpers.style.format({
+                    '總買(張)': fmt_dash, 
+                    '總賣(張)': fmt_dash, 
+                    '淨賣超(張)': fmt_dash
+                })
                 st.dataframe(styled_dump, use_container_width=True, hide_index=True)
             else: 
                 st.write("區間內無明顯倒貨分點")
