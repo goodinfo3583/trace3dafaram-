@@ -556,3 +556,42 @@ def render(STOCK_DICT=None):
                         
                         st.session_state['broker_global_scan_result'] = result_df
                         st.session_state['broker_global_scan_mode'] = scan_mode
+        
+        with c_clear:
+            if st.button("🗑️ 清除暫存", use_container_width=True):
+                st.session_state.pop('broker_global_scan_result', None)
+                st.rerun()
+
+        if 'broker_global_scan_result' in st.session_state:
+            cached_res = st.session_state['broker_global_scan_result']
+            cached_mode = st.session_state.get('broker_global_scan_mode', '未知模式')
+            
+            if not cached_res.empty:
+                st.success(f"🎯 掃描結果 ({cached_mode})：共發現 {len(cached_res)} 組主力特徵。")
+                styled_res = cached_res.head(100).style.format({'近期買超總張數': "{:,.0f}"})
+                st.dataframe(styled_res, use_container_width=True, hide_index=True)
+            else:
+                st.info("目前市場上無明顯的分點特徵。")
+          
+    if selected_stock_str:
+        target_stock = selected_stock_str.split(" ")[0].strip()
+        display_name = selected_stock_str
+        
+        # 🚀 這裡改呼叫新的滿血版函數！
+        df_raw_all = load_full_blood_broker_history()
+        
+        if not df_raw_all.empty:
+            try:
+                # 這裡傳錯網址了！
+                df_trend = calculate_chip_concentration("https://raw.githubusercontent.com/goodinfo3583/tw-broker-data/main/data/broker/broker_history.csv", target_stock)
+            except:
+                df_trend = pd.DataFrame()
+                
+            if not df_trend.empty:
+                render_broker_dashboard(target_stock, display_name, df_raw_all, df_trend)
+            else:
+                # 這裡的 '-' 會讓系統崩潰！
+                render_broker_dashboard(target_stock, display_name, df_raw_all, pd.DataFrame({'trade_date': ['-'], 'concentration_%': [0], 'net_buy': [0]}))
+                st.warning("⚠️ 集中度圖表暫時無法顯示，但下方的【囤貨明細】已切換為滿血版。")
+        else:
+            st.warning("⚠️ 找不到資料。滿血版資料庫可能是空的。")

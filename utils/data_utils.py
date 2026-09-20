@@ -91,43 +91,21 @@ def get_diff_ui(today_val, prev_val):
         return f"<br><span style='color:{color}; font-size:11px;'>({sign}{diff:,})</span>"
     except: return ""
 
-# 💡 優化 4： Parquet 集中度運算引擎
-@st.cache_data(show_spinner=False, ttl=3600)
-def calculate_chip_concentration(parquet_url: str, target_stock: str) -> pd.DataFrame:
+# utils/data_utils.py (替換原本的 calculate_chip_concentration)
+
+# 💡 優化 4：滿血版 Parquet 集中度運算引擎 (光速本地版)
+def calculate_chip_concentration(stock_df: pd.DataFrame) -> pd.DataFrame:
     """
-    計算指定股票的每日籌碼集中度 (適配滿血版 Parquet)
+    計算指定股票的每日籌碼集中度 (直接接收已經過濾好的 DataFrame，瞬間完成)
     """
-    try:
-        # 1. 讀取 Parquet，並開啟節省記憶體的 columns 篩選
-        columns_to_read = ['日期', '股票代號', '券商名稱', '買賣超股數', '總買進股數']
-        df = pd.read_parquet(parquet_url, columns=columns_to_read)
-        
-        # 轉換欄位名稱配合後續邏輯
-        df = df.rename(columns={
-            '日期': 'trade_date', 
-            '股票代號': 'stock_code', 
-            '買賣超股數': 'net_vol_shares'
-        })
-        df['trade_date'] = pd.to_datetime(df['trade_date']).dt.strftime('%Y-%m-%d')
-        df['net_vol'] = df['net_vol_shares'] / 1000  # 轉成張數
-        
-    except Exception as e:
-        print(f"[警告] 讀取籌碼 Parquet 失敗: {e}")
-        return pd.DataFrame()
-    
-    # 2. 過濾目標股票
-    df['stock_code'] = df['stock_code'].astype(str)
-    stock_df = df[df['stock_code'] == target_stock].copy()
-    
     if stock_df.empty:
         return pd.DataFrame() 
         
     results = []
     
-    # 3. 依照「交易日期」進行分組運算
+    # 依照「交易日期」進行分組運算
     for date, group in stock_df.groupby('trade_date'):
         # 當日該檔股票的「總成交張數」 = 所有分點的「總買進股數」加總 / 1000
-        # 因為每買一張必有一賣，所以算單邊買進總和就是總成交量
         daily_total_volume = (group['總買進股數'].sum()) / 1000
         
         if daily_total_volume == 0:
@@ -137,12 +115,9 @@ def calculate_chip_concentration(parquet_url: str, target_stock: str) -> pd.Data
         buy_side = group[group['net_vol'] > 0].sort_values('net_vol', ascending=False).head(15)
         sell_side = group[group['net_vol'] < 0].sort_values('net_vol', ascending=True).head(15)
         
-        # 前 15 大買超張數加總
         top15_buy_vol = buy_side['net_vol'].sum()
-        # 前 15 大賣超張數加總 (用絕對值)
         top15_sell_vol = abs(sell_side['net_vol'].sum())
         
-        # 淨買賣超 = 前15大買超 - 前15大賣超
         daily_net_vol = top15_buy_vol - top15_sell_vol
         
         # 真正的集中度公式：(前15大淨買超) / 當日總成交量
@@ -156,7 +131,6 @@ def calculate_chip_concentration(parquet_url: str, target_stock: str) -> pd.Data
             'concentration_%': concentration_pct
         })
         
-    # 4. 轉成 DataFrame 並依照日期排序
     result_df = pd.DataFrame(results)
     if not result_df.empty:
         result_df = result_df.sort_values('trade_date')
