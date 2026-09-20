@@ -219,7 +219,7 @@ def render_broker_dashboard(target_stock, display_name, df_raw_all, df_trend):
 
     with tab3:
         st.markdown("##### 🗺️ 分點淨買賣力道")
-        st.markdown("橫列為各分點，縱欄顯示**近 30 個交易日**。數字為買賣超張數，小數點代表零股交易，`-0.0` 表示賣出數量小於一張。")
+        st.markdown("橫列為各分點，縱欄顯示**近 30 個交易日**。數字為買賣超張數，`-0.0` 表示賣出數量小於一張。")
         all_matrix_raw = stock_raw.copy()
         if not all_matrix_raw.empty:
             all_matrix_raw['signed_vol'] = all_matrix_raw.apply(lambda x: abs(x['net_vol']) if x['side'] == 'buy' else -abs(x['net_vol']), axis=1)
@@ -235,13 +235,15 @@ def render_broker_dashboard(target_stock, display_name, df_raw_all, df_trend):
             pivot_df['區間累計'] = pivot_df.sum(axis=1)
             pivot_df = pivot_df.sort_values('區間累計', ascending=False)
             
+            # 🚀 修正：防禦小數點誤差，確保連買動態正確顯示！
             def calc_daily_streak(row_name):
                 if row_name not in full_pivot.index: return "-"
                 row = full_pivot.loc[row_name]
                 streak = 0; sign = None
                 for c in all_dates_sorted:
-                    if pd.isna(row.get(c, 0)) or row.get(c, 0) == 0: break  
-                    current_sign = 1 if row.get(c, 0) > 0 else -1
+                    val = row.get(c, 0)
+                    if pd.isna(val) or abs(val) < 0.01: break  
+                    current_sign = 1 if val > 0 else -1
                     if sign is None: sign = current_sign; streak = sign
                     elif sign == current_sign: streak += sign
                     else: break  
@@ -250,13 +252,15 @@ def render_broker_dashboard(target_stock, display_name, df_raw_all, df_trend):
                 else: return "-"
                 
             pivot_df['日連買動態'] = pivot_df.index.to_series().apply(calc_daily_streak)
+            
             def calc_weekly_streak(broker_name):
                 if weekly_sum.empty or broker_name not in weekly_sum.index: return "-"
                 row = weekly_sum.loc[broker_name]
                 streak = 0; sign = None
                 for c in week_cols:
-                    if pd.isna(row.get(c, 0)) or row.get(c, 0) == 0: break
-                    current_sign = 1 if row.get(c, 0) > 0 else -1
+                    val = row.get(c, 0)
+                    if pd.isna(val) or abs(val) < 0.01: break
+                    current_sign = 1 if val > 0 else -1
                     if sign is None: sign = current_sign; streak = sign
                     elif sign == current_sign: streak += sign
                     else: break
@@ -294,7 +298,7 @@ def render_broker_dashboard(target_stock, display_name, df_raw_all, df_trend):
                 try:
                     v = float(val)
                     if v > 0: return 'color: #FF4B4B;'
-                    elif v < 0: return 'color: #00E272;'
+                    elif v < -0.01: return 'color: #00E272;'
                 except: pass
                 return 'color: #94A3B8;'
 
@@ -323,15 +327,11 @@ def render(STOCK_DICT=None):
     with st.expander("🌍 全市場連買分點快搜 (尋找主力連續吃貨標的)", expanded=False):
         st.markdown("此功能將掃描資料庫中所有股票，找出當前處於「連續買超」或「重金砸盤」狀態的特定分點與個股。", unsafe_allow_html=True)
 
-        col_mode, col_filter = st.columns([3, 1])
-        with col_mode:
-            scan_mode = st.radio(
-                "請選擇全市場排行方式：", 
-                ["依日連買排行", "依週連買排行", "依近期買超張數排行", "依單一分點買超金額排行", "依單一股票買超金額排行", "依集中度斜率(Δ)排行", "依股價乖離率(吃豆腐)排行"], 
-                horizontal=True, key="global_broker_scan_radio"
-            )
-        with col_filter:
-            min_amount_filter = st.number_input("排除20日總成交額低於(億元)的冷門股：", min_value=0, value=1, step=1)
+        scan_mode = st.radio(
+            "請選擇全市場排行方式：", 
+            ["依日連買排行", "依週連買排行", "依近期買超張數排行", "依單一分點買超金額排行", "依單一股票買超金額排行", "依股價乖離率(吃豆腐)排行"], 
+            horizontal=True, key="global_broker_scan_radio"
+        )
         
         c_scan, c_clear = st.columns([3, 1])
         with c_scan:
@@ -349,58 +349,14 @@ def render(STOCK_DICT=None):
                                 latest_date = all_dates[0]
                                 df_20d = scan_df[scan_df['trade_date'].isin(all_dates[:20])]
                                 
+                                # 內建冷門股過濾：20日總成交額低於 1億元直接剔除
                                 market_20d = df_20d.groupby('stock_code')['總買進金額'].sum().reset_index()
-                                valid_stocks = market_20d[market_20d['總買進金額'] >= (min_amount_filter * 100000000)]['stock_code']
+                                valid_stocks = market_20d[market_20d['總買進金額'] >= 100000000]['stock_code']
                                 df_20d = df_20d[df_20d['stock_code'].isin(valid_stocks)]
                                 scan_df = scan_df[scan_df['stock_code'].isin(valid_stocks)]
                                 
-                                if scan_mode == "依集中度斜率(Δ)排行":
-                                    daily_vol = df_20d.groupby(['trade_date', 'stock_code'])['總買進股數'].sum() / 1000
-                                    df_buy = df_20d[df_20d['net_vol'] > 0]
-                                    df_sell = df_20d[df_20d['net_vol'] < 0]
-
-                                    top15_buy = df_buy.sort_values(['trade_date', 'stock_code', 'net_vol'], ascending=[True, True, False]).groupby(['trade_date', 'stock_code']).head(15).groupby(['trade_date', 'stock_code'])['net_vol'].sum()
-                                    top15_sell = df_sell.sort_values(['trade_date', 'stock_code', 'net_vol'], ascending=[True, True, True]).groupby(['trade_date', 'stock_code']).head(15).groupby(['trade_date', 'stock_code'])['net_vol'].sum()
-
-                                    daily_net = top15_buy.fillna(0) - top15_sell.abs().fillna(0)
-                                    conc_df = pd.DataFrame({'net_buy': daily_net, 'vol': daily_vol}).reset_index().sort_values('trade_date')
-
-                                    conc_df['5d_net'] = conc_df.groupby('stock_code')['net_buy'].transform(lambda x: x.rolling(5, min_periods=1).sum())
-                                    conc_df['5d_vol'] = conc_df.groupby('stock_code')['vol'].transform(lambda x: x.rolling(5, min_periods=1).sum())
-                                    conc_df['20d_net'] = conc_df.groupby('stock_code')['net_buy'].transform(lambda x: x.rolling(20, min_periods=1).sum())
-                                    conc_df['20d_vol'] = conc_df.groupby('stock_code')['vol'].transform(lambda x: x.rolling(20, min_periods=1).sum())
-
-                                    conc_df['5日集中度(%)'] = (conc_df['5d_net'] / conc_df['5d_vol'] * 100).fillna(0).round(2)
-                                    conc_df['20日集中度(%)'] = (conc_df['20d_net'] / conc_df['20d_vol'] * 100).fillna(0).round(2)
-                                    conc_df['Δ集中度(5-20日)'] = (conc_df['5日集中度(%)'] - conc_df['20日集中度(%)']).round(2)
-
-                                    result_df = conc_df[conc_df['trade_date'] == latest_date].copy()
-
-                                    market_20d_amt = df_20d.groupby('stock_code').agg(amt_20d=('總買進金額', 'sum'), sh_20d=('總買進股數', 'sum')).reset_index()
-                                    market_20d_amt['vwap_20d'] = (market_20d_amt['amt_20d'] / market_20d_amt['sh_20d']).fillna(0)
-                                    latest_price_df = df_20d[df_20d['trade_date'] == latest_date].groupby('stock_code').agg(amt_1d=('總買進金額', 'sum'), sh_1d=('總買進股數', 'sum')).reset_index()
-                                    latest_price_df['最新股價'] = (latest_price_df['amt_1d'] / latest_price_df['sh_1d']).fillna(0).round(2)
-                                    
-                                    price_trend = pd.merge(market_20d_amt[['stock_code', 'vwap_20d']], latest_price_df[['stock_code', '最新股價']], on='stock_code')
-                                    price_trend['price_diff_%'] = ((price_trend['最新股價'] - price_trend['vwap_20d']) / price_trend['vwap_20d'] * 100).fillna(0)
-
-                                    result_df = pd.merge(result_df, price_trend, on='stock_code')
-
-                                    def get_status(row):
-                                        d_conc = row['Δ集中度(5-20日)']
-                                        p_diff = row['price_diff_%']
-                                        if d_conc >= 3 and p_diff <= 3: return "🌟 偷偷吸籌 (看好)"
-                                        if d_conc >= 3 and p_diff > 3: return "🚀 量價齊揚 (多頭)"
-                                        if d_conc <= -3 and p_diff > 3: return "⚠️ 逢高出貨 (危險)"
-                                        if d_conc <= -3 and p_diff <= 3: return "🛑 籌碼渙散 (弱勢)"
-                                        if d_conc > 0: return "↗️ 偏多"
-                                        return "➡️ 盤整/偏空"
-
-                                    result_df['籌碼動態'] = result_df.apply(get_status, axis=1)
-                                    result_df = result_df[result_df['vol'] > 0].sort_values('Δ集中度(5-20日)', ascending=False)
-                                    result_df = result_df[['stock_code', '5日集中度(%)', '20日集中度(%)', 'Δ集中度(5-20日)', '最新股價', '籌碼動態']]
-
-                                elif scan_mode == "依股價乖離率(吃豆腐)排行":
+                                # 💡 股價乖離率 (吃豆腐) 掃描
+                                if scan_mode == "依股價乖離率(吃豆腐)排行":
                                     agg_20d = df_20d.groupby(['stock_code', broker_col]).agg(net_vol=('net_vol', 'sum'), buy_amt=('總買進金額', 'sum'), buy_shares=('總買進股數', 'sum')).reset_index()
                                     latest_price = (df_20d[df_20d['trade_date'] == latest_date].groupby('stock_code')['總買進金額'].sum() / df_20d[df_20d['trade_date'] == latest_date].groupby('stock_code')['總買進股數'].sum()).fillna(0).round(2)
                                     
@@ -424,6 +380,7 @@ def render(STOCK_DICT=None):
                                     result_df = dev_df.sort_values('絕對乖離', ascending=True)
                                     result_df = result_df[['stock_code', broker_col, '主力成本', '最新股價', '乖離率(%)', 'net_vol', '吃豆腐動態']].rename(columns={'net_vol': '主力囤貨(張)'})
 
+                                # 其餘原有的掃描功能
                                 else:
                                     agg_20d = df_20d.groupby(['stock_code', broker_col]).agg(
                                         近期買超總張數=('net_vol', 'sum'), 區間總買進股數=('總買進股數', 'sum'),
@@ -503,7 +460,6 @@ def render(STOCK_DICT=None):
                                         result_df = result_df[cols]
                                 
                                 if scan_mode == "依單一股票買超金額排行": result_df.rename(columns={'stock_code': '股票代號', broker_col: '參與大戶(前5大)'}, inplace=True)
-                                elif scan_mode == "依集中度斜率(Δ)排行": result_df.rename(columns={'stock_code': '股票代號'}, inplace=True)
                                 elif scan_mode == "依股價乖離率(吃豆腐)排行": result_df.rename(columns={'stock_code': '股票代號', broker_col: '最大主力分點'}, inplace=True)
                                 else: result_df.rename(columns={'stock_code': '股票代號', broker_col: '券商分點'}, inplace=True)
                                     
@@ -523,29 +479,24 @@ def render(STOCK_DICT=None):
                 
                 format_dict = {
                     '近期買超總張數': "{:,.1f}", '均價': "{:.2f}", '斥資(億)': "{:.2f}", '主力囤貨(張)': "{:,.1f}",
-                    '5日集中度(%)': "{:.2f}", '20日集中度(%)': "{:.2f}", 'Δ集中度(5-20日)': "{:.2f}", 
                     '主力成本': "{:.2f}", '最新股價': "{:.2f}", '乖離率(%)': "{:.2f}"
                 }
-                styled_res = cached_res.head(200).style.format(format_dict)
+                styled_res = cached_res.head(100).style.format(format_dict)
                 
                 if '斥資(億)' in cached_res.columns:
                     try: styled_res = styled_res.background_gradient(subset=['斥資(億)'], cmap='Reds')
                     except: pass
                 elif '乖離率(%)' in cached_res.columns:
-                    try: styled_res = styled_res.background_gradient(subset=['乖離率(%)'], cmap='coolwarm_r')
-                    except: pass
-                elif 'Δ集中度(5-20日)' in cached_res.columns:
-                    try: styled_res = styled_res.background_gradient(subset=['Δ集中度(5-20日)'], cmap='Reds')
+                    try: styled_res = styled_res.background_gradient(subset=['乖離率(%)'], cmap='coolwarm_r') 
                     except: pass
                     
                 st.dataframe(styled_res, use_container_width=True, hide_index=True)
             else:
-                st.info("目前市場上無符合條件的標的。")
+                st.info("目前市場上無明顯的分點特徵。")
 
-    # 🌟 2. 籌碼動能 (Δ) 專屬掃描器 🌟
+    # 🌟 2. 新增：籌碼集中動能 (Δ) 排行榜 🌟
     with st.expander("📈 全市場籌碼集中動能 (Δ) 排行榜 (Top 200)", expanded=False):
-        st.markdown("比較「今日的區間集中度」與「昨日的區間集中度」的變化量 ($\Delta$)，瞬間抓出籌碼急遽集中的飆股黑馬。")
-        min_amount_filter_momentum = st.number_input("排除20日總成交額低於(億元)的冷門股：", min_value=0, value=1, step=1, key="momentum_filter")
+        st.markdown("💡 **系統已自動啟動冷門股隱形濾網** (每日總成交額須大於1000萬)。自動根據資料庫天數，比對今日與昨日的集中度變化量 ($\Delta$)，瞬間抓出籌碼急遽集中的飆股黑馬。")
         
         c_mom_scan, c_mom_clear = st.columns([3, 1])
         with c_mom_scan:
@@ -557,18 +508,21 @@ def render(STOCK_DICT=None):
                         valid_dates = scan_df['trade_date'].dropna().unique()
                         all_dates = sorted(valid_dates, reverse=True)
                         
-                        if len(all_dates) >= 21:
-                            # 為了算出昨天的 20 日均線，我們需要拿 21 天的資料
-                            df_21d = scan_df[scan_df['trade_date'].isin(all_dates[:21])]
+                        max_days = len(all_dates)
+                        if max_days >= 6:
+                            # 🚀 自適應天數引擎：超過11天就算10日線，否則只算5日線
+                            calc_days = 11 if max_days >= 11 else 6
+                            df_calc = scan_df[scan_df['trade_date'].isin(all_dates[:calc_days])]
                             
-                            # 🚀 執行冷門股過濾
-                            market_21d = df_21d.groupby('stock_code')['總買進金額'].sum().reset_index()
-                            valid_stocks = market_21d[market_21d['總買進金額'] >= (min_amount_filter_momentum * 100000000)]['stock_code']
-                            df_21d = df_21d[df_21d['stock_code'].isin(valid_stocks)]
+                            # 隱形濾網：自動排除冷門股 (平均每日須 > 1000萬)
+                            min_amount = 100000000 if calc_days == 11 else 50000000
+                            market_amt = df_calc.groupby('stock_code')['總買進金額'].sum().reset_index()
+                            valid_stocks = market_amt[market_amt['總買進金額'] >= min_amount]['stock_code']
+                            df_calc = df_calc[df_calc['stock_code'].isin(valid_stocks)]
                             
-                            daily_vol = df_21d.groupby(['trade_date', 'stock_code'])['總買進股數'].sum() / 1000
-                            df_buy = df_21d[df_21d['net_vol'] > 0]
-                            df_sell = df_21d[df_21d['net_vol'] < 0]
+                            daily_vol = df_calc.groupby(['trade_date', 'stock_code'])['總買進股數'].sum() / 1000
+                            df_buy = df_calc[df_calc['net_vol'] > 0]
+                            df_sell = df_calc[df_calc['net_vol'] < 0]
 
                             top15_buy = df_buy.sort_values(['trade_date', 'stock_code', 'net_vol'], ascending=[True, True, False]).groupby(['trade_date', 'stock_code']).head(15).groupby(['trade_date', 'stock_code'])['net_vol'].sum()
                             top15_sell = df_sell.sort_values(['trade_date', 'stock_code', 'net_vol'], ascending=[True, True, True]).groupby(['trade_date', 'stock_code']).head(15).groupby(['trade_date', 'stock_code'])['net_vol'].sum()
@@ -576,30 +530,23 @@ def render(STOCK_DICT=None):
                             daily_net = top15_buy.fillna(0) - top15_sell.abs().fillna(0)
                             conc_df = pd.DataFrame({'net_buy': daily_net, 'vol': daily_vol}).reset_index().sort_values(['stock_code', 'trade_date'])
 
-                            # 分別計算 1日、5日、10日、20日的集中度
                             conc_df['1d_conc'] = (conc_df['net_buy'] / conc_df['vol'] * 100).fillna(0)
                             conc_df['5d_net'] = conc_df.groupby('stock_code')['net_buy'].transform(lambda x: x.rolling(5, min_periods=1).sum())
                             conc_df['5d_vol'] = conc_df.groupby('stock_code')['vol'].transform(lambda x: x.rolling(5, min_periods=1).sum())
-                            conc_df['10d_net'] = conc_df.groupby('stock_code')['net_buy'].transform(lambda x: x.rolling(10, min_periods=1).sum())
-                            conc_df['10d_vol'] = conc_df.groupby('stock_code')['vol'].transform(lambda x: x.rolling(10, min_periods=1).sum())
-                            conc_df['20d_net'] = conc_df.groupby('stock_code')['net_buy'].transform(lambda x: x.rolling(20, min_periods=1).sum())
-                            conc_df['20d_vol'] = conc_df.groupby('stock_code')['vol'].transform(lambda x: x.rolling(20, min_periods=1).sum())
-
                             conc_df['5d_conc'] = (conc_df['5d_net'] / conc_df['5d_vol'] * 100).fillna(0)
-                            conc_df['10d_conc'] = (conc_df['10d_net'] / conc_df['10d_vol'] * 100).fillna(0)
-                            conc_df['20d_conc'] = (conc_df['20d_net'] / conc_df['20d_vol'] * 100).fillna(0)
-
-                            # 計算今日與昨日的差距 (Δ)
+                            
                             conc_df['單日Δ'] = conc_df.groupby('stock_code')['1d_conc'].diff().fillna(0).round(2)
                             conc_df['5日Δ'] = conc_df.groupby('stock_code')['5d_conc'].diff().fillna(0).round(2)
-                            conc_df['10日Δ'] = conc_df.groupby('stock_code')['10d_conc'].diff().fillna(0).round(2)
-                            conc_df['20日Δ'] = conc_df.groupby('stock_code')['20d_conc'].diff().fillna(0).round(2)
                             
-                            # 整理顯示欄位
                             conc_df['單日集中度(%)'] = conc_df['1d_conc'].round(2)
                             conc_df['5日集中度(%)'] = conc_df['5d_conc'].round(2)
-                            conc_df['10日集中度(%)'] = conc_df['10d_conc'].round(2)
-                            conc_df['20日集中度(%)'] = conc_df['20d_conc'].round(2)
+
+                            if calc_days == 11:
+                                conc_df['10d_net'] = conc_df.groupby('stock_code')['net_buy'].transform(lambda x: x.rolling(10, min_periods=1).sum())
+                                conc_df['10d_vol'] = conc_df.groupby('stock_code')['vol'].transform(lambda x: x.rolling(10, min_periods=1).sum())
+                                conc_df['10d_conc'] = (conc_df['10d_net'] / conc_df['10d_vol'] * 100).fillna(0)
+                                conc_df['10日Δ'] = conc_df.groupby('stock_code')['10d_conc'].diff().fillna(0).round(2)
+                                conc_df['10日集中度(%)'] = conc_df['10d_conc'].round(2)
 
                             latest_conc = conc_df[(conc_df['trade_date'] == all_dates[0]) & (conc_df['vol'] > 0)].copy()
                             latest_conc.rename(columns={'stock_code': '股票代號'}, inplace=True)
@@ -610,8 +557,9 @@ def render(STOCK_DICT=None):
                                 latest_conc['股票名稱'] = "-"
                                 
                             st.session_state['momentum_scan_result'] = latest_conc
+                            st.session_state['momentum_calc_days'] = calc_days
                         else:
-                            st.warning("資料庫天數不足 21 天，無法計算完整動能。")
+                            st.warning("資料庫天數不足 6 天，無法計算 5 日動能。")
         with c_mom_clear:
             if st.button("🗑️ 清除動能暫存", use_container_width=True):
                 st.session_state.pop('momentum_scan_result', None)
@@ -619,7 +567,11 @@ def render(STOCK_DICT=None):
 
         if 'momentum_scan_result' in st.session_state:
             res_df = st.session_state['momentum_scan_result']
-            tab_1d, tab_5d, tab_10d, tab_20d = st.tabs(["單日集中度 Δ", "5日集中度 Δ", "10日集中度 Δ", "20日集中度 Δ"])
+            calc_days = st.session_state.get('momentum_calc_days', 6)
+            
+            tabs_names = ["單日集中度 Δ", "5日集中度 Δ"]
+            if calc_days == 11: tabs_names.append("10日集中度 Δ")
+            tabs = st.tabs(tabs_names)
             
             def render_momentum_tab(df, prefix):
                 disp_df = df[['股票代號', '股票名稱', f'{prefix}集中度(%)', f'{prefix}Δ']].sort_values(f'{prefix}Δ', ascending=False).head(200)
@@ -631,10 +583,10 @@ def render(STOCK_DICT=None):
                 except: pass
                 st.dataframe(styled, use_container_width=True)
 
-            with tab_1d: render_momentum_tab(res_df, "單日")
-            with tab_5d: render_momentum_tab(res_df, "5日")
-            with tab_10d: render_momentum_tab(res_df, "10日")
-            with tab_20d: render_momentum_tab(res_df, "20日")
+            with tabs[0]: render_momentum_tab(res_df, "單日")
+            with tabs[1]: render_momentum_tab(res_df, "5日")
+            if calc_days == 11:
+                with tabs[2]: render_momentum_tab(res_df, "10日")
 
     # 🌟 3. 個股查詢器 🌟
     stock_options = []
