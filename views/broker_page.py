@@ -8,7 +8,6 @@ from utils.data_utils import calculate_chip_concentration
 def load_full_blood_broker_history():
     remote_parquet_url = "https://huggingface.co/datasets/goodinfo3583/tw-broker-parquet/resolve/main/broker_summary_master.parquet"
     try:
-        # 讀取需要的滿血版欄位，節省記憶體
         columns_to_read = ['日期', '股票代號', '券商代號', '券商名稱', '買賣超股數', '總買進股數', '總買進金額', '買賣超金額']
         df = pd.read_parquet(remote_parquet_url, columns=columns_to_read)
         
@@ -20,14 +19,12 @@ def load_full_blood_broker_history():
             '買賣超股數': 'net_vol_shares'
         })
         
-        # 致命優化：將字串強制轉為 Category 型別
         df['stock_code'] = df['stock_code'].astype('category')
         df['broker'] = df['broker'].astype('category')
         df['broker_name'] = df['broker_name'].astype('category')
         
         df['trade_date'] = df['trade_date'].dt.strftime('%Y-%m-%d').astype('category')
         
-        # 股數轉張數
         df['net_vol'] = df['net_vol_shares'] / 1000
         df['side'] = df['net_vol'].apply(lambda x: 'buy' if x > 0 else 'sell').astype('category')
         
@@ -48,7 +45,6 @@ def sync_b8_data():
         broker_col = next((c for c in ['broker_name', 'broker', '券商名稱', '券商', 'name'] if c in df_raw.columns), None)
         if not broker_col: return
 
-        # 🚀 記憶體防爆 1：只留下需要的欄位
         df_light = df_raw[['trade_date', 'stock_code', broker_col, 'net_vol', 'side']].copy()
         
         df_light['signed_vol'] = df_light['net_vol'].abs()
@@ -59,7 +55,6 @@ def sync_b8_data():
         if not all_dates: return
         latest_date = all_dates[0]
 
-        # 🚀 記憶體防爆 2：日連買只追蹤「最新一天有買超」的候選人
         latest_buys = df_light[(df_light['trade_date'] == latest_date) & (df_light['signed_vol'] > 0)]
         day_candidates = latest_buys[['stock_code', broker_col]].drop_duplicates()
         df_day_filtered = pd.merge(df_light, day_candidates, on=['stock_code', broker_col], how='inner')
@@ -78,7 +73,6 @@ def sync_b8_data():
         valid_sum_cols = [c for c in all_dates[:20] if c in scan_pivot.columns]
         scan_pivot['近期買超總張數'] = scan_pivot[valid_sum_cols].sum(axis=1)
 
-        # 🚀 記憶體防爆 3：週連買只追蹤「最新一週有買超」的候選人
         df_week = df_light.dropna(subset=['trade_date']).copy()
         df_week['date_dt'] = pd.to_datetime(df_week['trade_date'], errors='coerce')
         df_week = df_week.dropna(subset=['date_dt'])
@@ -105,7 +99,6 @@ def sync_b8_data():
             
         weekly_sum['連買週數'] = weekly_sum.apply(calc_weekly, axis=1)
 
-        # 4. 合併並找出最佳分點特徵
         df_day = scan_pivot.reset_index()[['stock_code', broker_col, '連買日數', '近期買超總張數']]
         df_wk = weekly_sum.reset_index()[['stock_code', broker_col, '連買週數']]
         
@@ -117,11 +110,9 @@ def sync_b8_data():
             '近期買超總張數': 'max'
         }).reset_index().rename(columns={'stock_code': '統一代號'})
 
-        # 存入全域變數
         st.session_state['b8_summary_df'] = stock_summary
         st.session_state['b8_latest_date'] = latest_date
 
-        # 清空暫存記憶體
         import gc
         del df_raw, df_light, scan_pivot, weekly_sum, final_b8
         gc.collect()
@@ -129,7 +120,6 @@ def sync_b8_data():
     except Exception as e:
         print(f"B8 背景載入失敗: {e}")
         
-# 💡 效能救星 2：將所有圖表與選項封裝在 Fragment 內，避免切換日期時整頁重整
 @st.fragment
 def render_broker_dashboard(target_stock, display_name, df_raw_all, df_trend):
     latest_data = df_trend.iloc[-1]
@@ -139,7 +129,7 @@ def render_broker_dashboard(target_stock, display_name, df_raw_all, df_trend):
         value=f"{latest_data['concentration_%']}%",
         delta=f"淨買超 {latest_data['net_buy']:,} 張"
     )
-    #集中度繪圖    
+    
     import plotly.graph_objects as go
     st.subheader(f"📊 {display_name} 分點集中度連續性走勢")
     
@@ -198,7 +188,7 @@ def render_broker_dashboard(target_stock, display_name, df_raw_all, df_trend):
     
     tab1, tab2, tab3 = st.tabs(["🔹 單日進出明細", "🔹 區間囤貨 (近60日)", "🔹 歷史進出 (近30日)"])
     
-    # --------- 標籤 1: 單日明細 ---------
+    # --------- 標籤 1: 單日明細 (滿血均價版) ---------
     with tab1:
         selected_date = st.selectbox("請選擇要查看的交易日期：", available_dates, key="daily_date_sel")
         daily_raw = stock_raw[stock_raw['trade_date'] == selected_date]
@@ -216,8 +206,11 @@ def render_broker_dashboard(target_stock, display_name, df_raw_all, df_trend):
             
             df = df.sort_values('net_vol', ascending=False).head(15)
             
-            # 🚀 計算均價與金額(萬)
             df['均價'] = (df['總買進金額'] / df['總買進股數']).fillna(0).round(2)
+            if not is_buy:
+                # 若為賣方則計算均賣價
+                df['均價'] = (df['買賣超金額'].abs() / (df['net_vol']*1000)).fillna(0).round(2)
+            
             if '買賣超金額' in df.columns:
                 df['金額(萬)'] = (df['買賣超金額'] / 10000).round(0)
                 df = df[[broker_col, 'net_vol', '均價', '金額(萬)']]
@@ -240,7 +233,7 @@ def render_broker_dashboard(target_stock, display_name, df_raw_all, df_trend):
             if styled_sell is not None: st.dataframe(styled_sell, use_container_width=True, hide_index=True)
             else: st.write("當日無資料")
 
-    # --------- 標籤 2: 區間囤貨 (近60日) 🚀 ---------
+    # --------- 標籤 2: 區間囤貨 (近60日) 滿血版 ---------
     with tab2:
         st.markdown("##### 🕵️‍♂️ 誰在拿真金白銀連續吃貨？")
         recent_dates = available_dates[:60]
@@ -406,11 +399,22 @@ def render(STOCK_DICT=None):
 
     st.markdown("觀察前 15 大分點買賣力道相抵後的淨流向，追蹤籌碼集中度連續性與券商進出。(已升級滿血版金額運算)")
     
-    # 🌟 1. 將全市場掃描器移動到此處 (位於標題下方，選擇股票上方) 🌟
+    # 🌟 1. 全市場掃描器 (已新增斥資排序與縫合功能) 🌟
     with st.expander("🌍 全市場連買分點快搜 (尋找主力連續吃貨標的)", expanded=False):
-        st.markdown("此功能將掃描資料庫中所有股票，找出當前處於「連續買超」狀態的最高天數/週數分點。", unsafe_allow_html=True)
+        st.markdown("此功能將掃描資料庫中所有股票，找出當前處於「連續買超」或「重金砸盤」狀態的特定分點與個股。", unsafe_allow_html=True)
 
-        scan_mode = st.radio("請選擇全市場排行方式：", ["依日連買排行", "依週連買排行", "依近期買超張數排行"], horizontal=True, key="global_broker_scan_radio")
+        scan_mode = st.radio(
+            "請選擇全市場排行方式：", 
+            [
+                "依日連買排行", 
+                "依週連買排行", 
+                "依近期買超張數排行",
+                "依單一分點近期買超金額排行", 
+                "依單一股票買超金額排行"
+            ], 
+            horizontal=True, 
+            key="global_broker_scan_radio"
+        )
         
         c_scan, c_clear = st.columns([3, 1])
         with c_scan:
@@ -421,7 +425,6 @@ def render(STOCK_DICT=None):
                     if not df_raw_all.empty:
                         broker_col = next((c for c in ['broker_name', 'broker', '券商名稱', '券商', 'name'] if c in df_raw_all.columns), None)
                         if broker_col:
-                            # 🚀 掃描器滿血升級：帶入總買進股數與總買進金額，以便計算均價與斥資
                             scan_df = df_raw_all[['trade_date', 'stock_code', broker_col, 'net_vol', '總買進股數', '總買進金額', '買賣超金額']].copy()
                             
                             valid_dates = scan_df['trade_date'].dropna().unique()
@@ -430,23 +433,54 @@ def render(STOCK_DICT=None):
                             if all_dates:
                                 latest_date = all_dates[0]
                                 
-                                if scan_mode in ["依日連買排行", "依近期買超張數排行"]:
+                                # --- 共同的 20日區間資料聚合 (用於日連買、金額排行) ---
+                                valid_sum_dates = all_dates[:20]
+                                df_20d = scan_df[scan_df['trade_date'].isin(valid_sum_dates)]
+                                
+                                agg_20d = df_20d.groupby(['stock_code', broker_col]).agg(
+                                    近期買超總張數=('net_vol', 'sum'),
+                                    區間總買進股數=('總買進股數', 'sum'),
+                                    區間總買進金額=('總買進金額', 'sum'),
+                                    區間買賣超金額=('買賣超金額', 'sum')
+                                ).reset_index()
+                                
+                                # 💡 新增：依【單一分點買超金額】排行
+                                if scan_mode == "依單一分點近期買超金額排行":
+                                    result_df = agg_20d[agg_20d['區間買賣超金額'] > 0].copy()
+                                    result_df['均價'] = (result_df['區間總買進金額'] / result_df['區間總買進股數']).fillna(0).round(2)
+                                    result_df['斥資(億)'] = (result_df['區間買賣超金額'] / 100000000).round(2)
+                                    result_df = result_df.sort_values('斥資(億)', ascending=False)
+                                    result_df = result_df[['stock_code', broker_col, '近期買超總張數', '均價', '斥資(億)']]
+
+                                # 💡 新增：依【單一股票買超金額】排行 (自動縫合大戶名單)
+                                elif scan_mode == "依單一股票買超金額排行":
+                                    # 先過濾出真正買超的分點
+                                    buy_only_20d = agg_20d[agg_20d['區間買賣超金額'] > 0].copy()
+                                    # 再依股票代號進行二次聚合
+                                    stock_agg = buy_only_20d.groupby('stock_code').agg(
+                                        近期買超總張數=('近期買超總張數', 'sum'),
+                                        區間總買進股數=('區間總買進股數', 'sum'),
+                                        區間總買進金額=('區間總買進金額', 'sum'),
+                                        區間買賣超金額=('區間買賣超金額', 'sum'),
+                                        # 將有參與買超的分點名稱用逗號縫合起來
+                                        參與大戶=(broker_col, lambda x: ', '.join(x.dropna().unique()[:5])) # 只顯示前5個避免太長
+                                    ).reset_index()
+                                    
+                                    stock_agg['均價'] = (stock_agg['區間總買進金額'] / stock_agg['區間總買進股數']).fillna(0).round(2)
+                                    stock_agg['斥資(億)'] = (stock_agg['區間買賣超金額'] / 100000000).round(2)
+                                    result_df = stock_agg.sort_values('斥資(億)', ascending=False)
+                                    
+                                    # 因為已經群組化為單一股票，欄位重整一下
+                                    result_df = result_df[['stock_code', '參與大戶', '近期買超總張數', '均價', '斥資(億)']]
+                                    # 為了讓下方統一處理名稱，先暫時把 '參與大戶' 叫回 broker_col
+                                    result_df.rename(columns={'參與大戶': broker_col}, inplace=True)
+
+                                # 原本的日連買與張數排行
+                                elif scan_mode in ["依日連買排行", "依近期買超張數排行"]:
                                     latest_buys = scan_df[(scan_df['trade_date'] == latest_date) & (scan_df['net_vol'] > 0)]
                                     candidates = latest_buys[['stock_code', broker_col]].drop_duplicates()
                                     
                                     df_candidates = pd.merge(scan_df, candidates, on=['stock_code', broker_col], how='inner')
-                                    
-                                    # 計算各分點在近20日的區間聚合數據 (用於斥資與均價)
-                                    valid_sum_dates = all_dates[:20]
-                                    df_candidates_20d = df_candidates[df_candidates['trade_date'].isin(valid_sum_dates)]
-                                    
-                                    agg_20d = df_candidates_20d.groupby(['stock_code', broker_col]).agg(
-                                        近期買超總張數=('net_vol', 'sum'),
-                                        區間總買進股數=('總買進股數', 'sum'),
-                                        區間總買進金額=('總買進金額', 'sum'),
-                                        區間買賣超金額=('買賣超金額', 'sum')
-                                    ).reset_index()
-                                    
                                     scan_pivot = df_candidates.pivot_table(index=['stock_code', broker_col], columns='trade_date', values='net_vol', aggfunc='sum')
                                     
                                     def calc_global_daily_streak(row):
@@ -460,15 +494,20 @@ def render(STOCK_DICT=None):
                                     scan_pivot['連買日數'] = scan_pivot.apply(calc_global_daily_streak, axis=1)
                                     scan_pivot = scan_pivot.reset_index()
                                     
-                                    # 合併連買日數與聚合數據
                                     result_df = pd.merge(scan_pivot[['stock_code', broker_col, '連買日數']], agg_20d, on=['stock_code', broker_col])
                                     result_df = result_df[result_df['連買日數'] >= 1].copy() 
+                                    
+                                    result_df['均價'] = (result_df['區間總買進金額'] / result_df['區間總買進股數']).fillna(0).round(2)
+                                    result_df['斥資(億)'] = (result_df['區間買賣超金額'] / 100000000).round(2)
                                     
                                     if scan_mode == "依日連買排行":
                                         result_df = result_df[result_df['連買日數'] >= 2].sort_values(['連買日數', '近期買超總張數'], ascending=[False, False])
                                     else:
                                         result_df = result_df[result_df['近期買超總張數'] > 0].sort_values(['近期買超總張數', '連買日數'], ascending=[False, False])
-                                        
+                                    
+                                    result_df = result_df[['stock_code', broker_col, '連買日數', '近期買超總張數', '均價', '斥資(億)']]
+
+                                # 原本的週連買排行
                                 else:
                                     scan_df['date_dt'] = pd.to_datetime(scan_df['trade_date'], errors='coerce')
                                     scan_df = scan_df.dropna(subset=['date_dt'])
@@ -495,7 +534,6 @@ def render(STOCK_DICT=None):
                                         weekly_sum['連買週數'] = weekly_sum.apply(calc_global_weekly_streak, axis=1)
                                         weekly_sum = weekly_sum.reset_index()
                                         
-                                        # 為了週排行也顯示均價，把近4週對應回日資料抓出來聚合
                                         df_candidates_raw = pd.merge(scan_df, candidates_wk, on=['stock_code', broker_col], how='inner')
                                         valid_sum_weeks = all_weeks[:4]
                                         df_candidates_4w = df_candidates_raw[df_candidates_raw['year_week'].isin(valid_sum_weeks)]
@@ -510,16 +548,11 @@ def render(STOCK_DICT=None):
                                         result_df = pd.merge(weekly_sum[['stock_code', broker_col, '連買週數']], agg_4w, on=['stock_code', broker_col])
                                         result_df = result_df[result_df['連買週數'] >= 2].sort_values(['連買週數', '近期買超總張數'], ascending=[False, False])
                                 
-                                # 計算斥資與均價
-                                result_df['均價'] = (result_df['區間總買進金額'] / result_df['區間總買進股數']).fillna(0).round(2)
-                                result_df['斥資(億)'] = (result_df['區間買賣超金額'] / 100000000).round(2)
-                                
-                                # 整理最終要顯示的欄位
-                                if scan_mode == "依週連買排行":
-                                    result_df = result_df[['stock_code', broker_col, '連買週數', '近期買超總張數', '均價', '斥資(億)']]
-                                else:
-                                    result_df = result_df[['stock_code', broker_col, '連買日數', '近期買超總張數', '均價', '斥資(億)']]
+                                        result_df['均價'] = (result_df['區間總買進金額'] / result_df['區間總買進股數']).fillna(0).round(2)
+                                        result_df['斥資(億)'] = (result_df['區間買賣超金額'] / 100000000).round(2)
+                                        result_df = result_df[['stock_code', broker_col, '連買週數', '近期買超總張數', '均價', '斥資(億)']]
 
+                                # 統一名稱轉換
                                 if STOCK_DICT:
                                     result_df['股票名稱'] = result_df['stock_code'].astype(str).apply(
                                         lambda x: STOCK_DICT.get(x, {}).get('name', '-')
@@ -529,7 +562,12 @@ def render(STOCK_DICT=None):
                                         cols.insert(1, cols.pop(cols.index('股票名稱')))
                                         result_df = result_df[cols]
                                 
-                                result_df.rename(columns={'stock_code': '股票代號', broker_col: '券商分點'}, inplace=True)
+                                # 依據不同的模式，給予不同的欄位名稱
+                                if scan_mode == "依單一股票買超金額排行":
+                                    result_df.rename(columns={'stock_code': '股票代號', broker_col: '參與大戶(前5大)'}, inplace=True)
+                                else:
+                                    result_df.rename(columns={'stock_code': '股票代號', broker_col: '券商分點'}, inplace=True)
+                                    
                                 st.session_state['broker_global_scan_result'] = result_df
                                 st.session_state['broker_global_scan_mode'] = scan_mode
         
@@ -549,14 +587,13 @@ def render(STOCK_DICT=None):
                     '均價': "{:.2f}", 
                     '斥資(億)': "{:.2f}"
                 })
-                # 全市場掃描排行榜加上漸層，方便快速抓出真正的大戶
                 try: styled_res = styled_res.background_gradient(subset=['斥資(億)'], cmap='Reds')
                 except: pass
                 st.dataframe(styled_res, use_container_width=True, hide_index=True)
             else:
                 st.info("目前市場上無明顯的分點特徵。")
 
-    # 🌟 2. 選擇器往下移 🌟
+    # 🌟 2. 個股查詢器 🌟
     stock_options = []
     if STOCK_DICT:
         unique_options = {f"{v['id']} {v['name']}" for v in STOCK_DICT.values() if len(str(v['id'])) <= 4}
