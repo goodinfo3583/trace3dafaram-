@@ -130,39 +130,76 @@ def render_broker_dashboard(target_stock, display_name, df_raw_all, df_trend):
         delta=f"淨買超 {latest_data['net_buy']:,} 張"
     )
     
+    # === 畫圖區塊升級：股價、滾動集中度、主力防守線 ===
     import plotly.graph_objects as go
-    st.subheader(f"📊 {display_name} 分點集中度連續性走勢")
+    from plotly.subplots import make_subplots
     
-    df_trend_plot = df_trend.copy()
+    st.subheader(f"📊 {display_name} 籌碼與股價共振走勢")
+    
+    df_trend_plot = df_trend.copy().dropna(subset=['stock_price'])
     df_trend_plot['trade_date_short'] = pd.to_datetime(df_trend_plot['trade_date']).dt.strftime('%m-%d')
     
-    fig_trend = go.Figure()
+    # 建立雙 Y 軸圖表 (左Y軸放股價，右Y軸放集中度)
+    fig_trend = make_subplots(specs=[[{"secondary_y": True}]])
+    
+    # 1. 畫當日集中度 (柱狀圖，放右Y軸)
     colors = ['#FF4B4B' if val > 0 else '#00E272' for val in df_trend_plot['concentration_%']]
-    
     fig_trend.add_trace(go.Bar(
-        x=df_trend_plot['trade_date_short'], 
-        y=df_trend_plot['concentration_%'],
-        marker_color=colors,
-        text=[f"{v:.1f}%" if abs(v)>0 else "" for v in df_trend_plot['concentration_%']],
-        textposition='outside',
-        textfont=dict(size=10, color="#E2E8F0")
-    ))
+        x=df_trend_plot['trade_date_short'], y=df_trend_plot['concentration_%'],
+        marker_color=colors, name='單日集中度', opacity=0.6
+    ), secondary_y=True)
     
-    fig_trend.add_hline(y=0, line_color="#FFD700", line_width=1.5, line_dash="dash")
+    # 2. 畫滾動 5 日集中度 (黃色平滑線，放右Y軸，這能濾掉單日雜訊)
+    fig_trend.add_trace(go.Scatter(
+        x=df_trend_plot['trade_date_short'], y=df_trend_plot['5日集中度(%)'],
+        mode='lines', line=dict(color='#FFD700', width=2), name='5日滾動集中度'
+    ), secondary_y=True)
     
+    # 3. 畫真實股價 (藍色線，放左Y軸)
+    fig_trend.add_trace(go.Scatter(
+        x=df_trend_plot['trade_date_short'], y=df_trend_plot['stock_price'],
+        mode='lines+markers', line=dict(color='#38bdf8', width=2), name='市場均價(股價)'
+    ), secondary_y=False)
+    
+    # 🎯 4. 尋找近 20 日最大買超主力的「控盤成本線」並畫出防守底線
+    stock_raw = df_raw_all[df_raw_all['stock_code'] == target_stock].copy()
+    if not stock_raw.empty:
+        broker_col = next((c for c in ['broker_name', 'broker', '券商名稱'] if c in stock_raw.columns), None)
+        recent_20_dates = sorted(stock_raw['trade_date'].unique(), reverse=True)[:20]
+        recent_20_raw = stock_raw[stock_raw['trade_date'].isin(recent_20_dates)]
+        
+        # 找出近 20 日買超第一名的券商
+        top_broker_agg = recent_20_raw.groupby(broker_col).agg(
+            淨買張數=('net_vol', 'sum'),
+            總買進金額=('總買進金額', 'sum'),
+            總買進股數=('總買進股數', 'sum')
+        ).sort_values('淨買張數', ascending=False)
+        
+        if not top_broker_agg.empty and top_broker_agg.iloc[0]['淨買張數'] > 0:
+            top1_name = top_broker_agg.index[0]
+            # 計算該主力這 20 天的真實平均成本
+            top1_cost = round(top_broker_agg.iloc[0]['總買進金額'] / top_broker_agg.iloc[0]['總買進股數'], 2)
+            
+            # 畫出主力防守橫線
+            fig_trend.add_hline(
+                y=top1_cost, line_color="#FF4B4B", line_width=1.5, line_dash="dash",
+                annotation_text=f"🚩 最大主力 ({top1_name}) 防守成本: {top1_cost}元", 
+                annotation_position="bottom right",
+                annotation_font=dict(color="#FF4B4B"),
+                secondary_y=False
+            )
+
     fig_trend.update_layout(
-        height=320, 
-        template='plotly_dark', 
-        paper_bgcolor='rgba(0,0,0,0)', 
-        plot_bgcolor='rgba(0,0,0,0)',
+        height=400, template='plotly_dark', paper_bgcolor='rgba(0,0,0,0)', plot_bgcolor='rgba(0,0,0,0)',
         margin=dict(l=20, r=20, t=20, b=20),
-        yaxis=dict(title="集中度 (%)", showgrid=True, gridcolor='#334155'),
-        xaxis=dict(type='category', tickangle=45),
-        dragmode='pan'
+        legend=dict(orientation="h", yanchor="bottom", y=1.02, xanchor="right", x=1)
     )
     
-    st.plotly_chart(fig_trend, use_container_width=True, config={'displayModeBar': False})
+    fig_trend.update_yaxes(title_text="<b>股價 (元)</b>", secondary_y=False, gridcolor='#334155')
+    fig_trend.update_yaxes(title_text="<b>集中度 (%)</b>", secondary_y=True, showgrid=False)
     
+    st.plotly_chart(fig_trend, use_container_width=True, config={'displayModeBar': False})
+#====================    
     with st.expander("📅 展開查看：近 60 日集中度與淨買超歷史表", expanded=False):
         df_trend_disp = df_trend.sort_values('trade_date', ascending=False).head(60).copy()
         df_trend_disp = df_trend_disp[['trade_date', 'net_buy', 'concentration_%']]

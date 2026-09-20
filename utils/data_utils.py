@@ -91,49 +91,48 @@ def get_diff_ui(today_val, prev_val):
         return f"<br><span style='color:{color}; font-size:11px;'>({sign}{diff:,})</span>"
     except: return ""
 
-# utils/data_utils.py (替換原本的 calculate_chip_concentration)
-
-# 💡 優化 4：滿血版 Parquet 集中度運算引擎 (光速本地版)
+# utils/data_utils.py (升級集中度引擎)
 def calculate_chip_concentration(stock_df: pd.DataFrame) -> pd.DataFrame:
-    """
-    計算指定股票的每日籌碼集中度 (直接接收已經過濾好的 DataFrame，瞬間完成)
-    """
-    if stock_df.empty:
-        return pd.DataFrame() 
+    if stock_df.empty: return pd.DataFrame() 
         
     results = []
     
-    # 依照「交易日期」進行分組運算
     for date, group in stock_df.groupby('trade_date'):
-        # 當日該檔股票的「總成交張數」 = 所有分點的「總買進股數」加總 / 1000
+        # 1. 算出當日市場總成交量與市場均價 (充當真實股價！)
         daily_total_volume = (group['總買進股數'].sum()) / 1000
+        daily_total_amount = group['總買進金額'].sum()
         
-        if daily_total_volume == 0:
-            continue
+        if daily_total_volume == 0: continue
+        
+        # 當日股票均價
+        daily_vwap = round(daily_total_amount / (daily_total_volume * 1000), 2)
             
-        # 分出買賣方，並各自排序抓出前 15 大
         buy_side = group[group['net_vol'] > 0].sort_values('net_vol', ascending=False).head(15)
         sell_side = group[group['net_vol'] < 0].sort_values('net_vol', ascending=True).head(15)
         
         top15_buy_vol = buy_side['net_vol'].sum()
         top15_sell_vol = abs(sell_side['net_vol'].sum())
-        
         daily_net_vol = top15_buy_vol - top15_sell_vol
         
-        # 真正的集中度公式：(前15大淨買超) / 當日總成交量
         concentration_pct = round((daily_net_vol / daily_total_volume) * 100, 2)
         
         results.append({
             'trade_date': date,
-            'top15_buy': top15_buy_vol,
-            'top15_sell': top15_sell_vol,
+            'total_volume': daily_total_volume,
+            'stock_price': daily_vwap,          # 🎯 新增：當日股價
             'net_buy': daily_net_vol,
             'concentration_%': concentration_pct
         })
         
-    result_df = pd.DataFrame(results)
+    result_df = pd.DataFrame(results).sort_values('trade_date')
+    
+    # 🎯 核心進階策略：計算滾動時間序列 (5日、10日、20日集中度)
     if not result_df.empty:
-        result_df = result_df.sort_values('trade_date')
+        # 滾動 5 日集中度 = 近 5 日前15大淨買超總和 / 近 5 日總成交量
+        result_df['5日集中度(%)'] = (result_df['net_buy'].rolling(5).sum() / result_df['total_volume'].rolling(5).sum() * 100).round(2)
+        result_df['10日集中度(%)'] = (result_df['net_buy'].rolling(10).sum() / result_df['total_volume'].rolling(10).sum() * 100).round(2)
+        result_df['20日集中度(%)'] = (result_df['net_buy'].rolling(20).sum() / result_df['total_volume'].rolling(20).sum() * 100).round(2)
+        
     return result_df
 
 # 台股代號與名稱產業類別 萬用字典引擎
