@@ -577,21 +577,31 @@ def render(STOCK_DICT=None):
         target_stock = selected_stock_str.split(" ")[0].strip()
         display_name = selected_stock_str
         
-        # 🚀 這裡改呼叫新的滿血版函數！
+        # 載入全市場資料 (這裡會秒開，因為有快取)
         df_raw_all = load_full_blood_broker_history()
         
         if not df_raw_all.empty:
-            try:
-                # 這裡傳錯網址了！
-                df_trend = calculate_chip_concentration("https://raw.githubusercontent.com/goodinfo3583/tw-broker-data/main/data/broker/broker_history.csv", target_stock)
-            except:
-                df_trend = pd.DataFrame()
-                
-            if not df_trend.empty:
-                render_broker_dashboard(target_stock, display_name, df_raw_all, df_trend)
+            # 🚀 效能大躍進：直接在本地把這檔股票切出來
+            stock_raw = df_raw_all[df_raw_all['stock_code'] == target_stock].copy()
+            
+            if not stock_raw.empty:
+                try:
+                    # 🚀 將已經切好的資料傳給工具箱，0.01 秒瞬間算出集中度！
+                    df_trend = calculate_chip_concentration(stock_raw)
+                except Exception as e:
+                    print(f"集中度計算錯誤: {e}")
+                    df_trend = pd.DataFrame()
+                    
+                if not df_trend.empty:
+                    render_broker_dashboard(target_stock, display_name, df_raw_all, df_trend)
+                else:
+                    # 給一個合法的假日期避免圖表崩潰
+                    import datetime
+                    dummy_date = datetime.datetime.today().strftime('%Y-%m-%d')
+                    dummy_df = pd.DataFrame({'trade_date': [dummy_date], 'concentration_%': [0], 'net_buy': [0]})
+                    render_broker_dashboard(target_stock, display_name, df_raw_all, dummy_df)
+                    st.warning("⚠️ 查無此檔股票的近期集中度資料。")
             else:
-                # 這裡的 '-' 會讓系統崩潰！
-                render_broker_dashboard(target_stock, display_name, df_raw_all, pd.DataFrame({'trade_date': ['-'], 'concentration_%': [0], 'net_buy': [0]}))
-                st.warning("⚠️ 集中度圖表暫時無法顯示，但下方的【囤貨明細】已切換為滿血版。")
+                st.warning(f"⚠️ 資料庫中找不到 {display_name} 的交易紀錄。")
         else:
             st.warning("⚠️ 找不到資料。滿血版資料庫可能是空的。")
