@@ -3,51 +3,30 @@ import streamlit as st
 import pandas as pd
 from utils.data_utils import calculate_chip_concentration
 
-# 🌟 效能救星 1：改讀取你專屬的 Hugging Face 滿血版 Parquet！
+# 💡 效能救星 1：快取遠端資料並隱藏轉圈圈
 @st.cache_data(show_spinner=False, ttl=3600)
-def load_full_blood_broker_history():
-    # 你的 Hugging Face 直連網址
-    remote_parquet_url = "https://huggingface.co/datasets/goodinfo3583/tw-broker-parquet/resolve/main/broker_summary_master.parquet"
+def load_raw_broker_history(url):
     try:
-        df = pd.read_parquet(remote_parquet_url)
-        
-        # 將滿血版欄位，轉換成能相容你原本 UI 的名稱
-        df = df.rename(columns={
-            '日期': 'trade_date', 
-            '股票代號': 'stock_code', 
-            '券商名稱': 'broker_name',
-            '券商代號': 'broker',
-            '買賣超股數': 'net_vol_shares'
-        })
-        
-        # 確保日期是字串格式 (YYYY-MM-DD)，配合你原有的邏輯
-        df['trade_date'] = pd.to_datetime(df['trade_date']).dt.strftime('%Y-%m-%d')
-        
-        # 把股數轉換成張數 (為了配合你原本的淨買賣張數邏輯)
-        df['net_vol'] = df['net_vol_shares'] / 1000
-        
-        # 標記買方(buy)或賣方(sell)
-        df['side'] = df['net_vol'].apply(lambda x: 'buy' if x > 0 else 'sell')
-        
+        df = pd.read_csv(url, dtype={'stock_code': str})
         return df
     except Exception as e:
-        st.error(f"載入滿血版明細失敗: {e}")
+        st.error(f"載入原始明細失敗: {e}")
         return pd.DataFrame()
     
 def sync_b8_data():
     """在背景預先計算好全市場的 B8 券商連買狀態並存入 session_state"""
     if 'b8_summary_df' in st.session_state:
-        return
+        return # 如果已經載入過就跳過，節省效能
 
+    remote_csv_url = "https://raw.githubusercontent.com/goodinfo3583/tw-broker-data/main/data/broker/broker_history.csv"
     try:
-        # 🚀 這裡改呼叫新的滿血版函數！
-        df_raw = load_full_blood_broker_history()
+        df_raw = load_raw_broker_history(remote_csv_url) # 使用你原本寫好的快取讀取函數
         if df_raw.empty: return
 
         broker_col = next((c for c in ['broker', 'broker_name', '券商名稱', '券商', 'name'] if c in df_raw.columns), None)
         if not broker_col: return
 
-        # 🚀 從APPLY替換成LOC運算,這三行 (瞬間完成十萬筆運算)
+#       🚀 從APPLY替換成LOC運算,這三行 (瞬間完成十萬筆運算)
         df_raw['signed_vol'] = df_raw['net_vol'].abs()
         df_raw.loc[df_raw['side'] == 'sell', 'signed_vol'] = -df_raw['signed_vol']
 
@@ -147,7 +126,7 @@ def render_broker_dashboard(target_stock, display_name, df_raw_all, df_trend):
         plot_bgcolor='rgba(0,0,0,0)',
         margin=dict(l=20, r=20, t=20, b=20),
         yaxis=dict(title="集中度 (%)", showgrid=True, gridcolor='#334155'),
-        xaxis=dict(type='category', tickangle=45),
+        xaxis=dict(type='category', tickangle=45), # category 確保字串日期不會亂跳
         dragmode='pan'
     )
     
@@ -180,6 +159,7 @@ def render_broker_dashboard(target_stock, display_name, df_raw_all, df_trend):
     
     # --------- 標籤 1: 單日明細 ---------
     with tab1:
+        # 💡 在這裡切換日期，只會局部更新這個 Fragment，不會影響到上方的搜尋欄！
         selected_date = st.selectbox("請選擇要查看的交易日期：", available_dates, key="daily_date_sel")
         daily_raw = stock_raw[stock_raw['trade_date'] == selected_date]
         
@@ -188,7 +168,10 @@ def render_broker_dashboard(target_stock, display_name, df_raw_all, df_trend):
         def format_daily_table(df, is_buy):
             if df.empty: return None
             df = df.copy()
+            
+            # 以「券商名稱」為基準去除重複的資料列，保留第一筆即可，避免重複爬蟲出現2次
             df = df.drop_duplicates(subset=[broker_col])
+            
             if not is_buy: df['net_vol'] = df['net_vol'].abs()
             df = df.sort_values('net_vol', ascending=False).head(15)
             df = df[[broker_col, 'net_vol']]
@@ -207,13 +190,13 @@ def render_broker_dashboard(target_stock, display_name, df_raw_all, df_trend):
             if styled_sell is not None: st.dataframe(styled_sell, use_container_width=True, hide_index=True)
             else: st.write("當日無資料")
 
-    # --------- 標籤 2: 區間囤貨 (近60日) 🚀 滿血升級版 🚀 ---------
+    # --------- 標籤 2: 區間囤貨 (近60日) 滿血升級版 ---------
     with tab2:
         st.markdown("##### 🕵️‍♂️ 誰在拿真金白銀連續吃貨？")
         recent_dates = available_dates[:60]
         recent_raw = stock_raw[stock_raw['trade_date'].isin(recent_dates)].copy()
         
-        # 滿血聚合：算張數、金額與均價
+        # 🚀 滿血聚合：不只算張數，連金額與均價一起算出來！
         hoard_df = recent_raw.groupby(broker_col).agg(
             區間淨買超張數=('net_vol', 'sum'),
             區間總買進股數=('總買進股數', 'sum'),
@@ -221,8 +204,9 @@ def render_broker_dashboard(target_stock, display_name, df_raw_all, df_trend):
             區間淨買賣金額=('買賣超金額', 'sum')
         ).reset_index()
         
-        # 計算平均防守成本與斥資(億)
+        # 🚀 計算大戶底牌：平均防守成本！
         hoard_df['主力平均成本'] = (hoard_df['區間總買進金額'] / hoard_df['區間總買進股數']).fillna(0).round(2)
+        # 把金額轉成「萬」或「億」以利閱讀
         hoard_df['囤貨斥資(億)'] = (hoard_df['區間淨買賣金額'] / 100000000).round(2)
         
         col_hoard, col_dump = st.columns(2)
@@ -233,22 +217,19 @@ def render_broker_dashboard(target_stock, display_name, df_raw_all, df_trend):
         
         with col_hoard:
             st.markdown("##### 📈 近 60 日囤貨分點 (斥資破億榜)")
+            # 篩選真正砸錢買超的主力
             hoarders = hoard_df[hoard_df['區間淨買超張數'] > 0].sort_values('囤貨斥資(億)', ascending=False)
             
             if not hoarders.empty:
-                hoarders_display = hoarders[[broker_col, '區間淨買超張數', '主力平均成本', '囤貨斥資(億)']]
+                hoarders_display = hoarders[['券商名稱', '區間淨買超張數', '主力平均成本', '囤貨斥資(億)']]
                 hoarders_display.columns = ['券商名稱', '淨買超(張)', '均買價', '斥資(億)']
                 
+                # 幫均買價與金額上色
                 styled_hoard = hoarders_display.style.format({
                     '淨買超(張)': fmt_dash, 
                     '均買價': "{:.2f}",
                     '斥資(億)': "{:.2f}"
-                })
-                # 如果你的 Streamlit 版本較新，可以用 background_gradient 讓金額越大的越紅
-                try:
-                    styled_hoard = styled_hoard.background_gradient(subset=['斥資(億)'], cmap='Reds')
-                except:
-                    pass
+                }).background_gradient(subset=['斥資(億)'], cmap='Reds')
                 
                 st.dataframe(styled_hoard, use_container_width=True, hide_index=True)
             else: 
@@ -259,20 +240,17 @@ def render_broker_dashboard(target_stock, display_name, df_raw_all, df_trend):
             dumpers = hoard_df[hoard_df['區間淨買超張數'] < 0].sort_values('囤貨斥資(億)', ascending=True).copy()
             
             if not dumpers.empty:
+                # 倒貨金額取絕對值
                 dumpers['囤貨斥資(億)'] = dumpers['囤貨斥資(億)'].abs()
                 dumpers['區間淨買超張數'] = dumpers['區間淨買超張數'].abs()
                 
-                dumpers_display = dumpers[[broker_col, '區間淨買超張數', '囤貨斥資(億)']]
+                dumpers_display = dumpers[['券商名稱', '區間淨買超張數', '囤貨斥資(億)']]
                 dumpers_display.columns = ['券商名稱', '淨賣超(張)', '提款(億)']
                 
                 styled_dump = dumpers_display.style.format({
                     '淨賣超(張)': fmt_dash, 
                     '提款(億)': "{:.2f}"
-                })
-                try:
-                    styled_dump = styled_dump.background_gradient(subset=['提款(億)'], cmap='Greens')
-                except:
-                    pass
+                }).background_gradient(subset=['提款(億)'], cmap='Greens')
                 
                 st.dataframe(styled_dump, use_container_width=True, hide_index=True)
             else: 
@@ -281,7 +259,8 @@ def render_broker_dashboard(target_stock, display_name, df_raw_all, df_trend):
     # --------- 標籤 3: 歷史進出矩陣 (近30日) ---------
     with tab3:
         st.markdown("##### 🗺️ 分點淨買賣力道")
-        st.write("橫列為各分點，縱欄顯示**近 30 個交易日**。")
+        st.write("橫列為各分點，縱欄顯示**近 30 個交易日**。但「動態連買/連賣」是往前回溯**所有歷史資料**統計而成。")
+        st.write("若表格顯示「-」代表當日該分點**未進榜 (前15大)**，中斷則重新計算天數。")
         
         all_matrix_raw = stock_raw.copy()
         
@@ -290,11 +269,13 @@ def render_broker_dashboard(target_stock, display_name, df_raw_all, df_trend):
                 lambda x: abs(x['net_vol']) if x['side'] == 'buy' else -abs(x['net_vol']), axis=1
             )
             
+            # --- 1. 計算全歷史的週資料 ---
             all_matrix_raw['date_dt'] = pd.to_datetime(all_matrix_raw['trade_date'])
             all_matrix_raw['year_week'] = all_matrix_raw['date_dt'].dt.strftime('%Y-%W')
             weekly_sum = all_matrix_raw.groupby([broker_col, 'year_week'])['signed_vol'].sum().unstack(fill_value=0)
             week_cols = sorted(weekly_sum.columns, reverse=True)
             
+            # --- 2. 建立全歷史的日資料樞紐分析表 ---
             full_pivot = all_matrix_raw.pivot_table(
                 index=broker_col, 
                 columns='trade_date', 
@@ -303,11 +284,13 @@ def render_broker_dashboard(target_stock, display_name, df_raw_all, df_trend):
             )
             all_dates_sorted = sorted(full_pivot.columns, reverse=True)
             
+            # --- 3. 畫面顯示區間裁切 (近30日) ---
             display_dates = all_dates_sorted[:30]
             pivot_df = full_pivot[display_dates].copy()
             pivot_df['區間累計'] = pivot_df.sum(axis=1)
             pivot_df = pivot_df.sort_values('區間累計', ascending=False)
             
+            # --- 4. 計算日連買動態 (從全歷史資料 full_pivot 去追蹤) ---
             def calc_daily_streak(row_name):
                 if row_name not in full_pivot.index: return "-"
                 row = full_pivot.loc[row_name]
@@ -316,7 +299,7 @@ def render_broker_dashboard(target_stock, display_name, df_raw_all, df_trend):
                 for c in all_dates_sorted:
                     val = row.get(c, 0)
                     if pd.isna(val) or val == 0:
-                        break  
+                        break  # 沒進榜或是0即中斷
                     current_sign = 1 if val > 0 else -1
                     if sign is None:
                         sign = current_sign
@@ -324,13 +307,14 @@ def render_broker_dashboard(target_stock, display_name, df_raw_all, df_trend):
                     elif sign == current_sign:
                         streak += sign
                     else:
-                        break  
+                        break  # 轉買或轉賣即中斷
                 if streak > 0: return f"連買 {streak} 日"
                 elif streak < 0: return f"連賣 {-streak} 日"
                 else: return "-"
                 
             pivot_df['日連買動態'] = pivot_df.index.to_series().apply(calc_daily_streak)
 
+            # --- 5. 計算週連買動態 (從全歷史資料 weekly_sum 去追蹤) ---
             def calc_weekly_streak(broker_name):
                 if weekly_sum.empty or broker_name not in weekly_sum.index:
                     return "-"
@@ -355,12 +339,15 @@ def render_broker_dashboard(target_stock, display_name, df_raw_all, df_trend):
                 
             pivot_df['週連買動態'] = pivot_df.index.to_series().apply(calc_weekly_streak)
             
+            # --- 6. 收尾與排版 ---
             pivot_df[display_dates] = pivot_df[display_dates].fillna("-")
             pivot_df.index.name = "中文券商分點"
             
             cols = ['日連買動態', '週連買動態', '區間累計'] + display_dates
             pivot_df = pivot_df[cols]
 
+            #
+            # 👇 新增：加入排序過濾篩選器
             sort_option = st.radio(
                 "🔍 排序依據：", 
                 ["依區間累計排序(預設)", "依連買日數排序", "依連買週數排序"], 
@@ -368,20 +355,28 @@ def render_broker_dashboard(target_stock, display_name, df_raw_all, df_trend):
                 key=f"sort_radio_{target_stock}"
             )
             
+            # 建立文字解析函數，把 "連買 5 日" 轉成數字 5 來排序
             def extract_streak_num(val):
                 if isinstance(val, str) and "連買" in val:
                     try:
+                        # 擷取出裡面的數字
                         return int(''.join(filter(str.isdigit, val)))
                     except: return 0
                 return 0
 
+            # 依據選擇重新排序 pivot_df
             if sort_option == "依連買日數排序":
                 pivot_df['sort_key'] = pivot_df['日連買動態'].apply(extract_streak_num)
+                # 遇到連買天數相同時，再依區間累計金額(張數)當作第二排序
                 pivot_df = pivot_df.sort_values(['sort_key', '區間累計'], ascending=[False, False]).drop(columns=['sort_key'])
             
             elif sort_option == "依連買週數排序":
                 pivot_df['sort_key'] = pivot_df['週連買動態'].apply(extract_streak_num)
                 pivot_df = pivot_df.sort_values(['sort_key', '區間累計'], ascending=[False, False]).drop(columns=['sort_key'])
+            
+            # 預設就是依區間累計排序，所以不用特別寫 else
+            # 👆 新增結束
+            #
             
             def color_net_vol(val):
                 if isinstance(val, str):
@@ -418,7 +413,7 @@ def render(STOCK_DICT=None):
     </div>
     """, unsafe_allow_html=True)
 
-    st.markdown("觀察前 15 大分點買賣力道相抵後的淨流向，追蹤籌碼集中度連續性與券商進出。(已升級滿血版金額運算)")
+    st.markdown("觀察前 15 大分點買賣力道相抵後的淨流向，追蹤籌碼集中度連續性與券商進出。(8/25新增功能及數據")
     
     stock_options = []
     if STOCK_DICT:
@@ -426,6 +421,10 @@ def render(STOCK_DICT=None):
         stock_options = sorted(list(unique_options))
     
     default_index = 0
+    #for idx, opt in enumerate(stock_options):
+        #if opt.startswith("2354"):
+            #default_index = idx + 1
+            #break
 
     col1, col2 = st.columns([3, 1])
     with col1:
@@ -435,14 +434,17 @@ def render(STOCK_DICT=None):
             index=default_index,
             key="broker_search_input"
         )
-
-    # 🌟 全市場分點連買掃描器 🌟
+    # ==========================================
+    # 🌟 新增：全市場分點連買掃描器 (隱藏在折疊面板中，避免佔用平時空間)
+    # ==========================================
+    remote_csv_url = "https://raw.githubusercontent.com/goodinfo3583/tw-broker-data/main/data/broker/broker_history.csv"
+    
     with st.expander("🌍 全市場連買分點快搜 (尋找主力連續吃貨標的)", expanded=False):
         st.markdown("此功能將掃描資料庫中所有股票，找出當前處於「連續買超」狀態的最高天數/週數分點。", unsafe_allow_html=True)
 
         scan_mode = st.radio(
             "請選擇全市場排行方式：", 
-            ["依日連買排行", "依週連買排行", "依近期買超張數排行"],
+            ["依日連買排行", "依週連買排行", "依近期買超張數排行"], # 💡 新增張數排行
             horizontal=True,
             key="global_broker_scan_radio"
         )
@@ -451,8 +453,7 @@ def render(STOCK_DICT=None):
         with c_scan:
             if st.button("🚀 開始全市場掃描", use_container_width=True, type="primary"):
                 with st.spinner("正在進行市場運算，請稍候..."):
-                    # 🚀 這裡也改呼叫新的滿血版函數！
-                    df_raw_all = load_full_blood_broker_history()
+                    df_raw_all = load_raw_broker_history(remote_csv_url)
                     
                     if not df_raw_all.empty:
                         broker_col = next((c for c in ['broker', 'broker_name', '券商名稱', '券商', 'name'] if c in df_raw_all.columns), None)
@@ -486,16 +487,18 @@ def render(STOCK_DICT=None):
                                 
                                 result_df = scan_pivot[scan_pivot['連買日數'] >= 1].copy() 
                                 valid_sum_cols = [c for c in all_dates[:20] if c in result_df.columns]
-                                result_df['近期買超總張數'] = result_df[valid_sum_cols].sum(axis=1)
+                                result_df['近期買超總張數'] = result_df[valid_sum_cols].sum(axis=1) # 近20日總吃貨量
                                 
                                 if scan_mode == "依日連買排行":
                                     result_df = result_df[result_df['連買日數'] >= 2].reset_index().sort_values(['連買日數', '近期買超總張數'], ascending=[False, False])
                                 else:
+                                    # 依張數排行
                                     result_df = result_df[result_df['近期買超總張數'] > 0].reset_index().sort_values(['近期買超總張數', '連買日數'], ascending=[False, False])
                                     
                                 result_df = result_df[['stock_code', broker_col, '連買日數', '近期買超總張數']]
                                 
                             else:
+                                # 週排行
                                 scan_df_clean = scan_df.dropna(subset=['trade_date']).copy()
                                 scan_df_clean['date_dt'] = pd.to_datetime(scan_df_clean['trade_date'], errors='coerce')
                                 scan_df_clean = scan_df_clean.dropna(subset=['date_dt'])
@@ -522,6 +525,7 @@ def render(STOCK_DICT=None):
                                 result_df = result_df.reset_index().sort_values(['連買週數', '近期買超總張數'], ascending=[False, False])
                                 result_df = result_df[['stock_code', broker_col, '連買週數', '近期買超總張數']]
 
+                            # 映射名稱
                             if STOCK_DICT:
                                 result_df['股票名稱'] = result_df['stock_code'].astype(str).apply(
                                     lambda x: STOCK_DICT.get(x, {}).get('name', '-')
@@ -533,6 +537,7 @@ def render(STOCK_DICT=None):
                             
                             result_df.rename(columns={'stock_code': '股票代號', broker_col: '券商分點'}, inplace=True)
                             
+                            # 💡 存入 Session State 實現暫存！
                             st.session_state['broker_global_scan_result'] = result_df
                             st.session_state['broker_global_scan_mode'] = scan_mode
         
@@ -541,6 +546,7 @@ def render(STOCK_DICT=None):
                 st.session_state.pop('broker_global_scan_result', None)
                 st.rerun()
 
+        # --- 💡 從暫存中顯示資料 (這樣切換標的就不會消失了！) ---
         if 'broker_global_scan_result' in st.session_state:
             cached_res = st.session_state['broker_global_scan_result']
             cached_mode = st.session_state.get('broker_global_scan_mode', '未知模式')
@@ -551,30 +557,23 @@ def render(STOCK_DICT=None):
                 st.dataframe(styled_res, use_container_width=True, hide_index=True)
             else:
                 st.info("目前市場上無明顯的分點特徵。")
-          
+    # ==========================================          
     if selected_stock_str:
         target_stock = selected_stock_str.split(" ")[0].strip()
         display_name = selected_stock_str
         
-        # 🚀 這裡改呼叫新的滿血版函數！
-        df_raw_all = load_full_blood_broker_history()
+        remote_csv_url = "https://raw.githubusercontent.com/goodinfo3583/tw-broker-data/main/data/broker/broker_history.csv"
+        
+        # 使用快取函數瞬間載入資料
+        df_raw_all = load_raw_broker_history(remote_csv_url)
         
         if not df_raw_all.empty:
-            # 你原本在 data_utils 裡的 calculate_chip_concentration 也要確認它能吃這包滿血資料喔！
-            # 為了避免那邊壞掉，我們這邊如果算不出 df_trend，可以暫時隱藏最上方的圖表，只顯示下方的 Tab
-            try:
-                # 這裡原本你傳 url，現在應該直接傳 target_stock，如果你 data_utils 沒改的話這裡可能需要適配
-                # 我們假設 data_utils 裡面還是在讀取富邦 CSV，如果壞掉你可以直接把上面的 concentration 邏輯搬進來。
-                # 但為了讓你先看到 Tab2 的威力，我們維持原狀。
-                df_trend = calculate_chip_concentration("https://raw.githubusercontent.com/goodinfo3583/tw-broker-data/main/data/broker/broker_history.csv", target_stock)
-            except:
-                df_trend = pd.DataFrame()
-                
+            df_trend = calculate_chip_concentration(remote_csv_url, target_stock)
+            
             if not df_trend.empty:
+                # 🚀 呼叫 Fragment 隔離渲染，打勾或選擇日期時不再閃爍！
                 render_broker_dashboard(target_stock, display_name, df_raw_all, df_trend)
             else:
-                # 即使上面圖表算不出來，也要確保底下的超強 Tab2 能跑！
-                render_broker_dashboard(target_stock, display_name, df_raw_all, pd.DataFrame({'trade_date': ['-'], 'concentration_%': [0], 'net_buy': [0]}))
-                st.warning("⚠️ 集中度圖表暫時無法顯示，但下方的【囤貨明細】已切換為滿血版。")
+                st.warning("⚠️ 找不到該股票的集中度趨勢資料。")
         else:
-            st.warning("⚠️ 找不到資料。滿血版資料庫可能是空的。")
+            st.warning("⚠️ 找不到資料。遠端資料庫可能是空的。")
