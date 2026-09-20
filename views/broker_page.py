@@ -313,7 +313,7 @@ def render_broker_dashboard(target_stock, display_name, df_raw_all, df_trend):
 def render(STOCK_DICT=None):
     df_raw_all = load_full_blood_broker_history()
     if not df_raw_all.empty:
-        latest_db_date = df_raw_all['trade_date'].max()
+        latest_db_date = df_raw_all['trade_date'].astype(str).max()
         st.caption(f"🟢 當前遠端資料庫最新日期：**{latest_db_date}**")
     st.markdown("""
     <div style="background: linear-gradient(90deg, rgba(15,23,42,1) 0%, rgba(14,165,233,0.3) 50%, rgba(15,23,42,1) 100%); 
