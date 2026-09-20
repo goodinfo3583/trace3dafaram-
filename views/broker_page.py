@@ -155,27 +155,26 @@ def render_broker_dashboard(target_stock, display_name, df_raw_all, df_trend):
     st.subheader(f"📊 {display_name} 籌碼與股價共振走勢")
     
     df_trend_plot = df_trend.copy().dropna(subset=['stock_price'])
-    df_trend_plot['trade_date_short'] = pd.to_datetime(df_trend_plot['trade_date']).dt.strftime('%m-%d')
     
-    # 建立雙 Y 軸圖表 (左Y軸放股價，右Y軸放集中度)
+    # 建立雙 Y 軸圖表
     fig_trend = make_subplots(specs=[[{"secondary_y": True}]])
     
-    # 1. 畫當日集中度 (柱狀圖，放右Y軸)
+    # 1. 畫當日集中度 (x 改回 trade_date)
     colors = ['#FF4B4B' if val > 0 else '#00E272' for val in df_trend_plot['concentration_%']]
     fig_trend.add_trace(go.Bar(
-        x=df_trend_plot['trade_date_short'], y=df_trend_plot['concentration_%'],
+        x=df_trend_plot['trade_date'], y=df_trend_plot['concentration_%'],
         marker_color=colors, name='單日集中度', opacity=0.6
     ), secondary_y=True)
     
-    # 2. 畫滾動 5 日集中度 (黃色平滑線，放右Y軸，這能濾掉單日雜訊)
+    # 2. 畫滾動 5 日 (x 改回 trade_date)
     fig_trend.add_trace(go.Scatter(
-        x=df_trend_plot['trade_date_short'], y=df_trend_plot['5日集中度(%)'],
+        x=df_trend_plot['trade_date'], y=df_trend_plot['5日集中度(%)'],
         mode='lines', line=dict(color='#FFD700', width=2), name='5日滾動集中度'
     ), secondary_y=True)
     
-    # 3. 畫真實股價 (藍色線，放左Y軸)
+    # 3. 畫真實股價 (x 改回 trade_date)
     fig_trend.add_trace(go.Scatter(
-        x=df_trend_plot['trade_date_short'], y=df_trend_plot['stock_price'],
+        x=df_trend_plot['trade_date'], y=df_trend_plot['stock_price'],
         mode='lines+markers', line=dict(color='#38bdf8', width=2), name='市場均價(股價)'
     ), secondary_y=False)
     
@@ -210,7 +209,14 @@ def render_broker_dashboard(target_stock, display_name, df_raw_all, df_trend):
     fig_trend.update_layout(
         height=400, template='plotly_dark', paper_bgcolor='rgba(0,0,0,0)', plot_bgcolor='rgba(0,0,0,0)',
         margin=dict(l=20, r=20, t=20, b=20),
-        legend=dict(orientation="h", yanchor="bottom", y=1.02, xanchor="right", x=1)
+        legend=dict(orientation="h", yanchor="bottom", y=1.02, xanchor="right", x=1),
+        xaxis=dict(
+            type='category', 
+            tickmode='array',
+            tickvals=df_trend_plot['trade_date'],
+            ticktext=df_trend_plot['trade_date'].str.slice(5, 10), # 強制只顯示 MM-DD
+            tickangle=45
+        )
     )
     
     fig_trend.update_yaxes(title_text="<b>股價 (元)</b>", secondary_y=False, gridcolor='#334155')
