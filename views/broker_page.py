@@ -449,7 +449,7 @@ def render(STOCK_DICT=None):
             key="global_broker_scan_radio"
         )
         
-    c_scan, c_clear = st.columns([3, 1])
+        c_scan, c_clear = st.columns([3, 1])
         with c_scan:
             if st.button("🚀 開始全市場掃描", use_container_width=True, type="primary"):
                 with st.spinner("正在進行全市場運算 (啟動記憶體防爆機制)，請稍候..."):
