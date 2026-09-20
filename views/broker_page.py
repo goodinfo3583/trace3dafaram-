@@ -311,7 +311,7 @@ def render_broker_dashboard(target_stock, display_name, df_raw_all, df_trend):
 # 🖼️ 主渲染入口
 # ==========================================
 def render(STOCK_DICT=None):
-df_raw_all = load_full_blood_broker_history()
+    df_raw_all = load_full_blood_broker_history()
     if not df_raw_all.empty:
         latest_db_date = df_raw_all['trade_date'].max()
         st.caption(f"🟢 當前遠端資料庫最新日期：**{latest_db_date}**")
