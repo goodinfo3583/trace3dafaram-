@@ -28,7 +28,7 @@ def load_full_blood_broker_history():
         # 將 Timestamp 直接轉為字串格式 (YYYY-MM-DD)
         df['trade_date'] = df['trade_date'].dt.strftime('%Y-%m-%d').astype('category')
         
-        df['net_vol'] = (df['net_vol_shares'] / 1000).astype('float32') # 降低精確度省記憶體
+        df['net_vol'] = df['net_vol_shares'] / 1000 # 降低精確度省記憶體
         df['side'] = df['net_vol'].apply(lambda x: 'buy' if x > 0 else 'sell').astype('category')
         
         return df
@@ -46,7 +46,7 @@ def sync_b8_data():
         df_raw = load_full_blood_broker_history()
         if df_raw.empty: return
 
-        broker_col = next((c for c in ['broker', 'broker_name', '券商名稱', '券商', 'name'] if c in df_raw.columns), None)
+        broker_col = next((c for c in ['broker_name', 'broker', '券商名稱', '券商', 'name'] if c in stock_raw.columns), None)
         if not broker_col: return
 
         # 🚀 從APPLY替換成LOC運算,這三行 (瞬間完成十萬筆運算)
@@ -170,7 +170,7 @@ def render_broker_dashboard(target_stock, display_name, df_raw_all, df_trend):
         st.warning(f"在歷史總帳本中，找不到 **{display_name}** 的紀錄。")
         return
         
-    broker_col = next((c for c in ['broker', 'broker_name', '券商名稱', '券商', 'name'] if c in stock_raw.columns), None)
+    broker_col = next((c for c in ['broker_name', 'broker', '券商名稱', '券商', 'name'] if c in stock_raw.columns), None)
     
     if broker_col is None:
         st.error("⚠️ 無法在資料庫中找到「券商名稱」欄位！")
