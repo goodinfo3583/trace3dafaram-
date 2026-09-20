@@ -518,7 +518,7 @@ def render(STOCK_DICT=None):
                                 if scan_mode == "依週連買排行":
                                     result_df = result_df[['stock_code', broker_col, '連買週數', '近期買超總張數', '均價', '斥資(億)']]
                                 else:
-                                    result_df = result_df[['stock_code', broker_col, '連買日數', '近期買超總張數', '均價', '斥撿(億)']].rename(columns={'斥撿(億)': '斥資(億)'})
+                                    result_df = result_df[['stock_code', broker_col, '連買日數', '近期買超總張數', '均價', '斥資(億)']]
 
                                 if STOCK_DICT:
                                     result_df['股票名稱'] = result_df['stock_code'].astype(str).apply(
