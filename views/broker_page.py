@@ -449,130 +449,110 @@ def render(STOCK_DICT=None):
             key="global_broker_scan_radio"
         )
         
-        c_scan, c_clear = st.columns([3, 1])
+    c_scan, c_clear = st.columns([3, 1])
         with c_scan:
             if st.button("🚀 開始全市場掃描", use_container_width=True, type="primary"):
-                with st.spinner("正在進行市場運算，請稍候..."):
-                    # 🚀 這裡也改呼叫新的滿血版函數！
+                with st.spinner("正在進行全市場運算 (啟動記憶體防爆機制)，請稍候..."):
                     df_raw_all = load_full_blood_broker_history()
                     
                     if not df_raw_all.empty:
-                        broker_col = next((c for c in ['broker', 'broker_name', '券商名稱', '券商', 'name'] if c in df_raw_all.columns), None)
-                        if broker_col:
-                            scan_df = df_raw_all.copy()
-                            scan_df['signed_vol'] = scan_df.apply(
-                                lambda x: abs(x['net_vol']) if x['side'] == 'buy' else -abs(x['net_vol']), axis=1
+                        # 🚀 記憶體防爆 1：只保留需要的欄位，淨買賣超直接用 net_vol，不要再做 apply
+                        scan_df = df_raw_all[['trade_date', 'stock_code', 'broker_name', 'net_vol']].copy()
+                        
+                        valid_dates = scan_df['trade_date'].dropna().unique()
+                        all_dates = sorted(valid_dates, reverse=True)
+                        if not all_dates:
+                            st.warning("無有效日期資料")
+                            st.stop()
+                            
+                        latest_date = all_dates[0]
+                        
+                        if scan_mode in ["依日連買排行", "依近期買超張數排行"]:
+                            # 🚀 記憶體防爆 2：只抓出「最新交易日有買超」的股票與分點！(過濾掉 95% 不相干的資料)
+                            latest_buys = scan_df[(scan_df['trade_date'] == latest_date) & (scan_df['net_vol'] > 0)]
+                            candidates = latest_buys[['stock_code', 'broker_name']].drop_duplicates()
+                            
+                            # 把完整的資料與候選名單做 inner join，瞬間把 600 萬筆縮小到只剩幾萬筆
+                            df_candidates = pd.merge(scan_df, candidates, on=['stock_code', 'broker_name'], how='inner')
+                            
+                            # 現在 Pivot 絕對不會當機了
+                            scan_pivot = df_candidates.pivot_table(
+                                index=['stock_code', 'broker_name'], 
+                                columns='trade_date', 
+                                values='net_vol', 
+                                aggfunc='sum'
                             )
                             
-                            if scan_mode in ["依日連買排行", "依近期買超張數排行"]:
-                                valid_dates = scan_df['trade_date'].dropna().astype(str).unique()
-                                all_dates = sorted(valid_dates, reverse=True)
+                            def calc_global_daily_streak(row):
+                                streak = 0
+                                for c in all_dates:
+                                    val = row.get(c, 0)
+                                    if pd.isna(val) or val <= 0:
+                                        break
+                                    streak += 1
+                                return streak
                                 
-                                scan_pivot = scan_df.pivot_table(
-                                    index=['stock_code', broker_col], 
-                                    columns='trade_date', 
-                                    values='signed_vol', 
-                                    aggfunc='sum'
-                                )
-                                
-                                def calc_global_daily_streak(row):
-                                    streak = 0
-                                    for c in all_dates:
-                                        val = row.get(c, 0)
-                                        if pd.isna(val) or val <= 0:
-                                            break
-                                        streak += 1
-                                    return streak
-                                    
-                                scan_pivot['連買日數'] = scan_pivot.apply(calc_global_daily_streak, axis=1)
-                                
-                                result_df = scan_pivot[scan_pivot['連買日數'] >= 1].copy() 
-                                valid_sum_cols = [c for c in all_dates[:20] if c in result_df.columns]
-                                result_df['近期買超總張數'] = result_df[valid_sum_cols].sum(axis=1)
-                                
-                                if scan_mode == "依日連買排行":
-                                    result_df = result_df[result_df['連買日數'] >= 2].reset_index().sort_values(['連買日數', '近期買超總張數'], ascending=[False, False])
-                                else:
-                                    result_df = result_df[result_df['近期買超總張數'] > 0].reset_index().sort_values(['近期買超總張數', '連買日數'], ascending=[False, False])
-                                    
-                                result_df = result_df[['stock_code', broker_col, '連買日數', '近期買超總張數']]
-                                
+                            scan_pivot['連買日數'] = scan_pivot.apply(calc_global_daily_streak, axis=1)
+                            
+                            result_df = scan_pivot[scan_pivot['連買日數'] >= 1].copy() 
+                            valid_sum_cols = [c for c in all_dates[:20] if c in result_df.columns]
+                            result_df['近期買超總張數'] = result_df[valid_sum_cols].sum(axis=1)
+                            
+                            if scan_mode == "依日連買排行":
+                                result_df = result_df[result_df['連買日數'] >= 2].reset_index().sort_values(['連買日數', '近期買超總張數'], ascending=[False, False])
                             else:
-                                scan_df_clean = scan_df.dropna(subset=['trade_date']).copy()
-                                scan_df_clean['date_dt'] = pd.to_datetime(scan_df_clean['trade_date'], errors='coerce')
-                                scan_df_clean = scan_df_clean.dropna(subset=['date_dt'])
-                                scan_df_clean['year_week'] = scan_df_clean['date_dt'].dt.strftime('%Y-%W')
+                                result_df = result_df[result_df['近期買超總張數'] > 0].reset_index().sort_values(['近期買超總張數', '連買日數'], ascending=[False, False])
                                 
-                                weekly_sum = scan_df_clean.groupby(['stock_code', broker_col, 'year_week'])['signed_vol'].sum().unstack(fill_value=0)
-                                all_weeks = sorted(weekly_sum.columns, reverse=True)
-                                
-                                def calc_global_weekly_streak(row):
-                                    streak = 0
-                                    for c in all_weeks:
-                                        val = row.get(c, 0)
-                                        if pd.isna(val) or val <= 0:
-                                            break
-                                        streak += 1
-                                    return streak
-                                    
-                                weekly_sum['連買週數'] = weekly_sum.apply(calc_global_weekly_streak, axis=1)
-                                
-                                result_df = weekly_sum[weekly_sum['連買週數'] >= 2].copy()
-                                valid_sum_weeks = [c for c in all_weeks[:4] if c in result_df.columns]
-                                result_df['近期買超總張數'] = result_df[valid_sum_weeks].sum(axis=1)
-                                
-                                result_df = result_df.reset_index().sort_values(['連買週數', '近期買超總張數'], ascending=[False, False])
-                                result_df = result_df[['stock_code', broker_col, '連買週數', '近期買超總張數']]
-
-                            if STOCK_DICT:
-                                result_df['股票名稱'] = result_df['stock_code'].astype(str).apply(
-                                    lambda x: STOCK_DICT.get(x, {}).get('name', '-')
-                                )
-                                if '股票名稱' in result_df.columns:
-                                    cols = result_df.columns.tolist()
-                                    cols.insert(1, cols.pop(cols.index('股票名稱')))
-                                    result_df = result_df[cols]
+                            result_df = result_df[['stock_code', 'broker_name', '連買日數', '近期買超總張數']]
                             
-                            result_df.rename(columns={'stock_code': '股票代號', broker_col: '券商分點'}, inplace=True)
+                        else:
+                            # --- 週排行防爆版 ---
+                            scan_df['date_dt'] = pd.to_datetime(scan_df['trade_date'], errors='coerce')
+                            scan_df = scan_df.dropna(subset=['date_dt'])
+                            scan_df['year_week'] = scan_df['date_dt'].dt.strftime('%Y-%W')
                             
-                            st.session_state['broker_global_scan_result'] = result_df
-                            st.session_state['broker_global_scan_mode'] = scan_mode
-        
-        with c_clear:
-            if st.button("🗑️ 清除暫存", use_container_width=True):
-                st.session_state.pop('broker_global_scan_result', None)
-                st.rerun()
+                            # 同樣的招式：先以週聚合
+                            weekly_raw = scan_df.groupby(['stock_code', 'broker_name', 'year_week'], as_index=False)['net_vol'].sum()
+                            all_weeks = sorted(weekly_raw['year_week'].unique(), reverse=True)
+                            latest_week = all_weeks[0]
+                            
+                            # 找出「最新一週有買超」的候選人
+                            latest_week_buys = weekly_raw[(weekly_raw['year_week'] == latest_week) & (weekly_raw['net_vol'] > 0)]
+                            candidates_wk = latest_week_buys[['stock_code', 'broker_name']].drop_duplicates()
+                            
+                            df_candidates_wk = pd.merge(weekly_raw, candidates_wk, on=['stock_code', 'broker_name'], how='inner')
+                            
+                            weekly_sum = df_candidates_wk.pivot_table(index=['stock_code', 'broker_name'], columns='year_week', values='net_vol', aggfunc='sum')
+                            
+                            def calc_global_weekly_streak(row):
+                                streak = 0
+                                for c in all_weeks:
+                                    val = row.get(c, 0)
+                                    if pd.isna(val) or val <= 0:
+                                        break
+                                    streak += 1
+                                return streak
+                                
+                            weekly_sum['連買週數'] = weekly_sum.apply(calc_global_weekly_streak, axis=1)
+                            
+                            result_df = weekly_sum[weekly_sum['連買週數'] >= 2].copy()
+                            valid_sum_weeks = [c for c in all_weeks[:4] if c in result_df.columns]
+                            result_df['近期買超總張數'] = result_df[valid_sum_weeks].sum(axis=1)
+                            
+                            result_df = result_df.reset_index().sort_values(['連買週數', '近期買超總張數'], ascending=[False, False])
+                            result_df = result_df[['stock_code', 'broker_name', '連買週數', '近期買超總張數']]
 
-        if 'broker_global_scan_result' in st.session_state:
-            cached_res = st.session_state['broker_global_scan_result']
-            cached_mode = st.session_state.get('broker_global_scan_mode', '未知模式')
-            
-            if not cached_res.empty:
-                st.success(f"🎯 掃描結果 ({cached_mode})：共發現 {len(cached_res)} 組主力特徵。")
-                styled_res = cached_res.head(100).style.format({'近期買超總張數': "{:,.0f}"})
-                st.dataframe(styled_res, use_container_width=True, hide_index=True)
-            else:
-                st.info("目前市場上無明顯的分點特徵。")
-          
-    if selected_stock_str:
-        target_stock = selected_stock_str.split(" ")[0].strip()
-        display_name = selected_stock_str
-        
-        # 🚀 這裡改呼叫新的滿血版函數！
-        df_raw_all = load_full_blood_broker_history()
-        
-        if not df_raw_all.empty:
-            try:
-                # 這裡傳錯網址了！
-                df_trend = calculate_chip_concentration("https://raw.githubusercontent.com/goodinfo3583/tw-broker-data/main/data/broker/broker_history.csv", target_stock)
-            except:
-                df_trend = pd.DataFrame()
-                
-            if not df_trend.empty:
-                render_broker_dashboard(target_stock, display_name, df_raw_all, df_trend)
-            else:
-                # 這裡的 '-' 會讓系統崩潰！
-                render_broker_dashboard(target_stock, display_name, df_raw_all, pd.DataFrame({'trade_date': ['-'], 'concentration_%': [0], 'net_buy': [0]}))
-                st.warning("⚠️ 集中度圖表暫時無法顯示，但下方的【囤貨明細】已切換為滿血版。")
-        else:
-            st.warning("⚠️ 找不到資料。滿血版資料庫可能是空的。")
+                        # 映射名稱
+                        if STOCK_DICT:
+                            result_df['股票名稱'] = result_df['stock_code'].astype(str).apply(
+                                lambda x: STOCK_DICT.get(x, {}).get('name', '-')
+                            )
+                            if '股票名稱' in result_df.columns:
+                                cols = result_df.columns.tolist()
+                                cols.insert(1, cols.pop(cols.index('股票名稱')))
+                                result_df = result_df[cols]
+                        
+                        result_df.rename(columns={'stock_code': '股票代號', 'broker_name': '券商分點'}, inplace=True)
+                        
+                        st.session_state['broker_global_scan_result'] = result_df
+                        st.session_state['broker_global_scan_mode'] = scan_mode
