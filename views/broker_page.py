@@ -311,6 +311,10 @@ def render_broker_dashboard(target_stock, display_name, df_raw_all, df_trend):
 # 🖼️ 主渲染入口
 # ==========================================
 def render(STOCK_DICT=None):
+df_raw_all = load_full_blood_broker_history()
+    if not df_raw_all.empty:
+        latest_db_date = df_raw_all['trade_date'].max()
+        st.caption(f"🟢 當前遠端資料庫最新日期：**{latest_db_date}**")
     st.markdown("""
     <div style="background: linear-gradient(90deg, rgba(15,23,42,1) 0%, rgba(14,165,233,0.3) 50%, rgba(15,23,42,1) 100%); 
                 border-top: 1px solid #38bdf8; border-bottom: 1px solid #38bdf8; padding: 15px 20px; 
@@ -609,17 +613,19 @@ def render(STOCK_DICT=None):
             if calc_days >= 21: tabs_names.append("20日集中度 Δ")
             tabs = st.tabs(tabs_names)
             
-            # 格式化升降箭頭
+            # 格式化升降箭頭與新進榜判定
             def fmt_rank_chg(val):
-                if pd.isna(val) or val == 0: return "-"
+                if pd.isna(val): return "🆕 新進榜"  # 找不到昨天的資料，就是新進榜！
+                if val == 0: return "-"             # 名次和昨天一模一樣
                 if val > 0: return f"↑ {int(val)}"
                 return f"↓ {int(abs(val))}"
             
-            # 文字顏色上色邏輯
+            # 文字顏色上色邏輯也要配合更新
             def color_chg(val):
                 if isinstance(val, str):
                     if '↑' in val: return 'color: #FF4B4B; font-weight: bold;'
                     if '↓' in val: return 'color: #00E272;'
+                    if '🆕' in val: return 'color: #38bdf8; font-weight: bold;' # 新進榜給亮藍色
                 return 'color: #94A3B8;'
 
             # 🚀 修正：將前綴改為正確的中文名稱對接
