@@ -3,23 +3,21 @@ import time
 import random
 import pandas as pd
 import os
+import glob
 from io import StringIO
 from datetime import datetime, timedelta
-import subprocess
 import re
 
 from selenium.webdriver.common.by import By
+from selenium.webdriver.support.ui import Select # 🌟 新增：專門處理下拉選單的官方模組
 # 🌟 匯入終極突破武器 (SeleniumBase) 🌟
 from seleniumbase import Driver
 
 # ==========================================
 # 1. 設定區塊 (絕對路徑定位與跨夜邏輯)
 # ==========================================
-# 強制將工作目錄切換到腳本所在的資料夾
-BASE_DIR = os.path.dirname(os.path.abspath(__file__))
-os.chdir(BASE_DIR)
-
-SAVE_DIR = os.path.join(BASE_DIR, "data")
+# 🌟 指定儲存路徑 (依照你的需求)
+SAVE_DIR = r"C:\Users\User\Desktop\爬蟲\data"
 if not os.path.exists(SAVE_DIR):
     os.makedirs(SAVE_DIR)
 
@@ -34,7 +32,7 @@ else:
 # 自動修正為 YYYYMMDD 格式
 today = logical_date.strftime("%Y%m%d")
 
-# 新的目標基礎網址 (三大法人累計買超)
+# 目標基礎網址 (三大法人累計買超)
 BASE_URL = "https://goodinfo.tw/tw/StockList.asp?MARKET_CAT=%E7%86%B1%E9%96%80%E6%8E%92%E8%A1%8C&INDUSTRY_CAT=%E4%B8%89%E5%A4%A7%E6%B3%95%E4%BA%BA%E7%B4%AF%E8%A8%88%E8%B2%B7%E8%B6%85%E5%BC%B5%E6%95%B8+%E2%80%93+%E7%95%B6%E6%97%A5%40%40%E4%B8%89%E5%A4%A7%E6%B3%95%E4%BA%BA%E7%B4%AF%E8%A8%88%E8%B2%B7%E8%B6%85%40%40%E4%B8%89%E5%A4%A7%E6%B3%95%E4%BA%BA%E8%B2%B7%E8%B6%85%E5%BC%B5%E6%95%B8+%E2%80%93+%E7%95%B6%E6%97%A5"
 CF_KEYWORDS = ["Just a moment", "Cloudflare", "請稍候", "Attention", "驗證"]
 
@@ -43,7 +41,8 @@ CF_KEYWORDS = ["Just a moment", "Cloudflare", "請稍候", "Attention", "驗證"
 # ==========================================
 print("\n>> 正在啟動 Google Chrome 瀏覽器 (使用 SeleniumBase UC 模式)...")
 
-profile_path = os.path.join(BASE_DIR, "chrome_profile")
+# 在設定的資料夾旁邊建立 cookie 設定檔
+profile_path = os.path.join(os.path.dirname(SAVE_DIR), "chrome_profile")
 if not os.path.exists(profile_path):
     os.makedirs(profile_path)
 
@@ -57,17 +56,16 @@ try:
         window_size="1920,1080"
     )
     driver.maximize_window()
-    
     driver.execute_cdp_cmd('Emulation.setTimezoneOverride', {'timezoneId': 'Asia/Taipei'})
     driver.execute_cdp_cmd('Emulation.setGeolocationOverride', {'latitude': 25.0330, 'longitude': 121.5654, 'accuracy': 100})
     
-    print(" └─ 🎭 真人環境部署完成：已啟用 Cookie 記憶體與原生 UA！")
+    print(" └─ 🎭 真人環境部署完成：已啟用 Cookie 記憶體！")
 except Exception as e:
     print(f"啟動 Chrome 失敗！錯誤細節: {e}")
     exit()
 
 # ==========================================
-# 3. 核心抓取模組 (動態日期與名次)
+# 3. 核心抓取模組 (全新穩定版選單偵測)
 # ==========================================
 def check_and_solve_cf():
     """檢查並突破 Cloudflare 盾牌"""
@@ -88,26 +86,41 @@ def check_and_solve_cf():
             print(" └─ ⚠️ 仍在 Cloudflare 畫面，嘗試繼續等待...")
             time.sleep(5)
 
-def get_dropdown_options(keyword_to_find):
-    """通用函式：尋找包含特定關鍵字的下拉選單，並回傳所有選項文字"""
+def get_date_options():
+    """尋找日期的下拉選單"""
     selects = driver.find_elements(By.TAG_NAME, "select")
     for s in selects:
-        options = s.find_elements(By.TAG_NAME, "option")
-        options_texts = [opt.text.strip() for opt in options]
-        if any(keyword_to_find in text for text in options_texts):
-            return options, options_texts
-    return None, []
+        texts = [opt.text.strip() for opt in s.find_elements(By.TAG_NAME, "option")]
+        if any("最新資料" in t or "202" in t for t in texts):
+            return texts
+    return []
 
-def select_dropdown_option(target_text):
-    """通用函式：點擊特定的下拉選單選項並觸發網頁更新"""
+def get_rank_options():
+    """尋找名次的下拉選單"""
+    selects = driver.find_elements(By.TAG_NAME, "select")
+    for s in selects:
+        texts = [opt.text.strip() for opt in s.find_elements(By.TAG_NAME, "option")]
+        # 改用 300 或 高→低 來當作偵測名次選單的特徵，避免被空白干擾
+        if any("300" in t or "高→低" in t for t in texts):
+            return texts
+    return []
+
+def select_option(target_text):
+    """安全地點擊特定的下拉選單選項並觸發網頁更新"""
     selects = driver.find_elements(By.TAG_NAME, "select")
     for s in selects:
         options = s.find_elements(By.TAG_NAME, "option")
-        for opt in options:
-            if opt.text.strip() == target_text:
-                opt.click()
+        texts = [opt.text.strip() for opt in options]
+        if target_text in texts:
+            try:
+                # 使用官方 Select 物件進行切換
+                sel = Select(s)
+                sel.select_by_visible_text(target_text)
+                # 雙重保險：強迫觸發 onChange 事件
                 driver.execute_script("arguments[0].dispatchEvent(new Event('change'))", s)
                 return True
+            except Exception as e:
+                print(f"選單點擊發生錯誤: {e}")
     return False
 
 # ==========================================
@@ -117,28 +130,20 @@ print("\n>> 正在載入基礎網頁...")
 driver.uc_open_with_reconnect(BASE_URL, reconnect_time=4)
 check_and_solve_cf()
 
-# 取得日期選項 (通常包含 '最新資料' 或 '202')
-_, date_options_texts = get_dropdown_options("最新資料")
-if not date_options_texts:
-    # 備用方案，找尋包含年份的選單
-    _, date_options_texts = get_dropdown_options("202")
-
-# 我們只要抓前 3 天
-target_dates = date_options_texts[:3]
+target_dates = get_date_options()[:3] # 我們只要抓前 3 天
 print(f"\n>> 📅 成功抓取目標日期，準備執行: {target_dates}")
 
 success_count = 0
 total_tasks = 0
-failed_tasks = []
 
 for date_idx, date_text in enumerate(target_dates):
     print(f"\n{'='*50}")
     print(f"🗓️ 開始處理日期: {date_text} ({date_idx+1}/{len(target_dates)})")
     
-    # 點擊切換日期
-    if select_dropdown_option(date_text):
+    # 切換日期
+    if select_option(date_text):
         print(f" └─ 🔄 已切換至日期 {date_text}，等待載入...")
-        time.sleep(8)
+        time.sleep(6)
         check_and_solve_cf()
     
     # 處理檔名的日期前綴
@@ -149,17 +154,17 @@ for date_idx, date_text in enumerate(target_dates):
         file_date_str = re.sub(r'[^\d]', '', date_text.split('(')[0])
         if not file_date_str: file_date_str = today
 
-    # 動態取得當前日期有多少名次區間 (包含 "1-300名")
-    _, rank_options_texts = get_dropdown_options("1-300")
+    # 動態取得當前日期的名次區間
+    rank_options_texts = get_rank_options()
+    
     if not rank_options_texts:
-        print(" └─ ⚠️ 找不到名次下拉選單，略過此日期！")
-        continue
-        
-    print(f" └─ 📊 偵測到 {len(rank_options_texts)} 個名次區間: {rank_options_texts}")
+        print(" └─ ⚠️ 找不到名次下拉選單，可能今天只有一頁資料！將直接抓取當前頁面...")
+        rank_options_texts = ["全覽"] # 給予一個虛擬名稱讓迴圈可以跑一次
+    else:
+        print(f" └─ 📊 偵測到 {len(rank_options_texts)} 個名次區間: {rank_options_texts}")
     
     for rank_idx, rank_text in enumerate(rank_options_texts):
         total_tasks += 1
-        # 清理字串作為檔名後綴 (加上小括號為了相容你的 Parquet 正規表達式)
         clean_rank = rank_text.replace(' ', '').replace('/', '_')
         name_suffix = f"三大法人累計買超({clean_rank})"
         file_name = f"{file_date_str}_{name_suffix}.csv"
@@ -172,11 +177,12 @@ for date_idx, date_text in enumerate(target_dates):
             success_count += 1
             continue
 
-        # 切換名次
-        if select_dropdown_option(rank_text):
-            print(f"   └─ 🖱️ 已切換至 {rank_text}，等待網頁重新載入...")
-            time.sleep(8)
-            check_and_solve_cf()
+        # 如果不是虛擬名稱，就進行切換
+        if rank_text != "全覽":
+            if select_option(rank_text):
+                print(f"   └─ 🖱️ 已切換至 {rank_text}，等待網頁重新載入...")
+                time.sleep(6)
+                check_and_solve_cf()
             
         # 等待並解析表格
         print("   └─ 正在等待表格載入 (最長等待 60 秒)...")
@@ -225,7 +231,6 @@ for date_idx, date_text in enumerate(target_dates):
             success_count += 1
         else:
             print(f"   └─ ❌ 失敗！等了 60 秒還是沒有看到股票資料。")
-            failed_tasks.append((date_text, rank_text, file_name))
             
         # 防封鎖隨機休息 (不同名次之間)
         if rank_idx < len(rank_options_texts) - 1:
@@ -238,54 +243,40 @@ for date_idx, date_text in enumerate(target_dates):
         print(f"\n 💤 [防封鎖] 跨日期休息 {sleep_time:.2f} 秒...\n")
         time.sleep(sleep_time)
 
-# ==========================================
-# 4.5 敗部復活機制 (針對 failed_tasks) 略作簡化
-# ==========================================
-if failed_tasks:
-    print("\n" + "="*40)
-    print(f">> [敗部復活] 針對 {len(failed_tasks)} 個失敗項目重新嘗試... (可以自行擴充)")
-    # 為保持長度與原功能，這裡印出紀錄。因為動態選單切換需重跑前置，建議後續再手動補抓或交由明天自動補齊。
-
 print("-" * 40 + f"\n🎉 下載任務已全數執行完畢！最終成功率：{success_count}/{total_tasks}")
 driver.quit()
 
 # ==========================================
 # 5. 智慧動態分類與 Parquet 轉換引擎
 # ==========================================
-import glob
-
 print("\n>> [階段 3.5] 啟動資料自動整併引擎 (轉換 Parquet 並保留原始 CSV 檔案)...")
 
 def convert_monthly_to_parquet(save_dir):
-    # 1. 抓取目錄下所有的 CSV 檔案 (不再限於 today，確保跨日曆史資料也能被整併)
-    all_csvs = glob.glob(os.path.join(save_dir, "*.csv"))
+    # 🌟 修改點：強制只抓包含「三大法人累計買超」的 CSV 檔案，不要碰其他的！
+    all_csvs = glob.glob(os.path.join(save_dir, "*三大法人累計買超*.csv"))
     
     if not all_csvs:
-        print(" └─ ⚠️ 找不到 CSV 檔案，請確認爬蟲是否成功。")
+        print(" └─ ⚠️ 找不到任何『三大法人累計買超』的 CSV 檔案，請確認爬蟲是否成功。")
         return
 
-    # 2. 建立分類字典，將屬於同日期、同類別的檔案分組
+    # 建立分類字典，將屬於同日期、同類別的檔案分組
     category_groups = {}
     for file_path in all_csvs:
         filename = os.path.basename(file_path)
-        # 萃取日期與類別名稱 例如: 20260918_三大法人累計買超(1-300名).csv
+        # 萃取日期 例如: 20260918_三大法人累計買超(1-300名).csv
         match = re.match(r'^(\d{4,8})[-_]?(.*)\.csv$', filename)
         if match:
             file_date = match.group(1)
-            raw_category = match.group(2)
-            # 剝離括號內的內容，保留主類別名稱
-            clean_category = re.sub(r'\(.*?\)', '', raw_category).strip().strip('_-')
-            if not clean_category:
-                clean_category = "未分類資料"
+            # 強制將類別定名，不再看括號裡面的名次
+            clean_category = "三大法人累計買超" 
             
-            # 使用 Date + Category 作為群組 Key
             group_key = f"{file_date}_{clean_category}"
             
             if group_key not in category_groups:
                 category_groups[group_key] = []
             category_groups[group_key].append(file_path)
 
-    # 3. 逐一將各分類的 CSV 垂直合併並轉存為 Parquet
+    # 逐一將各分類的 CSV 垂直合併並轉存為 Parquet
     for group_key, files in category_groups.items():
         print(f" └─ 📦 正在整併並轉換類別: {group_key} (共包含 {len(files)} 個檔案)...")
         try:
@@ -319,19 +310,8 @@ def convert_monthly_to_parquet(save_dir):
         except Exception as e:
             print(f"    ❌ 轉換失敗 ({group_key}): {e}")
             
-    print(" └─ 📁 所有類別的原始 CSV 檔案皆已安全保留。")
+    print(" └─ 📁 只有『三大法人累計買超』被處理，不會干擾你其他資料夾的檔案。")
 
-# 執行全自動分類與轉換
+# 執行轉換
 convert_monthly_to_parquet(SAVE_DIR)
-
-# ==========================================
-# 6. 自動推播至 GitHub
-# ==========================================
-print("\n>> [階段四] 自動推播至 GitHub...")
-try:
-    subprocess.run(["git", "add", "data/"], cwd=BASE_DIR, check=True)
-    subprocess.run(["git", "commit", "-m", f"自動更新 {today} 三大法人買賣超資料"], cwd=BASE_DIR, check=False)
-    subprocess.run(["git", "push"], cwd=BASE_DIR, check=True)
-    print("✅ 資料已成功上傳至 GitHub！")
-except Exception as e:
-    print(f"⚠️ Git 推播失敗: {e}")
+print("\n>> 程式全數執行完畢！(已依照要求取消自動上傳 GitHub，請手動確認資料) 🎉")
