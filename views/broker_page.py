@@ -42,23 +42,33 @@ def sync_b8_data():
         return
 
     try:
-        # 🚀 這裡改呼叫新的滿血版函數！
+        # 讀取滿血版資料
         df_raw = load_full_blood_broker_history()
         if df_raw.empty: return
 
-        broker_col = next((c for c in ['broker_name', 'broker', '券商名稱', '券商', 'name'] if c in stock_raw.columns), None)
+        # 優先抓取中文券商名稱
+        broker_col = next((c for c in ['broker_name', 'broker', '券商名稱', '券商', 'name'] if c in df_raw.columns), None)
         if not broker_col: return
 
-        # 🚀 從APPLY替換成LOC運算,這三行 (瞬間完成十萬筆運算)
-        df_raw['signed_vol'] = df_raw['net_vol'].abs()
-        df_raw.loc[df_raw['side'] == 'sell', 'signed_vol'] = -df_raw['signed_vol']
+        # 🚀 記憶體防爆 1：只留下需要的欄位
+        df_light = df_raw[['trade_date', 'stock_code', broker_col, 'net_vol', 'side']].copy()
+        
+        # 轉換為 signed_vol (淨買賣張數)
+        df_light['signed_vol'] = df_light['net_vol'].abs()
+        df_light.loc[df_light['side'] == 'sell', 'signed_vol'] = -df_light['signed_vol']
 
-        valid_dates = df_raw['trade_date'].dropna().astype(str).unique()
+        valid_dates = df_light['trade_date'].dropna().unique()
         all_dates = sorted(valid_dates, reverse=True)
-        latest_date = all_dates[0] if all_dates else "未知日期"
+        if not all_dates: return
+        latest_date = all_dates[0]
 
-        # 1. 計算日連買與近期張數
-        scan_pivot = df_raw.pivot_table(index=['stock_code', broker_col], columns='trade_date', values='signed_vol', aggfunc='sum')
+        # 🚀 記憶體防爆 2：日連買只追蹤「最新一天有買超」的候選人
+        latest_buys = df_light[(df_light['trade_date'] == latest_date) & (df_light['signed_vol'] > 0)]
+        day_candidates = latest_buys[['stock_code', broker_col]].drop_duplicates()
+        df_day_filtered = pd.merge(df_light, day_candidates, on=['stock_code', broker_col], how='inner')
+
+        scan_pivot = df_day_filtered.pivot_table(index=['stock_code', broker_col], columns='trade_date', values='signed_vol', aggfunc='sum')
+        
         def calc_daily(row):
             streak = 0
             for c in all_dates:
@@ -66,18 +76,27 @@ def sync_b8_data():
                 if pd.isna(val) or val <= 0: break
                 streak += 1
             return streak
+            
         scan_pivot['連買日數'] = scan_pivot.apply(calc_daily, axis=1)
-        
         valid_sum_cols = [c for c in all_dates[:20] if c in scan_pivot.columns]
         scan_pivot['近期買超總張數'] = scan_pivot[valid_sum_cols].sum(axis=1)
 
-        # 2. 計算週連買
-        df_week = df_raw.dropna(subset=['trade_date']).copy()
+        # 🚀 記憶體防爆 3：週連買只追蹤「最新一週有買超」的候選人
+        df_week = df_light.dropna(subset=['trade_date']).copy()
         df_week['date_dt'] = pd.to_datetime(df_week['trade_date'], errors='coerce')
         df_week = df_week.dropna(subset=['date_dt'])
         df_week['year_week'] = df_week['date_dt'].dt.strftime('%Y-%W')
-        weekly_sum = df_week.groupby(['stock_code', broker_col, 'year_week'])['signed_vol'].sum().unstack(fill_value=0)
-        all_weeks = sorted(weekly_sum.columns, reverse=True)
+        
+        weekly_raw = df_week.groupby(['stock_code', broker_col, 'year_week'], as_index=False)['signed_vol'].sum()
+        all_weeks = sorted(weekly_raw['year_week'].unique(), reverse=True)
+        if not all_weeks: return
+        latest_week = all_weeks[0]
+        
+        latest_week_buys = weekly_raw[(weekly_raw['year_week'] == latest_week) & (weekly_raw['signed_vol'] > 0)]
+        week_candidates = latest_week_buys[['stock_code', broker_col]].drop_duplicates()
+        df_week_filtered = pd.merge(weekly_raw, week_candidates, on=['stock_code', broker_col], how='inner')
+        
+        weekly_sum = df_week_filtered.pivot_table(index=['stock_code', broker_col], columns='year_week', values='signed_vol', aggfunc='sum')
         
         def calc_weekly(row):
             streak = 0
@@ -86,9 +105,10 @@ def sync_b8_data():
                 if pd.isna(val) or val <= 0: break
                 streak += 1
             return streak
+            
         weekly_sum['連買週數'] = weekly_sum.apply(calc_weekly, axis=1)
 
-        # 3. 合併並找出「各檔股票」的最佳分點特徵 (取 Max)
+        # 4. 合併並找出最佳分點特徵
         df_day = scan_pivot.reset_index()[['stock_code', broker_col, '連買日數', '近期買超總張數']]
         df_wk = weekly_sum.reset_index()[['stock_code', broker_col, '連買週數']]
         
@@ -103,6 +123,11 @@ def sync_b8_data():
         # 存入全域變數
         st.session_state['b8_summary_df'] = stock_summary
         st.session_state['b8_latest_date'] = latest_date
+
+        # 清空暫存記憶體
+        import gc
+        del df_raw, df_light, scan_pivot, weekly_sum, final_b8
+        gc.collect()
 
     except Exception as e:
         print(f"B8 背景載入失敗: {e}")
