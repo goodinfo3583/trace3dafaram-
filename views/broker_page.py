@@ -2,26 +2,8 @@
 import streamlit as st
 import pandas as pd
 from utils.data_utils import calculate_chip_concentration
-# 🎯 輕量級分點慣性標籤庫 (你可以隨時擴充)
-BROKER_TAGS = {
-    "凱基台北": "⚠️ 隔日沖",
-    "統一城中": "⚠️ 隔日沖",
-    "元大土城永寧": "⚠️ 隔日沖",
-    "美林": "🌐 外資",
-    "台灣摩根士丹利": "🌐 外資",
-    "美商高盛": "🌐 外資",
-    "摩根大通": "🌐 外資",
-    "新加坡商瑞銀": "🌐 外資",
-    # 地緣券商你可以之後查好地址慢慢加，例如：
-    "富邦嘉義": "📍 嘉義地緣",
-}
 
-def apply_broker_tags(broker_name):
-    """給券商名稱貼上標籤的輕量級小幫手"""
-    name_str = str(broker_name)
-    tag = BROKER_TAGS.get(name_str, "")
-    return f"{name_str} {tag}" if tag else name_str
-# 🌟 效能救星 1：改讀取你專屬的 Hugging Face 滿血版 Parquet！
+# 🌟 1. 滿血版 Parquet 讀取引擎
 @st.cache_data(show_spinner=False, ttl=3600)
 def load_full_blood_broker_history():
     remote_parquet_url = "https://huggingface.co/datasets/goodinfo3583/tw-broker-parquet/resolve/main/broker_summary_master.parquet"
@@ -40,9 +22,7 @@ def load_full_blood_broker_history():
         df['stock_code'] = df['stock_code'].astype('category')
         df['broker'] = df['broker'].astype('category')
         df['broker_name'] = df['broker_name'].astype('category')
-        
         df['trade_date'] = df['trade_date'].dt.strftime('%Y-%m-%d').astype('category')
-        
         df['net_vol'] = df['net_vol_shares'] / 1000
         df['side'] = df['net_vol'].apply(lambda x: 'buy' if x > 0 else 'sell').astype('category')
         
@@ -52,10 +32,7 @@ def load_full_blood_broker_history():
         return pd.DataFrame()
     
 def sync_b8_data():
-    """在背景預先計算好全市場的 B8 券商連買狀態並存入 session_state"""
-    if 'b8_summary_df' in st.session_state:
-        return
-
+    if 'b8_summary_df' in st.session_state: return
     try:
         df_raw = load_full_blood_broker_history()
         if df_raw.empty: return
@@ -64,7 +41,6 @@ def sync_b8_data():
         if not broker_col: return
 
         df_light = df_raw[['trade_date', 'stock_code', broker_col, 'net_vol', 'side']].copy()
-        
         df_light['signed_vol'] = df_light['net_vol'].abs()
         df_light.loc[df_light['side'] == 'sell', 'signed_vol'] = -df_light['signed_vol']
 
@@ -121,11 +97,8 @@ def sync_b8_data():
         df_wk = weekly_sum.reset_index()[['stock_code', broker_col, '連買週數']]
         
         final_b8 = pd.merge(df_day, df_wk, on=['stock_code', broker_col], how='outer').fillna(0)
-        
         stock_summary = final_b8.groupby('stock_code').agg({
-            '連買日數': 'max',
-            '連買週數': 'max',
-            '近期買超總張數': 'max'
+            '連買日數': 'max', '連買週數': 'max', '近期買超總張數': 'max'
         }).reset_index().rename(columns={'stock_code': '統一代號'})
 
         st.session_state['b8_summary_df'] = stock_summary
@@ -137,7 +110,29 @@ def sync_b8_data():
 
     except Exception as e:
         print(f"B8 背景載入失敗: {e}")
-        
+
+# 🌟 2. 標籤與共用格式函數
+BROKER_TAGS = {
+    "凱基台北": "⚠️隔日沖", "統一城中": "⚠️隔日沖", "元大土城永寧": "⚠️隔日沖",
+    "美林": "🌐外資", "台灣摩根士丹利": "🌐外資", "美商高盛": "🌐外資", "摩根大通": "🌐外資"
+}
+
+def apply_broker_tags(broker_name):
+    name_str = str(broker_name)
+    tag = BROKER_TAGS.get(name_str, "")
+    return f"{name_str} {tag}" if tag else name_str
+
+def fmt_float(val):
+    if pd.isna(val) or val == 0: return "-"
+    if isinstance(val, (float, int)): return "{:,.1f}".format(val)
+    return str(val)
+
+def fmt_int(val):
+    if pd.isna(val) or val == 0: return "-"
+    if isinstance(val, (float, int)): return "{:,.0f}".format(val)
+    return str(val)
+
+# 🌟 3. 個股儀表板 Fragment
 @st.fragment
 def render_broker_dashboard(target_stock, display_name, df_raw_all, df_trend):
     latest_data = df_trend.iloc[-1]
@@ -148,10 +143,8 @@ def render_broker_dashboard(target_stock, display_name, df_raw_all, df_trend):
         delta=f"淨買超 {latest_data['net_buy']:,} 張"
     )
     
-    # === 畫圖區塊升級：股價、滾動集中度、主力防守線 ===
     import plotly.graph_objects as go
     from plotly.subplots import make_subplots
-    
     st.subheader(f"📊 {display_name} 籌碼與股價共振走勢")
     
     df_trend_plot = df_trend.copy().dropna(subset=['stock_price'])
@@ -159,51 +152,51 @@ def render_broker_dashboard(target_stock, display_name, df_raw_all, df_trend):
     # 建立雙 Y 軸圖表
     fig_trend = make_subplots(specs=[[{"secondary_y": True}]])
     
-    # 1. 畫當日集中度 (x 改回 trade_date)
     colors = ['#FF4B4B' if val > 0 else '#00E272' for val in df_trend_plot['concentration_%']]
     fig_trend.add_trace(go.Bar(
         x=df_trend_plot['trade_date'], y=df_trend_plot['concentration_%'],
-        marker_color=colors, name='單日集中度', opacity=0.6
+        marker_color=colors, name='單日集中度', opacity=0.4
     ), secondary_y=True)
     
-    # 2. 畫滾動 5 日 (x 改回 trade_date)
-    fig_trend.add_trace(go.Scatter(
-        x=df_trend_plot['trade_date'], y=df_trend_plot['5日集中度(%)'],
-        mode='lines', line=dict(color='#FFD700', width=2), name='5日滾動集中度'
-    ), secondary_y=True)
+    # 🚀 新增 5日、10日、20日 滾動集中度
+    if '5日集中度(%)' in df_trend_plot.columns:
+        fig_trend.add_trace(go.Scatter(
+            x=df_trend_plot['trade_date'], y=df_trend_plot['5日集中度(%)'],
+            mode='lines', line=dict(color='#FFD700', width=2), name='5日集中度'
+        ), secondary_y=True)
+    if '10日集中度(%)' in df_trend_plot.columns:
+        fig_trend.add_trace(go.Scatter(
+            x=df_trend_plot['trade_date'], y=df_trend_plot['10日集中度(%)'],
+            mode='lines', line=dict(color='#FF8C00', width=1.5, dash='dot'), name='10日集中度'
+        ), secondary_y=True)
+    if '20日集中度(%)' in df_trend_plot.columns:
+        fig_trend.add_trace(go.Scatter(
+            x=df_trend_plot['trade_date'], y=df_trend_plot['20日集中度(%)'],
+            mode='lines', line=dict(color='#FF00FF', width=1.5, dash='dash'), name='20日集中度'
+        ), secondary_y=True)
     
-    # 3. 畫真實股價 (x 改回 trade_date)
     fig_trend.add_trace(go.Scatter(
         x=df_trend_plot['trade_date'], y=df_trend_plot['stock_price'],
         mode='lines+markers', line=dict(color='#38bdf8', width=2), name='市場均價(股價)'
     ), secondary_y=False)
     
-    # 🎯 4. 尋找近 20 日最大買超主力的「控盤成本線」並畫出防守底線
+    # 🎯 畫出最大主力防守線
     stock_raw = df_raw_all[df_raw_all['stock_code'] == target_stock].copy()
-    if not stock_raw.empty:
-        broker_col = next((c for c in ['broker_name', 'broker', '券商名稱'] if c in stock_raw.columns), None)
+    broker_col = next((c for c in ['broker_name', 'broker', '券商名稱', '券商', 'name'] if c in stock_raw.columns), None)
+    if not stock_raw.empty and broker_col:
         recent_20_dates = sorted(stock_raw['trade_date'].unique(), reverse=True)[:20]
         recent_20_raw = stock_raw[stock_raw['trade_date'].isin(recent_20_dates)]
-        
-        # 找出近 20 日買超第一名的券商
         top_broker_agg = recent_20_raw.groupby(broker_col).agg(
-            淨買張數=('net_vol', 'sum'),
-            總買進金額=('總買進金額', 'sum'),
-            總買進股數=('總買進股數', 'sum')
+            淨買張數=('net_vol', 'sum'), 總買進金額=('總買進金額', 'sum'), 總買進股數=('總買進股數', 'sum')
         ).sort_values('淨買張數', ascending=False)
         
         if not top_broker_agg.empty and top_broker_agg.iloc[0]['淨買張數'] > 0:
             top1_name = top_broker_agg.index[0]
-            # 計算該主力這 20 天的真實平均成本
             top1_cost = round(top_broker_agg.iloc[0]['總買進金額'] / top_broker_agg.iloc[0]['總買進股數'], 2)
-            
-            # 畫出主力防守橫線
             fig_trend.add_hline(
                 y=top1_cost, line_color="#FF4B4B", line_width=1.5, line_dash="dash",
                 annotation_text=f"🚩 最大主力 ({top1_name}) 防守成本: {top1_cost}元", 
-                annotation_position="bottom right",
-                annotation_font=dict(color="#FF4B4B"),
-                secondary_y=False
+                annotation_position="bottom right", annotation_font=dict(color="#FF4B4B"), secondary_y=False
             )
 
     fig_trend.update_layout(
@@ -211,11 +204,8 @@ def render_broker_dashboard(target_stock, display_name, df_raw_all, df_trend):
         margin=dict(l=20, r=20, t=20, b=20),
         legend=dict(orientation="h", yanchor="bottom", y=1.02, xanchor="right", x=1),
         xaxis=dict(
-            type='category', 
-            tickmode='array',
-            tickvals=df_trend_plot['trade_date'],
-            ticktext=df_trend_plot['trade_date'].str.slice(5, 10), # 強制只顯示 MM-DD
-            tickangle=45
+            type='category', tickmode='array', tickvals=df_trend_plot['trade_date'],
+            ticktext=df_trend_plot['trade_date'].str.slice(5, 10), tickangle=45
         )
     )
     
@@ -223,23 +213,15 @@ def render_broker_dashboard(target_stock, display_name, df_raw_all, df_trend):
     fig_trend.update_yaxes(title_text="<b>集中度 (%)</b>", secondary_y=True, showgrid=False)
     
     st.plotly_chart(fig_trend, use_container_width=True, config={'displayModeBar': False})
-#====================    
+    
     with st.expander("📅 展開查看：近 60 日集中度與淨買超歷史表", expanded=False):
         df_trend_disp = df_trend.sort_values('trade_date', ascending=False).head(60).copy()
         df_trend_disp = df_trend_disp[['trade_date', 'net_buy', 'concentration_%']]
         df_trend_disp.columns = ['交易日期', '淨買超(張)', '集中度(%)']
-        st.dataframe(df_trend_disp, use_container_width=True, hide_index=True)
+        st.dataframe(df_trend_disp.style.format({'淨買超(張)': fmt_float, '集中度(%)': "{:.2f}"}), use_container_width=True, hide_index=True)
 
     st.markdown("---")
     st.subheader(f"🔍 {display_name} 券商分點進出明細")
-    
-    stock_raw = df_raw_all[df_raw_all['stock_code'] == target_stock].copy()
-    
-    if stock_raw.empty:
-        st.warning(f"在歷史總帳本中，找不到 **{display_name}** 的紀錄。")
-        return
-        
-    broker_col = next((c for c in ['broker_name', 'broker', '券商名稱', '券商', 'name'] if c in stock_raw.columns), None)
     
     if broker_col is None:
         st.error("⚠️ 無法在資料庫中找到「券商名稱」欄位！")
@@ -249,40 +231,35 @@ def render_broker_dashboard(target_stock, display_name, df_raw_all, df_trend):
     
     tab1, tab2, tab3 = st.tabs(["🔹 單日進出明細", "🔹 區間囤貨 (近60日)", "🔹 歷史進出 (近30日)"])
     
-    # --------- 標籤 1: 單日明細 (滿血均價版) ---------
+    # --------- 標籤 1: 單日明細 ---------
     with tab1:
         selected_date = st.selectbox("請選擇要查看的交易日期：", available_dates, key="daily_date_sel")
         daily_raw = stock_raw[stock_raw['trade_date'] == selected_date]
-        
         col_buy, col_sell = st.columns(2)
         
         def format_daily_table(df, is_buy):
             if df.empty: return None
-            df = df.copy()
-            df = df.drop_duplicates(subset=[broker_col])
+            df = df.copy().drop_duplicates(subset=[broker_col])
             
             if not is_buy: 
                 df['net_vol'] = df['net_vol'].abs()
                 if '買賣超金額' in df.columns: df['買賣超金額'] = df['買賣超金額'].abs()
             
             df = df.sort_values('net_vol', ascending=False).head(15)
-            
             df['均價'] = (df['總買進金額'] / df['總買進股數']).fillna(0).round(2)
-            if not is_buy:
-                # 若為賣方則計算均賣價
-                df['均價'] = (df['買賣超金額'].abs() / (df['net_vol']*1000)).fillna(0).round(2)
+            if not is_buy: df['均價'] = (df['買賣超金額'].abs() / (df['net_vol']*1000)).fillna(0).round(2)
+            
+            df[broker_col] = df[broker_col].apply(apply_broker_tags) # 貼標籤
             
             if '買賣超金額' in df.columns:
                 df['金額(萬)'] = (df['買賣超金額'] / 10000).round(0)
                 df = df[[broker_col, 'net_vol', '均價', '金額(萬)']]
                 df.columns = ['券商名稱', '張數', '均價', '金額(萬)']
-                df['券商名稱'] = df['券商名稱'].apply(apply_broker_tags)
-                return df.style.format({'張數': "{:,.1f}", '均價': "{:.2f}", '金額(萬)': "{:,.0f}"})
+                return df.style.format({'張數': fmt_float, '均價': "{:.2f}", '金額(萬)': fmt_int})
             else:
                 df = df[[broker_col, 'net_vol', '均價']]
                 df.columns = ['券商名稱', '張數', '均價']
-                df['券商名稱'] = df['券商名稱'].apply(apply_broker_tags)
-                return df.style.format({'張數': "{:,.1f}", '均價': "{:.2f}"})
+                return df.style.format({'張數': fmt_float, '均價': "{:.2f}"})
 
         with col_buy:
             st.markdown("##### 🔴 淨買超前 15 大分點")
@@ -296,68 +273,54 @@ def render_broker_dashboard(target_stock, display_name, df_raw_all, df_trend):
             if styled_sell is not None: st.dataframe(styled_sell, use_container_width=True, hide_index=True)
             else: st.write("當日無資料")
 
-    # --------- 標籤 2: 區間囤貨 (近60日) 滿血版 ---------
+    # --------- 標籤 2: 區間囤貨 ---------
     with tab2:
         st.markdown("##### 🕵️‍♂️ 誰在拿真金白銀連續吃貨？")
         recent_dates = available_dates[:60]
         recent_raw = stock_raw[stock_raw['trade_date'].isin(recent_dates)].copy()
         
         hoard_df = recent_raw.groupby(broker_col).agg(
-            區間淨買超張數=('net_vol', 'sum'),
-            區間總買進股數=('總買進股數', 'sum'),
-            區間總買進金額=('總買進金額', 'sum'),
-            區間淨買賣金額=('買賣超金額', 'sum')
+            區間淨買超張數=('net_vol', 'sum'), 區間總買進股數=('總買進股數', 'sum'),
+            區間總買進金額=('總買進金額', 'sum'), 區間淨買賣金額=('買賣超金額', 'sum')
         ).reset_index()
         
         hoard_df['均價'] = (hoard_df['區間總買進金額'] / hoard_df['區間總買進股數']).fillna(0).round(2)
         hoard_df['斥資(億)'] = (hoard_df['區間淨買賣金額'] / 100000000).round(2)
+        hoard_df[broker_col] = hoard_df[broker_col].apply(apply_broker_tags) # 貼標籤
         
         col_hoard, col_dump = st.columns(2)
-        
-        def fmt_dash(val):
-            if pd.isna(val) or val == 0: return "-"
-            return "{:,.0f}".format(val)
-        
         with col_hoard:
             st.markdown("##### 📈 近 60 日囤貨分點 (斥資破億榜)")
             hoarders = hoard_df[hoard_df['區間淨買超張數'] > 0].sort_values('斥資(億)', ascending=False)
-            
             if not hoarders.empty:
-                hoarders_display = hoarders[[broker_col, '區間淨買超張數', '均價', '斥資(億)']]
-                hoarders_display.columns = ['券商名稱', '淨買超(張)', '均價', '斥資(億)']
-                styled_hoard = hoarders_display.style.format({'淨買超(張)': fmt_dash, '均價': "{:.2f}", '斥資(億)': "{:.2f}"})
+                hoarders.columns = ['券商名稱', '淨買超(張)', '總買(股)', '總買(元)', '淨買(元)', '均價', '斥資(億)']
+                styled_hoard = hoarders[['券商名稱', '淨買超(張)', '均價', '斥資(億)']].style.format({'淨買超(張)': fmt_float, '均價': "{:.2f}", '斥資(億)': "{:.2f}"})
                 try: styled_hoard = styled_hoard.background_gradient(subset=['斥資(億)'], cmap='Reds')
                 except: pass
                 st.dataframe(styled_hoard, use_container_width=True, hide_index=True)
-            else: 
-                st.write("區間內無明顯囤貨分點")
+            else: st.write("無明顯囤貨")
                 
         with col_dump:
             st.markdown("##### 📉 近 60 日倒貨分點")
             dumpers = hoard_df[hoard_df['區間淨買超張數'] < 0].sort_values('斥資(億)', ascending=True).copy()
-            
             if not dumpers.empty:
                 dumpers['斥資(億)'] = dumpers['斥資(億)'].abs()
                 dumpers['區間淨買超張數'] = dumpers['區間淨買超張數'].abs()
-                dumpers_display = dumpers[[broker_col, '區間淨買超張數', '均價', '斥資(億)']]
-                dumpers_display.columns = ['券商名稱', '淨賣超(張)', '均價', '提款(億)']
-                styled_dump = dumpers_display.style.format({'淨賣超(張)': fmt_dash, '均價': "{:.2f}", '提款(億)': "{:.2f}"})
+                dumpers.columns = ['券商名稱', '淨賣超(張)', '總買(股)', '總買(元)', '淨賣(元)', '均價', '提款(億)']
+                styled_dump = dumpers[['券商名稱', '淨賣超(張)', '均價', '提款(億)']].style.format({'淨賣超(張)': fmt_float, '均價': "{:.2f}", '提款(億)': "{:.2f}"})
                 try: styled_dump = styled_dump.background_gradient(subset=['提款(億)'], cmap='Greens')
                 except: pass
                 st.dataframe(styled_dump, use_container_width=True, hide_index=True)
-            else: 
-                st.write("區間內無明顯倒貨分點")
+            else: st.write("無明顯倒貨")
 
-    # --------- 標籤 3: 歷史進出矩陣 (近30日) ---------
+    # --------- 標籤 3: 歷史進出矩陣 ---------
     with tab3:
         st.markdown("##### 🗺️ 分點淨買賣力道")
-        st.write("橫列為各分點，縱欄顯示**近 30 個交易日**。")
+        st.markdown("橫列為各分點，縱欄顯示**近 30 個交易日**。數字為買賣超張數，小數點代表零股交易，`-0.0` 表示賣出數量小於一張。")
         
         all_matrix_raw = stock_raw.copy()
         if not all_matrix_raw.empty:
-            all_matrix_raw['signed_vol'] = all_matrix_raw.apply(
-                lambda x: abs(x['net_vol']) if x['side'] == 'buy' else -abs(x['net_vol']), axis=1
-            )
+            all_matrix_raw['signed_vol'] = all_matrix_raw.apply(lambda x: abs(x['net_vol']) if x['side'] == 'buy' else -abs(x['net_vol']), axis=1)
             all_matrix_raw['date_dt'] = pd.to_datetime(all_matrix_raw['trade_date'])
             all_matrix_raw['year_week'] = all_matrix_raw['date_dt'].dt.strftime('%Y-%W')
             weekly_sum = all_matrix_raw.groupby([broker_col, 'year_week'])['signed_vol'].sum().unstack(fill_value=0)
@@ -374,8 +337,7 @@ def render_broker_dashboard(target_stock, display_name, df_raw_all, df_trend):
             def calc_daily_streak(row_name):
                 if row_name not in full_pivot.index: return "-"
                 row = full_pivot.loc[row_name]
-                streak = 0
-                sign = None
+                streak = 0; sign = None
                 for c in all_dates_sorted:
                     val = row.get(c, 0)
                     if pd.isna(val) or val == 0: break  
@@ -392,8 +354,7 @@ def render_broker_dashboard(target_stock, display_name, df_raw_all, df_trend):
             def calc_weekly_streak(broker_name):
                 if weekly_sum.empty or broker_name not in weekly_sum.index: return "-"
                 row = weekly_sum.loc[broker_name]
-                streak = 0
-                sign = None
+                streak = 0; sign = None
                 for c in week_cols:
                     val = row.get(c, 0)
                     if val == 0 or pd.isna(val): break
@@ -407,7 +368,10 @@ def render_broker_dashboard(target_stock, display_name, df_raw_all, df_trend):
                 
             pivot_df['週連買動態'] = pivot_df.index.to_series().apply(calc_weekly_streak)
             pivot_df[display_dates] = pivot_df[display_dates].fillna("-")
-            pivot_df.index.name = "中文券商分點"
+            
+            # 貼上標籤
+            pivot_df.index = pivot_df.index.to_series().apply(apply_broker_tags)
+            pivot_df.index.name = "券商分點"
             
             cols = ['日連買動態', '週連買動態', '區間累計'] + display_dates
             pivot_df = pivot_df[cols]
@@ -438,9 +402,9 @@ def render_broker_dashboard(target_stock, display_name, df_raw_all, df_trend):
                     elif v < 0: return 'color: #00E272;'
                 except: pass
                 return 'color: #94A3B8;'
-            
-            if hasattr(pivot_df.style, 'map'): styled_pivot = pivot_df.style.map(color_net_vol).format(lambda x: "{:,.0f}".format(x) if isinstance(x, (int, float)) else x)
-            else: styled_pivot = pivot_df.style.applymap(color_net_vol).format(lambda x: "{:,.0f}".format(x) if isinstance(x, (int, float)) else x)
+
+            if hasattr(pivot_df.style, 'map'): styled_pivot = pivot_df.style.map(color_net_vol).format(fmt_float)
+            else: styled_pivot = pivot_df.style.applymap(color_net_vol).format(fmt_float)
             
             st.dataframe(styled_pivot, use_container_width=True)
         else:
@@ -462,161 +426,167 @@ def render(STOCK_DICT=None):
 
     st.markdown("觀察前 15 大分點買賣力道相抵後的淨流向，追蹤籌碼集中度連續性與券商進出。(已升級滿血版金額運算)")
     
-    # 🌟 1. 全市場掃描器 (已新增斥資排序與縫合功能) 🌟
+    # 🌟 1. 全市場掃描器 (加入兩大魔王級掃描) 🌟
     with st.expander("🌍 全市場連買分點快搜 (尋找主力連續吃貨標的)", expanded=False):
         st.markdown("此功能將掃描資料庫中所有股票，找出當前處於「連續買超」或「重金砸盤」狀態的特定分點與個股。", unsafe_allow_html=True)
 
         scan_mode = st.radio(
             "請選擇全市場排行方式：", 
             [
-                "依日連買排行", 
-                "依週連買排行", 
-                "依近期買超張數排行",
-                "依單一分點近期買超金額排行", 
-                "依單一股票買超金額排行"
+                "依日連買排行", "依週連買排行", "依近期買超張數排行",
+                "依單一分點買超金額排行", "依單一股票買超金額排行",
+                "依集中度斜率(Δ)排行", "依股價乖離率(吃豆腐)排行"
             ], 
-            horizontal=True, 
-            key="global_broker_scan_radio"
+            horizontal=True, key="global_broker_scan_radio"
         )
         
         c_scan, c_clear = st.columns([3, 1])
         with c_scan:
             if st.button("🚀 開始全市場掃描", use_container_width=True, type="primary"):
-                with st.spinner("正在進行全市場運算 (包含均價與斥資運算)，請稍候..."):
+                with st.spinner("正在進行全市場運算 (啟動量子加速防爆引擎)，請稍候..."):
                     df_raw_all = load_full_blood_broker_history()
                     
                     if not df_raw_all.empty:
                         broker_col = next((c for c in ['broker_name', 'broker', '券商名稱', '券商', 'name'] if c in df_raw_all.columns), None)
                         if broker_col:
                             scan_df = df_raw_all[['trade_date', 'stock_code', broker_col, 'net_vol', '總買進股數', '總買進金額', '買賣超金額']].copy()
-                            
                             valid_dates = scan_df['trade_date'].dropna().unique()
                             all_dates = sorted(valid_dates, reverse=True)
                             
                             if all_dates:
                                 latest_date = all_dates[0]
-                                
-                                # --- 共同的 20日區間資料聚合 (用於日連買、金額排行) ---
                                 valid_sum_dates = all_dates[:20]
                                 df_20d = scan_df[scan_df['trade_date'].isin(valid_sum_dates)]
                                 
-                                agg_20d = df_20d.groupby(['stock_code', broker_col]).agg(
-                                    近期買超總張數=('net_vol', 'sum'),
-                                    區間總買進股數=('總買進股數', 'sum'),
-                                    區間總買進金額=('總買進金額', 'sum'),
-                                    區間買賣超金額=('買賣超金額', 'sum')
-                                ).reset_index()
-                                
-                                # 💡 新增：依【單一分點買超金額】排行
-                                if scan_mode == "依單一分點近期買超金額排行":
-                                    result_df = agg_20d[agg_20d['區間買賣超金額'] > 0].copy()
-                                    result_df['均價'] = (result_df['區間總買進金額'] / result_df['區間總買進股數']).fillna(0).round(2)
-                                    result_df['斥資(億)'] = (result_df['區間買賣超金額'] / 100000000).round(2)
-                                    result_df = result_df.sort_values('斥資(億)', ascending=False)
-                                    result_df = result_df[['stock_code', broker_col, '近期買超總張數', '均價', '斥資(億)']]
+                                # 💡 新增 1：集中度斜率 (Δ Concentration) 掃描
+                                if scan_mode == "依集中度斜率(Δ)排行":
+                                    daily_vol = df_20d.groupby(['trade_date', 'stock_code'])['總買進股數'].sum() / 1000
+                                    df_buy = df_20d[df_20d['net_vol'] > 0]
+                                    df_sell = df_20d[df_20d['net_vol'] < 0]
 
-                                # 💡 新增：依【單一股票買超金額】排行 (自動縫合大戶名單)
-                                elif scan_mode == "依單一股票買超金額排行":
-                                    # 先過濾出真正買超的分點
-                                    buy_only_20d = agg_20d[agg_20d['區間買賣超金額'] > 0].copy()
-                                    # 再依股票代號進行二次聚合
-                                    stock_agg = buy_only_20d.groupby('stock_code').agg(
-                                        近期買超總張數=('近期買超總張數', 'sum'),
-                                        區間總買進股數=('區間總買進股數', 'sum'),
-                                        區間總買進金額=('區間總買進金額', 'sum'),
-                                        區間買賣超金額=('區間買賣超金額', 'sum'),
-                                        # 將有參與買超的分點名稱用逗號縫合起來
-                                        參與大戶=(broker_col, lambda x: ', '.join(x.dropna().unique()[:5])) # 只顯示前5個避免太長
+                                    # Pandas 極速分組取 Top15
+                                    top15_buy = df_buy.sort_values(['trade_date', 'stock_code', 'net_vol'], ascending=[True, True, False]) \
+                                                      .groupby(['trade_date', 'stock_code']).head(15).groupby(['trade_date', 'stock_code'])['net_vol'].sum()
+                                    top15_sell = df_sell.sort_values(['trade_date', 'stock_code', 'net_vol'], ascending=[True, True, True]) \
+                                                        .groupby(['trade_date', 'stock_code']).head(15).groupby(['trade_date', 'stock_code'])['net_vol'].sum()
+
+                                    daily_net = top15_buy.fillna(0) - top15_sell.abs().fillna(0)
+                                    conc_df = pd.DataFrame({'net_buy': daily_net, 'vol': daily_vol}).reset_index().sort_values('trade_date')
+
+                                    conc_df['5d_net'] = conc_df.groupby('stock_code')['net_buy'].transform(lambda x: x.rolling(5, min_periods=1).sum())
+                                    conc_df['5d_vol'] = conc_df.groupby('stock_code')['vol'].transform(lambda x: x.rolling(5, min_periods=1).sum())
+                                    conc_df['20d_net'] = conc_df.groupby('stock_code')['net_buy'].transform(lambda x: x.rolling(20, min_periods=1).sum())
+                                    conc_df['20d_vol'] = conc_df.groupby('stock_code')['vol'].transform(lambda x: x.rolling(20, min_periods=1).sum())
+
+                                    conc_df['5日集中度(%)'] = (conc_df['5d_net'] / conc_df['5d_vol'] * 100).fillna(0).round(2)
+                                    conc_df['20日集中度(%)'] = (conc_df['20d_net'] / conc_df['20d_vol'] * 100).fillna(0).round(2)
+                                    conc_df['Δ集中度(5-20日)'] = (conc_df['5日集中度(%)'] - conc_df['20日集中度(%)']).round(2)
+
+                                    result_df = conc_df[conc_df['trade_date'] == latest_date]
+                                    result_df = result_df[result_df['vol'] > 0].sort_values('Δ集中度(5-20日)', ascending=False)
+                                    result_df = result_df[['stock_code', '5日集中度(%)', '20日集中度(%)', 'Δ集中度(5-20日)']]
+                                    result_df.rename(columns={'stock_code': '股票代號'}, inplace=True)
+
+                                # 💡 新增 2：股價乖離率 (距離主力成本) 掃描
+                                elif scan_mode == "依股價乖離率(吃豆腐)排行":
+                                    agg_20d = df_20d.groupby(['stock_code', broker_col]).agg(
+                                        net_vol=('net_vol', 'sum'), buy_amt=('總買進金額', 'sum'), buy_shares=('總買進股數', 'sum')
                                     ).reset_index()
                                     
-                                    stock_agg['均價'] = (stock_agg['區間總買進金額'] / stock_agg['區間總買進股數']).fillna(0).round(2)
-                                    stock_agg['斥資(億)'] = (stock_agg['區間買賣超金額'] / 100000000).round(2)
-                                    result_df = stock_agg.sort_values('斥資(億)', ascending=False)
+                                    latest_df = df_20d[df_20d['trade_date'] == latest_date]
+                                    latest_price = (latest_df.groupby('stock_code')['總買進金額'].sum() / latest_df.groupby('stock_code')['總買進股數'].sum()).fillna(0).round(2)
                                     
-                                    # 因為已經群組化為單一股票，欄位重整一下
-                                    result_df = result_df[['stock_code', '參與大戶', '近期買超總張數', '均價', '斥資(億)']]
-                                    # 為了讓下方統一處理名稱，先暫時把 '參與大戶' 叫回 broker_col
-                                    result_df.rename(columns={'參與大戶': broker_col}, inplace=True)
+                                    agg_20d = agg_20d[agg_20d['net_vol'] > 0]
+                                    top_broker = agg_20d.sort_values(['stock_code', 'net_vol'], ascending=[True, False]).groupby('stock_code').head(1)
+                                    top_broker['主力成本'] = (top_broker['buy_amt'] / top_broker['buy_shares']).fillna(0).round(2)
+                                    
+                                    dev_df = pd.merge(top_broker, latest_price.rename('最新股價'), on='stock_code')
+                                    dev_df['乖離率(%)'] = ((dev_df['最新股價'] - dev_df['主力成本']) / dev_df['主力成本'] * 100).round(2)
+                                    dev_df['絕對乖離'] = dev_df['乖離率(%)'].abs()
+                                    result_df = dev_df.sort_values('絕對乖離', ascending=True)
+                                    result_df = result_df[['stock_code', broker_col, '主力成本', '最新股價', '乖離率(%)', 'net_vol']]
+                                    result_df.rename(columns={'stock_code': '股票代號', broker_col: '最大主力分點', 'net_vol': '主力囤貨(張)'}, inplace=True)
 
-                                # 原本的日連買與張數排行
-                                elif scan_mode in ["依日連買排行", "依近期買超張數排行"]:
-                                    latest_buys = scan_df[(scan_df['trade_date'] == latest_date) & (scan_df['net_vol'] > 0)]
-                                    candidates = latest_buys[['stock_code', broker_col]].drop_duplicates()
-                                    
-                                    df_candidates = pd.merge(scan_df, candidates, on=['stock_code', broker_col], how='inner')
-                                    scan_pivot = df_candidates.pivot_table(index=['stock_code', broker_col], columns='trade_date', values='net_vol', aggfunc='sum')
-                                    
-                                    def calc_global_daily_streak(row):
-                                        streak = 0
-                                        for c in all_dates:
-                                            val = row.get(c, 0)
-                                            if pd.isna(val) or val <= 0: break
-                                            streak += 1
-                                        return streak
-                                        
-                                    scan_pivot['連買日數'] = scan_pivot.apply(calc_global_daily_streak, axis=1)
-                                    scan_pivot = scan_pivot.reset_index()
-                                    
-                                    result_df = pd.merge(scan_pivot[['stock_code', broker_col, '連買日數']], agg_20d, on=['stock_code', broker_col])
-                                    result_df = result_df[result_df['連買日數'] >= 1].copy() 
-                                    
-                                    result_df['均價'] = (result_df['區間總買進金額'] / result_df['區間總買進股數']).fillna(0).round(2)
-                                    result_df['斥資(億)'] = (result_df['區間買賣超金額'] / 100000000).round(2)
-                                    
-                                    if scan_mode == "依日連買排行":
-                                        result_df = result_df[result_df['連買日數'] >= 2].sort_values(['連買日數', '近期買超總張數'], ascending=[False, False])
-                                    else:
-                                        result_df = result_df[result_df['近期買超總張數'] > 0].sort_values(['近期買超總張數', '連買日數'], ascending=[False, False])
-                                    
-                                    result_df = result_df[['stock_code', broker_col, '連買日數', '近期買超總張數', '均價', '斥資(億)']]
-
-                                # 原本的週連買排行
+                                # 其餘原有的掃描功能
                                 else:
-                                    scan_df['date_dt'] = pd.to_datetime(scan_df['trade_date'], errors='coerce')
-                                    scan_df = scan_df.dropna(subset=['date_dt'])
-                                    scan_df['year_week'] = scan_df['date_dt'].dt.strftime('%Y-%W')
+                                    agg_20d = df_20d.groupby(['stock_code', broker_col]).agg(
+                                        近期買超總張數=('net_vol', 'sum'), 區間總買進股數=('總買進股數', 'sum'),
+                                        區間總買進金額=('總買進金額', 'sum'), 區間買賣超金額=('買賣超金額', 'sum')
+                                    ).reset_index()
                                     
-                                    weekly_raw = scan_df.groupby(['stock_code', broker_col, 'year_week'], as_index=False)['net_vol'].sum()
-                                    all_weeks = sorted(weekly_raw['year_week'].unique(), reverse=True)
-                                    if all_weeks:
-                                        latest_week = all_weeks[0]
-                                        latest_week_buys = weekly_raw[(weekly_raw['year_week'] == latest_week) & (weekly_raw['net_vol'] > 0)]
-                                        candidates_wk = latest_week_buys[['stock_code', broker_col]].drop_duplicates()
-                                        
-                                        df_candidates_wk = pd.merge(weekly_raw, candidates_wk, on=['stock_code', broker_col], how='inner')
-                                        weekly_sum = df_candidates_wk.pivot_table(index=['stock_code', broker_col], columns='year_week', values='net_vol', aggfunc='sum')
-                                        
-                                        def calc_global_weekly_streak(row):
-                                            streak = 0
-                                            for c in all_weeks:
-                                                val = row.get(c, 0)
-                                                if pd.isna(val) or val <= 0: break
-                                                streak += 1
-                                            return streak
-                                            
-                                        weekly_sum['連買週數'] = weekly_sum.apply(calc_global_weekly_streak, axis=1)
-                                        weekly_sum = weekly_sum.reset_index()
-                                        
-                                        df_candidates_raw = pd.merge(scan_df, candidates_wk, on=['stock_code', broker_col], how='inner')
-                                        valid_sum_weeks = all_weeks[:4]
-                                        df_candidates_4w = df_candidates_raw[df_candidates_raw['year_week'].isin(valid_sum_weeks)]
-                                        
-                                        agg_4w = df_candidates_4w.groupby(['stock_code', broker_col]).agg(
-                                            近期買超總張數=('net_vol', 'sum'),
-                                            區間總買進股數=('總買進股數', 'sum'),
-                                            區間總買進金額=('總買進金額', 'sum'),
-                                            區間買賣超金額=('買賣超金額', 'sum')
-                                        ).reset_index()
-                                        
-                                        result_df = pd.merge(weekly_sum[['stock_code', broker_col, '連買週數']], agg_4w, on=['stock_code', broker_col])
-                                        result_df = result_df[result_df['連買週數'] >= 2].sort_values(['連買週數', '近期買超總張數'], ascending=[False, False])
-                                
+                                    if scan_mode == "依單一分點買超金額排行":
+                                        result_df = agg_20d[agg_20d['區間買賣超金額'] > 0].copy()
                                         result_df['均價'] = (result_df['區間總買進金額'] / result_df['區間總買進股數']).fillna(0).round(2)
                                         result_df['斥資(億)'] = (result_df['區間買賣超金額'] / 100000000).round(2)
-                                        result_df = result_df[['stock_code', broker_col, '連買週數', '近期買超總張數', '均價', '斥資(億)']]
+                                        result_df = result_df.sort_values('斥資(億)', ascending=False)
+                                        result_df = result_df[['stock_code', broker_col, '近期買超總張數', '均價', '斥資(億)']]
+
+                                    elif scan_mode == "依單一股票買超金額排行":
+                                        buy_only_20d = agg_20d[agg_20d['區間買賣超金額'] > 0].copy()
+                                        stock_agg = buy_only_20d.groupby('stock_code').agg(
+                                            近期買超總張數=('近期買超總張數', 'sum'), 區間總買進股數=('區間總買進股數', 'sum'),
+                                            區間總買進金額=('區間總買進金額', 'sum'), 區間買賣超金額=('區間買賣超金額', 'sum'),
+                                            參與大戶=(broker_col, lambda x: ', '.join(x.dropna().unique()[:5]))
+                                        ).reset_index()
+                                        stock_agg['均價'] = (stock_agg['區間總買進金額'] / stock_agg['區間總買進股數']).fillna(0).round(2)
+                                        stock_agg['斥資(億)'] = (stock_agg['區間買賣超金額'] / 100000000).round(2)
+                                        result_df = stock_agg.sort_values('斥資(億)', ascending=False)
+                                        result_df = result_df[['stock_code', '參與大戶', '近期買超總張數', '均價', '斥資(億)']].rename(columns={'參與大戶': broker_col})
+
+                                    elif scan_mode in ["依日連買排行", "依近期買超張數排行"]:
+                                        latest_buys = scan_df[(scan_df['trade_date'] == latest_date) & (scan_df['net_vol'] > 0)]
+                                        candidates = latest_buys[['stock_code', broker_col]].drop_duplicates()
+                                        df_candidates = pd.merge(scan_df, candidates, on=['stock_code', broker_col], how='inner')
+                                        scan_pivot = df_candidates.pivot_table(index=['stock_code', broker_col], columns='trade_date', values='net_vol', aggfunc='sum')
+                                        def calc_global_daily_streak(row):
+                                            streak = 0
+                                            for c in all_dates:
+                                                if pd.isna(row.get(c, 0)) or row.get(c, 0) <= 0: break
+                                                streak += 1
+                                            return streak
+                                        scan_pivot['連買日數'] = scan_pivot.apply(calc_global_daily_streak, axis=1)
+                                        scan_pivot = scan_pivot.reset_index()
+                                        result_df = pd.merge(scan_pivot[['stock_code', broker_col, '連買日數']], agg_20d, on=['stock_code', broker_col])
+                                        result_df = result_df[result_df['連買日數'] >= 1].copy() 
+                                        result_df['均價'] = (result_df['區間總買進金額'] / result_df['區間總買進股數']).fillna(0).round(2)
+                                        result_df['斥資(億)'] = (result_df['區間買賣超金額'] / 100000000).round(2)
+                                        if scan_mode == "依日連買排行": result_df = result_df[result_df['連買日數'] >= 2].sort_values(['連買日數', '近期買超總張數'], ascending=[False, False])
+                                        else: result_df = result_df[result_df['近期買超總張數'] > 0].sort_values(['近期買超總張數', '連買日數'], ascending=[False, False])
+                                        result_df = result_df[['stock_code', broker_col, '連買日數', '近期買超總張數', '均價', '斥資(億)']]
+
+                                    else:
+                                        scan_df['date_dt'] = pd.to_datetime(scan_df['trade_date'], errors='coerce')
+                                        scan_df = scan_df.dropna(subset=['date_dt'])
+                                        scan_df['year_week'] = scan_df['date_dt'].dt.strftime('%Y-%W')
+                                        weekly_raw = scan_df.groupby(['stock_code', broker_col, 'year_week'], as_index=False)['net_vol'].sum()
+                                        all_weeks = sorted(weekly_raw['year_week'].unique(), reverse=True)
+                                        if all_weeks:
+                                            latest_week_buys = weekly_raw[(weekly_raw['year_week'] == all_weeks[0]) & (weekly_raw['net_vol'] > 0)]
+                                            candidates_wk = latest_week_buys[['stock_code', broker_col]].drop_duplicates()
+                                            df_candidates_wk = pd.merge(weekly_raw, candidates_wk, on=['stock_code', broker_col], how='inner')
+                                            weekly_sum = df_candidates_wk.pivot_table(index=['stock_code', broker_col], columns='year_week', values='net_vol', aggfunc='sum')
+                                            def calc_global_weekly_streak(row):
+                                                streak = 0
+                                                for c in all_weeks:
+                                                    if pd.isna(row.get(c, 0)) or row.get(c, 0) <= 0: break
+                                                    streak += 1
+                                                return streak
+                                            weekly_sum['連買週數'] = weekly_sum.apply(calc_global_weekly_streak, axis=1)
+                                            weekly_sum = weekly_sum.reset_index()
+                                            df_candidates_raw = pd.merge(scan_df, candidates_wk, on=['stock_code', broker_col], how='inner')
+                                            df_candidates_4w = df_candidates_raw[df_candidates_raw['year_week'].isin(all_weeks[:4])]
+                                            agg_4w = df_candidates_4w.groupby(['stock_code', broker_col]).agg(
+                                                近期買超總張數=('net_vol', 'sum'), 區間總買進股數=('總買進股數', 'sum'),
+                                                區間總買進金額=('總買進金額', 'sum'), 區間買賣超金額=('買賣超金額', 'sum')
+                                            ).reset_index()
+                                            result_df = pd.merge(weekly_sum[['stock_code', broker_col, '連買週數']], agg_4w, on=['stock_code', broker_col])
+                                            result_df = result_df[result_df['連買週數'] >= 2].sort_values(['連買週數', '近期買超總張數'], ascending=[False, False])
+                                            result_df['均價'] = (result_df['區間總買進金額'] / result_df['區間總買進股數']).fillna(0).round(2)
+                                            result_df['斥資(億)'] = (result_df['區間買賣超金額'] / 100000000).round(2)
+                                            result_df = result_df[['stock_code', broker_col, '連買週數', '近期買超總張數', '均價', '斥資(億)']]
 
                                 # 統一名稱轉換
-                                if STOCK_DICT:
+                                if STOCK_DICT and 'stock_code' in result_df.columns:
                                     result_df['股票名稱'] = result_df['stock_code'].astype(str).apply(
                                         lambda x: STOCK_DICT.get(x, {}).get('name', '-')
                                     )
@@ -625,10 +595,9 @@ def render(STOCK_DICT=None):
                                         cols.insert(1, cols.pop(cols.index('股票名稱')))
                                         result_df = result_df[cols]
                                 
-                                # 依據不同的模式，給予不同的欄位名稱
                                 if scan_mode == "依單一股票買超金額排行":
                                     result_df.rename(columns={'stock_code': '股票代號', broker_col: '參與大戶(前5大)'}, inplace=True)
-                                else:
+                                elif scan_mode not in ["依集中度斜率(Δ)排行", "依股價乖離率(吃豆腐)排行"]:
                                     result_df.rename(columns={'stock_code': '股票代號', broker_col: '券商分點'}, inplace=True)
                                     
                                 st.session_state['broker_global_scan_result'] = result_df
@@ -642,16 +611,21 @@ def render(STOCK_DICT=None):
         if 'broker_global_scan_result' in st.session_state:
             cached_res = st.session_state['broker_global_scan_result']
             cached_mode = st.session_state.get('broker_global_scan_mode', '未知模式')
-            
             if not cached_res.empty:
-                st.success(f"🎯 掃描結果 ({cached_mode})：共發現 {len(cached_res)} 組主力特徵。")
-                styled_res = cached_res.head(100).style.format({
-                    '近期買超總張數': "{:,.1f}", 
-                    '均價': "{:.2f}", 
-                    '斥資(億)': "{:.2f}"
-                })
-                try: styled_res = styled_res.background_gradient(subset=['斥資(億)'], cmap='Reds')
-                except: pass
+                st.success(f"🎯 掃描結果 ({cached_mode})：共發現 {len(cached_res)} 組特徵。")
+                
+                format_dict = {'近期買超總張數': fmt_float, '均價': "{:.2f}", '斥資(億)': "{:.2f}", '主力囤貨(張)': fmt_float}
+                styled_res = cached_res.head(100).style.format(format_dict)
+                if '斥資(億)' in cached_res.columns:
+                    try: styled_res = styled_res.background_gradient(subset=['斥資(億)'], cmap='Reds')
+                    except: pass
+                elif '乖離率(%)' in cached_res.columns:
+                    try: styled_res = styled_res.background_gradient(subset=['乖離率(%)'], cmap='coolwarm')
+                    except: pass
+                elif 'Δ集中度(5-20日)' in cached_res.columns:
+                    try: styled_res = styled_res.background_gradient(subset=['Δ集中度(5-20日)'], cmap='Reds')
+                    except: pass
+                    
                 st.dataframe(styled_res, use_container_width=True, hide_index=True)
             else:
                 st.info("目前市場上無明顯的分點特徵。")
@@ -662,16 +636,9 @@ def render(STOCK_DICT=None):
         unique_options = {f"{v['id']} {v['name']}" for v in STOCK_DICT.values() if len(str(v['id'])) <= 4}
         stock_options = sorted(list(unique_options))
     
-    default_index = 0
-
     col1, col2 = st.columns([3, 1])
     with col1:
-        selected_stock_str = st.selectbox(
-            "請選擇要查詢的股票：", 
-            options=[""] + stock_options,
-            index=default_index,
-            key="broker_search_input"
-        )
+        selected_stock_str = st.selectbox("請選擇要查詢的股票：", options=[""] + stock_options, index=0, key="broker_search_input")
           
     if selected_stock_str:
         target_stock = selected_stock_str.split(" ")[0].strip()
