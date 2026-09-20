@@ -91,50 +91,75 @@ def get_diff_ui(today_val, prev_val):
         return f"<br><span style='color:{color}; font-size:11px;'>({sign}{diff:,})</span>"
     except: return ""
 
-# 💡 優化 4：遠端資料讀取「極度消耗網路資源」，設定 1 小時快取 (ttl=3600)
+# 💡 優化 4： Parquet 集中度運算引擎
 @st.cache_data(show_spinner=False, ttl=3600)
-def calculate_chip_concentration(csv_path: str, target_stock: str) -> pd.DataFrame:
+def calculate_chip_concentration(parquet_url: str, target_stock: str) -> pd.DataFrame:
     """
-    計算指定股票的每日籌碼集中度
+    計算指定股票的每日籌碼集中度 (適配滿血版 Parquet)
     """
-    # 1. 讀取資料庫 (支援 GitHub Raw 網址)
     try:
-        df = pd.read_csv(csv_path)
+        # 1. 讀取 Parquet，並開啟節省記憶體的 columns 篩選
+        columns_to_read = ['日期', '股票代號', '券商名稱', '買賣超股數', '總買進股數']
+        df = pd.read_parquet(parquet_url, columns=columns_to_read)
+        
+        # 轉換欄位名稱配合後續邏輯
+        df = df.rename(columns={
+            '日期': 'trade_date', 
+            '股票代號': 'stock_code', 
+            '買賣超股數': 'net_vol_shares'
+        })
+        df['trade_date'] = pd.to_datetime(df['trade_date']).dt.strftime('%Y-%m-%d')
+        df['net_vol'] = df['net_vol_shares'] / 1000  # 轉成張數
+        
     except Exception as e:
-        print(f"[警告] 讀取籌碼 CSV 失敗: {e}")
+        print(f"[警告] 讀取籌碼 Parquet 失敗: {e}")
         return pd.DataFrame()
     
-    # 2. 確保股票代碼是字串格式，並過濾出我們要的標的 (例如 1709)
+    # 2. 過濾目標股票
     df['stock_code'] = df['stock_code'].astype(str)
     stock_df = df[df['stock_code'] == target_stock].copy()
     
     if stock_df.empty:
-        return pd.DataFrame() # 如果沒資料就回傳空表
+        return pd.DataFrame() 
         
-    # 3. 準備一個列表來裝每天的計算結果
     results = []
     
-    # 4. 依照「交易日期」進行分組運算
+    # 3. 依照「交易日期」進行分組運算
     for date, group in stock_df.groupby('trade_date'):
-        buy_side = group[group['side'] == 'buy']
-        sell_side = group[group['side'] == 'sell']
+        # 當日該檔股票的「總成交張數」 = 所有分點的「總買進股數」加總 / 1000
+        # 因為每買一張必有一賣，所以算單邊買進總和就是總成交量
+        daily_total_volume = (group['總買進股數'].sum()) / 1000
         
+        if daily_total_volume == 0:
+            continue
+            
+        # 分出買賣方，並各自排序抓出前 15 大
+        buy_side = group[group['net_vol'] > 0].sort_values('net_vol', ascending=False).head(15)
+        sell_side = group[group['net_vol'] < 0].sort_values('net_vol', ascending=True).head(15)
+        
+        # 前 15 大買超張數加總
         top15_buy_vol = buy_side['net_vol'].sum()
-        top15_sell_vol = sell_side['net_vol'].sum() 
-        daily_net_vol = top15_buy_vol + top15_sell_vol
+        # 前 15 大賣超張數加總 (用絕對值)
+        top15_sell_vol = abs(sell_side['net_vol'].sum())
         
-        concentration_pct = round(buy_side['pct'].sum() - sell_side['pct'].sum(), 2)
+        # 淨買賣超 = 前15大買超 - 前15大賣超
+        daily_net_vol = top15_buy_vol - top15_sell_vol
+        
+        # 真正的集中度公式：(前15大淨買超) / 當日總成交量
+        concentration_pct = round((daily_net_vol / daily_total_volume) * 100, 2)
         
         results.append({
             'trade_date': date,
             'top15_buy': top15_buy_vol,
-            'top15_sell': abs(top15_sell_vol),
+            'top15_sell': top15_sell_vol,
             'net_buy': daily_net_vol,
             'concentration_%': concentration_pct
         })
         
-    # 5. 轉成 DataFrame 並依照日期排序
-    result_df = pd.DataFrame(results).sort_values('trade_date')
+    # 4. 轉成 DataFrame 並依照日期排序
+    result_df = pd.DataFrame(results)
+    if not result_df.empty:
+        result_df = result_df.sort_values('trade_date')
     return result_df
 
 # 台股代號與名稱產業類別 萬用字典引擎
