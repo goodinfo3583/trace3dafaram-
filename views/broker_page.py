@@ -205,8 +205,9 @@ def render_broker_dashboard(target_stock, display_name, df_raw_all, df_trend):
     
     tab1, tab2, tab3 = st.tabs(["🔹 單日進出明細", "🔹 區間囤貨 (近60日)", "🔹 歷史進出 (近30日)"])
     
-    # --------- 標籤 1: 單日明細 ---------
+# --------- 標籤 1: 單日明細 ---------
     with tab1:
+        # 💡 在這裡切換日期，只會局部更新這個 Fragment，不會影響到上方的搜尋欄！
         selected_date = st.selectbox("請選擇要查看的交易日期：", available_dates, key="daily_date_sel")
         daily_raw = stock_raw[stock_raw['trade_date'] == selected_date]
         
@@ -215,24 +216,51 @@ def render_broker_dashboard(target_stock, display_name, df_raw_all, df_trend):
         def format_daily_table(df, is_buy):
             if df.empty: return None
             df = df.copy()
+            
+            # 以「券商名稱」為基準去除重複的資料列
             df = df.drop_duplicates(subset=[broker_col])
-            if not is_buy: df['net_vol'] = df['net_vol'].abs()
+            
+            # 如果是賣方，將張數與金額轉為正數以利閱讀
+            if not is_buy: 
+                df['net_vol'] = df['net_vol'].abs()
+                if '買賣超金額' in df.columns:
+                    df['買賣超金額'] = df['買賣超金額'].abs()
+            
+            # 依張數由大到小排序，抓出前 15 大
             df = df.sort_values('net_vol', ascending=False).head(15)
-            df = df[[broker_col, 'net_vol']]
-            df.columns = ['券商名稱', '張數']
-            return df
+            
+            # 🚀 滿血升級：加入金額欄位 (轉換為「萬元」方便閱讀)
+            if '買賣超金額' in df.columns:
+                df['金額(萬)'] = (df['買賣超金額'] / 10000).round(0)
+                df = df[[broker_col, 'net_vol', '金額(萬)']]
+                df.columns = ['券商名稱', '張數', '金額(萬)']
+                
+                # 套用千分位逗號格式
+                return df.style.format({
+                    '張數': "{:,.1f}",    # 保留一位小數，精準顯示零股
+                    '金額(萬)': "{:,.0f}"
+                })
+            else:
+                # 備用方案：若沒抓到金額欄位，維持原樣
+                df = df[[broker_col, 'net_vol']]
+                df.columns = ['券商名稱', '張數']
+                return df.style.format({'張數': "{:,.1f}"})
 
         with col_buy:
             st.markdown("##### 🔴 淨買超前 15 大分點")
             styled_buy = format_daily_table(daily_raw[daily_raw['side'] == 'buy'], True)
-            if styled_buy is not None: st.dataframe(styled_buy, use_container_width=True, hide_index=True)
-            else: st.write("當日無資料")
+            if styled_buy is not None: 
+                st.dataframe(styled_buy, use_container_width=True, hide_index=True)
+            else: 
+                st.write("當日無資料")
             
         with col_sell:
             st.markdown("##### 🟢 淨賣超前 15 大分點")
             styled_sell = format_daily_table(daily_raw[daily_raw['side'] == 'sell'], False)
-            if styled_sell is not None: st.dataframe(styled_sell, use_container_width=True, hide_index=True)
-            else: st.write("當日無資料")
+            if styled_sell is not None: 
+                st.dataframe(styled_sell, use_container_width=True, hide_index=True)
+            else: 
+                st.write("當日無資料")
 
     # --------- 標籤 2: 區間囤貨 (近60日) 🚀 滿血升級版 🚀 ---------
     with tab2:
