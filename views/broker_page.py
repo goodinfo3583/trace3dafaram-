@@ -92,9 +92,8 @@ def apply_broker_tags(broker_name):
     tag = BROKER_TAGS.get(name_str, "")
     return f"{name_str} {tag}" if tag else name_str
 
-# 🚀 修復 Bug：絕對不能把文字轉換成 "-"！
 def fmt_float(val): 
-    if isinstance(val, str): return val  # 如果是連買文字，直接放行！
+    if isinstance(val, str): return val 
     return "{:,.1f}".format(val) if isinstance(val, (float, int)) and not pd.isna(val) else "-"
 
 def fmt_int(val): 
@@ -351,7 +350,6 @@ def render(STOCK_DICT=None):
         with c_scan:
             if st.button("🚀 開始全市場掃描", use_container_width=True, type="primary"):
                 with st.spinner("正在進行全市場運算 (包含動態標籤判定)，請稍候..."):
-                    df_raw_all = load_full_blood_broker_history()
                     if not df_raw_all.empty:
                         broker_col = next((c for c in ['broker_name', 'broker', '券商名稱', '券商', 'name'] if c in df_raw_all.columns), None)
                         if broker_col:
@@ -535,7 +533,7 @@ def render(STOCK_DICT=None):
                     '最新日買超張數': "{:,.0f}", '最新均價': "{:.2f}"
                 }
                 
-                styled_res = cached_res.head(100).style.format(format_dict)
+                styled_res = cached_res.head(200).style.format(format_dict)
                 
                 if '斥資(億)' in cached_res.columns:
                     try: styled_res = styled_res.background_gradient(subset=['斥資(億)'], cmap='Reds')
@@ -550,13 +548,12 @@ def render(STOCK_DICT=None):
 
     # 🌟 2. 新增：籌碼集中動能 (Δ) 排行榜 🌟
     with st.expander("📈 全市場籌碼集中動能 (Δ) 排行榜 (Top 200)", expanded=False):
-        st.markdown(r"💡 **已過濾每日總成交額須小於1000萬標的。** 比對今日與昨日的集中度變化量 ($\Delta$)，瞬間抓出籌碼急遽集中的飆股黑馬。")
+        st.markdown(r"💡 **已過濾每日總成交額須大於1000萬標的。** 比對今日與昨日的集中度變化量 ($\Delta$)，瞬間抓出籌碼急遽集中的飆股黑馬。")
         st.markdown(r"集中度 % 代表籌碼掌握度需大於 '0'，$\Delta$ 是加速度，代表發動程度。若集中度高且股價低，勝率較高。")
         c_mom_scan, c_mom_clear = st.columns([3, 1])
         with c_mom_scan:
             if st.button("🚀 開始計算動能排行榜", use_container_width=True, type="primary"):
                 with st.spinner("正在進行矩陣運算，提取全市場動能特徵..."):
-                    df_raw_all = load_full_blood_broker_history()
                     if not df_raw_all.empty:
                         scan_df = df_raw_all[['trade_date', 'stock_code', 'net_vol', '總買進股數', '買賣超金額']].copy()
                         valid_dates = scan_df['trade_date'].dropna().unique()
