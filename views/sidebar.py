@@ -263,9 +263,8 @@ def render_sidebar_broker_tracking(query, display_name):
             m_col1, m_col2 = st.columns(2)
             with m_col1: st.metric(label=f"最新集中度 ({latest_data['trade_date']})", value=f"{latest_data['concentration_%']}%")
             with m_col2:
-                net_buy_val = latest_data['net_buy']
-                net_str = f"+{net_buy_val:,}" if net_buy_val > 0 else f"{net_buy_val:,}"
-                st.metric(label="主體淨買賣超", value=f"{net_str} 張")
+                net_buy_val = latest_data['net_buy'] #小數點位數顯示
+                net_str = f"+{net_buy_val:,.1f}" if net_buy_val > 0 else f"{net_buy_val:,.1f}"              st.metric(label="主體淨買賣超", value=f"{net_str} 張")
             
             with st.expander("📅 展開查看：近 60 日集中度與淨買超", expanded=False):
                 df_trend_disp = df_trend.sort_values('trade_date', ascending=False).head(60).copy()[['trade_date', 'net_buy', 'concentration_%']]
