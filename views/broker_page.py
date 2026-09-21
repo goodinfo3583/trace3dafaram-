@@ -235,7 +235,7 @@ def render_broker_dashboard(target_stock, display_name, df_raw_all, df_trend):
             pivot_df['區間累計'] = pivot_df.sum(axis=1)
             pivot_df = pivot_df.sort_values('區間累計', ascending=False)
             
-            # 🚀 修正：防禦小數點誤差，確保連買動態正確顯示！
+            # 🚀 修正：防禦小數點誤差，並確保在未貼標籤的 index 上運算！
             def calc_daily_streak(row_name):
                 if row_name not in full_pivot.index: return "-"
                 row = full_pivot.loc[row_name]
@@ -251,6 +251,7 @@ def render_broker_dashboard(target_stock, display_name, df_raw_all, df_trend):
                 elif streak < 0: return f"連賣 {-streak} 日"
                 else: return "-"
                 
+            # 💡 在貼標籤之前，先算好天數！
             pivot_df['日連買動態'] = pivot_df.index.to_series().apply(calc_daily_streak)
             
             def calc_weekly_streak(broker_name):
@@ -269,6 +270,99 @@ def render_broker_dashboard(target_stock, display_name, df_raw_all, df_trend):
                 else: return "-"
                 
             pivot_df['週連買動態'] = pivot_df.index.to_series().apply(calc_weekly_streak)
+            
+            # 💡 算完連買天數後，再來給 Index 貼上標籤
+            pivot_df[display_dates] = pivot_df[display_dates].fillna("-")
+            pivot_df.index = pivot_df.index.to_series().apply(apply_broker_tags)
+            pivot_df.index.name = "券商分點"
+            
+            cols = ['日連買動態', '週連買動態', '區間累計'] + display_dates
+            pivot_df = pivot_df[cols]
+            sort_option = st.radio("🔍 排序依據：", ["依區間累計排序(預設)", "依連買日數排序", "依連買週數排序"], horizontal=True, key=f"sort_radio_{target_stock}")
+            
+            def extract_streak_num(val):
+                if isinstance(val, str) and "連買" in val:
+                    try: return int(''.join(filter(str.isdigit, val)))
+                    except: return 0
+                return 0
+
+            if sort_option == "依連買日數排序":
+                pivot_df['sort_key'] = pivot_df['日連買動態'].apply(extract_streak_num)
+                pivot_df = pivot_df.sort_values(['sort_key', '區間累計'], ascending=[False, False]).drop(columns=['sort_key'])
+            elif sort_option == "依連買週數排序":
+                pivot_df['sort_key'] = pivot_df['週連買動態'].apply(extract_streak_num)
+                pivot_df = pivot_df.sort_values(['sort_key', '區間累計'], ascending=[False, False]).drop(columns=['sort_key'])
+            
+            def color_net_vol(val):
+                if isinstance(val, str):
+                    if val == "-": return 'color: #64748B;' 
+                    if "連買" in val: return 'color: #FF4B4B;' 
+                    if "連賣" in val: return 'color: #00E272;' 
+                try:
+                    v = float(val)
+                    if v > 0: return 'color: #FF4B4B;'
+                    elif v < -0.01: return 'color: #00E272;'
+                except: pass
+                return 'color: #94A3B8;'
+
+            if hasattr(pivot_df.style, 'map'): styled_pivot = pivot_df.style.map(color_net_vol).format(fmt_float)
+            else: styled_pivot = pivot_df.style.applymap(color_net_vol).format(fmt_float)
+            st.dataframe(styled_pivot, use_container_width=True)
+        else: st.write("無足夠資料產出")with tab3:
+        st.markdown("##### 🗺️ 分點淨買賣力道")
+        st.markdown("橫列為各分點，縱欄顯示**近 30 個交易日**。數字為買賣超張數，`-0.0` 表示賣出數量小於一張。")
+        all_matrix_raw = stock_raw.copy()
+        if not all_matrix_raw.empty:
+            all_matrix_raw['signed_vol'] = all_matrix_raw.apply(lambda x: abs(x['net_vol']) if x['side'] == 'buy' else -abs(x['net_vol']), axis=1)
+            all_matrix_raw['date_dt'] = pd.to_datetime(all_matrix_raw['trade_date'])
+            all_matrix_raw['year_week'] = all_matrix_raw['date_dt'].dt.strftime('%Y-%W')
+            weekly_sum = all_matrix_raw.groupby([broker_col, 'year_week'])['signed_vol'].sum().unstack(fill_value=0)
+            week_cols = sorted(weekly_sum.columns, reverse=True)
+            
+            full_pivot = all_matrix_raw.pivot_table(index=broker_col, columns='trade_date', values='signed_vol', aggfunc='sum')
+            all_dates_sorted = sorted(full_pivot.columns, reverse=True)
+            display_dates = all_dates_sorted[:30]
+            pivot_df = full_pivot[display_dates].copy()
+            pivot_df['區間累計'] = pivot_df.sum(axis=1)
+            pivot_df = pivot_df.sort_values('區間累計', ascending=False)
+            
+            # 🚀 修正：防禦小數點誤差，並確保在未貼標籤的 index 上運算！
+            def calc_daily_streak(row_name):
+                if row_name not in full_pivot.index: return "-"
+                row = full_pivot.loc[row_name]
+                streak = 0; sign = None
+                for c in all_dates_sorted:
+                    val = row.get(c, 0)
+                    if pd.isna(val) or abs(val) < 0.01: break  
+                    current_sign = 1 if val > 0 else -1
+                    if sign is None: sign = current_sign; streak = sign
+                    elif sign == current_sign: streak += sign
+                    else: break  
+                if streak > 0: return f"連買 {streak} 日"
+                elif streak < 0: return f"連賣 {-streak} 日"
+                else: return "-"
+                
+            # 💡 在貼標籤之前，先算好天數！
+            pivot_df['日連買動態'] = pivot_df.index.to_series().apply(calc_daily_streak)
+            
+            def calc_weekly_streak(broker_name):
+                if weekly_sum.empty or broker_name not in weekly_sum.index: return "-"
+                row = weekly_sum.loc[broker_name]
+                streak = 0; sign = None
+                for c in week_cols:
+                    val = row.get(c, 0)
+                    if pd.isna(val) or abs(val) < 0.01: break
+                    current_sign = 1 if val > 0 else -1
+                    if sign is None: sign = current_sign; streak = sign
+                    elif sign == current_sign: streak += sign
+                    else: break
+                if streak > 0: return f"連買 {streak} 週"
+                elif streak < 0: return f"連賣 {-streak} 週"
+                else: return "-"
+                
+            pivot_df['週連買動態'] = pivot_df.index.to_series().apply(calc_weekly_streak)
+            
+            # 💡 算完連買天數後，再來給 Index 貼上標籤
             pivot_df[display_dates] = pivot_df[display_dates].fillna("-")
             pivot_df.index = pivot_df.index.to_series().apply(apply_broker_tags)
             pivot_df.index.name = "券商分點"
@@ -306,7 +400,6 @@ def render_broker_dashboard(target_stock, display_name, df_raw_all, df_trend):
             else: styled_pivot = pivot_df.style.applymap(color_net_vol).format(fmt_float)
             st.dataframe(styled_pivot, use_container_width=True)
         else: st.write("無足夠資料產出")
-
 # ==========================================
 # 🖼️ 主渲染入口
 # ==========================================
@@ -333,7 +426,11 @@ def render(STOCK_DICT=None):
 
         scan_mode = st.radio(
             "請選擇全市場排行方式：", 
-            ["依日連買排行", "依週連買排行", "依近期買超張數排行", "依單一分點買超金額排行", "依單一股票買超金額排行", "依股價乖離率(吃豆腐)排行"], 
+            [
+                "依日連買排行", "依週連買排行", "依近期買超張數排行", 
+                "依單一分點買超金額排行", "依單一股票買超金額排行", 
+                "依股價乖離率(吃豆腐)排行", "🌟 依主力(Top15)買超張數排行 (復刻三竹)"
+            ], 
             horizontal=True, key="global_broker_scan_radio"
         )
         
@@ -359,8 +456,50 @@ def render(STOCK_DICT=None):
                                 df_20d = df_20d[df_20d['stock_code'].isin(valid_stocks)]
                                 scan_df = scan_df[scan_df['stock_code'].isin(valid_stocks)]
                                 
-                                # 💡 股價乖離率 (吃豆腐) 掃描
-                                if scan_mode == "依股價乖離率(吃豆腐)排行":
+                                # 💡 1. 復刻三竹：依整體主力(Top15)買超張數排行
+                                if scan_mode == "🌟 依主力(Top15)買超張數排行 (復刻三竹)":
+                                    df_buy = df_20d[df_20d['net_vol'] > 0]
+                                    df_sell = df_20d[df_20d['net_vol'] < 0]
+
+                                    # 算出每天、每檔股票的前15大淨買與淨賣
+                                    top15_buy = df_buy.sort_values(['trade_date', 'stock_code', 'net_vol'], ascending=[True, True, False]).groupby(['trade_date', 'stock_code']).head(15).groupby(['trade_date', 'stock_code'])['net_vol'].sum()
+                                    top15_sell = df_sell.sort_values(['trade_date', 'stock_code', 'net_vol'], ascending=[True, True, True]).groupby(['trade_date', 'stock_code']).head(15).groupby(['trade_date', 'stock_code'])['net_vol'].sum()
+
+                                    # 算出「主力真實淨買張數」
+                                    daily_net = (top15_buy.fillna(0) - top15_sell.abs().fillna(0)).reset_index()
+                                    daily_net.rename(columns={'net_vol': '主力淨買超'}, inplace=True)
+                                    
+                                    # 轉置成矩陣來算「連買天數」
+                                    pivot_net = daily_net.pivot_table(index='stock_code', columns='trade_date', values='主力淨買超', aggfunc='sum')
+                                    
+                                    def calc_stock_streak(row):
+                                        streak = 0
+                                        sign = None
+                                        for c in all_dates[:20]:
+                                            val = row.get(c, 0)
+                                            if pd.isna(val) or val == 0: break
+                                            current_sign = 1 if val > 0 else -1
+                                            if sign is None: sign = current_sign; streak = sign
+                                            elif sign == current_sign: streak += sign
+                                            else: break
+                                        if streak > 0: return f"🔥 連 {streak} 買"
+                                        elif streak < 0: return f"🩸 連 {-streak} 賣"
+                                        return "-"
+                                        
+                                    pivot_net['主力連買動態'] = pivot_net.apply(calc_stock_streak, axis=1)
+                                    result_df = pivot_net.reset_index()[['stock_code', '主力連買動態', latest_date]]
+                                    result_df.rename(columns={latest_date: '最新日買超張數'}, inplace=True)
+                                    
+                                    # 只抓最新一天是大於 0 的 (當日有買超)
+                                    result_df = result_df[result_df['最新日買超張數'] > 0].sort_values('最新日買超張數', ascending=False)
+                                    
+                                    # 補上均價資訊
+                                    latest_price = (df_20d[df_20d['trade_date'] == latest_date].groupby('stock_code')['總買進金額'].sum() / df_20d[df_20d['trade_date'] == latest_date].groupby('stock_code')['總買進股數'].sum()).fillna(0).round(2).reset_index(name='最新均價')
+                                    result_df = pd.merge(result_df, latest_price, on='stock_code')
+                                    result_df = result_df.head(50) # 只取前 50 名
+                                    
+                                # 💡 2. 股價乖離率 (吃豆腐) 掃描
+                                elif scan_mode == "依股價乖離率(吃豆腐)排行":
                                     agg_20d = df_20d.groupby(['stock_code', broker_col]).agg(net_vol=('net_vol', 'sum'), buy_amt=('總買進金額', 'sum'), buy_shares=('總買進股數', 'sum')).reset_index()
                                     latest_price = (df_20d[df_20d['trade_date'] == latest_date].groupby('stock_code')['總買進金額'].sum() / df_20d[df_20d['trade_date'] == latest_date].groupby('stock_code')['總買進股數'].sum()).fillna(0).round(2)
                                     
@@ -456,6 +595,7 @@ def render(STOCK_DICT=None):
                                             result_df['斥資(億)'] = (result_df['區間買賣超金額'] / 100000000).round(2)
                                             result_df = result_df[['stock_code', broker_col, '連買週數', '近期買超總張數', '均價', '斥資(億)']]
 
+                                # 統一名稱轉換
                                 if STOCK_DICT and 'stock_code' in result_df.columns:
                                     result_df['股票名稱'] = result_df['stock_code'].astype(str).apply(lambda x: STOCK_DICT.get(x, {}).get('name', '-'))
                                     if '股票名稱' in result_df.columns:
@@ -463,7 +603,8 @@ def render(STOCK_DICT=None):
                                         cols.insert(1, cols.pop(cols.index('股票名稱')))
                                         result_df = result_df[cols]
                                 
-                                if scan_mode == "依單一股票買超金額排行": result_df.rename(columns={'stock_code': '股票代號', broker_col: '參與大戶(前5大)'}, inplace=True)
+                                if scan_mode == "🌟 依主力(Top15)買超張數排行 (復刻三竹)": result_df.rename(columns={'stock_code': '股票代號'}, inplace=True)
+                                elif scan_mode == "依單一股票買超金額排行": result_df.rename(columns={'stock_code': '股票代號', broker_col: '參與大戶(前5大)'}, inplace=True)
                                 elif scan_mode == "依股價乖離率(吃豆腐)排行": result_df.rename(columns={'stock_code': '股票代號', broker_col: '最大主力分點'}, inplace=True)
                                 else: result_df.rename(columns={'stock_code': '股票代號', broker_col: '券商分點'}, inplace=True)
                                     
@@ -483,8 +624,10 @@ def render(STOCK_DICT=None):
                 
                 format_dict = {
                     '近期買超總張數': "{:,.1f}", '均價': "{:.2f}", '斥資(億)': "{:.2f}", '主力囤貨(張)': "{:,.1f}",
-                    '主力成本': "{:.2f}", '最新股價': "{:.2f}", '乖離率(%)': "{:.2f}"
+                    '主力成本': "{:.2f}", '最新股價': "{:.2f}", '乖離率(%)': "{:.2f}",
+                    '最新日買超張數': "{:,.0f}", '最新均價': "{:.2f}"
                 }
+                
                 styled_res = cached_res.head(100).style.format(format_dict)
                 
                 if '斥資(億)' in cached_res.columns:
