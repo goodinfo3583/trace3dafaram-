@@ -405,7 +405,7 @@ def render(STOCK_DICT=None):
                                     # 補上均價資訊
                                     latest_price = (df_20d[df_20d['trade_date'] == latest_date].groupby('stock_code')['總買進金額'].sum() / df_20d[df_20d['trade_date'] == latest_date].groupby('stock_code')['總買進股數'].sum()).fillna(0).round(2).reset_index(name='最新均價')
                                     result_df = pd.merge(result_df, latest_price, on='stock_code')
-                                    result_df = result_df.head(50) # 只取前 50 名
+                                    result_df = result_df.head(200) # 只取前 200 名
                                     
                                 # 💡 2. 股價乖離率 (吃豆腐) 掃描
                                 elif scan_mode == "依股價乖離率(吃豆腐)排行":
