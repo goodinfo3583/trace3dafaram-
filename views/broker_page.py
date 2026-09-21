@@ -391,16 +391,16 @@ def render(STOCK_DICT=None):
             
             st.dataframe(styled, use_container_width=True)
 
-# 🌟     2. 替換最下方的頁籤呼叫 (修正上一版單日呼叫錯欄位的 bug)
-            with mom_tabs[0]: render_momentum_tab(res_df, "單日", "1d_rank_chg")
-            with mom_tabs[1]: render_momentum_tab(res_df, "5日", "5d_rank_chg")
-            if calc_days >= 11:
-                with mom_tabs[2]: render_momentum_tab(res_df, "10日", "10d_rank_chg")
-            if calc_days >= 21:
-                with mom_tabs[3]: render_momentum_tab(res_df, "20日", "20d_rank_chg")
-            if calc_days >= 31:
-                with mom_tabs[4]: render_momentum_tab(res_df, "30日", "30d_rank_chg")
-        else:
+        # 🌟 2. 替換最下方的頁籤呼叫 (修正上一版單日呼叫錯欄位的 bug)
+        with mom_tabs[0]: render_momentum_tab(res_df, "單日", "1d_rank_chg")
+        with mom_tabs[1]: render_momentum_tab(res_df, "5日", "5d_rank_chg")
+        if calc_days >= 11:
+            with mom_tabs[2]: render_momentum_tab(res_df, "10日", "10d_rank_chg")
+        if calc_days >= 21:
+            with mom_tabs[3]: render_momentum_tab(res_df, "20日", "20d_rank_chg")
+        if calc_days >= 31:
+            with mom_tabs[4]: render_momentum_tab(res_df, "30日", "30d_rank_chg")
+    else:
         st.info("動能資料載入中或後台尚未產出今日資料。")
 
     st.markdown("---")
