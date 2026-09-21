@@ -92,8 +92,14 @@ def apply_broker_tags(broker_name):
     tag = BROKER_TAGS.get(name_str, "")
     return f"{name_str} {tag}" if tag else name_str
 
-def fmt_float(val): return "{:,.1f}".format(val) if isinstance(val, (float, int)) and not pd.isna(val) else "-"
-def fmt_int(val): return "{:,.0f}".format(val) if isinstance(val, (float, int)) and not pd.isna(val) else "-"
+# 🚀 修復 Bug：絕對不能把文字轉換成 "-"！
+def fmt_float(val): 
+    if isinstance(val, str): return val  # 如果是連買文字，直接放行！
+    return "{:,.1f}".format(val) if isinstance(val, (float, int)) and not pd.isna(val) else "-"
+
+def fmt_int(val): 
+    if isinstance(val, str): return val
+    return "{:,.0f}".format(val) if isinstance(val, (float, int)) and not pd.isna(val) else "-"
 
 # 🌟 3. 個股儀表板 Fragment
 @st.fragment
@@ -235,7 +241,6 @@ def render_broker_dashboard(target_stock, display_name, df_raw_all, df_trend):
             pivot_df['區間累計'] = pivot_df.sum(axis=1)
             pivot_df = pivot_df.sort_values('區間累計', ascending=False)
             
-            # 🚀 修正：防禦小數點誤差，並確保在未貼標籤的 index 上運算！
             def calc_daily_streak(row_name):
                 if row_name not in full_pivot.index: return "-"
                 row = full_pivot.loc[row_name]
@@ -247,11 +252,10 @@ def render_broker_dashboard(target_stock, display_name, df_raw_all, df_trend):
                     if sign is None: sign = current_sign; streak = sign
                     elif sign == current_sign: streak += sign
                     else: break  
-                if streak > 0: return f"連買 {streak} 日"
-                elif streak < 0: return f"連賣 {-streak} 日"
+                if streak > 0: return f"🔥 連買 {streak} 日"
+                elif streak < 0: return f"🩸 連賣 {-streak} 日"
                 else: return "-"
                 
-            # 💡 在貼標籤之前，先算好天數！
             pivot_df['日連買動態'] = pivot_df.index.to_series().apply(calc_daily_streak)
             
             def calc_weekly_streak(broker_name):
@@ -265,13 +269,11 @@ def render_broker_dashboard(target_stock, display_name, df_raw_all, df_trend):
                     if sign is None: sign = current_sign; streak = sign
                     elif sign == current_sign: streak += sign
                     else: break
-                if streak > 0: return f"連買 {streak} 週"
-                elif streak < 0: return f"連賣 {-streak} 週"
+                if streak > 0: return f"🔥 連買 {streak} 週"
+                elif streak < 0: return f"🩸 連賣 {-streak} 週"
                 else: return "-"
                 
             pivot_df['週連買動態'] = pivot_df.index.to_series().apply(calc_weekly_streak)
-            
-            # 💡 算完連買天數後，再來給 Index 貼上標籤
             pivot_df[display_dates] = pivot_df[display_dates].fillna("-")
             pivot_df.index = pivot_df.index.to_series().apply(apply_broker_tags)
             pivot_df.index.name = "券商分點"
@@ -309,6 +311,7 @@ def render_broker_dashboard(target_stock, display_name, df_raw_all, df_trend):
             else: styled_pivot = pivot_df.style.applymap(color_net_vol).format(fmt_float)
             st.dataframe(styled_pivot, use_container_width=True)
         else: st.write("無足夠資料產出")
+
 # ==========================================
 # 🖼️ 主渲染入口
 # ==========================================
@@ -317,6 +320,7 @@ def render(STOCK_DICT=None):
     if not df_raw_all.empty:
         latest_db_date = df_raw_all['trade_date'].astype(str).max()
         st.caption(f"🟢 當前遠端資料庫最新日期：**{latest_db_date}**")
+        
     st.markdown("""
     <div style="background: linear-gradient(90deg, rgba(15,23,42,1) 0%, rgba(14,165,233,0.3) 50%, rgba(15,23,42,1) 100%); 
                 border-top: 1px solid #38bdf8; border-bottom: 1px solid #38bdf8; padding: 15px 20px; 
@@ -327,7 +331,7 @@ def render(STOCK_DICT=None):
     </div>
     """, unsafe_allow_html=True)
 
-    st.markdown("觀察前 15 大分點買賣力道相抵後的淨流向，追蹤籌碼集中度連續性與券商進出。(已加入小數點優化與冷門股濾網)")
+    st.markdown("觀察前 15 大分點買賣力道相抵後的淨流向，追蹤籌碼集中度連續性與券商進出。")
     
     # 🌟 1. 全市場掃描器 🌟
     with st.expander("🌍 全市場連買分點快搜 (尋找主力連續吃貨標的)", expanded=False):
@@ -336,9 +340,9 @@ def render(STOCK_DICT=None):
         scan_mode = st.radio(
             "請選擇全市場排行方式：", 
             [
-                "依單一分點日連買排行", "依單一分點週連買排行", "依單一分點買超張數排行", 
+                "依日連買排行", "依週連買排行", "依近期買超張數排行", 
                 "依單一分點買超金額排行", "依單一股票買超金額排行", 
-                "依股價乖離率(吃豆腐)排行", "🌟 依主力(Top15)買超張數排行"
+                "依股價乖離率(吃豆腐)排行", "🌟 依主力(Top15)買超張數排行 (復刻三竹)"
             ], 
             horizontal=True, key="global_broker_scan_radio"
         )
@@ -370,20 +374,16 @@ def render(STOCK_DICT=None):
                                     df_buy = df_20d[df_20d['net_vol'] > 0]
                                     df_sell = df_20d[df_20d['net_vol'] < 0]
 
-                                    # 算出每天、每檔股票的前15大淨買與淨賣
                                     top15_buy = df_buy.sort_values(['trade_date', 'stock_code', 'net_vol'], ascending=[True, True, False]).groupby(['trade_date', 'stock_code']).head(15).groupby(['trade_date', 'stock_code'])['net_vol'].sum()
                                     top15_sell = df_sell.sort_values(['trade_date', 'stock_code', 'net_vol'], ascending=[True, True, True]).groupby(['trade_date', 'stock_code']).head(15).groupby(['trade_date', 'stock_code'])['net_vol'].sum()
 
-                                    # 算出「主力真實淨買張數」
                                     daily_net = (top15_buy.fillna(0) - top15_sell.abs().fillna(0)).reset_index()
                                     daily_net.rename(columns={'net_vol': '主力淨買超'}, inplace=True)
                                     
-                                    # 轉置成矩陣來算「連買天數」
                                     pivot_net = daily_net.pivot_table(index='stock_code', columns='trade_date', values='主力淨買超', aggfunc='sum')
                                     
                                     def calc_stock_streak(row):
-                                        streak = 0
-                                        sign = None
+                                        streak = 0; sign = None
                                         for c in all_dates[:20]:
                                             val = row.get(c, 0)
                                             if pd.isna(val) or val == 0: break
@@ -399,13 +399,11 @@ def render(STOCK_DICT=None):
                                     result_df = pivot_net.reset_index()[['stock_code', '主力連買動態', latest_date]]
                                     result_df.rename(columns={latest_date: '最新日買超張數'}, inplace=True)
                                     
-                                    # 只抓最新一天是大於 0 的 (當日有買超)
                                     result_df = result_df[result_df['最新日買超張數'] > 0].sort_values('最新日買超張數', ascending=False)
                                     
-                                    # 補上均價資訊
                                     latest_price = (df_20d[df_20d['trade_date'] == latest_date].groupby('stock_code')['總買進金額'].sum() / df_20d[df_20d['trade_date'] == latest_date].groupby('stock_code')['總買進股數'].sum()).fillna(0).round(2).reset_index(name='最新均價')
                                     result_df = pd.merge(result_df, latest_price, on='stock_code')
-                                    result_df = result_df.head(200) # 只取前 200 名
+                                    result_df = result_df.head(200)
                                     
                                 # 💡 2. 股價乖離率 (吃豆腐) 掃描
                                 elif scan_mode == "依股價乖離率(吃豆腐)排行":
@@ -552,8 +550,8 @@ def render(STOCK_DICT=None):
 
     # 🌟 2. 新增：籌碼集中動能 (Δ) 排行榜 🌟
     with st.expander("📈 全市場籌碼集中動能 (Δ) 排行榜 (Top 200)", expanded=False):
-        st.markdown("💡 **已過濾每日總成交額須小於1000萬標的。** 比對今日與昨日的集中度變化量 ($\\Delta$)，瞬間抓出籌碼急遽集中的飆股黑馬。")
-        st.markdown("集中度 % 代表籌碼掌握度需大於 '0'，$\\Delta$ 是加速度，代表發動程度。若集中度高且股價低，勝率較高。")
+        st.markdown(r"💡 **已過濾每日總成交額須小於1000萬標的。** 比對今日與昨日的集中度變化量 ($\Delta$)，瞬間抓出籌碼急遽集中的飆股黑馬。")
+        st.markdown(r"集中度 % 代表籌碼掌握度需大於 '0'，$\Delta$ 是加速度，代表發動程度。若集中度高且股價低，勝率較高。")
         c_mom_scan, c_mom_clear = st.columns([3, 1])
         with c_mom_scan:
             if st.button("🚀 開始計算動能排行榜", use_container_width=True, type="primary"):
@@ -667,22 +665,21 @@ def render(STOCK_DICT=None):
             
             # 格式化升降箭頭與新進榜判定
             def fmt_rank_chg(val):
-                if pd.isna(val): return "🆕 新進榜"  # 找不到昨天的資料，就是新進榜！
-                if val == 0: return "-"             # 名次和昨天一模一樣
+                if pd.isna(val): return "🆕 新進榜"  
+                if val == 0: return "-"             
                 if val > 0: return f"↑ {int(val)}"
                 return f"↓ {int(abs(val))}"
             
-            # 文字顏色上色邏輯也要配合更新
+            # 文字顏色上色邏輯
             def color_chg(val):
                 if isinstance(val, str):
                     if '↑' in val: return 'color: #FF4B4B; font-weight: bold;'
                     if '↓' in val: return 'color: #00E272;'
-                    if '🆕' in val: return 'color: #38bdf8; font-weight: bold;' # 新進榜給亮藍色
+                    if '🆕' in val: return 'color: #38bdf8; font-weight: bold;' 
                 return 'color: #94A3B8;'
 
             # 🚀 修正：將前綴改為正確的中文名稱對接
             def render_momentum_tab(df, prefix, rank_col_name):
-                # 💡【修復重點 1】：建立英轉中字典，把計算用的欄位名稱對應成我們想要的中文
                 prefix_map = {
                     "單日": "1d_conc",
                     "5日": "5d_conc",
@@ -693,23 +690,18 @@ def render(STOCK_DICT=None):
                 
                 disp_df = df.copy()
                 
-                # 💡【修復重點 2】：先把英文的集中度欄位，重新命名為標準中文格式
                 if eng_conc_col in disp_df.columns:
                     disp_df.rename(columns={eng_conc_col: f'{prefix}集中度(%)'}, inplace=True)
                 
-                # 準備要顯示的欄位
                 cols_to_show = ['股票代號', '股票名稱', '名次變化', f'{prefix}集中度(%)', f'{prefix}Δ', '主力買超(萬)', '最新動態', '今日上榜期程']
                 
-                # 防呆：確保所有要求的欄位都在 df 裡面，避免其他 KeyError
                 valid_cols = [c for c in cols_to_show if c in disp_df.columns]
                 
                 disp_df['名次變化'] = disp_df.get(rank_col_name, pd.Series(dtype=float)).apply(fmt_rank_chg)
                 
-                # 針對 Δ 進行排序，取前 200 名
                 if f'{prefix}Δ' in disp_df.columns:
                     disp_df = disp_df.sort_values(f'{prefix}Δ', ascending=False).head(200)
                 
-                # 重新整理顯示用的 DataFrame
                 disp_df = disp_df[valid_cols]
                 
                 if f'{prefix}集中度(%)' in disp_df.columns:
@@ -724,7 +716,6 @@ def render(STOCK_DICT=None):
                     f'{prefix}Δ': "{:.2f}",
                     '主力買超(萬)': "{:,.0f}"
                 }
-                # 確保只有存在的欄位才套用格式化
                 safe_format_dict = {k: v for k, v in format_dict.items() if k in disp_df.columns}
                 
                 styled = disp_df.style.format(safe_format_dict)
@@ -738,8 +729,7 @@ def render(STOCK_DICT=None):
                 
                 st.dataframe(styled, use_container_width=True)
 
-            # 🚀 修正：傳入正確的中文前綴
-            with tabs[0]: render_momentum_tab(res_df, "單日", "5d_rank_chg") # 單日借用5日的升降
+            with tabs[0]: render_momentum_tab(res_df, "單日", "5d_rank_chg")
             with tabs[1]: render_momentum_tab(res_df, "5日", "5d_rank_chg")
             if calc_days >= 11:
                 with tabs[2]: render_momentum_tab(res_df, "10日", "10d_rank_chg")
