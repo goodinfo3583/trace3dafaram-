@@ -308,9 +308,26 @@ def render_broker_dashboard(target_stock, display_name, df_raw_all, df_trend):
 # 🖼️ 主渲染入口
 # ==========================================
 def render(STOCK_DICT=None):
+<<<<<<< HEAD
     st.markdown("""券商主力淨買力與集中度追蹤""", unsafe_allow_html=True)
     st.markdown("### 🌍 全市場連買分點快搜")
     scan_tab1, scan_tab2 = st.tabs(["依主力買超張數排行", "依股價乖離率(吃豆腐)排行"])
+=======
+    # 🌟 替換成與其他頁面相同的發光大標題
+    st.markdown("""
+    <div style="background: linear-gradient(90deg, rgba(15,23,42,1) 0%, rgba(14,165,233,0.3) 50%, rgba(15,23,42,1) 100%); 
+                border-top: 1px solid #38bdf8; border-bottom: 1px solid #38bdf8; padding: 15px 20px; 
+                border-radius: 10px; text-align: center; box-shadow: 0px 0px 20px rgba(56, 189, 248, 0.2); margin-bottom: 20px;">
+        <h2 style="color: #e0f2fe; margin: 0; letter-spacing: 2px; text-shadow: 0 0 15px rgba(56, 189, 248, 0.8);">
+            券商主力淨買力與集中度
+        </h2>
+    </div>
+    """, unsafe_allow_html=True)
+
+    # 🌟 1. 全市場掃描器 (無按鈕、直接分頁呈現) 🌟
+    st.markdown("### 🌍 券商主力斥資買超力")
+    scan_tab1, scan_tab2 = st.tabs(["🔹 Top 15 券商主力買超金額排行", "🔹 單一券商主力防線乖離(豆腐好吃)"])
+>>>>>>> 758348db97acfdf23023ac1ec1f3fcc13e4e1d28
 
     with scan_tab1:
         df_top15 = fetch_parquet_from_hf("scan__依主力Top15買超張數排行_復刻三竹.parquet")
@@ -362,10 +379,18 @@ def render(STOCK_DICT=None):
         if STOCK_DICT and '股票代號' in df_momentum.columns:
             df_momentum['股票名稱'] = df_momentum['股票代號'].astype(str).apply(lambda x: STOCK_DICT.get(x, {}).get('name', '-'))
         
+<<<<<<< HEAD
         tabs_names = ["單日集中度 Δ", "5日集中度 Δ"]
         if calc_days >= 11: tabs_names.append("10日集中度 Δ")
         if calc_days >= 21: tabs_names.append("20日集中度 Δ")
         if calc_days >= 31: tabs_names.append("30日集中度 Δ")
+=======
+        # 根據資料天數動態決定要顯示幾個 Tab
+        tabs_names = ["🔹 單日集中度 Δ", "🔹 5日集中度 Δ"]
+        if calc_days >= 11: tabs_names.append("🔹 10日集中度 Δ")
+        if calc_days >= 21: tabs_names.append("🔹 20日集中度 Δ")
+        if calc_days >= 31: tabs_names.append("🔹 30日集中度 Δ") # 預留未來天數增加的空間
+>>>>>>> 758348db97acfdf23023ac1ec1f3fcc13e4e1d28
         
         mom_tabs = st.tabs(tabs_names)
         
@@ -435,7 +460,7 @@ def render(STOCK_DICT=None):
     st.markdown("---")
 
     # 🌟 3. 個股查詢器 🌟
-    st.markdown("### 🔍 個股查詢與走勢圖")
+    st.markdown("### 🔍 個股集中度、囤貨券商查詢與走勢圖")
     stock_options = []
     if STOCK_DICT:
         unique_options = {f"{v['id']} {v['name']}" for v in STOCK_DICT.values() if len(str(v['id'])) <= 4}

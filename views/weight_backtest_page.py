@@ -5,6 +5,18 @@ import re
 import os
 import glob
 import datetime
+import urllib.parse
+# ==========================================
+# 🌟 導入 HF Parquet 讀取器 (供 B8 新功能使用)
+# ==========================================
+@st.cache_data(show_spinner=False, ttl=3600)
+def fetch_parquet_from_hf(file_name):
+    HF_BASE_URL = "https://huggingface.co/datasets/goodinfo3583/tw-broker-parquet/resolve/main"
+    url = f"{HF_BASE_URL}/{urllib.parse.quote(file_name)}"
+    try:
+        return pd.read_parquet(url)
+    except Exception:
+        return pd.DataFrame()
 try:
     from views.b0_page import sync_b0_data
 except ImportError:
@@ -262,11 +274,11 @@ def render_debug_panel(filtered_df, any_filter_applied, dynamic_price_col_b6):
             if not df_b7_hist.empty and '動態' in df_b7_hist.columns: debug_df = pd.merge(debug_df, df_b7_hist[['統一代號', '近月質押增減(%)', '動態']].rename(columns={'近月質押增減(%)': 'B7_質押近月增減%', '動態': 'B7_質押動態'}), on='統一代號', how='left')
 
             #把 B8 欄位加入除錯透視鏡 
+            # 1. 舊版 B8 summary (保留相容性)
             df_b8_debug = clean_stock_id(get_df('b8_summary')).drop_duplicates(subset=['統一代號'])
             if not df_b8_debug.empty:
                 b8_debug_cols = ['統一代號']
                 b8_rename_dict = {}
-                
                 if '連買日數' in df_b8_debug.columns:
                     b8_debug_cols.append('連買日數')
                     b8_rename_dict['連買日數'] = 'B8_日連買'
@@ -276,11 +288,68 @@ def render_debug_panel(filtered_df, any_filter_applied, dynamic_price_col_b6):
                 if '近期買超總張數' in df_b8_debug.columns:
                     b8_debug_cols.append('近期買超總張數')
                     b8_rename_dict['近期買超總張數'] = 'B8_囤貨張數'
-
                 if len(b8_debug_cols) > 1:
                     debug_df = pd.merge(debug_df, df_b8_debug[b8_debug_cols].rename(columns=b8_rename_dict), on='統一代號', how='left')
-            # 除錯位置結束 
-            
+
+            # 2. 新增 B8 Top15 主力買超排行
+            try:
+                df_top15_debug = fetch_parquet_from_hf("scan__依主力Top15買超張數排行_復刻三竹.parquet")
+                if not df_top15_debug.empty:
+                    df_top15_debug = clean_stock_id(df_top15_debug).drop_duplicates(subset=['統一代號'])
+                    t15_cols = ['統一代號']
+                    t15_rename = {}
+                    if '主力連買動態' in df_top15_debug.columns:
+                        t15_cols.append('主力連買動態')
+                        t15_rename['主力連買動態'] = 'B8_主力連買動態'
+                    if '最新日買超張數' in df_top15_debug.columns and '最新均價' in df_top15_debug.columns:
+                        df_top15_debug['B8_斥資(億)'] = (df_top15_debug['最新日買超張數'] * df_top15_debug['最新均價'] * 1000 / 100000000).round(2)
+                        t15_cols.append('B8_斥資(億)')
+                    if len(t15_cols) > 1:
+                        debug_df = pd.merge(debug_df, df_top15_debug[t15_cols].rename(columns=t15_rename), on='統一代號', how='left')
+            except Exception: pass
+
+            # 3. 新增 B8 吃豆腐防線乖離
+            try:
+                df_tofu_debug = fetch_parquet_from_hf("scan_依股價乖離率吃豆腐排行.parquet")
+                if not df_tofu_debug.empty:
+                    df_tofu_debug = clean_stock_id(df_tofu_debug).drop_duplicates(subset=['統一代號'])
+                    tofu_cols = ['統一代號']
+                    tofu_rename = {}
+                    if '乖離率(%)' in df_tofu_debug.columns:
+                        tofu_cols.append('乖離率(%)')
+                        tofu_rename['乖離率(%)'] = 'B8_乖離率(%)'
+                    if '吃豆腐動態' in df_tofu_debug.columns:
+                        tofu_cols.append('吃豆腐動態')
+                        tofu_rename['吃豆腐動態'] = 'B8_吃豆腐動態'
+                    if '主力囤貨(張)' in df_tofu_debug.columns and '主力成本' in df_tofu_debug.columns:
+                        df_tofu_debug['B8_吃貨斥資(萬)'] = (df_tofu_debug['主力囤貨(張)'] * df_tofu_debug['主力成本'] * 1000 / 10000).round(0)
+                        tofu_cols.append('B8_吃貨斥存(萬)')
+                    if len(tofu_cols) > 1:
+                        debug_df = pd.merge(debug_df, df_tofu_debug[tofu_cols].rename(columns=tofu_rename), on='統一代號', how='left')
+            except Exception: pass
+
+            # 4. 新增 B8 籌碼集中動能 (Δ)
+            try:
+                df_mom_debug = fetch_parquet_from_hf("momentum_latest.parquet")
+                if not df_mom_debug.empty:
+                    df_mom_debug = clean_stock_id(df_mom_debug).drop_duplicates(subset=['統一代號'])
+                    mom_cols = ['統一代號']
+                    mom_rename = {}
+                    if '今日上榜期程' in df_mom_debug.columns:
+                        mom_cols.append('今日上榜期程')
+                        mom_rename['今日上榜期程'] = 'B8_上榜期程'
+                    if '最新動態' in df_mom_debug.columns:
+                        mom_cols.append('最新動態')
+                        mom_rename['最新動態'] = 'B8_集中度動態'
+                    for d_col in ['單日Δ', '5日Δ', '10日Δ']:
+                        if d_col in df_mom_debug.columns:
+                            mom_cols.append(d_col)
+                            mom_rename[d_col] = f'B8_{d_col}'
+                    if len(mom_cols) > 1:
+                        debug_df = pd.merge(debug_df, df_mom_debug[mom_cols].rename(columns=mom_rename), on='統一代號', how='left')
+            except Exception: pass
+            # 除錯位置結束
+                      
             st.write(f"🔍 檢核明細 (共 {len(debug_df)} 筆)：")
             st.dataframe(debug_df, use_container_width=True, hide_index=True)
             st.session_state['debug_df'] = debug_df 
@@ -578,7 +647,16 @@ def show_weight_backtest_page(STOCK_DICT, DATA_DIR="data"):
             st.session_state['filter_b8_day_streak'] = 0
             st.session_state['filter_b8_week_streak'] = 0
             st.session_state['filter_b8_buy_vol_min'] = 0
-
+            # 新增的過濾器狀態清空
+            st.session_state['filter_b8_top15_trend'] = []
+            st.session_state['filter_b8_top15_money'] = 0.0
+            st.session_state['filter_b8_tofu_bias'] = (-30.0, 30.0)
+            st.session_state['filter_b8_tofu_trend'] = []
+            st.session_state['filter_b8_tofu_money'] = 0.0
+            st.session_state['filter_b8_mom_period'] = []
+            st.session_state['filter_b8_mom_trend'] = []
+            st.session_state['filter_b8_mom_slope'] = False
+            
         st.button("清空過濾條件", icon=":material/ink_eraser:", on_click=reset_filters, use_container_width=True)
 
     filtered_df = base_df.copy()
@@ -865,17 +943,30 @@ def show_weight_backtest_page(STOCK_DICT, DATA_DIR="data"):
         b7_6m_inc = st.checkbox("🎯 近半年董監波段持股增加 (> 0)", key="filter_b7_6m_inc")
 
 
-    # 👇 B8 展開面板
+    # 👇 B8 展開面板 (與 Parquet 原始資料字串完全對齊)
     b8_latest_date_str = st.session_state.get('b8_latest_date', '最新交易日').replace('-', '/') 
-    with st.expander(f"🏢 B8 券商主力過濾 (資料基準日: {b8_latest_date_str})", expanded=False):
-        st.markdown("**🔹 1. 分點連續買超天數/週數**")
-        st.caption("過濾出全市場中，有特定券商分點正在「連續吃貨」的標的。")
+    with st.expander(f"🏢 B8 券商主力與動能過濾 (資料基準日: {b8_latest_date_str})", expanded=False):
+        st.markdown("**🔹 1. 券商主力買超排行 (Top 15 連買與斥資)**")
         c_b8_1, c_b8_2 = st.columns(2)
-        b8_day_streak = c_b8_1.number_input("🔴 特定分點日連買大於等於 (天)：", min_value=0, value=0, step=1, key="filter_b8_day_streak", help="設定 0 代表不限制。設定 3 代表至少有一家分點連買 3 天。")
-        b8_week_streak = c_b8_2.number_input("🔵 特定分點週連買大於等於 (週)：", min_value=0, value=0, step=1, key="filter_b8_week_streak", help="設定 0 代表不限制。")
+        b8_top15_streak = c_b8_1.number_input("🔴 分點連買大於等於 (天)：", min_value=0, value=0, step=1, key="filter_b8_day_streak", help="系統會自動解析「🔥 連 n 買」")
+        b8_top15_money = c_b8_2.number_input("主力斥資大於 (億)：", min_value=0.0, value=0.0, step=0.5, key="filter_b8_top15_money")
 
-        st.markdown("**🔹 2. 區間囤貨量過濾**")
-        b8_buy_vol_min = st.number_input("📦 該分點近期買超總張數大於 (張)：", min_value=0, value=0, step=100, key="filter_b8_buy_vol_min", help="配合上方的連買條件，過濾出不僅連買，且囤貨達一定張數的主力。")
+        st.markdown("**🔹 2. 券商主力防線乖離 (豆腐好吃)**")
+        c_b8_5, c_b8_6 = st.columns(2)
+        b8_tofu_bias = c_b8_5.slider("乖離率區間 (%)：", -30.0, 30.0, (-30.0, 30.0), 1.0, key="filter_b8_tofu_bias")
+        b8_tofu_money = c_b8_6.number_input("吃貨斥資大於 (萬)：", min_value=0.0, value=0.0, step=100.0, key="filter_b8_tofu_money")
+        
+        tofu_options = ["🎯 成本保衛戰 (極佳吃豆腐點)", "🔥 主力已拉開獲利 (追高風險)", "🩸 主力套牢中 (防守失敗)", "🚀 脫離成本區"]
+        b8_tofu_trend = st.multiselect("吃豆腐動態 (可複選)：", tofu_options, key="filter_b8_tofu_trend")
+
+        st.markdown("**🔹 3. 全市場籌碼集中動能 (Δ) Top 200**")
+        b8_mom_logic = st.radio("今日上榜期程篩選邏輯：", ["交集 (必須同時符合勾選期程)", "聯集 (符合任一期程即可)"], horizontal=True, key="filter_b8_mom_logic")
+        c_b8_8, c_b8_9 = st.columns(2)
+        b8_mom_period = c_b8_8.multiselect("今日上榜期程：", ["單日", "5日", "10日", "20日", "30日"], key="filter_b8_mom_period")
+        
+        mom_options = ["↗️ 溫和吃貨", "➡️ 橫盤震盪", "⚠️ 大戶跳車 (警戒)", "🚀 籌碼急凍 (強勢吸籌)"]
+        b8_mom_trend = c_b8_9.multiselect("集中度最新動態：", mom_options, key="filter_b8_mom_trend")
+        b8_mom_slope = st.checkbox("📈 單日 Δ > 5日 Δ > 10日 Δ (集中度動能斜率向上)", key="filter_b8_mom_slope")
     # ==========================================
     # 執行過濾邏輯
     # ==========================================
@@ -1147,25 +1238,77 @@ def show_weight_backtest_page(STOCK_DICT, DATA_DIR="data"):
         if not df_b7_main.empty and '▼近半年增減%' in df_b7_main.columns:
             any_filter_applied = True
             filtered_df = filtered_df[filtered_df['統一代號'].isin(df_b7_main[pd.to_numeric(df_b7_main['▼近半年增減%'], errors='coerce').fillna(0) > 0]['統一代號'].unique())]
-    # B8 執行過濾邏輯
+    # ==========================================
+    # B8 執行過濾邏輯 (對接 HF Parquet)
+    # ==========================================
+    # --- 1: 主力買超金額排行 ---
     b8_day_val = st.session_state.get('filter_b8_day_streak', 0)
-    b8_wk_val = st.session_state.get('filter_b8_week_streak', 0)
-    b8_vol_val = st.session_state.get('filter_b8_buy_vol_min', 0)
-
-    if b8_day_val > 0 or b8_wk_val > 0 or b8_vol_val > 0:
-        df_b8 = clean_stock_id(get_df('b8_summary'))
-        if not df_b8.empty:
+    b8_top15_money = st.session_state.get('filter_b8_top15_money', 0.0)
+    if b8_day_val > 0 or b8_top15_money > 0:
+        df_top15 = fetch_parquet_from_hf("scan__依主力Top15買超張數排行_復刻三竹.parquet")
+        if not df_top15.empty:
             any_filter_applied = True
-            b8_mask = pd.Series(True, index=df_b8.index)
-            
-            if b8_day_val > 0:
-                b8_mask &= (df_b8['連買日數'] >= b8_day_val)
-            if b8_wk_val > 0:
-                b8_mask &= (df_b8['連買週數'] >= b8_wk_val)
-            if b8_vol_val > 0:
-                b8_mask &= (df_b8['近期買超總張數'] >= b8_vol_val)
+            mask = pd.Series(True, index=df_top15.index)
+            if b8_top15_money > 0 and '最新日買超張數' in df_top15.columns and '最新均價' in df_top15.columns:
+                df_top15['斥資(億)'] = (df_top15['最新日買超張數'] * df_top15['最新均價'] * 1000 / 100000000)
+                mask &= (df_top15['斥資(億)'] >= b8_top15_money)
+            if b8_day_val > 0 and '主力連買動態' in df_top15.columns:
+                # 🛠️ 擷取 "🔥 連 4 買" 裡面的數字
+                def parse_streak(val):
+                    import re
+                    match = re.search(r'連\s*(\d+)\s*買', str(val))
+                    return int(match.group(1)) if match else 0
+                df_top15['連續天數'] = df_top15['主力連買動態'].apply(parse_streak)
+                mask &= (df_top15['連續天數'] >= b8_day_val)
+
+            filtered_df = filtered_df[filtered_df['統一代號'].isin(df_top15[mask]['股票代號'].astype(str).unique())]
+
+    # --- 2: 主力防線乖離 ---
+    b8_tofu_bias = st.session_state.get('filter_b8_tofu_bias', (-30.0, 30.0))
+    b8_tofu_trend = st.session_state.get('filter_b8_tofu_trend', [])
+    b8_tofu_money = st.session_state.get('filter_b8_tofu_money', 0.0)
+    if b8_tofu_bias[0] > -30.0 or b8_tofu_bias[1] < 30.0 or b8_tofu_trend or b8_tofu_money > 0:
+        df_tofu = fetch_parquet_from_hf("scan_依股價乖離率吃豆腐排行.parquet")
+        if not df_tofu.empty:
+            any_filter_applied = True
+            mask = pd.Series(True, index=df_tofu.index)
+            if '乖離率(%)' in df_tofu.columns:
+                mask &= df_tofu['乖離率(%)'].between(b8_tofu_bias[0], b8_tofu_bias[1])
+            if b8_tofu_money > 0 and '主力囤貨(張)' in df_tofu.columns and '主力成本' in df_tofu.columns:
+                df_tofu['斥資(萬)'] = (df_tofu['主力囤貨(張)'] * df_tofu['主力成本'] * 1000 / 10000)
+                mask &= (df_tofu['斥資(萬)'] >= b8_tofu_money)
+            if b8_tofu_trend and '吃豆腐動態' in df_tofu.columns:
+                mask &= df_tofu['吃豆腐動態'].isin(b8_tofu_trend)
                 
-            filtered_df = filtered_df[filtered_df['統一代號'].isin(df_b8[b8_mask]['統一代號'].unique())]
+            filtered_df = filtered_df[filtered_df['統一代號'].isin(df_tofu[mask]['股票代號'].astype(str).unique())]
+
+    # --- 3: 籌碼集中動能 ---
+    b8_mom_period = st.session_state.get('filter_b8_mom_period', [])
+    b8_mom_trend = st.session_state.get('filter_b8_mom_trend', [])
+    b8_mom_slope = st.session_state.get('filter_b8_mom_slope', False)
+    if b8_mom_period or b8_mom_trend or b8_mom_slope:
+        df_mom = fetch_parquet_from_hf("momentum_latest.parquet")
+        if not df_mom.empty:
+            any_filter_applied = True
+            mask = pd.Series(True, index=df_mom.index)
+            
+            # 判斷交集/聯集邏輯
+            if b8_mom_period and '今日上榜期程' in df_mom.columns:
+                is_and = "交集" in st.session_state.get('filter_b8_mom_logic', '交集')
+                period_mask = pd.Series(True, index=df_mom.index) if is_and else pd.Series(False, index=df_mom.index)
+                for p in b8_mom_period:
+                    if is_and: period_mask &= df_mom['今日上榜期程'].astype(str).str.contains(p, na=False)
+                    else: period_mask |= df_mom['今日上榜期程'].astype(str).str.contains(p, na=False)
+                mask &= period_mask
+                
+            if b8_mom_trend and '最新動態' in df_mom.columns:
+                mask &= df_mom['最新動態'].isin(b8_mom_trend)
+                
+            if b8_mom_slope:
+                if '單日Δ' in df_mom.columns and '5日Δ' in df_mom.columns and '10日Δ' in df_mom.columns:
+                    mask &= (df_mom['單日Δ'] > df_mom['5日Δ']) & (df_mom['5日Δ'] > df_mom['10日Δ'])
+                    
+            filtered_df = filtered_df[filtered_df['統一代號'].isin(df_mom[mask]['股票代號'].astype(str).unique())]
 
     # ==========================================
     # 🌟 呼叫 Fragment 1：除錯透視鏡
