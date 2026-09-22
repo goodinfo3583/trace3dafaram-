@@ -5,13 +5,10 @@ import re
 import os
 import glob
 import datetime
-import urllib.parse  # ⭐ 新增：處理 HF 網址編碼
-
 try:
     from views.b0_page import sync_b0_data
 except ImportError:
     def sync_b0_data(DATA_DIR): pass
-
 # ==========================================
 # 🌟 導入背景喚醒引擎
 # ==========================================
@@ -31,38 +28,10 @@ except ImportError:
     def sync_b7_data(DATA_DIR): pass
     def sync_pledge_data(DATA_DIR): pass
     def sync_pledge_history_data(DATA_DIR): pass
-
-# ⭐ 修正：移除對舊版 broker_page.py 中 sync_b8_data 的依賴，改為本地 HF 抓取機制
-HF_BASE_URL = "https://huggingface.co/datasets/goodinfo3583/tw-broker-parquet/resolve/main"
-
-@st.cache_data(show_spinner=False, ttl=3600)
-def fetch_parquet_from_hf_for_backtest(file_name):
-    url = f"{HF_BASE_URL}/{urllib.parse.quote(file_name)}"
-    try:
-        return pd.read_parquet(url)
-    except Exception:
-        return pd.DataFrame()
-
-def sync_b8_data():
-    """ 
-    讀取後台算好的 B8 全市場連買與囤貨彙總表。
-    若無專屬彙總檔 (b8_summary.parquet)，則降級使用 Top15 掃描檔替代，確保系統不崩潰。
-    """
-    df = fetch_parquet_from_hf_for_backtest("b8_summary.parquet") 
-    if not df.empty:
-        st.session_state['b8_summary_df'] = df
-    else:
-        # 🛡️ 降級備用方案：拿新的 scan 檔案來扛
-        df_scan = fetch_parquet_from_hf_for_backtest("scan__依主力Top15買超張數排行_復刻三竹.parquet")
-        if not df_scan.empty and '股票代號' in df_scan.columns:
-            df_scan = df_scan.rename(columns={'股票代號': '統一代號', '最新日買超張數': '近期買超總張數'})
-            # 補齊預設欄位避免除錯透視鏡或過濾器報錯
-            if '連買日數' not in df_scan.columns: df_scan['連買日數'] = 0
-            if '連買週數' not in df_scan.columns: df_scan['連買週數'] = 0
-            st.session_state['b8_summary_df'] = df_scan
-        else:
-            st.session_state['b8_summary_df'] = pd.DataFrame()
-
+try:
+    from views.broker_page import sync_b8_data
+except ImportError:
+    def sync_b8_data(): pass
 # ==========================================
 # 🌟 萬能鑰匙：對接全站暫存變數
 # ==========================================
@@ -156,13 +125,15 @@ def render_debug_panel(filtered_df, any_filter_applied, dynamic_price_col_b6):
                 df_b1_debug = df_b1_debug[[c for c in check_cols if c in df_b1_debug.columns]].drop_duplicates(subset=['統一代號'])
                 debug_df = pd.merge(debug_df, df_b1_debug, on='統一代號', how='left')
             
-            # 2. 處理 B1 外資持股表
+            # 2. 處理 B1 外資持股表，並精準安插在特定欄位之間
             df_b1_foreign = clean_stock_id(get_df('b1_foreign_df')).drop_duplicates(subset=['統一代號'])
             if not df_b1_foreign.empty:
                 foreign_cols = sorted([c for c in df_b1_foreign.columns if c.startswith('外資持股_')], reverse=True)
                 if foreign_cols:
                     latest_foreign_col = foreign_cols[0]
                     df_foreign_extract = df_b1_foreign[['統一代號', latest_foreign_col]].copy()
+                    
+                    # 👇 修正 1：將外資持股比格式化為小數點後兩位
                     df_foreign_extract[latest_foreign_col] = pd.to_numeric(df_foreign_extract[latest_foreign_col], errors='coerce').apply(lambda x: f"{x:.2f}" if pd.notna(x) else None)
                     df_foreign_extract = df_foreign_extract.rename(columns={latest_foreign_col: '外資持股比'})
                     
@@ -175,6 +146,7 @@ def render_debug_panel(filtered_df, any_filter_applied, dynamic_price_col_b6):
                         cols.insert(insert_idx, '外資持股比')
                         debug_df = debug_df[cols]
                         
+                        # 👇 修正 2：讓除錯透視鏡中，未進榜的「法人持股 0」顯示為 None
                         debug_df['法人持股'] = debug_df['法人持股'].apply(lambda x: None if pd.isna(x) or str(x).strip() in ['0', '0.0', '0.00', '未進榜'] else x)
                         
             b2_labels = zip(['b2_1', 'b2_2', 'b2_3', 'b2_4'], ['外資成交動態', '投信成交動態', '外資發行動態', '投信發行動態'])
@@ -289,7 +261,7 @@ def render_debug_panel(filtered_df, any_filter_applied, dynamic_price_col_b6):
             df_b7_hist = clean_stock_id(get_df('b7_pledge_history')).drop_duplicates(subset=['統一代號'])
             if not df_b7_hist.empty and '動態' in df_b7_hist.columns: debug_df = pd.merge(debug_df, df_b7_hist[['統一代號', '近月質押增減(%)', '動態']].rename(columns={'近月質押增減(%)': 'B7_質押近月增減%', '動態': 'B7_質押動態'}), on='統一代號', how='left')
 
-            # B8 欄位加入除錯透視鏡 
+            #把 B8 欄位加入除錯透視鏡 
             df_b8_debug = clean_stock_id(get_df('b8_summary')).drop_duplicates(subset=['統一代號'])
             if not df_b8_debug.empty:
                 b8_debug_cols = ['統一代號']
@@ -315,6 +287,7 @@ def render_debug_panel(filtered_df, any_filter_applied, dynamic_price_col_b6):
     else:
         st.info("👆 請在上方展開模組中至少設定一項條件，目前預設顯示全市場標的。")
 
+
 # ==========================================
 # 🚀 局部渲染魔法 2：計分展示與寫入功能 (避免打勾時全頁重整)
 # ==========================================
@@ -328,6 +301,7 @@ def render_result_and_save_panel():
         
         if not result_df.empty:
             display_df = result_df[['統一代號', '股票名稱', '產業別', '總分', '得分明細']].rename(columns={'統一代號': '股票代號'})
+            # 👉 將文字修改為上限 3 檔
             display_df.insert(0, '寫入追蹤 (本週上限3檔)', False)
             
             st.caption("💡 勾選下方『寫入追蹤』，即可將該檔標的存入歷史模型庫中，並在「建立名單」中觀察。")
@@ -335,6 +309,7 @@ def render_result_and_save_panel():
             edited_df = st.data_editor(
                 display_df,
                 column_config={
+                    # 👉 將文字修改為上限 3 檔
                     "寫入追蹤 (本週上限3檔)": st.column_config.CheckboxColumn(
                         "寫入追蹤",
                         help="勾選欲寫入追蹤系統的標的",
@@ -352,6 +327,7 @@ def render_result_and_save_panel():
                 key="editor_save_track"
             )
             
+            # 👉 將文字修改為上限 3 檔
             selected_rows = edited_df[edited_df['寫入追蹤 (本週上限3檔)'] == True]
             
             st.write("---")
@@ -396,7 +372,7 @@ def render_result_and_save_panel():
                                     this_week_count = len(this_week_data)
                                     old_track = old_track.drop(columns=['date_obj'])
                                     
-                                # 每周上限3檔
+                                #  每周上限3檔
                                 if this_week_count + len(selected_rows) > 3:
                                     st.error(f"冒險者：每週最多只能存取 3 檔標的！您本週已存取 {this_week_count} 檔，本次勾選 {len(selected_rows)} 檔，已達上限。")
                                 else:
@@ -433,11 +409,12 @@ def render_result_and_save_panel():
                                         
                                     final_save_df = save_targets[['鎖定日期', '股票代號', '股票名稱', '鎖定收盤價', '總分', '得分明細', '當下策略特徵', '追蹤狀態', '帳號']].rename(columns={'股票代號': '代號', '股票名稱': '名稱'})
                                     
-                                    # 防呆 1：先剃除本次可能重複的標的
+                                    # 💡 防呆機制 1：先剃除本次勾選清單中可能出現的重複標的 (避免計分系統產出重複)
                                     final_save_df = final_save_df.drop_duplicates(subset=['鎖定日期', '代號', '帳號'])
                                     
                                     if not old_track.empty and '鎖定日期' in old_track.columns and '代號' in old_track.columns and '帳號' in old_track.columns:
                                         for _, row in final_save_df.iterrows():
+                                            # 💡 防呆機制 2：使用更嚴謹的型別轉換 (一律轉字串、去小數點、去空白)，避免 3711.0 和 3711 比對失敗
                                             curr_account = old_track['帳號'].astype(str).str.replace(r'\.0$', '', regex=True).str.strip().str.lower()
                                             curr_date = old_track['鎖定日期'].astype(str).str.strip()
                                             curr_code = old_track['代號'].astype(str).str.replace(r'\.0$', '', regex=True).str.strip()
@@ -451,7 +428,7 @@ def render_result_and_save_panel():
                                             
                                     new_track = pd.concat([old_track, final_save_df], ignore_index=True)
                                     conn.update(spreadsheet=SHEET_URL, worksheet="實驗室模型追蹤", data=new_track)
-                                    st.cache_data.clear()
+                                    st.cache_data.clear() # 💡 寫入後清除快取，保證下次讀取最新狀態
                                     
                                     if 'pending_watchlist_adds' not in st.session_state:
                                         st.session_state['pending_watchlist_adds'] = []
@@ -477,10 +454,7 @@ def show_weight_backtest_page(STOCK_DICT, DATA_DIR="data"):
     if 'b7_main' not in st.session_state: sync_b7_data(DATA_DIR)
     if 'b7_pledge' not in st.session_state: sync_pledge_data(DATA_DIR)
     if 'b7_pledge_history' not in st.session_state: sync_pledge_history_data(DATA_DIR)
-    
-    # ⭐ 喚醒獨立的 B8 背景資料
-    sync_b8_data() 
-
+    sync_b8_data() # 喚醒 B8 背景資料
     st.markdown("""
     <div style="background: linear-gradient(90deg, rgba(15,23,42,1) 0%, rgba(14,165,233,0.3) 50%, rgba(15,23,42,1) 100%); 
                 border-top: 1px solid #38bdf8; border-bottom: 1px solid #38bdf8; padding: 15px 20px; 
@@ -614,18 +588,24 @@ def show_weight_backtest_page(STOCK_DICT, DATA_DIR="data"):
     b0_latest_date_str = "未知日期"
     df_b0 = get_df('b0_price')
     if not df_b0.empty and '股價日期' in df_b0.columns:
+        # 確保取出來的資料是字串，並去掉頭尾多餘空白
         date_raw = str(df_b0['股價日期'].iloc[0]).strip()
         try:
+            # 1. 先處理「只有 月/日」的格式 (例如 "09/04")
             parts = date_raw.replace("-", "/").split("/")
             if len(parts) == 2:
+                # 發現只有兩段，手動補上 2026 年
                 b0_latest_date_str = f"2026/{parts[0].zfill(2)}/{parts[1].zfill(2)}"
             else:
+                # 2. 交給 pandas 解析完整日期
                 dt = pd.to_datetime(date_raw)
+                # 如果年份解析出來異常 (例如被當作 0001 年或 1900 年)，強制校正為 2026
                 if dt.year < 2000:
                     b0_latest_date_str = f"2026/{dt.month:02d}/{dt.day:02d}"
                 else:
                     b0_latest_date_str = dt.strftime("%Y/%m/%d")
         except Exception:
+            # 3. 備用方案 (針對完全無法被 pd.to_datetime 解析的特殊字串，如 "1150904" 或 "0904")
             clean_date = date_raw.replace("-", "").replace("/", "").split(" ")[0]
             if len(clean_date) >= 8:
                 b0_latest_date_str = f"{clean_date[:4]}/{clean_date[4:6]}/{clean_date[6:8]}"
@@ -884,6 +864,7 @@ def show_weight_backtest_page(STOCK_DICT, DATA_DIR="data"):
         st.markdown("**🔹 3. 波段持股過濾**")
         b7_6m_inc = st.checkbox("🎯 近半年董監波段持股增加 (> 0)", key="filter_b7_6m_inc")
 
+
     # 👇 B8 展開面板
     b8_latest_date_str = st.session_state.get('b8_latest_date', '最新交易日').replace('-', '/') 
     with st.expander(f"🏢 B8 券商主力過濾 (資料基準日: {b8_latest_date_str})", expanded=False):
@@ -895,7 +876,6 @@ def show_weight_backtest_page(STOCK_DICT, DATA_DIR="data"):
 
         st.markdown("**🔹 2. 區間囤貨量過濾**")
         b8_buy_vol_min = st.number_input("📦 該分點近期買超總張數大於 (張)：", min_value=0, value=0, step=100, key="filter_b8_buy_vol_min", help="配合上方的連買條件，過濾出不僅連買，且囤貨達一定張數的主力。")
-        
     # ==========================================
     # 執行過濾邏輯
     # ==========================================
@@ -945,7 +925,6 @@ def show_weight_backtest_page(STOCK_DICT, DATA_DIR="data"):
             any_filter_applied = True
             valid_trend_codes = df_b0[df_b0['資金延續趨勢'].isin(b0_fund_trend)]['統一代號'].unique()
             filtered_df = filtered_df[filtered_df['統一代號'].isin(valid_trend_codes)]     
-            
     # B1 過濾
     if not df_b1_raw.empty:
         hit_mask = pd.Series(True, index=df_b1_raw.index)
@@ -1168,8 +1147,7 @@ def show_weight_backtest_page(STOCK_DICT, DATA_DIR="data"):
         if not df_b7_main.empty and '▼近半年增減%' in df_b7_main.columns:
             any_filter_applied = True
             filtered_df = filtered_df[filtered_df['統一代號'].isin(df_b7_main[pd.to_numeric(df_b7_main['▼近半年增減%'], errors='coerce').fillna(0) > 0]['統一代號'].unique())]
-            
-    # ⭐ B8 執行過濾邏輯 (對接全新的 HF 暫存表)
+    # B8 執行過濾邏輯
     b8_day_val = st.session_state.get('filter_b8_day_streak', 0)
     b8_wk_val = st.session_state.get('filter_b8_week_streak', 0)
     b8_vol_val = st.session_state.get('filter_b8_buy_vol_min', 0)
@@ -1180,11 +1158,11 @@ def show_weight_backtest_page(STOCK_DICT, DATA_DIR="data"):
             any_filter_applied = True
             b8_mask = pd.Series(True, index=df_b8.index)
             
-            if b8_day_val > 0 and '連買日數' in df_b8.columns:
+            if b8_day_val > 0:
                 b8_mask &= (df_b8['連買日數'] >= b8_day_val)
-            if b8_wk_val > 0 and '連買週數' in df_b8.columns:
+            if b8_wk_val > 0:
                 b8_mask &= (df_b8['連買週數'] >= b8_wk_val)
-            if b8_vol_val > 0 and '近期買超總張數' in df_b8.columns:
+            if b8_vol_val > 0:
                 b8_mask &= (df_b8['近期買超總張數'] >= b8_vol_val)
                 
             filtered_df = filtered_df[filtered_df['統一代號'].isin(df_b8[b8_mask]['統一代號'].unique())]
@@ -1226,12 +1204,11 @@ def show_weight_backtest_page(STOCK_DICT, DATA_DIR="data"):
             st.markdown("**特定資金與董監防線**")
             w_b6 = st.number_input("鉅額防守成功", value=1.5, step=0.5)
             w_b7 = st.number_input("董監增持/質押降", value=1.5, step=0.5)
-            # ⭐ 升級加入 B8 計分欄位
-            w_b8 = st.number_input("特定分點連買/囤貨", value=1.5, step=0.5)
 
     # ==========================================
     # 3. 執行計分運算 (Scoring Engine)
     # ==========================================
+    # 💡 移除 on_click 參數，保留過濾條件
     if st.button("開始計算權重分數", icon=":material/vital_signs:", use_container_width=True):
         with st.spinner("🧠 籌碼大數據融合計算中..."):
             score_df = filtered_df.copy()
@@ -1313,20 +1290,6 @@ def show_weight_backtest_page(STOCK_DICT, DATA_DIR="data"):
                     score_df.loc[mask, '總分'] += w_b7
                     sign = "+" if w_b7 > 0 else ""
                     score_df.loc[mask, '得分明細'] += f"[質押下降 {sign}{w_b7}] "
-
-            # ⭐ 升級加入 B8 計分邏輯
-            if w_b8 != 0:
-                df_b8_score = clean_stock_id(get_df('b8_summary'))
-                if not df_b8_score.empty:
-                    b8_cond = pd.Series(False, index=df_b8_score.index)
-                    if '連買日數' in df_b8_score.columns: b8_cond |= (df_b8_score['連買日數'] >= 2)
-                    if '近期買超總張數' in df_b8_score.columns: b8_cond |= (df_b8_score['近期買超總張數'] >= 500)
-                    
-                    valid_b8_codes = df_b8_score[b8_cond]['統一代號'].unique()
-                    mask = score_df['統一代號'].isin(valid_b8_codes)
-                    score_df.loc[mask, '總分'] += w_b8
-                    sign = "+" if w_b8 > 0 else ""
-                    score_df.loc[mask, '得分明細'] += f"[主力分點囤貨 {sign}{w_b8}] "
 
             score_df = score_df.sort_values(by='總分', ascending=False).reset_index(drop=True)
             st.session_state['scored_result'] = score_df[score_df['總分'] != 0].copy()

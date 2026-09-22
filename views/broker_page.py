@@ -275,7 +275,16 @@ def render_broker_dashboard(target_stock, display_name, df_raw_all, df_trend):
 # 🖼️ 主渲染入口 (這裡所有的程式碼都縮排進來了！)
 # ==========================================
 def render(STOCK_DICT=None):
-    st.markdown("""券商主力淨買力與集中度追蹤""", unsafe_allow_html=True)
+    # 🌟 替換成與其他頁面相同的發光大標題
+    st.markdown("""
+    <div style="background: linear-gradient(90deg, rgba(15,23,42,1) 0%, rgba(14,165,233,0.3) 50%, rgba(15,23,42,1) 100%); 
+                border-top: 1px solid #38bdf8; border-bottom: 1px solid #38bdf8; padding: 15px 20px; 
+                border-radius: 10px; text-align: center; box-shadow: 0px 0px 20px rgba(56, 189, 248, 0.2); margin-bottom: 20px;">
+        <h2 style="color: #e0f2fe; margin: 0; letter-spacing: 2px; text-shadow: 0 0 15px rgba(56, 189, 248, 0.8);">
+            券商主力淨買力與集中度
+        </h2>
+    </div>
+    """, unsafe_allow_html=True)
 
     # 🌟 1. 全市場掃描器 (無按鈕、直接分頁呈現) 🌟
     st.markdown("### 🌍 全市場連買分點快搜")
