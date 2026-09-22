@@ -274,11 +274,11 @@ def render_debug_panel(filtered_df, any_filter_applied, dynamic_price_col_b6):
             if not df_b7_hist.empty and '動態' in df_b7_hist.columns: debug_df = pd.merge(debug_df, df_b7_hist[['統一代號', '近月質押增減(%)', '動態']].rename(columns={'近月質押增減(%)': 'B7_質押近月增減%', '動態': 'B7_質押動態'}), on='統一代號', how='left')
 
             #把 B8 欄位加入除錯透視鏡 
+            # 1. 舊版 B8 summary (保留相容性)
             df_b8_debug = clean_stock_id(get_df('b8_summary')).drop_duplicates(subset=['統一代號'])
             if not df_b8_debug.empty:
                 b8_debug_cols = ['統一代號']
                 b8_rename_dict = {}
-                
                 if '連買日數' in df_b8_debug.columns:
                     b8_debug_cols.append('連買日數')
                     b8_rename_dict['連買日數'] = 'B8_日連買'
@@ -288,11 +288,68 @@ def render_debug_panel(filtered_df, any_filter_applied, dynamic_price_col_b6):
                 if '近期買超總張數' in df_b8_debug.columns:
                     b8_debug_cols.append('近期買超總張數')
                     b8_rename_dict['近期買超總張數'] = 'B8_囤貨張數'
-
                 if len(b8_debug_cols) > 1:
                     debug_df = pd.merge(debug_df, df_b8_debug[b8_debug_cols].rename(columns=b8_rename_dict), on='統一代號', how='left')
-            # 除錯位置結束 
-            
+
+            # 2. 新增 B8 Top15 主力買超排行
+            try:
+                df_top15_debug = fetch_parquet_from_hf("scan__依主力Top15買超張數排行_復刻三竹.parquet")
+                if not df_top15_debug.empty:
+                    df_top15_debug = clean_stock_id(df_top15_debug).drop_duplicates(subset=['統一代號'])
+                    t15_cols = ['統一代號']
+                    t15_rename = {}
+                    if '主力連買動態' in df_top15_debug.columns:
+                        t15_cols.append('主力連買動態')
+                        t15_rename['主力連買動態'] = 'B8_主力連買動態'
+                    if '最新日買超張數' in df_top15_debug.columns and '最新均價' in df_top15_debug.columns:
+                        df_top15_debug['B8_斥資(億)'] = (df_top15_debug['最新日買超張數'] * df_top15_debug['最新均價'] * 1000 / 100000000).round(2)
+                        t15_cols.append('B8_斥資(億)')
+                    if len(t15_cols) > 1:
+                        debug_df = pd.merge(debug_df, df_top15_debug[t15_cols].rename(columns=t15_rename), on='統一代號', how='left')
+            except Exception: pass
+
+            # 3. 新增 B8 吃豆腐防線乖離
+            try:
+                df_tofu_debug = fetch_parquet_from_hf("scan_依股價乖離率吃豆腐排行.parquet")
+                if not df_tofu_debug.empty:
+                    df_tofu_debug = clean_stock_id(df_tofu_debug).drop_duplicates(subset=['統一代號'])
+                    tofu_cols = ['統一代號']
+                    tofu_rename = {}
+                    if '乖離率(%)' in df_tofu_debug.columns:
+                        tofu_cols.append('乖離率(%)')
+                        tofu_rename['乖離率(%)'] = 'B8_乖離率(%)'
+                    if '吃豆腐動態' in df_tofu_debug.columns:
+                        tofu_cols.append('吃豆腐動態')
+                        tofu_rename['吃豆腐動態'] = 'B8_吃豆腐動態'
+                    if '主力囤貨(張)' in df_tofu_debug.columns and '主力成本' in df_tofu_debug.columns:
+                        df_tofu_debug['B8_吃貨斥資(萬)'] = (df_tofu_debug['主力囤貨(張)'] * df_tofu_debug['主力成本'] * 1000 / 10000).round(0)
+                        tofu_cols.append('B8_吃貨斥存(萬)')
+                    if len(tofu_cols) > 1:
+                        debug_df = pd.merge(debug_df, df_tofu_debug[tofu_cols].rename(columns=tofu_rename), on='統一代號', how='left')
+            except Exception: pass
+
+            # 4. 新增 B8 籌碼集中動能 (Δ)
+            try:
+                df_mom_debug = fetch_parquet_from_hf("momentum_latest.parquet")
+                if not df_mom_debug.empty:
+                    df_mom_debug = clean_stock_id(df_mom_debug).drop_duplicates(subset=['統一代號'])
+                    mom_cols = ['統一代號']
+                    mom_rename = {}
+                    if '今日上榜期程' in df_mom_debug.columns:
+                        mom_cols.append('今日上榜期程')
+                        mom_rename['今日上榜期程'] = 'B8_上榜期程'
+                    if '最新動態' in df_mom_debug.columns:
+                        mom_cols.append('最新動態')
+                        mom_rename['最新動態'] = 'B8_集中度動態'
+                    for d_col in ['單日Δ', '5日Δ', '10日Δ']:
+                        if d_col in df_mom_debug.columns:
+                            mom_cols.append(d_col)
+                            mom_rename[d_col] = f'B8_{d_col}'
+                    if len(mom_cols) > 1:
+                        debug_df = pd.merge(debug_df, df_mom_debug[mom_cols].rename(columns=mom_rename), on='統一代號', how='left')
+            except Exception: pass
+            # 除錯位置結束
+                      
             st.write(f"🔍 檢核明細 (共 {len(debug_df)} 筆)：")
             st.dataframe(debug_df, use_container_width=True, hide_index=True)
             st.session_state['debug_df'] = debug_df 
