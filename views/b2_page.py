@@ -74,7 +74,9 @@ def process_b2_files(files, target_col_keyword, val_col_suffix):
             
             if pd.isna(today): return "⚪ 觀望 (無資料)"
             
-            val_str = f"({today}%)"
+            # 👇 這裡加上 :.2f 限制小數點後兩位
+            val_str = f"({today:.2f}%)"
+            
             if "發行數" in val_col_suffix:
                 if base == 0: return f"🆕 今日突擊卡位 {val_str}" if today > 0 else "💤 籌碼沉澱中"
                 if today < 0: return f"🚨 轉賣反轉 {val_str}"
