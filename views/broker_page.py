@@ -309,9 +309,17 @@ def render_broker_dashboard(target_stock, display_name, df_raw_all, df_trend):
 # 🖼️ 主渲染入口
 # ==========================================
 def render(STOCK_DICT=None):
-    st.markdown("""券商主力淨買力與集中度追蹤""", unsafe_allow_html=True)
+    st.markdown("""
+    <div style="background: linear-gradient(90deg, rgba(15,23,42,1) 0%, rgba(14,165,233,0.3) 50%, rgba(15,23,42,1) 100%); 
+                border-top: 1px solid #38bdf8; border-bottom: 1px solid #38bdf8; padding: 15px 20px; 
+                border-radius: 10px; text-align: center; box-shadow: 0px 0px 20px rgba(56, 189, 248, 0.2); margin-bottom: 20px;">
+        <h2 style="color: #e0f2fe; margin: 0; letter-spacing: 2px; text-shadow: 0 0 15px rgba(56, 189, 248, 0.8);">
+            券商動向
+        </h2>
+    </div>
+    """, unsafe_allow_html=True)
     st.markdown("### 🌍 全市場連買分點快搜")
-    scan_tab1, scan_tab2 = st.tabs(["依主力買超張數排行", "依股價乖離率(吃豆腐)排行"])
+    scan_tab1, scan_tab2 = st.tabs(["🔹 Top 15主力買超排行", "🔹 單一主力成本分析(豆腐好吃)"])
 
     with scan_tab1:
         df_top15 = fetch_parquet_from_hf("scan__依主力Top15買超張數排行_復刻三竹.parquet")
@@ -363,10 +371,10 @@ def render(STOCK_DICT=None):
         if STOCK_DICT and '股票代號' in df_momentum.columns:
             df_momentum['股票名稱'] = df_momentum['股票代號'].astype(str).apply(lambda x: STOCK_DICT.get(x, {}).get('name', '-'))
         
-        tabs_names = ["單日集中度 Δ", "5日集中度 Δ"]
-        if calc_days >= 11: tabs_names.append("10日集中度 Δ")
-        if calc_days >= 21: tabs_names.append("20日集中度 Δ")
-        if calc_days >= 31: tabs_names.append("30日集中度 Δ")
+        tabs_names = ["🔹 單日集中度 Δ", "🔹 5日集中度 Δ"]
+        if calc_days >= 11: tabs_names.append("🔹 10日集中度 Δ")
+        if calc_days >= 21: tabs_names.append("🔹 20日集中度 Δ")
+        if calc_days >= 31: tabs_names.append("🔹 30日集中度 Δ")
         
         mom_tabs = st.tabs(tabs_names)
         
