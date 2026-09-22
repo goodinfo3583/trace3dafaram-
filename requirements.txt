@@ -10,3 +10,6 @@ streamlit-authenticator
 seleniumbase
 html5lib
 beautifulsoup4
+pyarrow
+fastparquet
+matplotlib

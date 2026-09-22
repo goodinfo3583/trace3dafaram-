@@ -54,13 +54,15 @@
 
 │   ├── 📄 news\_page.py          # 市場消息
 
-│   ├── 📄 broker\_page.py       # 券商分點
+│   ├── 📄 broker\_page.py       # 券商分點 (連結hugging face資料庫)
 
 │   ├── 📄 contact\_page.py       # 聯絡我們 (寫入 G-Sheets)
 
 │   ├── 📄 login\_page.py         # 登入頁面
 
 │   ├── 📄 sidebar.py            # 側邊視窗欄位
+
+│   ├── 📄 sidebar.py            # 儲存全站整合合併檔案下載按鈕設計
 
 │   ├── 📄 watchlist\_page.py     # 使用者自訂追蹤清單 (寫入 G-Sheets)
 
