@@ -169,7 +169,7 @@ def render_debug_panel(filtered_df, any_filter_applied, dynamic_price_col_b6):
             df_b3_main = get_df('b3_main')
             if not df_b3_main.empty:
                 df_b3_main = clean_stock_id(df_b3_main).drop_duplicates(subset=['統一代號', '連買類型']) 
-                df_b3_main['B3_組合狀態'] = df_b3_main['連買類型'] + "(" + df_b3_main['連買週期數'].astype(str) + ")-" + df_b3_main['狀態動態']
+                df_b3_main['B3_組合狀態'] = df_b3_main['連買類型'].astype(str) + "(" + df_b3_main['連買週期數'].astype(str) + ")-" + df_b3_main['狀態動態'].astype(str)
                 b3_summary = df_b3_main.groupby('統一代號')['B3_組合狀態'].apply(lambda x: " | ".join(x)).reset_index()
                 debug_df = pd.merge(debug_df, b3_summary.rename(columns={'B3_組合狀態': 'B3_連買狀態'}), on='統一代號', how='left')
 
