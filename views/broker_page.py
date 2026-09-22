@@ -346,9 +346,9 @@ def render(STOCK_DICT=None):
         
         # 根據資料天數動態決定要顯示幾個 Tab
         tabs_names = ["🔹 單日集中度 Δ", "🔹 5日集中度 Δ"]
-        if calc_days >= 11: tabs_names.append("10日集中度 Δ")
-        if calc_days >= 21: tabs_names.append("20日集中度 Δ")
-        if calc_days >= 31: tabs_names.append("30日集中度 Δ") # 預留未來天數增加的空間
+        if calc_days >= 11: tabs_names.append("🔹 10日集中度 Δ")
+        if calc_days >= 21: tabs_names.append("🔹 20日集中度 Δ")
+        if calc_days >= 31: tabs_names.append("🔹 30日集中度 Δ") # 預留未來天數增加的空間
         
         mom_tabs = st.tabs(tabs_names)
         
