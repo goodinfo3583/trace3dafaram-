@@ -1,3 +1,4 @@
+#views/broker_page.py
 import streamlit as st
 import pandas as pd
 import requests
@@ -12,7 +13,6 @@ HF_BASE_URL = "https://huggingface.co/datasets/goodinfo3583/tw-broker-parquet/re
 # 🚀 共用遠端讀取函數 (加入快取，1小時內不重複下載，實現瞬間切換)
 @st.cache_data(show_spinner=False, ttl=3600)
 def fetch_parquet_from_hf(file_name):
-    # urllib.parse.quote 處理中文檔名的網址編碼問題
     url = f"{HF_BASE_URL}/{urllib.parse.quote(file_name)}"
     try:
         return pd.read_parquet(url)
@@ -150,19 +150,47 @@ def render_broker_dashboard(target_stock, display_name, df_raw_all, df_trend):
 
     with tab2:
         st.markdown("##### 🕵️‍♂️ 誰在拿真金白銀連續吃貨？")
+        
+        # 1. 取得多期程的純粹均買價/均賣價
+        intervals = [1, 5, 10, 20, 60]
+        cost_dfs = []
+        for i in intervals:
+            if len(available_dates) >= i:
+                df_i = stock_raw[stock_raw['trade_date'].isin(available_dates[:i])]
+                agg_i = df_i.groupby(broker_col).agg(
+                    buy_amt=('總買進金額', 'sum'), buy_vol=('總買進股數', 'sum'),
+                    sell_amt=('總賣出金額', 'sum'), sell_vol=('總賣出股數', 'sum')
+                ).reset_index()
+                agg_i[f'{i}日均買'] = (agg_i['buy_amt'] / agg_i['buy_vol']).fillna(0).round(2)
+                agg_i[f'{i}日均賣'] = (agg_i['sell_amt'] / agg_i['sell_vol']).fillna(0).round(2)
+                cost_dfs.append(agg_i[[broker_col, f'{i}日均買', f'{i}日均賣']])
+
+        # 2. 統整 60 日的主力總囤貨量
         recent_raw = stock_raw[stock_raw['trade_date'].isin(available_dates[:60])].copy()
-        hoard_df = recent_raw.groupby(broker_col).agg(區間淨買超張數=('net_vol', 'sum'), 區間總買進股數=('總買進股數', 'sum'), 區間總買進金額=('總買進金額', 'sum'), 區間淨買賣金額=('買賣超金額', 'sum')).reset_index()
-        hoard_df['均價'] = (hoard_df['區間總買進金額'] / hoard_df['區間總買進股數']).fillna(0).round(2)
+        hoard_df = recent_raw.groupby(broker_col).agg(
+            區間淨買超張數=('net_vol', 'sum'), 
+            區間淨買賣金額=('買賣超金額', 'sum')
+        ).reset_index()
         hoard_df['斥資(億)'] = (hoard_df['區間淨買賣金額'] / 100000000).round(2)
         hoard_df[broker_col] = hoard_df[broker_col].apply(apply_broker_tags)
         
+        # 3. 合併多期程均價
+        for cdf in cost_dfs:
+            hoard_df = pd.merge(hoard_df, cdf, on=broker_col, how='left')
+
         col_hoard, col_dump = st.columns(2)
         with col_hoard:
             st.markdown("##### 📈 近 60 日囤貨分點 (斥資破億榜)")
-            hoarders = hoard_df[hoard_df['區間淨買超張數'] > 0].sort_values('斥資(億)', ascending=False)
+            hoarders = hoard_df[hoard_df['區間淨買超張數'] > 0].sort_values('斥資(億)', ascending=False).copy()
             if not hoarders.empty:
-                hoarders.columns = ['券商名稱', '淨買超(張)', '總買(股)', '總買(元)', '淨買(元)', '均價', '斥資(億)']
-                styled_hoard = hoarders[['券商名稱', '淨買超(張)', '均價', '斥資(億)']].style.format({'淨買超(張)': fmt_float, '均價': "{:.2f}", '斥資(億)': "{:.2f}"})
+                hoarders = hoarders.rename(columns={'區間淨買超張數': '淨買超(張)'})
+                buy_cols = [c for c in [f'{i}日均買' for i in intervals] if c in hoarders.columns]
+                display_cols = [broker_col, '淨買超(張)'] + buy_cols + ['斥資(億)']
+                
+                format_dict = {'淨買超(張)': fmt_float, '斥資(億)': "{:.2f}"}
+                for bc in buy_cols: format_dict[bc] = "{:.2f}"
+                
+                styled_hoard = hoarders[display_cols].style.format(format_dict)
                 try: styled_hoard = styled_hoard.background_gradient(subset=['斥資(億)'], cmap='Reds')
                 except: pass
                 st.dataframe(styled_hoard, use_container_width=True, hide_index=True)
@@ -174,8 +202,15 @@ def render_broker_dashboard(target_stock, display_name, df_raw_all, df_trend):
             if not dumpers.empty:
                 dumpers['斥資(億)'] = dumpers['斥資(億)'].abs()
                 dumpers['區間淨買超張數'] = dumpers['區間淨買超張數'].abs()
-                dumpers.columns = ['券商名稱', '淨賣超(張)', '總買(股)', '總買(元)', '淨賣(元)', '均價', '提款(億)']
-                styled_dump = dumpers[['券商名稱', '淨賣超(張)', '均價', '提款(億)']].style.format({'淨賣超(張)': fmt_float, '均價': "{:.2f}", '提款(億)': "{:.2f}"})
+                dumpers = dumpers.rename(columns={'區間淨買超張數': '淨賣超(張)', '斥資(億)': '提款(億)'})
+                
+                sell_cols = [c for c in [f'{i}日均賣' for i in intervals] if c in dumpers.columns]
+                display_cols = [broker_col, '淨賣超(張)'] + sell_cols + ['提款(億)']
+                
+                format_dict = {'淨賣超(張)': fmt_float, '提款(億)': "{:.2f}"}
+                for sc in sell_cols: format_dict[sc] = "{:.2f}"
+                
+                styled_dump = dumpers[display_cols].style.format(format_dict)
                 try: styled_dump = styled_dump.background_gradient(subset=['提款(億)'], cmap='Greens')
                 except: pass
                 st.dataframe(styled_dump, use_container_width=True, hide_index=True)
@@ -270,9 +305,8 @@ def render_broker_dashboard(target_stock, display_name, df_raw_all, df_trend):
             st.dataframe(styled_pivot, use_container_width=True)
         else: st.write("無足夠資料產出")
 
-
 # ==========================================
-# 🖼️ 主渲染入口 (這裡所有的程式碼都縮排進來了！)
+# 🖼️ 主渲染入口
 # ==========================================
 def render(STOCK_DICT=None):
     st.markdown("""券商主力淨買力與集中度追蹤""", unsafe_allow_html=True)
