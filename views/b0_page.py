@@ -1,217 +1,35 @@
-# views/b0_page.py
 import streamlit as st
 import pandas as pd
-import numpy as np
 import os
-import glob
-import re
 
 # ==========================================
-# 💡 效能救星 1：將耗時的檔案讀取、清洗、合併快取起來 (已支援 Parquet)
+# 💡 效能救星：只讀取爬蟲腳本算好的輕量化 Parquet
 # ==========================================
 @st.cache_data(show_spinner=False, ttl=300)
-def get_cached_b0_data(DATA_DIR):
-    # 修改 1：同時搜尋 Parquet 與 CSV 檔案，優先讀取 Parquet
-    search_patterns = [
-        os.path.join(DATA_DIR, "*成交價*.parquet"),
-        os.path.join(DATA_DIR, "*成交價*.csv")
-    ]
-    files = []
-    for pattern in search_patterns:
-        files.extend(glob.glob(pattern))
+def load_b0_data(DATA_DIR):
+    latest_path = os.path.join(DATA_DIR, "B0_latest_calculated.parquet")
+    history_path = os.path.join(DATA_DIR, "B0_lite_history.parquet")
     
-    if not files:
-        return None
-        
-    all_dfs = []
-    for f in files:
-        df = None 
-        # 根據副檔名選擇讀取引擎
-        if f.endswith('.parquet'):
-            try:
-                df = pd.read_parquet(f)
-            except Exception as e:
-                print(f"Parquet 讀取失敗: {f}, 錯誤: {e}")
-        else:
-            for enc in ['utf-8-sig', 'big5', 'cp950', 'utf-8']:
-                try:
-                    df = pd.read_csv(f, encoding=enc, header=0, dtype=str)
-                    break
-                except: pass
-            
-        if df is not None and not df.empty:
-            df.columns = [re.sub(r'[\s\n\r\t\u3000\ufeff]+', '', str(c)) for c in df.columns]
-            
-            # 👇 強制剔除重複的同名欄位，防止 Parquet 讀取崩潰 👇
-            df = df.loc[:, ~df.columns.duplicated()]
-            
-            c_code = next((c for c in df.columns if '代號' in c), None)
-            date_col = next((c for c in df.columns if '日期' in c), None)
-            name_col = next((c for c in df.columns if c in ['名稱', '股票名稱', '證券名稱']), None)
-            
-            if c_code and date_col:
-                df['統一代號'] = df[c_code].astype(str).str.replace(r'\.0$', '', regex=True).str.strip()
-                df['標準日期'] = df[date_col].astype(str).str.strip()
-                if name_col:
-                    df['B0_原始名稱'] = df[name_col].astype(str).str.strip()
-                else:
-                    df['B0_原始名稱'] = ""
-                
-                vol_col = next((c for c in df.columns if c in ['成交張數', '總量', '成交量', '累積成交張數', '張數']), None)
-                if vol_col:
-                    df['成交張數_num'] = pd.to_numeric(df[vol_col].astype(str).str.replace(',', ''), errors='coerce').fillna(0)
-                    df['成交張數'] = df['成交張數_num'] 
-                else:
-                    df['成交張數_num'] = 0
-                    df['成交張數'] = 0
-
-                amt_col = next((c for c in df.columns if c in ['成交額(百萬)', '成交金額', '成交額', '總金額']), None)
-                if amt_col:
-                    df['成交額_num'] = pd.to_numeric(df[amt_col].astype(str).str.replace(',', ''), errors='coerce').fillna(0)
-                    df['成交額(百萬)'] = df['成交額_num']
-                else:
-                    df['成交額_num'] = 0
-                    df['成交額(百萬)'] = 0
-                    
-                if 'PER' in df.columns:
-                    df['PER'] = pd.to_numeric(df['PER'].astype(str).str.replace(',', ''), errors='coerce')
-                if '成交' in df.columns:
-                    df['成交'] = pd.to_numeric(df['成交'].astype(str).str.replace(',', ''), errors='coerce')
-                if '漲跌幅' in df.columns:
-                    df['漲跌幅'] = pd.to_numeric(df['漲跌幅'].astype(str).str.replace(',', '').str.replace('%', ''), errors='coerce')
-
-                all_dfs.append(df)
-                
-    if not all_dfs: return None
-    
-    combined_df = pd.concat(all_dfs, ignore_index=True)
-      
-    # ==========================================
-    # 多週期均量與動能運算
-    # ==========================================
-    # 🛡️ 關鍵防呆：強制將日期轉為純字串，並剔除合併產生的隱藏空值 (NaN/NaT/pd.NA)
-    # 1. 針對 Parquet 格式產生的 pd.NA，需先 fillna("") 再轉字串
-    if '統一代號' in combined_df.columns:
-        combined_df['統一代號'] = combined_df['統一代號'].fillna("").astype(str)
-    combined_df['標準日期'] = combined_df['標準日期'].fillna("").astype(str)
-    
-    # 2. 擴充過濾條件，加入 '' 以防 pandas 轉型殘留
-    invalid_dates = ['nan', 'nat', 'none', '', '']
-    combined_df = combined_df[~combined_df['標準日期'].str.lower().str.strip().isin(invalid_dates)]
-
-    # 3. 執行 Pandas 內部排序
-    combined_df = combined_df.sort_values(by=['統一代號', '標準日期', '成交張數_num'], ascending=[True, True, False])
-    
-    # 👇 關鍵修正：加入這行！強制剔除同一天同時讀取到 Parquet 與 CSV 造成的雙胞胎資料
-    combined_df = combined_df.drop_duplicates(subset=['統一代號', '標準日期'], keep='first')
-    
-    # 4. 終極防呆：強制轉為原生 Python 字串後再排序，徹底杜絕 TypeError
-    valid_dates = [str(d) for d in combined_df['標準日期'].unique()]
-    unique_dates = sorted(valid_dates, reverse=True)
-    
-    if not unique_dates: return None
-    latest_date = unique_dates[0]
-    
-    df_today = combined_df[combined_df['標準日期'] == latest_date].copy()
-    sorted_df = combined_df.sort_values(by=['統一代號', '標準日期'], ascending=[True, False])
-    
-    avg_dict = {}
-    periods = [5, 10, 20, 30, 45]
-    
-    for p in periods:
-        top_p_df = sorted_df.groupby('統一代號').head(p)
-        p_avg = top_p_df.groupby('統一代號').agg(
-            **{
-                f'{p}日均量': ('成交張數_num', 'mean'),
-                f'{p}日均額': ('成交額_num', 'mean')
-            }
-        ).reset_index()
-        df_today = pd.merge(df_today, p_avg, on='統一代號', how='left')
-        df_today[f'{p}日均量'] = df_today[f'{p}日均量'].round(0)
-        df_today[f'{p}日均額'] = df_today[f'{p}日均額'].round(2)
-
-    df_today['股價日期'] = latest_date
-    
-    prev_day_df = sorted_df.groupby('統一代號').nth(1).reset_index()
-    prev_day_df = prev_day_df[['統一代號', '成交額_num', '成交張數_num', '漲跌幅']].rename(columns={
-        '成交額_num': '昨日成交額',
-        '成交張數_num': '昨日成交量',
-        '漲跌幅': '昨日漲跌幅'
-    })
-    
-    df_today = pd.merge(df_today, prev_day_df, on='統一代號', how='left')
-        
-    safe_prev_amt = df_today['昨日成交額'].replace(0, 0.01).fillna(0.01)
-    df_today['成交金額日變化率'] = ((df_today['成交額_num'] / safe_prev_amt) - 1) * 100  
-
-    def get_special_pattern(row):
-        today_pct = row.get('漲跌幅', 0)
-        today_vol = row.get('成交張數_num', 0)
-        yesterday_pct = row.get('昨日漲跌幅', 0)
-        yesterday_vol = row.get('昨日成交量', 0)
-        avg_v = row.get('5日均量', 0)
-        
-        if pd.isna(today_pct): today_pct = 0
-        if pd.isna(yesterday_pct): yesterday_pct = 0
-        
-        if yesterday_pct >= 4.0 and yesterday_vol >= 1000:
-            if today_vol <= (yesterday_vol * 0.5) and today_pct >= -2.0:
-                return "🕵️ 昨強今急縮 (洗盤防守)"
-                
-        if avg_v >= 500 and today_vol > 0:
-            if today_vol <= (avg_v * 0.3) and abs(today_pct) <= 1.5:
-                return "💤 極致窒息量 (醞釀表態)"
-                
-        return "-"
-
-    df_today['B0_特殊型態'] = df_today.apply(get_special_pattern, axis=1)
-
-    def get_vp_status(row):
-        pct = row.get('漲跌幅', 0)
-        if pd.isna(pct): pct = 0
-        vol = row.get('成交張數_num', 0)
-        avg_v = row.get('5日均量', 0)
-        if avg_v == 0 or vol == 0: return "⚪ 無明顯動能"
-        ratio = vol / avg_v
-        if ratio >= 1.5: v_stat = "放量"
-        elif ratio <= 0.7: v_stat = "縮量"
-        else: v_stat = "平量"
-        
-        if pct >= 4.0: p_stat = "大漲"
-        elif pct > 1.5: p_stat = "價升"
-        elif pct >= -1.5: p_stat = "滯漲"
-        elif pct > -4.0: p_stat = "小跌"
-        else: p_stat = "大跌"
-        
-        comb = f"{v_stat}{p_stat}"
-        mapping = {
-            "放量大漲": "🚀 放量大漲 (量價齊升，持續看漲)", "縮量大漲": "🔒 縮量大漲 (鎖倉高控盤，延續上漲)", "平量大漲": "✈️ 平量大漲 (一致看漲無拋壓，加速上漲)",
-            "縮量價升": "📈 價升量縮 (量價背離，下方承接看拉高)", "放量滯漲": "⚠️ 放量滯漲 (拋壓增大，即將見頂反轉)", "平量滯漲": "⏸️ 平量滯漲 (拋壓增大，高位見頂)",
-            "縮量小跌": "📉 縮量小跌 (主力洗盤止跌，擇機進場)", "放量小跌": "🛡️ 放量小跌 (見底信號，越跌越買反轉)", "平量小跌": "🥀 平量價縮 (下跌中繼，弱反彈信號)",
-            "縮量大跌": "☠️ 縮量大跌 (一致看空無承接，加速下跌)", "放量大跌": "🩸 放量大跌 (跟風砸盤，高位出貨持續跌)", "平量大跌": "🕳️ 平量大跌 (一致看空無承接，加速下跌)"
-        }
-        return mapping.get(comb, "⚖️ 溫和震盪整理")
-
-    df_today['B0_量價狀態'] = df_today.apply(get_vp_status, axis=1)
-    
-    # 👇 改成同時回傳「今日資料」與「完整歷史資料」
-    return df_today, combined_df
+    try:
+        df_today = pd.read_parquet(latest_path) if os.path.exists(latest_path) else pd.DataFrame()
+        df_lite_hist = pd.read_parquet(history_path) if os.path.exists(history_path) else pd.DataFrame()
+        return df_today, df_lite_hist
+    except Exception as e:
+        print(f"讀取 B0 快取失敗: {e}")
+        return pd.DataFrame(), pd.DataFrame()
 
 def sync_b0_data(DATA_DIR):
-    cache_result = get_cached_b0_data(DATA_DIR)
-    if cache_result is not None:
-        st.session_state['b0_price'] = cache_result[0]
-
+    df_today, _ = load_b0_data(DATA_DIR)
+    if not df_today.empty:
+        st.session_state['b0_price'] = df_today
 
 # ==========================================
-# 🚀 效能救星 2：把篩選器與圖表包裝成 Fragment，避免拉動滑桿時整頁重整
+# 🚀 互動儀表板
 # ==========================================
 @st.fragment
 def render_b0_interactive_dashboard(df_b0, df_history):
-    # 🌟 關鍵修改：先在頁面最上方建立一個「佔位容器」，保留給盤面結構使用
     top_container = st.container()
 
-    # 接著顯示篩選器 UI
     with st.expander("🛠️ 全域條件篩選 (點擊展開/收合)", expanded=True):
         col1, col2, col3, col4 = st.columns([1.5, 1, 1.5, 1])
         with col1:
@@ -229,10 +47,9 @@ def render_b0_interactive_dashboard(df_b0, df_history):
         special_opts = [opt for opt in df_b0['B0_特殊型態'].unique() if opt != "-"]
         sel_special = st.multiselect("🕵️ 特殊洗盤與窒息量篩選 (高勝率買點)", special_opts, placeholder="未選擇則顯示全部")
 
-    # 執行全域過濾邏輯 (根據上面的輸入計算 filtered_df)
     filtered_df = df_b0.copy()
     if search_kw:
-        filtered_df = filtered_df[filtered_df['統一代號'].str.contains(search_kw) | filtered_df['股票名稱'].str.contains(search_kw)]
+        filtered_df = filtered_df[filtered_df['統一代號'].astype(str).str.contains(search_kw) | filtered_df['股票名稱'].astype(str).str.contains(search_kw)]
     if vol_filter > 0:
         filtered_df = filtered_df[filtered_df['成交張數_num'] >= vol_filter]
     if sel_status:
@@ -248,29 +65,20 @@ def render_b0_interactive_dashboard(df_b0, df_history):
     if sel_special:
         filtered_df = filtered_df[filtered_df['B0_特殊型態'].isin(sel_special)]
 
-    # ==========================================
-    # 🌟 利用 `with top_container:` 將計算完的盤面結構塞回最上方
-    # ==========================================
     with top_container:
         st.markdown("### 📊 盤面結構 (基於當前篩選條件)")
         
-        # 1. 取得當前篩選後的「合格標的清單」
         valid_codes = filtered_df['統一代號'].unique()
-        
-        # 2. 從歷史資料中提取這些合格標的，並依日期分組計算各項數量
         hist_filtered = df_history[df_history['統一代號'].isin(valid_codes)]
+        
         breadth_history = hist_filtered.groupby('標準日期').agg(
             漲家數=('漲跌幅', lambda x: (x > 0).sum()),
             跌家數=('漲跌幅', lambda x: (x < 0).sum()),
             平盤數=('漲跌幅', lambda x: (x == 0).sum()),
             漲停數=('漲跌幅', lambda x: (x >= 9.5).sum()),
             跌停數=('漲跌幅', lambda x: (x <= -9.5).sum())
-        ).reset_index()
+        ).reset_index().sort_values('標準日期', ascending=False)
         
-        # 確保日期由新到舊排列
-        breadth_history = breadth_history.sort_values('標準日期', ascending=False)
-        
-        # 3. 取得「今日」與「昨日」的數據來計算 Delta (變化量箭頭)
         up_count = down_count = flat_count = limit_up_count = limit_down_count = 0
         prev_up = prev_down = prev_flat = prev_l_up = prev_l_down = None
         
@@ -288,8 +96,6 @@ def render_b0_interactive_dashboard(df_b0, df_history):
             prev_l_up = breadth_history.iloc[1]['漲停數']
             prev_l_down = breadth_history.iloc[1]['跌停數']
         
-        # 4. 繪製帶有 Delta 比較箭頭的 Metrics UI
-        # delta_color="inverse" 會讓「數值增加時變成紅色(負面)」，符合跌停數變多是壞事的情境！
         m1, m2, m3, m4, m5 = st.columns(5)
         m1.metric("漲家數 📈", f"{up_count} 家", delta=None if prev_up is None else f"{int(up_count - prev_up)} 家")
         m2.metric("跌家數 📉", f"{down_count} 家", delta=None if prev_down is None else f"{int(down_count - prev_down)} 家", delta_color="inverse")
@@ -297,7 +103,6 @@ def render_b0_interactive_dashboard(df_b0, df_history):
         m4.metric("漲停數 🚀", f"{limit_up_count} 家", delta=None if prev_l_up is None else f"{int(limit_up_count - prev_l_up)} 家")
         m5.metric("跌停數 ☠️", f"{limit_down_count} 家", delta=None if prev_l_down is None else f"{int(limit_down_count - prev_l_down)} 家", delta_color="inverse")
         
-        # 5. 顯示漲跌停的 Expander 細節
         limit_up_df = filtered_df[filtered_df['漲跌幅'] >= 9.5]
         limit_down_df = filtered_df[filtered_df['漲跌幅'] <= -9.5]
         
@@ -311,20 +116,14 @@ def render_b0_interactive_dashboard(df_b0, df_history):
                 ld_list = (limit_down_df['統一代號'] + " " + limit_down_df['股票名稱']).tolist()
                 st.write("、".join(ld_list))
 
-        # 6. 顯示近期歷史趨勢橫向表格
         if len(breadth_history) > 0:
             st.markdown("##### 📅 歷史盤面變化")
-            # 把表格轉置 (T) 讓指標變成列、日期變成欄位
-            breadth_table = breadth_history.set_index('標準日期').T
-            # 將 YYYYMMDD 精簡轉換為 MMDD 以利閱讀
+            breadth_table = breadth_history.head(15).set_index('標準日期').T
             breadth_table.columns = [str(c)[-4:] for c in breadth_table.columns]
             st.dataframe(breadth_table, use_container_width=True)
 
         st.markdown("---")
 
-    # ==========================================
-    # 繼續繪製下方的頁籤區塊
-    # ==========================================
     tab_basic, tab_momentum = st.tabs(["🔹 全市場基礎量價", "🔹 資金動能雷達"])
 
     with tab_basic:
@@ -354,7 +153,7 @@ def render_b0_interactive_dashboard(df_b0, df_history):
 
     with tab_momentum:
         st.markdown("#### 資金動力渦輪：找出真正的行情燃料")
-        st.caption("本區塊先行排除流動性太差的標的 (成交額 > 5000萬 且 股價 > 10元)，以避免倍數失真，本表至8/12開始更新30日.45日還不準確。")
+        st.caption("本區塊先行排除流動性太差的標的 (成交額 > 5000萬 且 股價 > 10元)，以避免倍數失真。")
 
         momentum_df = filtered_df[
             (filtered_df['成交額(百萬)'] > 50) & 
@@ -369,7 +168,6 @@ def render_b0_interactive_dashboard(df_b0, df_history):
         st.caption("市場資金總量增加最多，代表用錢和量砸出來的活絡程度，也可看族群性 (主升段發動或大型法人調倉，已排除流動性過差標的，也不看籌碼流向何處)")
         
         periods = [5, 10, 20, 30, 45]
-        
         for p in periods:
             avg_col = f'{p}日均額'
             if avg_col in momentum_df.columns:
@@ -386,7 +184,6 @@ def render_b0_interactive_dashboard(df_b0, df_history):
                 "成交金額日變化率": st.column_config.NumberColumn("日變化率(%)", format="%+.1f %%"),
                 "成交額(百萬)": st.column_config.NumberColumn("今日成交額", format="%.0f"),
             }
-            
             for p in periods:
                 if f'較{p}日均額增加' in momentum_df.columns:
                     summary_cols_abs.append(f'較{p}日均額增加')
@@ -408,17 +205,7 @@ def render_b0_interactive_dashboard(df_b0, df_history):
                 avg_col = f'{p}日均額'
                 if avg_col in momentum_df.columns:
                     top_abs = momentum_df.sort_values(f'較{p}日均額增加', ascending=False).head(30)
-                    
-                    display_cols_abs = [
-                        '統一代號', 
-                        '股票名稱', 
-                        f'較{p}日均額增加', 
-                        '成交額(百萬)', 
-                        avg_col, 
-                        '成交金額日變化率', 
-                        '漲跌幅'
-                    ]
-                    
+                    display_cols_abs = ['統一代號', '股票名稱', f'較{p}日均額增加', '成交額(百萬)', avg_col, '成交金額日變化率', '漲跌幅']
                     st.dataframe(
                         top_abs[display_cols_abs],
                         use_container_width=True, hide_index=True, height=400,
@@ -436,7 +223,7 @@ def render_b0_interactive_dashboard(df_b0, df_history):
                     st.warning(f"目前資料庫中尚未累積滿 {p} 日的歷史成交資料。")
 
 
-        st.markdown("", unsafe_allow_html=True)
+        st.markdown("---")
         st.markdown("##### 🚀 出量點火器 (8/12起算)")
         st.caption("看相較5日均額最敏感，找看看突然異常放量的股票 (可能突破第一根，或波段重新發動，須留意延續性)")      
 
@@ -478,16 +265,7 @@ def render_b0_interactive_dashboard(df_b0, df_history):
             with ignition_tabs[idx + 1]: 
                 if f'{p}日爆發倍數' in momentum_df.columns:
                     top_ratio = momentum_df.sort_values(f'{p}日爆發倍數', ascending=False).head(30)
-                    
-                    display_cols_ratio = [
-                        '統一代號', 
-                        '股票名稱', 
-                        f'{p}日爆發倍數', 
-                        '成交額(百萬)', 
-                        f'{p}日均額', 
-                        '成交金額日變化率', 
-                        '漲跌幅'
-                    ]
+                    display_cols_ratio = ['統一代號', '股票名稱', f'{p}日爆發倍數', '成交額(百萬)', f'{p}日均額', '成交金額日變化率', '漲跌幅']
                     
                     st.dataframe(
                         top_ratio[display_cols_ratio],
@@ -517,14 +295,10 @@ def render_b0_interactive_dashboard(df_b0, df_history):
                 ma20 = float(row.get('20日均額', 0))
                 
                 if ma5 > 0 and ma10 > 0 and ma20 > 0:
-                    if ma5 > ma10 and ma10 > ma20:
-                        return "🔥 資金湧入 (延續性強)"
-                    elif today > ma5 and ma5 <= ma10:
-                        return "⚡ 單日點火 (需觀察)"
-                    elif ma5 < ma10 and ma10 < ma20:
-                        return "💧 資金退潮 (動能弱)"
-                    else:
-                        return "⚖️ 震盪換手"
+                    if ma5 > ma10 and ma10 > ma20: return "🔥 資金湧入 (延續性強)"
+                    elif today > ma5 and ma5 <= ma10: return "⚡ 單日點火 (需觀察)"
+                    elif ma5 < ma10 and ma10 < ma20: return "💧 資金退潮 (動能弱)"
+                    else: return "⚖️ 震盪換手"
                 return "⚪ 資料不足"
             except:
                 return "-"
@@ -549,18 +323,16 @@ def render_b0_interactive_dashboard(df_b0, df_history):
                 "30日均額": st.column_config.NumberColumn("30日均", format="%.0f"),
             }
         )
+
 # ==========================================
 # 🌟 主渲染入口
 # ==========================================
 def show_b0_page(DATA_DIR, STOCK_DICT):
-    # 💡 瞬間讀取！再也不會卡住
-    cache_result = get_cached_b0_data(DATA_DIR)
+    df_b0, df_history = load_b0_data(DATA_DIR)
     
-    if cache_result is None or cache_result[0].empty:
+    if df_b0.empty:
         st.warning("⚠️ 目前資料庫中無任何有效的成交價檔案，請確認 `data` 資料夾狀態。")
         return
-        
-    df_b0, df_history = cache_result # 👇 解包取得歷史資料
 
     date_raw = str(df_b0['股價日期'].iloc[0])
     b0_latest_date_str = date_raw
@@ -569,32 +341,18 @@ def show_b0_page(DATA_DIR, STOCK_DICT):
     elif len(date_raw) == 4:
         b0_latest_date_str = f"2026/{date_raw[:2]}/{date_raw[2:]}"
 
-
-    st.markdown("""
-    <div style="background: linear-gradient(90deg, rgba(15,23,42,1) 0%, rgba(14,165,233,0.3) 50%, rgba(15,23,42,1) 100%); 
-                border-top: 1px solid #38bdf8; border-bottom: 1px solid #38bdf8; padding: 15px 20px; 
-                border-radius: 10px; text-align: center; box-shadow: 0px 0px 20px rgba(56, 189, 248, 0.2); margin-bottom: 20px;">
-        <h2 style="color: #e0f2fe; margin: 0; letter-spacing: 2px; text-shadow: 0 0 15px rgba(56, 189, 248, 0.8);">
-            量價與估值掃描
-        </h2>
-    </div>
-    """, unsafe_allow_html=True)
-    
+    st.markdown("## 🏆 量價與估值掃描")
     st.caption(f"資料基準日: **{b0_latest_date_str}** ｜ 透視全市場資金動能與主力控盤狀態。")
     st.write("---")
     
     def resolve_stock_name(row):
         raw_name = str(row.get('B0_原始名稱', '')).strip()
-        if raw_name and raw_name.lower() != 'nan' and raw_name != 'none':
-            return raw_name
+        if raw_name and raw_name.lower() != 'nan' and raw_name != 'none': return raw_name
         code = str(row.get('統一代號', ''))
         if STOCK_DICT:
             dict_name = STOCK_DICT.get(code, {}).get("name", "")
-            if dict_name: 
-                return dict_name
+            if dict_name: return dict_name
         return ""
         
     df_b0['股票名稱'] = df_b0.apply(resolve_stock_name, axis=1)
-
-
     render_b0_interactive_dashboard(df_b0, df_history)
