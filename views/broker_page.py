@@ -288,7 +288,7 @@ def render(STOCK_DICT=None):
 
     # 🌟 1. 全市場掃描器 (無按鈕、直接分頁呈現) 🌟
     st.markdown("### 🌍 券商主力斥資買超力")
-    scan_tab1, scan_tab2 = st.tabs(["🔹 券商主力買超金額排行", "🔹 券商主力防線乖離(豆腐好吃)"])
+    scan_tab1, scan_tab2 = st.tabs(["🔹 Top 15 券商主力買超金額排行", "🔹 單一券商主力防線乖離(豆腐好吃)"])
 
     with scan_tab1:
         df_top15 = fetch_parquet_from_hf("scan__依主力Top15買超張數排行_復刻三竹.parquet")
