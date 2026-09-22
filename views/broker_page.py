@@ -287,8 +287,8 @@ def render(STOCK_DICT=None):
     """, unsafe_allow_html=True)
 
     # 🌟 1. 全市場掃描器 (無按鈕、直接分頁呈現) 🌟
-    st.markdown("### 🌍 全市場連買分點快搜")
-    scan_tab1, scan_tab2 = st.tabs(["依主力買超張數排行", "依股價乖離率(吃豆腐)排行"])
+    st.markdown("### 🌍 券商主力斥資買超力")
+    scan_tab1, scan_tab2 = st.tabs(["🔹 券商主力買超金額排行", "🔹 券商主力防線乖離(豆腐好吃)"])
 
     with scan_tab1:
         df_top15 = fetch_parquet_from_hf("scan__依主力Top15買超張數排行_復刻三竹.parquet")
@@ -415,7 +415,7 @@ def render(STOCK_DICT=None):
     st.markdown("---")
 
     # 🌟 3. 個股查詢器 🌟
-    st.markdown("### 🔍 個股查詢與走勢圖")
+    st.markdown("### 🔍 個股集中度、囤貨券商查詢與走勢圖")
     stock_options = []
     if STOCK_DICT:
         unique_options = {f"{v['id']} {v['name']}" for v in STOCK_DICT.values() if len(str(v['id'])) <= 4}
