@@ -499,24 +499,6 @@ def render_admin_panel(DATA_DIR, local_latest_date, is_updated_today, status_tex
 
 @st.fragment
 def render_b1_main_tables(final_df, color_ref, date_cols):
-    # 💡 複製一份避免修改到快取
-    df_view = final_df.copy() if not final_df.empty else pd.DataFrame()
-    
-    # --- 💡 新增：全市場單日動能 (△) 排名與變化計算 ---
-    if not df_view.empty:
-        if len(date_cols) >= 3:
-            # 計算昨日的單日增減 (昨日持股 - 前日持股)
-            df_view['昨日全市場△'] = df_view[date_cols[1]] - df_view[date_cols[2]]
-            # 進行全市場排名 (數字越小代表排名越前面，增減最大)
-            df_view['今日全市場排名'] = df_view['△'].rank(ascending=False, method='min')
-            df_view['昨日全市場排名'] = df_view['昨日全市場△'].rank(ascending=False, method='min')
-            # 計算名次變化 (正數代表進步)
-            df_view['名次變化_數值'] = df_view['昨日全市場排名'] - df_view['今日全市場排名']
-        else:
-            df_view['今日全市場排名'] = df_view['△'].rank(ascending=False, method='min') if not df_view.empty else float('nan')
-            df_view['昨日全市場排名'] = float('nan')
-            df_view['名次變化_數值'] = float('nan')
-            
     c1, c2, c3 = st.columns([1, 1, 2])
     show_etf = c1.checkbox("顯示 ETF", value=True, key="blk1_etf_sync")
     show_bond = c2.checkbox("顯示 債券/債券ETF", value=True, key="blk1_bond_sync")
@@ -529,26 +511,13 @@ def render_b1_main_tables(final_df, color_ref, date_cols):
     def format_delta(val):
         if pd.isna(val) or abs(val) < 0.005: return "0.00"
         return f"+{val:.2f}" if val > 0 else f"{val:.2f}"
-        
-    def fmt_rank_chg(chg):
-        if pd.isna(chg): return "🆕 新進榜"
-        if chg == 0: return "-"
-        if chg > 0: return f"↑ +{int(chg)}"
-        return f"↓ {int(chg)}"
-
-    def color_chg(val):
-        if isinstance(val, str):
-            if '↑' in val: return 'color: #FF4B4B; font-weight: bold;'
-            if '↓' in val: return 'color: #00E272;'
-            if '🆕' in val: return 'color: #38bdf8; font-weight: bold;' 
-        return 'color: #94A3B8;'
 
     def get_local_tab_df(target_day_str):
-        if df_view.empty: return pd.DataFrame()
-        df = df_view[df_view['今日上榜'].astype(str).str.contains(f'{target_day_str}日', na=False)].copy()
+        if final_df is None or final_df.empty: return pd.DataFrame()
+        df = final_df[final_df['今日上榜'].astype(str).str.contains(f'{target_day_str}日', na=False)].copy()
         if df.empty: return df
         
-        # 過濾邏輯
+        # 💡 將 Category 轉為字串做條件篩選
         code_str = df['股票代號'].astype(str)
         is_bond = code_str.str.endswith('B')
         is_etf = (code_str.str.len() >= 5) & (~is_bond)
@@ -560,18 +529,16 @@ def render_b1_main_tables(final_df, color_ref, date_cols):
             mask &= (code_str.str.contains(search_kw, na=False)) | (df['股票名稱'].astype(str).str.contains(search_kw, na=False))
         df = df[mask].copy()
         
-        df = df.sort_values(by='△', ascending=False)
-        
         rank_col = f'{target_day_str}日排名'
         change_col = f'{target_day_str}日ΔChange'
         
-        if rank_col not in df.columns:
-            df[rank_col] = range(1, len(df) + 1)
-            
-        # 💡 加入名次變化與前日排名
-        df['前日排名'] = df['昨日全市場排名'].apply(lambda x: "🆕" if pd.isna(x) else str(int(x)))
-        df['名次變化'] = df['名次變化_數值'].apply(fmt_rank_chg)
+        # 💡 現在 △ 是乾淨的 float32，直接排序！
+        df = df.sort_values(by='△', ascending=False)
         
+        if rank_col not in df.columns:
+            df[f'{target_day_str}日排名'] = range(1, len(df) + 1)
+            
+        # 💡 只有在顯示層才套用排版字串
         df['法人持股'] = df['法人持股'].apply(lambda x: f"{x:.2f}%" if x > 0 else None)
         df['△'] = df['△'].apply(format_delta)
         if change_col in df.columns: 
@@ -580,32 +547,28 @@ def render_b1_main_tables(final_df, color_ref, date_cols):
         df['法人金額'] = "0.00" 
         df['最新動態'] = df['最新動態'].astype(str).replace("nan", "⚪ 尚無比對紀錄")
         return df
-        
-    def render_styled_tab(df, prefix):
-        if df.empty:
-            st.info(f"⚪ 尚無 {prefix} 進榜數據。")
-            return
-        
-        # 💡 乾淨的欄位排序
-        display_cols = [f'{prefix}排名', '股票代號', '股票名稱', '法人持股', '前日排名', '名次變化', '△', f'{prefix}ΔChange', '法人金額', '最新動態', '今日上榜']
-        valid_cols = [c for c in display_cols if c in df.columns]
-        
-        styled = df[valid_cols].style
-        if '名次變化' in valid_cols:
-            if hasattr(styled, 'map'): styled = styled.map(color_chg, subset=['名次變化'])
-            else: styled = styled.applymap(color_chg, subset=['名次變化'])
-        
-        st.dataframe(styled, use_container_width=True, hide_index=True)
 
-    # 💡 透過共用模組，一行程式碼解決一個分頁
-    with tab5: render_styled_tab(get_local_tab_df(5), '5日')
-    with tab20: render_styled_tab(get_local_tab_df(20), '20日')
-    with tab60: render_styled_tab(get_local_tab_df(60), '60日')
-    with tab120: render_styled_tab(get_local_tab_df(120), '120日')
-        
+    with tab5:
+        df_5 = get_local_tab_df(5)
+        display_cols = ['5日排名', '股票代號', '股票名稱', '法人持股', '△', '5日ΔChange', '法人金額', '最新動態', '今日上榜']
+        if not df_5.empty: st.dataframe(df_5[[c for c in display_cols if c in df_5.columns]], use_container_width=True, hide_index=True)
+        else: st.info("⚪ 尚無 5日進榜數據。")
+    with tab20:
+        df_20 = get_local_tab_df(20)
+        display_cols = ['20日排名', '股票代號', '股票名稱', '法人持股', '△', '20日ΔChange', '法人金額', '最新動態', '今日上榜']
+        if not df_20.empty: st.dataframe(df_20[[c for c in display_cols if c in df_20.columns]], use_container_width=True, hide_index=True)
+    with tab60:
+        df_60 = get_local_tab_df(60)
+        display_cols = ['60日排名', '股票代號', '股票名稱', '法人持股', '△', '60日ΔChange', '法人金額', '最新動態', '今日上榜']
+        if not df_60.empty: st.dataframe(df_60[[c for c in display_cols if c in df_60.columns]], use_container_width=True, hide_index=True)
+    with tab120:
+        df_120 = get_local_tab_df(120)
+        display_cols = ['120日排名', '股票代號', '股票名稱', '法人持股', '△', '120日ΔChange', '法人金額', '最新動態', '今日上榜']
+        if not df_120.empty: st.dataframe(df_120[[c for c in display_cols if c in df_120.columns]], use_container_width=True, hide_index=True)
+            
     with tab_all:
-        if not df_view.empty:
-            code_str = df_view['股票代號'].astype(str)
+        if final_df is not None and not final_df.empty:
+            code_str = final_df['股票代號'].astype(str)
             is_bond = code_str.str.endswith('B')
             is_etf = (code_str.str.len() >= 5) & (~is_bond)
             is_stock = code_str.str.len() == 4
@@ -613,9 +576,9 @@ def render_b1_main_tables(final_df, color_ref, date_cols):
             if show_etf: mask |= is_etf
             if show_bond: mask |= is_bond
             if search_kw:
-                mask &= (code_str.str.contains(search_kw, na=False)) | (df_view['股票名稱'].astype(str).str.contains(search_kw, na=False))
+                mask &= (code_str.str.contains(search_kw, na=False)) | (final_df['股票名稱'].astype(str).str.contains(search_kw, na=False))
                 
-            filtered_df = df_view[mask].copy()
+            filtered_df = final_df[mask].copy()
             filtered_df = filtered_df.sort_values(by='△', ascending=False)
             
             rename_dict = {c: f"{c[4:8]}持股%" for c in date_cols}
@@ -628,10 +591,6 @@ def render_b1_main_tables(final_df, color_ref, date_cols):
             filtered_df['法人持股'] = filtered_df['法人持股'].apply(lambda x: f"{x:.2f}%" if pd.notna(x) and x > 0 else None)
             filtered_df['△'] = filtered_df['△'].apply(format_delta)
             
-            # 💡 在歷史軌跡全能池也加上名次變化
-            filtered_df['前日排名'] = filtered_df['昨日全市場排名'].apply(lambda x: "🆕" if pd.isna(x) else str(int(x)))
-            filtered_df['名次變化'] = filtered_df['名次變化_數值'].apply(fmt_rank_chg)
-            
             def highlight_row(row):
                 cnt = color_ref.get(row['股票代號'], 0)
                 if cnt == 4: bg = 'background-color: rgba(240, 90, 90, 0.25)'     
@@ -641,16 +600,11 @@ def render_b1_main_tables(final_df, color_ref, date_cols):
                 else: bg = 'background-color: #111622; color: #E2E8F0'                                                                                                                                                                                                                                                                                                                                                                                                                                                  
                 return [bg] * len(row)
                 
-            all_display_cols = ['股票代號', '股票名稱', '今日上榜', '最新動態', '前日排名', '名次變化', '△'] + new_date_cols
-            
-            styled_all = filtered_df[all_display_cols].style.apply(highlight_row, axis=1)
-            if hasattr(styled_all, 'map'): styled_all = styled_all.map(color_chg, subset=['名次變化'])
-            else: styled_all = styled_all.applymap(color_chg, subset=['名次變化'])
-                
-            st.dataframe(styled_all, use_container_width=True)
+            all_display_cols = ['股票代號', '股票名稱', '今日上榜', '最新動態', '△'] + new_date_cols
+            st.dataframe(filtered_df[all_display_cols].style.apply(highlight_row, axis=1), use_container_width=True)
 
     st.write("")
-    st.info("💡 △是單日的法人持股增減(如果最新基準日未進前200榜，△會直接以歸0計算)；5/20/60/120日ΔChange為5/20/60/120期間的累積變化。名次變化代表全市場動能對比。")
+    st.info("💡 △是單日的法人持股增減(如果最新基準日未進前200榜，△會直接以歸0計算)；5/20/60/120日ΔChange為該期間的累積變化。")
     
 @st.fragment
 def render_b1_treemap(final_df, STOCK_DICT):

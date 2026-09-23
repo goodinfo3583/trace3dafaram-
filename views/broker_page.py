@@ -441,7 +441,7 @@ def render(STOCK_DICT=None):
             
             if eng_conc_col in disp_df.columns: disp_df.rename(columns={eng_conc_col: f'{prefix}集中度(%)'}, inplace=True)
             
-            # 💡 1. 調整順序：先進行排序與賦予今日名次
+            # 確保以該期程的 Δ 進行排序，並取前 200 名
             if f'{prefix}Δ' in disp_df.columns: 
                 disp_df = disp_df.sort_values(f'{prefix}Δ', ascending=False).head(200)
                 
@@ -449,24 +449,14 @@ def render(STOCK_DICT=None):
             disp_df.index = disp_df.index + 1
             disp_df.index.name = "名次"
 
-            # 💡 2. 利用「今日名次」與「名次變化(chg)」反推「前日排名」
+            # 直接套用後台給的變化，不自己做數學反推
             if rank_col_name in disp_df.columns:
-                def get_prev_rank(curr_rank, chg):
-                    if pd.isna(chg): return "🆕"
-                    # 邏輯：今日第 5 名，名次變化 +3 (上升3名) -> 代表前天是第 8 名 (5+3)
-                    return str(int(curr_rank + chg))
-                
-                # 同步處理前日排名與變化箭頭
-                disp_df['前日排名'] = [get_prev_rank(idx, chg) for idx, chg in zip(disp_df.index, disp_df[rank_col_name])]
                 disp_df['名次變化'] = disp_df[rank_col_name].apply(fmt_rank_chg)
-            else:
-                disp_df['前日排名'] = "-"
-                disp_df['名次變化'] = "-"
                 
             amt_col = f'{prefix}主力買超(萬)'
             
-            # 💡 3. 將「前日排名」加入顯示陣列中 (放在名次變化旁邊)
-            cols_to_show = ['股票代號', '股票名稱', '前日排名', '名次變化', f'{prefix}集中度(%)', f'{prefix}Δ', amt_col, '最新動態', '今日上榜期程']
+            # 移除「前日排名」欄位
+            cols_to_show = ['股票代號', '股票名稱', '名次變化', f'{prefix}集中度(%)', f'{prefix}Δ', amt_col, '最新動態', '今日上榜期程']
             valid_cols = [c for c in cols_to_show if c in disp_df.columns]
             
             disp_df = disp_df[valid_cols]
