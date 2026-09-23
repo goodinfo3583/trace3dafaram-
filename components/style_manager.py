@@ -228,28 +228,43 @@ def render_b2_top10_glass_card():
         raw_df_22 = st.session_state.get('df_blk2_2', pd.DataFrame()) 
         raw_df_23 = st.session_state.get('df_blk2_3', pd.DataFrame()) 
         raw_df_24 = st.session_state.get('df_blk2_4', pd.DataFrame()) 
+        
         def get_top10(df, target_col):
             if df is None or df.empty or target_col not in df.columns: return pd.DataFrame()
             df['股票代號'] = df['股票代號'].astype(str).str.strip()
             pure = df[(df['股票代號'].str.len() == 4) & (~df['股票代號'].str.startswith('00'))].copy()
+            # 💡 防呆機制：確保就算是含有 % 的字串也能被正確轉為數字排序
+            if pure[target_col].dtype == object:
+                pure[target_col] = pure[target_col].astype(str).str.replace(',', '', regex=False).str.replace('%', '', regex=False)
             pure[target_col] = pd.to_numeric(pure[target_col], errors='coerce').fillna(0)
             return pure.sort_values(by=target_col, ascending=False).head(10)
-        def get_col(df, kw):
-            cols = [c for c in df.columns if kw in c]
+            
+        def get_col(df, kw1, kw2):
+            # 💡 寬容搜尋機制：只要包含關鍵字就抓出來，不怕後端改欄位名稱
+            cols = [c for c in df.columns if kw1 in c or kw2 in c]
             if not cols: return None, "未知"
-            return cols[0], cols[0].replace(kw, "")
-        c21, d21 = get_col(raw_df_21, "成交比%")
-        c22, d22 = get_col(raw_df_22, "成交比%")
-        c23, d23 = get_col(raw_df_23, "發行數%")
-        c24, d24 = get_col(raw_df_24, "發行數%")
+            # 優先回傳帶有 % 的欄位
+            for c in cols:
+                if '%' in c or '％' in c: return c, c.replace(kw1, "").replace(kw2, "").replace("%", "").replace("(", "").replace(")", "")
+            return cols[0], cols[0].replace(kw1, "").replace(kw2, "")
+            
+        c21, d21 = get_col(raw_df_21, "成交比%", "成交")
+        c22, d22 = get_col(raw_df_22, "成交比%", "成交")
+        c23, d23 = get_col(raw_df_23, "發行數%", "發行")
+        c24, d24 = get_col(raw_df_24, "發行數%", "發行")
+        
         df_21, df_22 = get_top10(raw_df_21, c21), get_top10(raw_df_22, c22)
         df_23, df_24 = get_top10(raw_df_23, c23), get_top10(raw_df_24, c24)
+        
         def make_list_html(df, val_col):
             if df.empty or val_col is None: return "<p style='font-size:13.5px; text-align:center; color:#94A3B8; margin-top:40px;'>無資料</p>"
             html = "<ul style='padding-left: 0; margin: 0; list-style-type: none;'>"
             for i, row in enumerate(df.to_dict('records')):
                 val = row.get(val_col, 0)
-                cs = row.get('今日短動態', '').split('(')[0].strip()              
+                try: val_fmt = f"{float(val):.1f}"
+                except: val_fmt = "0.0"
+                
+                cs = str(row.get('今日短動態', '')).split('(')[0].strip()              
                 if "轉賣反轉" in cs: short_status = "🚨轉賣"
                 elif "卡位" in cs: short_status = "🆕卡位"
                 elif "加碼" in cs: short_status = "🔥加碼"
@@ -258,21 +273,25 @@ def render_b2_top10_glass_card():
                 elif "調節" in cs: short_status = "📉調節"
                 elif "持平" in cs: short_status = "🔄持平"
                 elif "趨緩" in cs: short_status = "⚠️趨緩"
+                elif not cs or cs == "nan": short_status = "⚪觀察"
                 else: short_status = cs[:3]
+                
                 html += (
                     f"<li style='display: flex; align-items: center; justify-content: space-between; margin-bottom: 6px; font-size: 13.5px; line-height: 1.4;'>"
-                    f"  <div style='display: flex; align-items: center; width: 50%; overflow: hidden;'>"
+                    f"  <div style='display: flex; align-items: center; width: 48%; overflow: hidden;'>"
                     f"      <b style='color:#FFF; width:22px; flex-shrink: 0;'>{i+1}.</b>"
                     f"      <span style='white-space:nowrap; overflow:hidden; text-overflow:ellipsis;'>{row['股票代號']}{row['股票名稱']}</span>"
                     f"  </div>"
-                    f"  <div style='width: 25%; color:#FFD700; font-size: 11px; text-align: right; white-space:nowrap;'>{short_status}</div>"
-                    f"  <div style='width: 25%; color:#FF4C4C; font-weight:bold; text-align: right;'>{val:.1f}%</div>"
+                    f"  <div style='width: 27%; color:#FFD700; font-size: 11px; text-align: right; white-space:nowrap; flex-shrink: 0;'>{short_status}</div>"
+                    f"  <div style='width: 25%; color:#FF4C4C; font-weight:bold; text-align: right; white-space:nowrap; flex-shrink: 0;'>{val_fmt}%</div>"
                     f"</li>"
                 )
             html += "</ul>"
             return html
+            
         h_21, h_22 = make_list_html(df_21, c21), make_list_html(df_22, c22)
         h_23, h_24 = make_list_html(df_23, c23), make_list_html(df_24, c24)
+        
         card_html = f"""
 <input type="checkbox" id="close-b2-card" style="display:none;">
 <input type="checkbox" id="min-b2-card" style="display:none;">
@@ -419,11 +438,14 @@ def render_b4_top10_glass_card():
         df_sq, df_rk = sq_data['df'], rk_data['df']
         date_sq = sq_data['date'][-4:] if sq_data['date'] and len(sq_data['date']) >= 4 else "未知"
         date_rk = rk_data['date'][-4:] if rk_data['date'] and len(rk_data['date']) >= 4 else "未知"
+        
         def get_pure_radar_stocks(df):
             if df is None or df.empty: return pd.DataFrame()
             df['代號'] = df['代號'].astype(str).str.strip()
             return df[(df['代號'].str.len() == 4) & (~df['代號'].str.startswith('00'))].copy()
+            
         pure_sq, pure_rk = get_pure_radar_stocks(df_sq).head(20), get_pure_radar_stocks(df_rk).head(20)
+        
         def make_radar_html(df, start_idx, theme):
             sub_df = df.iloc[start_idx : start_idx+10]
             if sub_df.empty: return "<p style='font-size:13.5px; text-align:center; color:#94A3B8; margin-top:40px;'>尚無目標</p>"
@@ -431,6 +453,11 @@ def render_b4_top10_glass_card():
             for i, row in enumerate(sub_df.to_dict('records')):
                 status = row.get('軋空評估', '') if theme == 'sq' else row.get('套牢評估', '')
                 pct = row.get('漲跌幅', 0.0)
+                
+                # 💡 修復記憶體 float32 造成的無限小數點問題 (強制限制到小數點後 1 位)
+                try: pct_fmt = f"{float(pct):.1f}"
+                except: pct_fmt = "0.0"
+                
                 short_status = status[:7] if len(status) > 7 else status
                 pct_color = "#FF4C4C" if theme == 'sq' else "#00e676"                
                 html += (
@@ -439,12 +466,13 @@ def render_b4_top10_glass_card():
                     f"      <b style='color:#FFF; width:22px; flex-shrink: 0;'>{start_idx + i + 1}.</b>"
                     f"      <span style='white-space:nowrap; overflow:hidden; text-overflow:ellipsis;'>{row['代號']}{row['名稱']}</span>"
                     f"  </div>"
-                    f"  <div style='width: 25%; color:#FFD700; font-size: 11px; text-align: left; white-space:nowrap;'>{short_status}</div>"
-                    f"  <div style='width: 20%; color:{pct_color}; font-weight:bold; text-align: right;'>{pct}%</div>"
+                    f"  <div style='width: 25%; color:#FFD700; font-size: 11px; text-align: left; white-space:nowrap; flex-shrink: 0;'>{short_status}</div>"
+                    f"  <div style='width: 20%; color:{pct_color}; font-weight:bold; text-align: right; white-space:nowrap; flex-shrink: 0;'>{pct_fmt}%</div>"
                     f"</li>"
                 )
             html += "</ul>"
             return html
+            
         h_sq_1_10, h_sq_11_20 = make_radar_html(pure_sq, 0, 'sq'), make_radar_html(pure_sq, 10, 'sq')
         h_rk_1_10, h_rk_11_20 = make_radar_html(pure_rk, 0, 'rk'), make_radar_html(pure_rk, 10, 'rk')
 
@@ -497,7 +525,7 @@ def render_b4_top10_glass_card():
 </div></div>
 """
         st.markdown(card_html, unsafe_allow_html=True)
-    except Exception as e: pass  
+    except Exception as e: pass
 
 #B5 大腿動向玻璃卡片
 def render_b5_top10_glass_card():
