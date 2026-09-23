@@ -579,12 +579,16 @@ def render_b1_main_tables(final_df, color_ref, date_cols):
                 mask &= (code_str.str.contains(search_kw, na=False)) | (final_df['股票名稱'].astype(str).str.contains(search_kw, na=False))
                 
             filtered_df = final_df[mask].copy()
+            
+            # 💡 因為是 float32，直接排序
             filtered_df = filtered_df.sort_values(by='△', ascending=False)
             
+            # 將 8 碼日期縮減為 4 碼
             rename_dict = {c: f"{c[4:8]}持股%" for c in date_cols}
             filtered_df = filtered_df.rename(columns=rename_dict)
             new_date_cols = [rename_dict[c] for c in date_cols]
             
+            # 💡 只有在顯示時才掛上 % 跟 未進榜 的字眼
             for c in new_date_cols:
                 filtered_df[c] = filtered_df[c].apply(lambda x: "未進榜" if pd.isna(x) or x == 0 else f"{x:.2f}")
                 
@@ -597,15 +601,16 @@ def render_b1_main_tables(final_df, color_ref, date_cols):
                 elif cnt == 3: bg = 'background-color: rgba(255, 165, 0, 0.25)'    
                 elif cnt == 2: bg = 'background-color: rgba(80, 200, 120, 0.25)'    
                 elif cnt == 1: bg = 'background-color: rgba(0, 127, 255, 0.25)'    
-                else: bg = 'background-color: #111622; color: #E2E8F0'                                                                                                                                                                                                                                                                                                                                                                                                                                                  
+                else: bg = 'background-color: #111622; color: #E2E8F0'                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                 
                 return [bg] * len(row)
                 
             all_display_cols = ['股票代號', '股票名稱', '今日上榜', '最新動態', '△'] + new_date_cols
             st.dataframe(filtered_df[all_display_cols].style.apply(highlight_row, axis=1), use_container_width=True)
 
     st.write("")
-    st.info("💡 △是單日的法人持股增減(如果最新基準日未進前200榜，△會直接以歸0計算)；5/20/60/120日ΔChange為該期間的累積變化。")
-    
+    st.info("💡 △是單日的法人持股增減(如果最新基準日未進前200榜，△會直接以歸0計算)；5/20/60/120日ΔChange為5/20/60/120期間的累積變化，我們可以試著短線與長線一起觀察。")
+
+
 @st.fragment
 def render_b1_treemap(final_df, STOCK_DICT):
     st.write("---")
