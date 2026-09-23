@@ -229,29 +229,41 @@ def render_b2_top10_glass_card():
         raw_df_23 = st.session_state.get('df_blk2_3', pd.DataFrame()) 
         raw_df_24 = st.session_state.get('df_blk2_4', pd.DataFrame()) 
         
+        def get_col(df):
+            # 💡 終極寬容搜尋：直接找以 202 開頭的日期欄位 (這就是最新的數據欄位)
+            if df is None or df.empty: return None, "未知"
+            for c in df.columns:
+                if str(c).startswith('202'):
+                    # 擷取日期 (前4碼通常是年份，我們取後4碼當日期)
+                    date_str = str(c)[4:8] if len(str(c)) >= 8 else "未知"
+                    return c, date_str
+            return None, "未知"
+
         def get_top10(df, target_col):
-            if df is None or df.empty or target_col not in df.columns: return pd.DataFrame()
-            df['股票代號'] = df['股票代號'].astype(str).str.strip()
-            pure = df[(df['股票代號'].str.len() == 4) & (~df['股票代號'].str.startswith('00'))].copy()
-            # 💡 防呆機制：確保就算是含有 % 的字串也能被正確轉為數字排序
-            if pure[target_col].dtype == object:
+            if df is None or df.empty or target_col is None or target_col not in df.columns: 
+                return pd.DataFrame()
+            
+            # 確保代號是字串，以利長度判斷
+            temp_df = df.copy()
+            temp_df['股票代號'] = temp_df['股票代號'].astype(str).str.strip()
+            
+            # 過濾：只留 4 碼，且不以 00 開頭 (排除 ETF 等)
+            pure = temp_df[(temp_df['股票代號'].str.len() == 4) & (~temp_df['股票代號'].str.startswith('00'))].copy()
+            
+            if pure.empty: return pd.DataFrame()
+
+            # 確保目標欄位是數字
+            if pure[target_col].dtype == object or pure[target_col].dtype.name == 'category':
                 pure[target_col] = pure[target_col].astype(str).str.replace(',', '', regex=False).str.replace('%', '', regex=False)
             pure[target_col] = pd.to_numeric(pure[target_col], errors='coerce').fillna(0)
+            
+            # 排序並取前 10 名
             return pure.sort_values(by=target_col, ascending=False).head(10)
             
-        def get_col(df, kw1, kw2):
-            # 💡 寬容搜尋機制：只要包含關鍵字就抓出來，不怕後端改欄位名稱
-            cols = [c for c in df.columns if kw1 in c or kw2 in c]
-            if not cols: return None, "未知"
-            # 優先回傳帶有 % 的欄位
-            for c in cols:
-                if '%' in c or '％' in c: return c, c.replace(kw1, "").replace(kw2, "").replace("%", "").replace("(", "").replace(")", "")
-            return cols[0], cols[0].replace(kw1, "").replace(kw2, "")
-            
-        c21, d21 = get_col(raw_df_21, "成交比%", "成交")
-        c22, d22 = get_col(raw_df_22, "成交比%", "成交")
-        c23, d23 = get_col(raw_df_23, "發行數%", "發行")
-        c24, d24 = get_col(raw_df_24, "發行數%", "發行")
+        c21, d21 = get_col(raw_df_21)
+        c22, d22 = get_col(raw_df_22)
+        c23, d23 = get_col(raw_df_23)
+        c24, d24 = get_col(raw_df_24)
         
         df_21, df_22 = get_top10(raw_df_21, c21), get_top10(raw_df_22, c22)
         df_23, df_24 = get_top10(raw_df_23, c23), get_top10(raw_df_24, c24)
