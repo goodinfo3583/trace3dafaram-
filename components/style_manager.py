@@ -230,12 +230,12 @@ def render_b2_top10_glass_card():
         raw_df_24 = st.session_state.get('df_blk2_4', pd.DataFrame()) 
         
         def get_col(df):
-            # 💡 終極寬容搜尋：直接找以 202 開頭的日期欄位 (這就是最新的數據欄位)
+            # 💡 修正：B2 的欄位名稱已經瘦身成 "0921成交比%"，不會以 202 開頭，改用後綴關鍵字來找
             if df is None or df.empty: return None, "未知"
             for c in df.columns:
-                if str(c).startswith('202'):
-                    # 擷取日期 (前4碼通常是年份，我們取後4碼當日期)
-                    date_str = str(c)[4:8] if len(str(c)) >= 8 else "未知"
+                if "成交比" in str(c) or "發行數" in str(c):
+                    # 擷取日期 (前4碼，例如 '0921')
+                    date_str = str(c)[:4] if len(str(c)) >= 4 else "未知"
                     return c, date_str
             return None, "未知"
 
