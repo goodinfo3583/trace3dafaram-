@@ -48,11 +48,14 @@ def load_full_blood_broker_history():
         df['broker'] = df['broker'].astype('category')
         df['broker_name'] = df['broker_name'].astype('category')
         
-        # 日期處理並轉為 category 節省空間
+        # 💡 將 trade_date 轉為「有順序的類別 (Ordered Category)」節省空間，並支援排序與 max()
         if pd.api.types.is_datetime64_any_dtype(df['trade_date']):
-            df['trade_date'] = df['trade_date'].dt.strftime('%Y-%m-%d').astype('category')
+            temp_dates = df['trade_date'].dt.strftime('%Y-%m-%d')
         else:
-            df['trade_date'] = df['trade_date'].astype(str).astype('category')
+            temp_dates = df['trade_date'].astype(str)
+            
+        unique_dates = sorted([d for d in temp_dates.unique() if pd.notna(d) and d != 'nan'])
+        df['trade_date'] = pd.Categorical(temp_dates, categories=unique_dates, ordered=True)
 
         # 💡 數值降級 (Downcast)：將 float64 降級為 float32
         df['net_vol'] = (df['net_vol_shares'] / 1000).astype('float32')
@@ -117,7 +120,7 @@ def render_broker_dashboard(target_stock, display_name, df_raw_all, df_trend):
     fig_trend.update_layout(
         height=400, template='plotly_dark', paper_bgcolor='rgba(0,0,0,0)', plot_bgcolor='rgba(0,0,0,0)', margin=dict(l=20, r=20, t=20, b=20),
         legend=dict(orientation="h", yanchor="bottom", y=1.02, xanchor="right", x=1),
-        xaxis=dict(type='category', tickmode='array', tickvals=df_trend_plot['trade_date'], ticktext=df_trend_plot['trade_date'].str.slice(5, 10), tickangle=45)
+        xaxis=dict(type='category', tickmode='array', tickvals=df_trend_plot['trade_date'], ticktext=df_trend_plot['trade_date'].astype(str).str.slice(5, 10), tickangle=45)
     )
     fig_trend.update_yaxes(title_text="**股價 (元)**", secondary_y=False, gridcolor='#334155')
     fig_trend.update_yaxes(title_text="**集中度 (%)**", secondary_y=True, showgrid=False)
@@ -131,7 +134,7 @@ def render_broker_dashboard(target_stock, display_name, df_raw_all, df_trend):
     st.markdown("---")
     st.subheader(f"🔍 {display_name} 券商分點進出明細")
     if broker_col is None: return st.error("⚠️ 無法在資料庫中找到「券商名稱」欄位！")
-    available_dates = sorted(stock_raw['trade_date'].unique(), reverse=True)
+    available_dates = sorted(stock_raw['trade_date'].dropna().unique(), reverse=True)
     tab1, tab2, tab3 = st.tabs(["🔹 單日進出明細", "🔹 區間囤貨 (近60日)", "🔹 歷史進出 (近30日)"])
     
     with tab1:
@@ -243,13 +246,13 @@ def render_broker_dashboard(target_stock, display_name, df_raw_all, df_trend):
         all_matrix_raw = stock_raw.copy()
         if not all_matrix_raw.empty:
             all_matrix_raw['signed_vol'] = all_matrix_raw.apply(lambda x: abs(x['net_vol']) if x['side'] == 'buy' else -abs(x['net_vol']), axis=1)
-            all_matrix_raw['date_dt'] = pd.to_datetime(all_matrix_raw['trade_date'])
+            all_matrix_raw['date_dt'] = pd.to_datetime(all_matrix_raw['trade_date'].astype(str))
             all_matrix_raw['year_week'] = all_matrix_raw['date_dt'].dt.strftime('%Y-%W')
             weekly_sum = all_matrix_raw.groupby([broker_col, 'year_week'])['signed_vol'].sum().unstack(fill_value=0)
             week_cols = sorted(weekly_sum.columns, reverse=True)
             
             full_pivot = all_matrix_raw.pivot_table(index=broker_col, columns='trade_date', values='signed_vol', aggfunc='sum')
-            all_dates_sorted = sorted(full_pivot.columns, reverse=True)
+            all_dates_sorted = sorted([c for c in full_pivot.columns if pd.notna(c)], reverse=True)
             display_dates = all_dates_sorted[:30]
             pivot_df = full_pivot[display_dates].copy()
             pivot_df['區間累計'] = pivot_df.sum(axis=1)
@@ -335,7 +338,8 @@ def render(STOCK_DICT=None):
     df_raw_all = load_full_blood_broker_history()
     latest_date = "讀取中..."
     if not df_raw_all.empty and 'trade_date' in df_raw_all.columns:
-        latest_date = df_raw_all['trade_date'].max()
+        # 💡 安全抓取最新日期，避免受舊版無順序快取的影響
+        latest_date = pd.Series(df_raw_all['trade_date'].unique()).dropna().astype(str).max()
 
     st.markdown(f"""
     <div style="background: linear-gradient(90deg, rgba(15,23,42,1) 0%, rgba(14,165,233,0.3) 50%, rgba(15,23,42,1) 100%); 
