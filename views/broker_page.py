@@ -421,12 +421,16 @@ def render(STOCK_DICT=None):
         
         mom_tabs = st.tabs(tabs_names)
         
-        def fmt_rank_chg(val):
-            if pd.isna(val): return "🆕 新進榜"  
-            if val == 0: return "-"             
-            if val > 0: return f"↑ +{int(val)}"
-            return f"↓ {int(val)}"
-        
+        def fmt_rank_chg(chg):
+            if pd.isna(chg): return "🆕"
+            if chg == 0: return "-"
+            if chg > 0: return f"↑ +{int(chg)}"
+            return f"↓ {int(chg)}"
+            
+        def fmt_prev_rank(rank):
+            if pd.isna(rank): return "-"
+            return str(int(rank))
+            
         def color_chg(val):
             if isinstance(val, str):
                 if '↑' in val: return 'color: #FF4B4B; font-weight: bold;'
@@ -435,24 +439,34 @@ def render(STOCK_DICT=None):
             return 'color: #94A3B8;'
 
         def render_momentum_tab(df, prefix):
-            prefix_map = {"單日": "1d_conc", "5日": "5d_conc", "10日": "10d_conc", "20日": "20d_conc", "30日": "30d_conc"}
+            prefix_map = {"單日": "1d_conc", "5日": "5d_conc", "10日": "10d_conc", "20日": "20d_conc"}
             eng_conc_col = prefix_map.get(prefix)
             disp_df = df.copy()
             
             if eng_conc_col in disp_df.columns: disp_df.rename(columns={eng_conc_col: f'{prefix}集中度(%)'}, inplace=True)
             
-            # 確保以該期程的 Δ 進行排序，並取前 200 名
-            if f'{prefix}Δ' in disp_df.columns: 
+            # 🌟 直接依據後台的全市場真實排名來篩選前 200 名
+            rank_col = f'{prefix}當前排名'
+            if rank_col in disp_df.columns:
+                disp_df = disp_df.sort_values(rank_col, ascending=True).head(200)
+            elif f'{prefix}Δ' in disp_df.columns: 
                 disp_df = disp_df.sort_values(f'{prefix}Δ', ascending=False).head(200)
                 
             disp_df.reset_index(drop=True, inplace=True)
             disp_df.index = disp_df.index + 1
-            disp_df.index.name = "名次"
+            disp_df.index.name = "畫面排序"
                 
             amt_col = f'{prefix}主力買超(萬)'
+            change_col = f'{prefix}名次變化'
+            prev_rank_col = f'{prefix}前日排名'
             
-            # 💡 乾淨的欄位顯示，徹底剔除「名次變化」與「前日排名」
-            cols_to_show = ['股票代號', '股票名稱', f'{prefix}集中度(%)', f'{prefix}Δ', amt_col, '最新動態', '今日上榜期程']
+            if change_col in disp_df.columns:
+                disp_df['名次變化'] = disp_df[change_col].apply(fmt_rank_chg)
+            if prev_rank_col in disp_df.columns:
+                disp_df['前日排名'] = disp_df[prev_rank_col].apply(fmt_prev_rank)
+            
+            # 乾淨直接地叫出所有的欄位
+            cols_to_show = ['股票代號', '股票名稱', '前日排名', '名次變化', f'{prefix}集中度(%)', f'{prefix}Δ', amt_col, '最新動態', '今日上榜期程']
             valid_cols = [c for c in cols_to_show if c in disp_df.columns]
             
             disp_df = disp_df[valid_cols]
@@ -462,15 +476,17 @@ def render(STOCK_DICT=None):
             safe_format_dict = {k: v for k, v in format_dict.items() if k in disp_df.columns}
             
             styled = disp_df.style.format(safe_format_dict)
-
-            # 僅保留數值強度的熱力圖渲染
+            if '名次變化' in disp_df.columns: 
+                if hasattr(styled, 'map'): styled = styled.map(color_chg, subset=['名次變化'])
+                else: styled = styled.applymap(color_chg, subset=['名次變化'])
+                
             if f'{prefix}Δ' in disp_df.columns: 
                 try: styled = styled.background_gradient(subset=[f'{prefix}Δ'], cmap='Reds')
                 except: pass
             
             st.dataframe(styled, use_container_width=True)
 
-        # 💡 呼叫時也一併拿掉用不到的 rank_col_name 參數
+        # 呼叫時拿掉沒用的參數，單純傳入 Prefix
         with mom_tabs[0]: render_momentum_tab(df_momentum, "單日")
         with mom_tabs[1]: render_momentum_tab(df_momentum, "5日")
         if calc_days >= 11:
