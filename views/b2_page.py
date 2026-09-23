@@ -165,6 +165,18 @@ def show_b2_page(DATA_DIR):
     """B2 專屬頁面 UI 渲染"""
     df_21, df_22, df_23, df_24 = get_cached_b2_data(DATA_DIR)
     
+    # 👇 補上這段：將資料寫入 session_state，讓懸浮卡片與選股過濾頁面能抓到資料
+    st.session_state['df_blk2_1'] = df_21
+    st.session_state['df_blk2_2'] = df_22
+    st.session_state['df_blk2_3'] = df_23
+    st.session_state['df_blk2_4'] = df_24
+    
+    # 同時寫入簡寫 key，以對接 weight_backtest_page.py 裡面的 KEY_MAP
+    st.session_state['b2_1'] = df_21
+    st.session_state['b2_2'] = df_22
+    st.session_state['b2_3'] = df_23
+    st.session_state['b2_4'] = df_24
+
     # 利用 4 個獨立的 Fragment 渲染
     render_b2_1(df_21)
     render_b2_2(df_22)
