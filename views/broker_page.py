@@ -10,7 +10,7 @@ from utils.data_utils import calculate_chip_concentration
 # ==========================================
 HF_BASE_URL = "https://huggingface.co/datasets/goodinfo3583/tw-broker-parquet/resolve/main"
 
-# 🚀 共用遠端讀取函數 (加入快取，1小時內不重複下載，實現瞬間切換)
+# 🚀 共用遠端讀取函數 (僅供"小檔案"使用，避免大檔案造成雙重快取佔用記憶體)
 @st.cache_data(show_spinner=False, ttl=3600)
 def fetch_parquet_from_hf(file_name):
     url = f"{HF_BASE_URL}/{urllib.parse.quote(file_name)}"
@@ -30,18 +30,42 @@ def fetch_text_from_hf(file_name):
         pass
     return "6"
 
-# 🌟 1. 滿血版 Parquet 讀取引擎 (供個股查詢使用)
+# 🌟 1. 滿血版 Parquet 讀取引擎 (極限瘦身版，專門處理 190MB 大檔)
 @st.cache_data(show_spinner=False, ttl=3600)
 def load_full_blood_broker_history():
-    df = fetch_parquet_from_hf("broker_summary_master.parquet")
+    # 直接讀取，不透過 fetch_parquet_from_hf，避免在系統產生兩份龐大快取
+    url = f"{HF_BASE_URL}/{urllib.parse.quote('broker_summary_master.parquet')}"
+    try:
+        df = pd.read_parquet(url)
+    except Exception:
+        return pd.DataFrame()
+
     if not df.empty:
         df = df.rename(columns={'日期': 'trade_date', '股票代號': 'stock_code', '券商名稱': 'broker_name', '券商代號': 'broker', '買賣超股數': 'net_vol_shares'})
+        
+        # 💡 記憶體瘦身核心：類別化 (Category)
         df['stock_code'] = df['stock_code'].astype('category')
         df['broker'] = df['broker'].astype('category')
         df['broker_name'] = df['broker_name'].astype('category')
-        df['trade_date'] = df['trade_date'].dt.strftime('%Y-%m-%d').astype('category')
-        df['net_vol'] = df['net_vol_shares'] / 1000
+        
+        # 日期處理並轉為 category 節省空間
+        if pd.api.types.is_datetime64_any_dtype(df['trade_date']):
+            df['trade_date'] = df['trade_date'].dt.strftime('%Y-%m-%d').astype('category')
+        else:
+            df['trade_date'] = df['trade_date'].astype(str).astype('category')
+
+        # 💡 數值降級 (Downcast)：將 float64 降級為 float32
+        df['net_vol'] = (df['net_vol_shares'] / 1000).astype('float32')
         df['side'] = df['net_vol'].apply(lambda x: 'buy' if x > 0 else 'sell').astype('category')
+        
+        # 針對其他肥大的金額與股數欄位進行 float32 降級
+        for col in ['總買進金額', '總買進股數', '總賣出金額', '總賣出股數', '買賣超金額']:
+            if col in df.columns:
+                df[col] = pd.to_numeric(df[col], downcast='float').astype('float32')
+        
+        # 🗑️ 刪除已轉換完畢且不需要的原始大數字欄位，進一步釋放記憶體
+        df = df.drop(columns=['net_vol_shares'], errors='ignore')
+
     return df
 
 # 🌟 2. 標籤與共用格式函數
@@ -151,7 +175,6 @@ def render_broker_dashboard(target_stock, display_name, df_raw_all, df_trend):
     with tab2:
         st.markdown("##### 🕵️‍♂️ 誰在拿真金白銀連續吃貨？")
         
-        # 1. 取得多期程的純粹均買價/均賣價
         intervals = [1, 5, 10, 20, 60]
         cost_dfs = []
         for i in intervals:
@@ -165,7 +188,6 @@ def render_broker_dashboard(target_stock, display_name, df_raw_all, df_trend):
                 agg_i[f'{i}日均賣'] = (agg_i['sell_amt'] / agg_i['sell_vol']).fillna(0).round(2)
                 cost_dfs.append(agg_i[[broker_col, f'{i}日均買', f'{i}日均賣']])
 
-        # 2. 統整 60 日的主力總囤貨量
         recent_raw = stock_raw[stock_raw['trade_date'].isin(available_dates[:60])].copy()
         hoard_df = recent_raw.groupby(broker_col).agg(
             區間淨買超張數=('net_vol', 'sum'), 
@@ -174,7 +196,6 @@ def render_broker_dashboard(target_stock, display_name, df_raw_all, df_trend):
         hoard_df['斥資(億)'] = (hoard_df['區間淨買賣金額'] / 100000000).round(2)
         hoard_df[broker_col] = hoard_df[broker_col].apply(apply_broker_tags)
         
-        # 3. 合併多期程均價
         for cdf in cost_dfs:
             hoard_df = pd.merge(hoard_df, cdf, on=broker_col, how='left')
 
@@ -309,15 +330,33 @@ def render_broker_dashboard(target_stock, display_name, df_raw_all, df_trend):
 # 🖼️ 主渲染入口
 # ==========================================
 def render(STOCK_DICT=None):
-    st.markdown("""
+    
+    # 🌟 嘗試取得大表中的最新日期，作為基準日
+    df_raw_all = load_full_blood_broker_history()
+    latest_date = "讀取中..."
+    if not df_raw_all.empty and 'trade_date' in df_raw_all.columns:
+        latest_date = df_raw_all['trade_date'].max()
+
+    st.markdown(f"""
     <div style="background: linear-gradient(90deg, rgba(15,23,42,1) 0%, rgba(14,165,233,0.3) 50%, rgba(15,23,42,1) 100%); 
                 border-top: 1px solid #38bdf8; border-bottom: 1px solid #38bdf8; padding: 15px 20px; 
                 border-radius: 10px; text-align: center; box-shadow: 0px 0px 20px rgba(56, 189, 248, 0.2); margin-bottom: 20px;">
         <h2 style="color: #e0f2fe; margin: 0; letter-spacing: 2px; text-shadow: 0 0 15px rgba(56, 189, 248, 0.8);">
             券商動向
+            <span style="color:#00D2FF; font-size:16px; font-weight:500; margin-left:12px; text-shadow: none;">基準日：{latest_date}</span>
         </h2>
     </div>
     """, unsafe_allow_html=True)
+    
+    # 🌟 增加強制清除快取按鈕 (解決 HF 上傳後要等 1 小時才會更新的問題)
+    col_btn1, col_btn2 = st.columns([8, 2])
+    with col_btn2:
+        if st.button("🔄 強制刷新最新資料", use_container_width=True):
+            fetch_parquet_from_hf.clear()
+            fetch_text_from_hf.clear()
+            load_full_blood_broker_history.clear()
+            st.rerun()
+
     st.markdown("### 🌍 全市場連買分點快搜")
     scan_tab1, scan_tab2 = st.tabs(["🔹 Top 15主力買超排行", "🔹 單一主力成本分析(豆腐好吃)"])
 
@@ -398,7 +437,6 @@ def render(STOCK_DICT=None):
             
             if eng_conc_col in disp_df.columns: disp_df.rename(columns={eng_conc_col: f'{prefix}集中度(%)'}, inplace=True)
             
-            # 依據期程顯示對應的買超金額
             amt_col = f'{prefix}主力買超(萬)'
             cols_to_show = ['股票代號', '股票名稱', '名次變化', f'{prefix}集中度(%)', f'{prefix}Δ', amt_col, '最新動態', '今日上榜期程']
             valid_cols = [c for c in cols_to_show if c in disp_df.columns]
@@ -457,7 +495,6 @@ def render(STOCK_DICT=None):
     if selected_stock_str:
         target_stock = selected_stock_str.split(" ")[0].strip()
         display_name = selected_stock_str
-        df_raw_all = load_full_blood_broker_history()
         
         if not df_raw_all.empty:
             stock_raw = df_raw_all[df_raw_all['stock_code'] == target_stock].copy()
