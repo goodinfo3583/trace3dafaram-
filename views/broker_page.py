@@ -434,7 +434,7 @@ def render(STOCK_DICT=None):
                 if '🆕' in val: return 'color: #38bdf8; font-weight: bold;' 
             return 'color: #94A3B8;'
 
-        def render_momentum_tab(df, prefix, rank_col_name):
+        def render_momentum_tab(df, prefix):
             prefix_map = {"單日": "1d_conc", "5日": "5d_conc", "10日": "10d_conc", "20日": "20d_conc", "30日": "30d_conc"}
             eng_conc_col = prefix_map.get(prefix)
             disp_df = df.copy()
@@ -448,15 +448,11 @@ def render(STOCK_DICT=None):
             disp_df.reset_index(drop=True, inplace=True)
             disp_df.index = disp_df.index + 1
             disp_df.index.name = "名次"
-
-            # 直接套用後台給的變化，不自己做數學反推
-            if rank_col_name in disp_df.columns:
-                disp_df['名次變化'] = disp_df[rank_col_name].apply(fmt_rank_chg)
                 
             amt_col = f'{prefix}主力買超(萬)'
             
-            # 移除「前日排名」欄位
-            cols_to_show = ['股票代號', '股票名稱', '名次變化', f'{prefix}集中度(%)', f'{prefix}Δ', amt_col, '最新動態', '今日上榜期程']
+            # 💡 乾淨的欄位顯示，徹底剔除「名次變化」與「前日排名」
+            cols_to_show = ['股票代號', '股票名稱', f'{prefix}集中度(%)', f'{prefix}Δ', amt_col, '最新動態', '今日上榜期程']
             valid_cols = [c for c in cols_to_show if c in disp_df.columns]
             
             disp_df = disp_df[valid_cols]
@@ -466,25 +462,23 @@ def render(STOCK_DICT=None):
             safe_format_dict = {k: v for k, v in format_dict.items() if k in disp_df.columns}
             
             styled = disp_df.style.format(safe_format_dict)
-            if '名次變化' in disp_df.columns: 
-                if hasattr(styled, 'map'):
-                    styled = styled.map(color_chg, subset=['名次變化'])
-                else:
-                    styled = styled.applymap(color_chg, subset=['名次變化'])
+
+            # 僅保留數值強度的熱力圖渲染
             if f'{prefix}Δ' in disp_df.columns: 
                 try: styled = styled.background_gradient(subset=[f'{prefix}Δ'], cmap='Reds')
                 except: pass
             
             st.dataframe(styled, use_container_width=True)
 
-        with mom_tabs[0]: render_momentum_tab(df_momentum, "單日", "1d_rank_chg")
-        with mom_tabs[1]: render_momentum_tab(df_momentum, "5日", "5d_rank_chg")
+        # 💡 呼叫時也一併拿掉用不到的 rank_col_name 參數
+        with mom_tabs[0]: render_momentum_tab(df_momentum, "單日")
+        with mom_tabs[1]: render_momentum_tab(df_momentum, "5日")
         if calc_days >= 11:
-            with mom_tabs[2]: render_momentum_tab(df_momentum, "10日", "10d_rank_chg")
+            with mom_tabs[2]: render_momentum_tab(df_momentum, "10日")
         if calc_days >= 21:
-            with mom_tabs[3]: render_momentum_tab(df_momentum, "20日", "20d_rank_chg")
+            with mom_tabs[3]: render_momentum_tab(df_momentum, "20日")
         if calc_days >= 31:
-            with mom_tabs[4]: render_momentum_tab(df_momentum, "30日", "30d_rank_chg")
+            with mom_tabs[4]: render_momentum_tab(df_momentum, "30日")
     else:
         st.info("動能資料載入中或後台尚未產出今日資料。")
 
