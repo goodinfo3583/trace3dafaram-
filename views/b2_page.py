@@ -108,55 +108,9 @@ def get_cached_b2_data(DATA_DIR):
     df_23 = process_b2_files(files_23, target_col_keyword='買賣超佔發行張數', val_col_suffix='發行數%')
     df_24 = process_b2_files(files_24, target_col_keyword='買賣超佔發行張數', val_col_suffix='發行數%')
 
+    # 確保回傳 4 個值
     return df_21, df_22, df_23, df_24
 
-
-# ==========================================
-# 🚀 局部渲染魔法：四個獨立的 Fragment
-# ==========================================
-def render_block(df, title, keys, is_block_1=False):
-    st.write("---")
-    if is_block_1:
-        st.markdown("""
-        <div style="background: linear-gradient(90deg, rgba(15,23,42,1) 0%, rgba(14,165,233,0.3) 50%, rgba(15,23,42,1) 100%); 
-                    border-top: 1px solid #38bdf8; border-bottom: 1px solid #38bdf8; padding: 15px 20px; 
-                    border-radius: 10px; text-align: center; box-shadow: 0px 0px 20px rgba(56, 189, 248, 0.2); margin-bottom: 20px;">
-            <h2 style="color: #e0f2fe; margin: 0; letter-spacing: 2px; text-shadow: 0 0 15px rgba(56, 189, 248, 0.8);">法人掃貨</h2>
-        </div>
-        """, unsafe_allow_html=True)
-        
-    st.header(title)
-    if df is not None and not df.empty:
-        if "成交量" in title:
-            st.info("動態 🔥 強延續 (買盤加速) ⚠️ 趨緩 (買盤力道減弱) 🔄 持平 📉 調節洗盤 (微幅調節) 🚨 劇烈倒貨 (強烈賣出)")
-            
-        c1, c2 = st.columns(2)
-        show_etf = c1.checkbox("顯示 ETF", value=True, key=keys[0])
-        show_bond = c2.checkbox("顯示 債券/債券ETF", value=True, key=keys[1])
-        
-        # 修正：先轉回 string 才能做 len() 和 endswith() 判斷
-        code_str = df['股票代號'].astype(str)
-        mask = (code_str.str.len() == 4)
-        if show_etf: mask |= ((code_str.str.len() >= 5) & (~code_str.str.endswith('B')))
-        if show_bond: mask |= code_str.str.endswith('B')
-        
-        display_df = df[mask].copy()
-        display_df.index = range(1, len(display_df) + 1)
-        st.dataframe(display_df, use_container_width=True)
-    else:
-        st.warning(f"⚠️ 記憶體中無 {title} 數據。")
-
-@st.fragment
-def render_b2_1(df_21): render_block(df_21, "外資 5 日 買超佔標的成交量", ["fo_etf_v9", "fo_bond_v9"], True)
-
-@st.fragment
-def render_b2_2(df_22): render_block(df_22, "投信 5 日 買超佔標的成交量", ["sitc_etf_v9", "sitc_bond_v9"])
-
-@st.fragment
-def render_b2_3(df_23): render_block(df_23, "外資 5 日 買超佔公司發行張數", ["foreign_etf_final_v3", "foreign_bond_final_v3"])
-
-@st.fragment
-def render_b2_4(df_24): render_block(df_24, "投信 5 日 買超佔公司發行張數", ["sitc_etf_final_v3", "sitc_bond_final_v3"])
 
 # ==========================================
 # 🖼️ 前台畫面渲染主程式
@@ -165,7 +119,7 @@ def show_b2_page(DATA_DIR):
     """B2 專屬頁面 UI 渲染"""
     df_21, df_22, df_23, df_24 = get_cached_b2_data(DATA_DIR)
     
-    # 👇 補上這段：將資料寫入 session_state，讓懸浮卡片與選股過濾頁面能抓到資料
+    # 將資料寫入 session_state，讓懸浮卡片與選股過濾頁面能抓到資料
     st.session_state['df_blk2_1'] = df_21
     st.session_state['df_blk2_2'] = df_22
     st.session_state['df_blk2_3'] = df_23
@@ -184,7 +138,7 @@ def show_b2_page(DATA_DIR):
     render_b2_4(df_24)
     
 def sync_b2_data(DATA_DIR):
-    """供背景或其他頁面喚醒 B2 資料使用"""
+    """供背景或其他頁面喚醒 B2 資料使用 (必須要有這個！)"""
     df_21, df_22, df_23, df_24 = get_cached_b2_data(DATA_DIR)
     st.session_state['df_blk2_1'] = df_21
     st.session_state['df_blk2_2'] = df_22

@@ -15,9 +15,7 @@ import plotly.express as px
 from components import style_manager
 from components import nav_manager
 # 定義修改路徑呼叫工具函式
-from utils.data_utils import (
-    STOCK_DICT, extract_date_from_name, robust_read_csv, get_latest_csv, get_prev_csv, get_diff_ui
-)
+from utils.data_utils import (STOCK_DICT, extract_date_from_name, robust_read_csv, get_latest_csv, get_prev_csv, get_diff_ui)
 # 頁面模組或新增其他頁面模組
 from views.login_page import show_login_page
 from views.contact_page import show_contact_page
@@ -25,7 +23,7 @@ from views.news_page import show_news_page
 from views.pool_page import show_pool_page
 from views.b0_page import show_b0_page, sync_b0_data
 from views.b1_page import show_b1_page, sync_b1_data
-from views.b2_page import show_b2_page, get_cached_b2_data
+from views.b2_page import show_b2_page, get_cached_b2_data, sync_b2_data
 from views.b3_page import show_b3_page, sync_b3_data
 from views.b4_page import show_b4_page, sync_b4_data
 from views.b5_page import show_b5_page, sync_b5_data
@@ -55,12 +53,10 @@ os.makedirs(SCORE_HISTORY_DIR, exist_ok=True)
 os.makedirs(MARKET_HISTORY_DIR, exist_ok=True)
 os.makedirs(BLOCK_HISTORY_DIR, exist_ok=True)
 
-# ✨ 修改 ：在載入畫面之前，確保 B3 數據已經存在記憶體中供卡片/跑馬燈使用
-if 'df_blk2_1' not in st.session_state:
-    # 💡 呼叫新的快取引擎，並只拿「前 15 筆」塞給右下角卡片顯示，極度節省記憶體！
-    df_21, _, _, _ = get_cached_b2_data(DATA_DIR)
-    if df_21 is not None and not df_21.empty:
-        st.session_state['df_blk2_1'] = df_21.head(15).copy()
+# ✨ 修改 ：在載入畫面之前，確保各區塊數據已經存在記憶體中供卡片/跑馬燈使用
+# 💡 把四個表格的 Top 15 都塞入記憶體，讓懸浮卡片的四個輪播都有資料！
+if 'df_blk2_1' not in st.session_state or 'df_blk2_4' not in st.session_state:
+    sync_b2_data(DATA_DIR)
 if 'b3_data' not in st.session_state:
     sync_b3_data(DATA_DIR)
 if 'b4_squeeze_radar' not in st.session_state:
@@ -159,7 +155,7 @@ if current_page == "all":
     with st.spinner("背景全市場數據高速運算中..."):
         sync_b0_data(DATA_DIR)
         sync_b1_data(DATA_DIR)
-        get_cached_b2_data(DATA_DIR)      # 👇 替換成這行 (直接呼叫快取引擎)
+        sync_b2_data(DATA_DIR)
         sync_b3_data(DATA_DIR)
         sync_b4_data(DATA_DIR)
         sync_b5_data(DATA_DIR)
