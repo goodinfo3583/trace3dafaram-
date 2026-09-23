@@ -114,6 +114,40 @@ def get_cached_b2_data(DATA_DIR):
 # ==========================================
 # 🖼️ 前台畫面渲染主程式
 # ==========================================
+# 請將這段程式碼加在 views/b2_page.py 裡面，例如加在 show_b2_page 函式的前面或後面
+
+@st.fragment
+def render_b2_1(df):
+    st.subheader("📊 外資買超佔成交比")
+    if not df.empty:
+        st.dataframe(df, use_container_width=True)
+    else:
+        st.info("目前無資料")
+
+@st.fragment
+def render_b2_2(df):
+    st.subheader("📊 投信買超佔成交比")
+    if not df.empty:
+        st.dataframe(df, use_container_width=True)
+    else:
+        st.info("目前無資料")
+
+@st.fragment
+def render_b2_3(df):
+    st.subheader("📊 外資買超佔發行張數")
+    if not df.empty:
+        st.dataframe(df, use_container_width=True)
+    else:
+        st.info("目前無資料")
+
+@st.fragment
+def render_b2_4(df):
+    st.subheader("📊 投信買超佔發行張數")
+    if not df.empty:
+        st.dataframe(df, use_container_width=True)
+    else:
+        st.info("目前無資料")
+
 def show_b2_page(DATA_DIR):
     """B2 專屬頁面 UI 渲染"""
     df_21, df_22, df_23, df_24 = get_cached_b2_data(DATA_DIR)
