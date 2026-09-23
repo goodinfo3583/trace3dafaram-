@@ -76,7 +76,6 @@ def process_all_b7_data(DATA_DIR):
     df_hold_trend = pd.DataFrame()
     if c_hold:
         hold_df = master_df[[c_code, c_name, c_month, c_hold]].copy()
-        # 💡 強制轉為 float32
         hold_df[c_hold] = pd.to_numeric(hold_df[c_hold].astype(str).str.replace('%', '', regex=False).str.replace(',', '', regex=False), errors='coerce').astype('float32')
         hold_df = hold_df.drop_duplicates(subset=[c_code, c_month], keep='first')
         
@@ -117,22 +116,41 @@ def process_all_b7_data(DATA_DIR):
     latest_df = master_df[master_df[c_month] == latest_m].drop_duplicates(subset=[c_code], keep='first').copy()
     
     req_cols_map = {
-        "排名": "排名", c_code: "代號", c_name: "名稱", c_month: "持股 資料 月份",
-        "全體董監持股(%)": "全體 董監 持股 (%)", "全體董監質押(%)": "全體 董監 質押 (%)", 
-        "全體董監持股(萬張)": "全體 董監 持股 (萬張)", "全體董監質押(萬張)": "全體 董監 質押 (萬張)", 
+        "排名": "排名", 
+        c_code: "代號", 
+        c_name: "名稱", 
+        c_month: "持股 資料 月份",
+        "全體董監持股(%)": "全體 董監 持股 (%)", 
+        "全體董監質押(%)": "全體 董監 質押 (%)", 
+        "全體董監持股(萬張)": "全體 董監 持股 (萬張)", 
+        "全體董監質押(萬張)": "全體 董監 質押 (萬張)", 
         "全體董監增減張數": "全體 董監 增減 張數"
     }
     
     avail_cols = []
     rename_l_dict = {}
+    
+    # 💡 修正處：精確且防呆的欄位配對，杜絕 Duplicate columns
     for orig_c, new_c in req_cols_map.items():
-        matched = next((c for c in latest_df.columns if orig_c in c or c_code == orig_c or c_name == orig_c or c_month == orig_c), None)
-        if matched:
+        if not orig_c: continue
+        
+        matched = None
+        if orig_c in latest_df.columns:
+            matched = orig_c
+        else:
+            matched = next((c for c in latest_df.columns if orig_c in c), None)
+            
+        # 確保不會抓到重複的欄位
+        if matched and matched not in avail_cols:
             avail_cols.append(matched)
             rename_l_dict[matched] = new_c
             
     if avail_cols:
-        df_pledge_latest = latest_df[avail_cols].rename(columns=rename_l_dict)
+        df_pledge_latest = latest_df[avail_cols].copy()
+        df_pledge_latest = df_pledge_latest.rename(columns=rename_l_dict)
+        # 最終保險：剃除意外的重複欄位
+        df_pledge_latest = df_pledge_latest.loc[:, ~df_pledge_latest.columns.duplicated()]
+        
         if "排名" in df_pledge_latest.columns:
             df_pledge_latest["排名"] = pd.to_numeric(df_pledge_latest["排名"], errors='coerce').astype('float32')
             df_pledge_latest = df_pledge_latest.dropna(subset=["排名"]).sort_values(by="排名", ascending=True)
@@ -143,7 +161,6 @@ def process_all_b7_data(DATA_DIR):
     df_pledge_trend = pd.DataFrame()
     if c_pledge:
         pledge_df = master_df[[c_code, c_name, c_month, c_pledge]].copy()
-        # 💡 強制轉為 float32
         pledge_df[c_pledge] = pd.to_numeric(pledge_df[c_pledge].astype(str).str.replace('%', '', regex=False).str.replace(',', '', regex=False), errors='coerce').astype('float32')
         pledge_df = pledge_df.drop_duplicates(subset=[c_code, c_month], keep='first')
         
