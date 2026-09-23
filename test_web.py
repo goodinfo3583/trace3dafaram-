@@ -53,8 +53,8 @@ os.makedirs(SCORE_HISTORY_DIR, exist_ok=True)
 os.makedirs(MARKET_HISTORY_DIR, exist_ok=True)
 os.makedirs(BLOCK_HISTORY_DIR, exist_ok=True)
 
-# ✨ 修改 ：在載入畫面之前，確保各區塊數據已經存在記憶體中供卡片/跑馬燈使用
-# 💡 把四個表格的 Top 15 都塞入記憶體，讓懸浮卡片的四個輪播都有資料！
+# 在載入畫面之前，確保各區塊數據已經存在記憶體中供卡片/跑馬燈使用
+# 把四個表格的 Top 15 都塞入記憶體，讓懸浮卡片的四個輪播都有資料
 if 'df_blk2_1' not in st.session_state or 'df_blk2_4' not in st.session_state:
     sync_b2_data(DATA_DIR)
 if 'b3_data' not in st.session_state:
@@ -90,9 +90,7 @@ st.markdown(
         display: none !important;
     }
     </style>
-    """,
-    unsafe_allow_html=True
-)
+    """,unsafe_allow_html=True)
 
 is_perf_mode = st.session_state.get('performance_mode', False)
 
@@ -110,14 +108,12 @@ if not is_perf_mode:
         style_manager.render_b4_top10_glass_card()
         # 呼叫 B5 大腿雙向共振卡片 (左下方)
         style_manager.render_b5_top10_glass_card()
-
         # 呼叫 課程NPC 懸浮卡片 (右下方)
         style_manager.render_course_npc()   
     except AttributeError as e:
         # 避免尚未存檔完成時當機
         print(f"UI 渲染警告: {e}")
         pass
-
 
 # 注入客製化頂部導覽列
 # nav_manager.inject_custom_header()
@@ -129,8 +125,6 @@ nav_manager.inject_custom_header(is_logged_in)
 from streamlit_gsheets import GSheetsConnection
 conn = st.connection("gsheets", type=GSheetsConnection)
 SHEET_URL = "https://docs.google.com/spreadsheets/d/1TxHDahg8ul6lmUtDN-7X75cBXbkU0jaZ3M9zg6exBgU"
-
-
 
 # 定義路徑
 backup_df_path = os.path.join(DATA_DIR, "sidebar_twse_df_backup.csv")
@@ -205,10 +199,6 @@ with st.sidebar:
     render_sidebar_war_room(STOCK_DICT, DATA_DIR)
     render_global_admin_sidebar(DATA_DIR)
 
-
-# ==========================================
-# 🏠 核心五大 區塊1-5原始碼位置
-# ==========================================
 # ==========================================
 # 🎭 幕後無縫換頁引擎 (放在最後)
 # ==========================================
