@@ -182,3 +182,15 @@ def show_b2_page(DATA_DIR):
     render_b2_2(df_22)
     render_b2_3(df_23)
     render_b2_4(df_24)
+    
+def sync_b2_data(DATA_DIR):
+    """供背景或其他頁面喚醒 B2 資料使用"""
+    df_21, df_22, df_23, df_24 = get_cached_b2_data(DATA_DIR)
+    st.session_state['df_blk2_1'] = df_21
+    st.session_state['df_blk2_2'] = df_22
+    st.session_state['df_blk2_3'] = df_23
+    st.session_state['df_blk2_4'] = df_24
+    st.session_state['b2_1'] = df_21
+    st.session_state['b2_2'] = df_22
+    st.session_state['b2_3'] = df_23
+    st.session_state['b2_4'] = df_24
