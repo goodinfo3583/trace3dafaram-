@@ -15,7 +15,9 @@ import plotly.express as px
 from components import style_manager
 from components import nav_manager
 # 定義修改路徑呼叫工具函式
-from utils.data_utils import (STOCK_DICT, extract_date_from_name, robust_read_csv, get_latest_csv, get_prev_csv, get_diff_ui)
+from utils.data_utils import (
+    STOCK_DICT, extract_date_from_name, robust_read_csv, get_latest_csv, get_prev_csv, get_diff_ui
+)
 # 頁面模組或新增其他頁面模組
 from views.login_page import show_login_page
 from views.contact_page import show_contact_page
@@ -23,7 +25,7 @@ from views.news_page import show_news_page
 from views.pool_page import show_pool_page
 from views.b0_page import show_b0_page, sync_b0_data
 from views.b1_page import show_b1_page, sync_b1_data
-from views.b2_page import show_b2_page, get_cached_b2_data, sync_b2_data
+from views.b2_page import show_b2_page, sync_b2_data
 from views.b3_page import show_b3_page, sync_b3_data
 from views.b4_page import show_b4_page, sync_b4_data
 from views.b5_page import show_b5_page, sync_b5_data
@@ -53,9 +55,21 @@ os.makedirs(SCORE_HISTORY_DIR, exist_ok=True)
 os.makedirs(MARKET_HISTORY_DIR, exist_ok=True)
 os.makedirs(BLOCK_HISTORY_DIR, exist_ok=True)
 
+<<<<<<< HEAD
 # 💡 開機卡死防護：移除全域強迫同步，改為按需載入。
 # 當使用者點擊對應分頁時，該分頁會自動呼叫 sync 函式將資料寫入 session_state。
 # 這樣一來網頁就能瞬間開機，不再卡在「Your app is in the oven」。
+=======
+# ✨ 修改 ：在載入畫面之前，確保 B3 數據已經存在記憶體中供卡片/跑馬燈使用
+if 'df_blk2_1' not in st.session_state:
+    sync_b2_data(DATA_DIR)
+if 'b3_data' not in st.session_state:
+    sync_b3_data(DATA_DIR)
+if 'b4_squeeze_radar' not in st.session_state:
+    sync_b4_data(DATA_DIR)
+if 'b5_1000' not in st.session_state:
+    sync_b5_data(DATA_DIR)
+>>>>>>> 2a718a89fcb9ad7b5907129b182ecca3df5ccc76
 
 # 呼叫渲染視覺元件 components
 style_manager.apply_global_theme()
@@ -83,7 +97,9 @@ st.markdown(
         display: none !important;
     }
     </style>
-    """,unsafe_allow_html=True)
+    """,
+    unsafe_allow_html=True
+)
 
 is_perf_mode = st.session_state.get('performance_mode', False)
 
@@ -101,12 +117,14 @@ if not is_perf_mode:
         style_manager.render_b4_top10_glass_card()
         # 呼叫 B5 大腿雙向共振卡片 (左下方)
         style_manager.render_b5_top10_glass_card()
+
         # 呼叫 課程NPC 懸浮卡片 (右下方)
         style_manager.render_course_npc()   
     except AttributeError as e:
         # 避免尚未存檔完成時當機
         print(f"UI 渲染警告: {e}")
         pass
+
 
 # 注入客製化頂部導覽列
 # nav_manager.inject_custom_header()
@@ -118,6 +136,8 @@ nav_manager.inject_custom_header(is_logged_in)
 from streamlit_gsheets import GSheetsConnection
 conn = st.connection("gsheets", type=GSheetsConnection)
 SHEET_URL = "https://docs.google.com/spreadsheets/d/1TxHDahg8ul6lmUtDN-7X75cBXbkU0jaZ3M9zg6exBgU"
+
+
 
 # 定義路徑
 backup_df_path = os.path.join(DATA_DIR, "sidebar_twse_df_backup.csv")
@@ -142,7 +162,7 @@ if current_page == "all":
     with st.spinner("背景全市場數據高速運算中..."):
         sync_b0_data(DATA_DIR)
         sync_b1_data(DATA_DIR)
-        sync_b2_data(DATA_DIR)
+        sync_b2_data(DATA_DIR)           # 在背景後台算好 b2
         sync_b3_data(DATA_DIR)
         sync_b4_data(DATA_DIR)
         sync_b5_data(DATA_DIR)
@@ -192,6 +212,10 @@ with st.sidebar:
     render_sidebar_war_room(STOCK_DICT, DATA_DIR)
     render_global_admin_sidebar(DATA_DIR)
 
+
+# ==========================================
+# 🏠 核心五大 區塊1-5原始碼位置
+# ==========================================
 # ==========================================
 # 🎭 幕後無縫換頁引擎 (放在最後)
 # ==========================================
