@@ -38,15 +38,16 @@ def get_cached_stock_price(sid, start_str=None, end_str=None):
         pass
     return 0.0
 
+
 # ==========================================
 # 🌟 "觀察名單"專屬工具函數區 
 # ==========================================
 def get_df_safe(*keys): 
-    """🌟 升級版：直接回傳 reference，不再無腦 .copy() 浪費記憶體"""
+    """🌟 升級版：支援多重 Key 備援，完美橋接新舊版記憶體變數"""
     for k in keys:
         df = st.session_state.get(k)
         if isinstance(df, pd.DataFrame) and not df.empty:
-            return df
+            return df.copy()
     return pd.DataFrame()
 
 def fmt_d(d_str): 
@@ -197,12 +198,9 @@ def show_pool_page(conn, SHEET_URL, DATA_DIR, STOCK_DICT):
                         if id_c: it_sell_ids = set(df_is[id_c].astype(str).str.replace(r'\D', '', regex=True))
                 except: pass
 
-                s_b4_mar_pct = set(df_b4_mar_pct.get('股票代號', [])) if not df_b4_mar_pct.empty else set()
-                s_b4_mar_vol = set(df_b4_mar_vol.get('股票代號', [])) if not df_b4_mar_vol.empty else set()
-                s_b4_sho_pct = set(df_b4_sho_pct.get('股票代號', [])) if not df_b4_sho_pct.empty else set()
-                s_b4_sho_vol = set(df_b4_sho_vol.get('股票代號', [])) if not df_b4_sho_vol.empty else set()
-                s_b4_mp_pct = set(df_b4_mp_pct.get('股票代號', [])) if not df_b4_mp_pct.empty else set()
-                s_b4_mp_vol = set(df_b4_mp_vol.get('股票代號', [])) if not df_b4_mp_vol.empty else set()
+                s_b4_mar_pct, s_b4_mar_vol = set(df_b4_mar_pct.get('股票代號', [])), set(df_b4_mar_vol.get('股票代號', []))
+                s_b4_sho_pct, s_b4_sho_vol = set(df_b4_sho_pct.get('股票代號', [])), set(df_b4_sho_vol.get('股票代號', []))
+                s_b4_mp_pct, s_b4_mp_vol = set(df_b4_mp_pct.get('股票代號', [])), set(df_b4_mp_vol.get('股票代號', []))
 
                 bad_b2_vol = ['持平', '調節洗盤', '劇烈倒貨', '觀望']
                 bad_b2_iss = ['轉賣反轉', '籌碼沉澱中', '今日量縮持平']
@@ -247,27 +245,6 @@ def show_pool_page(conn, SHEET_URL, DATA_DIR, STOCK_DICT):
                         delta_col = next((c for c in df_b5_400.columns if '400張增減' in c or '總增減' in c or '增減' in c), None)
                         if delta_col:
                             dict_400 = {ultra_clean_id(k): raw_delta_to_trend(v) for k, v in zip(df_b5_400['股票代號'], df_b5_400[delta_col])}
-
-                # ==========================================
-                # 🔥 效能救星：預先萃取 B4 (資券) 資料成 Dict，避免迴圈內搜尋 DataFrame
-                # ==========================================
-                b4_mar_pct_dict, b4_mar_vol_dict, b4_sho_pct_dict, b4_sho_vol_dict, b4_mp_pct_dict, b4_mp_vol_dict = {}, {}, {}, {}, {}, {}
-                def _ext_b4_change(df_x):
-                    if df_x.empty or '股票代號' not in df_x.columns or '漲跌幅%' not in df_x.columns: return {}
-                    return {str(k).strip(): float(str(v).replace('%', '')) for k, v in zip(df_x['股票代號'], df_x['漲跌幅%']) if pd.notna(v) and str(v).replace('%', '').replace('.', '', 1).replace('-', '', 1).isdigit()}
-                
-                b4_mar_pct_dict = _ext_b4_change(df_b4_mar_pct)
-                b4_mar_vol_dict = _ext_b4_change(df_b4_mar_vol)
-                b4_sho_pct_dict = _ext_b4_change(df_b4_sho_pct)
-                b4_sho_vol_dict = _ext_b4_change(df_b4_sho_vol)
-                b4_mp_pct_dict = _ext_b4_change(df_b4_mp_pct)
-                b4_mp_vol_dict = _ext_b4_change(df_b4_mp_vol)
-
-                b4_sho_pct_decrease_dict = {}
-                if not df_b4_sho_pct.empty and '股票代號' in df_b4_sho_pct.columns:
-                    s_col = next((c for c in df_b4_sho_pct.columns if '當日' in str(c) and ('%' in str(c) or '增減' in str(c))), None)
-                    if s_col:
-                        b4_sho_pct_decrease_dict = {str(k).strip(): float(str(v).replace('%', '')) for k, v in zip(df_b4_sho_pct['股票代號'], df_b4_sho_pct[s_col]) if pd.notna(v) and str(v).replace('%', '').replace('.', '', 1).replace('-', '', 1).isdigit()}
 
                 results = []
                 for _, row in pool_df.iterrows():
@@ -321,17 +298,21 @@ def show_pool_page(conn, SHEET_URL, DATA_DIR, STOCK_DICT):
                     if sid in s_b4_mp_vol: r_b4_mp += "✔️(量)"; score += 0.5; details.append("券增(量): +0.5"); b4_list_count += 1
                     
                     if b4_list_count > 0:
-                        change_val = max([
-                            b4_mar_pct_dict.get(sid, 0.0), b4_mar_vol_dict.get(sid, 0.0),
-                            b4_sho_pct_dict.get(sid, 0.0), b4_sho_vol_dict.get(sid, 0.0),
-                            b4_mp_pct_dict.get(sid, 0.0), b4_mp_vol_dict.get(sid, 0.0)
-                        ])
-                        
+                        change_val = 0.0
+                        for b4_df in [df_b4_mar_pct, df_b4_mar_vol, df_b4_sho_pct, df_b4_sho_vol, df_b4_mp_pct, df_b4_mp_vol]:
+                            if not b4_df.empty and sid in b4_df['股票代號'].values and '漲跌幅%' in b4_df.columns:
+                                try: change_val = float(str(b4_df.loc[b4_df['股票代號'] == sid, '漲跌幅%'].iloc[0]).replace('%', '')); break 
+                                except: pass
                         if change_val > 0:
                             score += 0.7; details.append("榜上+當日上漲: +0.7")
                             if change_val > 3: score += 0.7; details.append("榜上+漲幅>3%: +0.7")
                                 
-                        short_decrease_val = b4_sho_pct_decrease_dict.get(sid, 0.0)
+                        short_decrease_val = 0.0
+                        if not df_b4_sho_pct.empty and sid in df_b4_sho_pct['股票代號'].values:
+                            s_col = next((c for c in df_b4_sho_pct.columns if '當日' in str(c) and ('%' in str(c) or '增減' in str(c))), None)
+                            if s_col:
+                                try: short_decrease_val = float(str(df_b4_sho_pct.loc[df_b4_sho_pct['股票代號'] == sid, s_col].iloc[0]).replace('%', ''))
+                                except: pass
                         if abs(short_decrease_val) >= 1: score += 1.2; details.append("空頭認輸(借券減>1%): +1.2")
 
                     # 動態捕捉
@@ -381,6 +362,7 @@ def show_pool_page(conn, SHEET_URL, DATA_DIR, STOCK_DICT):
                 prev_scores_dict = {}
                 hist_combined = pd.DataFrame() 
                 try:
+                    # 💡 把 ttl 從 10 延長至 60 秒，避免頁面互動時連續卡住
                     gs_history = conn.read(spreadsheet=SHEET_URL, worksheet="選股歷史", ttl=60)
                     gs_history = gs_history.dropna(how="all")
                     if not gs_history.empty and '紀錄日期' in gs_history.columns:
@@ -392,7 +374,7 @@ def show_pool_page(conn, SHEET_URL, DATA_DIR, STOCK_DICT):
                             id_col = '代號' if '代號' in prev_df.columns else '股票代號' if '股票代號' in prev_df.columns else None
                             if id_col: prev_scores_dict = dict(zip(prev_df[id_col].astype(str).str.replace(r'\.0$', '', regex=True).str.replace(r'\D', '', regex=True), prev_df['總分']))
                 except Exception as e: 
-                    pass
+                    st.warning(f"⚠️ 無法讀取 Google Sheets 歷史紀錄以計算變量，錯誤訊息：{e}")
 
                 def calc_table_delta(row):
                     sid = str(row['代號']).strip()
@@ -427,6 +409,7 @@ def show_pool_page(conn, SHEET_URL, DATA_DIR, STOCK_DICT):
                     save_df.insert(0, '紀錄日期', anchor_date_str)
                     if st.session_state.get('last_gsheet_save_date') != anchor_date_str:
                         try:
+                            # 💡 寫入前清除快取確保拿到最新，寫完後會重新刷新
                             old_df = conn.read(spreadsheet=SHEET_URL, worksheet="選股歷史", ttl=0).dropna(how="all")
                             if not old_df.empty and '紀錄日期' in old_df.columns:
                                 old_df['紀錄日期'] = old_df['紀錄日期'].astype(str).str.replace(r'\.0$', '', regex=True).str.zfill(8)
@@ -435,7 +418,9 @@ def show_pool_page(conn, SHEET_URL, DATA_DIR, STOCK_DICT):
                             conn.update(spreadsheet=SHEET_URL, worksheet="選股歷史", data=final_save_df)
                             st.session_state['last_gsheet_save_date'] = anchor_date_str
                             hist_combined = final_save_df.copy()
-                        except Exception as e: pass
+                        except Exception as e: st.warning(f"⚠️ 歷史同步暫緩({e})")
+                elif not valid_calc:
+                    st.warning("⚠️ 本次計算總分多數為 0，已啟動防呆攔截機制：暫不覆寫 Google Sheets 歷史紀錄。請點擊上方按鈕載入最新籌碼大數據。")
 
                 # ==========================================
                 # 🚀 局部渲染魔法 (Fragment) 避免畫面亂跳
@@ -498,7 +483,8 @@ def show_pool_page(conn, SHEET_URL, DATA_DIR, STOCK_DICT):
 
                             treemap_pool_df['產業別'] = treemap_pool_df['代號'].astype(str).apply(
                                 lambda sid: STOCK_DICT.get(sid, {}).get("industry", "ETF / 債券 / 其他")
-                            ).replace('', 'ETF / 債券 / 其他')
+                            )
+                            treemap_pool_df['產業別'] = treemap_pool_df['產業別'].replace('', 'ETF / 債券 / 其他')
 
                             pool_excluded_etfs = treemap_pool_df[treemap_pool_df['產業別'] == 'ETF / 債券 / 其他'].sort_values(by='代號').copy()
                             treemap_pool_df = treemap_pool_df[treemap_pool_df['產業別'] != 'ETF / 債券 / 其他']
@@ -621,6 +607,9 @@ def show_pool_page(conn, SHEET_URL, DATA_DIR, STOCK_DICT):
                                 
                                 st.markdown(f"<div style='margin-top: 5px; line-height: 2.4;'>{tags_html}</div>", unsafe_allow_html=True)
                                 
+                        else:
+                            st.info("⚪ 尚無數據或找不到產業字典，無法繪製產業板塊圖。")
+
                     elif selected_view == "🔹 歷史分數追蹤表":
                         try:
                             if not f_hist_combined.empty:
@@ -643,7 +632,7 @@ def show_pool_page(conn, SHEET_URL, DATA_DIR, STOCK_DICT):
                             else: 
                                 st.warning("⚪ 尚無足夠的歷史分數紀錄。")
                         except Exception as e: 
-                            pass
+                            st.error(f"發生錯誤: {e}")
 
                     elif selected_view == "🔹 模型驗證：每週 Top 5 追蹤":
                         st.markdown("### 🏆 嚴選 5 檔模型追蹤")
@@ -678,10 +667,7 @@ def show_pool_page(conn, SHEET_URL, DATA_DIR, STOCK_DICT):
                                     with st.expander("🔐 站長用寫入追蹤名單", expanded=True):
                                         track_pw = st.text_input("密碼", type="password", key="track_pw")
                                         
-                                        try:
-                                            expected_pw = st.secrets["passwords"]["pool_admin"]
-                                        except:
-                                            expected_pw = "admin"
+                                        expected_pw = st.secrets["passwords"]["pool_admin"]
                                         
                                         if track_pw == expected_pw:
                                             st.markdown("""
@@ -707,7 +693,6 @@ def show_pool_page(conn, SHEET_URL, DATA_DIR, STOCK_DICT):
                                                         try: old_track = conn.read(spreadsheet=SHEET_URL, worksheet="歷史名單回測觀察", ttl=0).dropna(how="all")
                                                         except: old_track = pd.DataFrame()
                                                         new_track = pd.concat([old_track, top5_df], ignore_index=True)
-                                                        new_track = new_track.astype(str) # 強制轉純文字防呆
                                                         conn.update(spreadsheet=SHEET_URL, worksheet="歷史名單回測觀察", data=new_track)
                                                         st.success(f"✅ 已成功將 {track_date} 的名單寫入 Google Sheets！")
                                                     except Exception as e:
@@ -781,28 +766,28 @@ def show_pool_page(conn, SHEET_URL, DATA_DIR, STOCK_DICT):
                                         
                                     week_df['模型分數變化'] = week_df.apply(score_diff, axis=1)
                                     
-                                show_cols = ['鎖定日期', '▼明細', '代號', '名稱', '鎖定收盤價', col_price_name, '區間報酬', '總分', '今日分數', '模型分數變化']
+                                    show_cols = ['鎖定日期', '▼明細', '代號', '名稱', '鎖定收盤價', col_price_name, '區間報酬', '總分', '今日分數', '模型分數變化']
 
-                                st.dataframe(
-                                    week_df[[c for c in show_cols if c in week_df.columns]], 
-                                    use_container_width=True, 
-                                    hide_index=True,
-                                    column_config={
-                                        "▼明細": st.column_config.TextColumn(
-                                            "▼明細", 
-                                            help="滑鼠游標停留在這裡，查看鎖定當時的各項權重分數", 
-                                            width="small", 
-                                            max_chars=4
-                                        )
-                                    }
-                                )
-                                
-                                if is_expired:
-                                    st.info("🔒 此梯次名單已追蹤滿 4 週。為了客觀評估波段策略，此表已凍結於結案當時的收盤價與績效，不再隨每日盤勢波動。")
-                                else:
-                                    st.info("💡 **驗證方法**：觀察鎖定股票的『區間報酬』是否為正，並核對『模型分數變化』是否持續上升。這能印證籌碼集中度與股價的連動性！")
+                                    st.dataframe(
+                                        week_df[[c for c in show_cols if c in week_df.columns]], 
+                                        use_container_width=True, 
+                                        hide_index=True,
+                                        column_config={
+                                            "▼明細": st.column_config.TextColumn(
+                                                "▼明細", 
+                                                help="滑鼠游標停留在這裡，查看鎖定當時的各項權重分數", 
+                                                width="small", 
+                                                max_chars=4
+                                            )
+                                        }
+                                    )
+                                    
+                                    if is_expired:
+                                        st.info("🔒 此梯次名單已追蹤滿 4 週。為了客觀評估波段策略，此表已凍結於結案當時的收盤價與績效，不再隨每日盤勢波動。")
+                                    else:
+                                        st.info("💡 **驗證方法**：觀察鎖定股票的『區間報酬』是否為正，並核對『模型分數變化』是否持續上升。這能印證籌碼集中度與股價的連動性！")
                         except Exception as e:
-                            pass
+                            st.write("⚪ 尚無歷史追蹤紀錄，請輸入密碼鎖定第一筆，或確認 Google Sheets 已建立工作表。")
 
                 # 👇 呼叫這個局部渲染魔法函數，把剛剛算好的分數傳進去！
                 render_pool_interactive_ui(res_df, hist_combined)
