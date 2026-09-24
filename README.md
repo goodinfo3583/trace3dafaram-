@@ -2,7 +2,7 @@
 
 
 
-部署於streamlit cloud>專案架構goodinfo3583/trace3dafaram-
+專案架構goodinfo3583/trace3dafaram-
 
 📁 專案根目錄/
 
@@ -10,13 +10,21 @@
 
 ├── 📄test\_web.py                   #  主程式 (main)(Router \& 初始化)
 
-│                                	# 負責: 連線資料庫、根據點擊把冒險者帶到對應的包廂(views)。
+│                                # 負責: 連線資料庫、讀取 Session、根據點擊把冒險者帶到對應的包廂(views)。
+
+├── 📄newdaily1820\_scraper.py #爬蟲每日法人買賣超資料、法人掃貨、法人連買、鉅額交易(證券交易所、櫃買中心、Goodinfo)
 
 │
 
-│
+├── 📄newdaily2200\_scraper.py #爬蟲每日 融資餘額 法人 資券動向(證券交易所、櫃買中心、Goodinfo)
 
 │
+
+├── 📄saturday1230\_scraper.py #爬蟲每周大股東變化 大腿動向(神秘金字塔、Goodinfo)
+
+│
+
+├── 📄company\_month\_scraper.py #爬蟲每月董監變化 (Goodinfo)
 
 │
 
@@ -46,15 +54,13 @@
 
 │   ├── 📄 news\_page.py          # 市場消息
 
-│   ├── 📄 broker\_page.py       # 券商分點 (連結hugging face資料庫,b8)
+│   ├── 📄 broker\_page.py       # 券商分點
 
 │   ├── 📄 contact\_page.py       # 聯絡我們 (寫入 G-Sheets)
 
 │   ├── 📄 login\_page.py         # 登入頁面
 
 │   ├── 📄 sidebar.py            # 側邊視窗欄位
-
-│   ├── 📄 sidebar\_admin.py      # 儲存全站檔案下載按鈕設計
 
 │   ├── 📄 watchlist\_page.py     # 使用者自訂追蹤清單 (寫入 G-Sheets)
 
