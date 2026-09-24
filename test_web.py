@@ -56,14 +56,15 @@ os.makedirs(MARKET_HISTORY_DIR, exist_ok=True)
 os.makedirs(BLOCK_HISTORY_DIR, exist_ok=True)
 
 # ✨ 修改 ：在載入畫面之前，確保 B3 數據已經存在記憶體中供卡片/跑馬燈使用
-if 'df_blk2_1' not in st.session_state:
-    sync_b2_data(DATA_DIR)
-if 'b3_data' not in st.session_state:
-    sync_b3_data(DATA_DIR)
-if 'b4_squeeze_radar' not in st.session_state:
-    sync_b4_data(DATA_DIR)
-if 'b5_1000' not in st.session_state:
-    sync_b5_data(DATA_DIR)
+with st.spinner("系統資料初始化中..."):
+    if 'df_blk2_1' not in st.session_state:
+        sync_b2_data(DATA_DIR)
+    if 'b3_data' not in st.session_state:
+        sync_b3_data(DATA_DIR)
+    if 'b4_squeeze_radar' not in st.session_state:
+        sync_b4_data(DATA_DIR)
+    if 'b5_1000' not in st.session_state:
+        sync_b5_data(DATA_DIR)
 
 # 呼叫渲染視覺元件 components
 style_manager.apply_global_theme()
