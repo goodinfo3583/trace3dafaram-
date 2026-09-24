@@ -55,17 +55,6 @@ os.makedirs(SCORE_HISTORY_DIR, exist_ok=True)
 os.makedirs(MARKET_HISTORY_DIR, exist_ok=True)
 os.makedirs(BLOCK_HISTORY_DIR, exist_ok=True)
 
-# ✨ 修改 ：在載入畫面之前，確保 B3 數據已經存在記憶體中供卡片/跑馬燈使用
-with st.spinner("系統資料初始化中..."):
-    if 'df_blk2_1' not in st.session_state:
-        sync_b2_data(DATA_DIR)
-    if 'b3_data' not in st.session_state:
-        sync_b3_data(DATA_DIR)
-    if 'b4_squeeze_radar' not in st.session_state:
-        sync_b4_data(DATA_DIR)
-    if 'b5_1000' not in st.session_state:
-        sync_b5_data(DATA_DIR)
-
 # 呼叫渲染視覺元件 components
 style_manager.apply_global_theme()
 
@@ -183,12 +172,20 @@ elif current_page == "b0":
 elif current_page == "b1":
     show_b1_page(DATA_DIR, STOCK_DICT)
 elif current_page == "b2":
+    if 'df_blk2_1' not in st.session_state:
+        sync_b2_data(DATA_DIR)    
     show_b2_page(DATA_DIR)
 elif current_page == "b3":
+    if 'b3_data' not in st.session_state:
+        sync_b3_data(DATA_DIR)
     show_b3_page(DATA_DIR)
 elif current_page == "b4":
+    if 'b4_squeeze_radar' not in st.session_state:
+        sync_b4_data(DATA_DIR)
     show_b4_page(DATA_DIR)
 elif current_page == "b5":
+    if 'b5_1000' not in st.session_state:
+        sync_b5_data(DATA_DIR)
     show_b5_page(DATA_DIR, STOCK_DICT) 
 elif current_page == "b6":
     show_b6_page(DATA_DIR)
@@ -202,6 +199,7 @@ elif current_page == "setting":
     show_setting_page()
 elif current_page == "weight_backtest":
     show_weight_backtest_page(STOCK_DICT)
+
 # 渲染側邊欄
 with st.sidebar:
     render_sidebar_war_room(STOCK_DICT, DATA_DIR)
