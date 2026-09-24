@@ -10,21 +10,13 @@
 
 ├── 📄test\_web.py                   #  主程式 (main)(Router \& 初始化)
 
-│                                # 負責: 連線資料庫、讀取 Session、根據點擊把冒險者帶到對應的包廂(views)。
-
-├── 📄newdaily1820\_scraper.py #爬蟲每日法人買賣超資料、法人掃貨、法人連買、鉅額交易(證券交易所、櫃買中心、Goodinfo)
+│                                	# 負責: 連線資料庫、根據點擊把冒險者帶到對應的包廂(views)。
 
 │
 
-├── 📄newdaily2200\_scraper.py #爬蟲每日 融資餘額 法人 資券動向(證券交易所、櫃買中心、Goodinfo)
-
 │
 
-├── 📄saturday1230\_scraper.py #爬蟲每周大股東變化 大腿動向(神秘金字塔、Goodinfo)
-
 │
-
-├── 📄company\_month\_scraper.py #爬蟲每月董監變化 (Goodinfo)
 
 │
 
