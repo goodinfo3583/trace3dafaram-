@@ -53,7 +53,7 @@ def apply_global_theme(image_path="./image/派對盛宴邀請.png"):
     .stButton > button:hover, .stLinkButton > a:hover {{ border-color: #00D2FF !important; color: #00D2FF !important; box-shadow: 0 0 8px rgba(0, 210, 255, 0.2); }}
     </style>""", unsafe_allow_html=True)
 
-    # 💡 修復 JS 引擎：確保 ids 名稱與 HTML 生成的 ID 完全一致
+    # 💡 終極修復 JS 引擎：強健化點擊偵測，保證一鍵收合絕對成功
     components.html("""<script>
     (function(){
         if(window.parent.window.customDragDelegated) return;
@@ -62,13 +62,40 @@ def apply_global_theme(image_path="./image/派對盛宴邀請.png"):
         
         doc.addEventListener('click', e => {
             let t = e.target;
-            if((t.tagName==='IMG' && (t.src?.includes('icon-card') || t.alt?.includes('icon-card'))) || (t.closest('div[data-testid="stImage"]')?.querySelector('img')?.src?.includes('icon-card'))) {
-                e.preventDefault(); e.stopPropagation();
-                const ids = ['b2-card','b3-card','b4-card','b5-card'], cbs = ids.map(id=>doc.getElementById(`close-${id}`)), mins = ids.map(id=>doc.getElementById(`min-${id}`));
+            let img = null;
+            
+            // 尋找被點擊的圖片元素 (直指圖片或其父容器)
+            if (t.tagName === 'IMG') img = t;
+            else if (t.closest && t.closest('div[data-testid="stImage"]')) {
+                img = t.closest('div[data-testid="stImage"]').querySelector('img');
+            }
+            
+            // 確認是否為圖卡按鈕
+            if (img && ((img.src && img.src.includes('icon-card')) || (img.alt && img.alt.includes('icon-card')))) {
+                e.preventDefault(); 
+                e.stopPropagation();
+                const ids = ['b2-card', 'b3-card', 'b4-card', 'b5-card'];
                 let open = false, min = false;
-                for(let i=0; i<4; i++) { if(cbs[i] && mins[i]) { if(!cbs[i].checked && !mins[i].checked) open=true; if(!cbs[i].checked && mins[i].checked) min=true; } }
-                let nMin = open, nClose = !open && min;
-                mins.forEach(c => { if(c) c.checked = nMin; }); cbs.forEach(c => { if(c) c.checked = nClose; });
+                
+                let cbs = ids.map(id => doc.getElementById('close-' + id));
+                let mins = ids.map(id => doc.getElementById('min-' + id));
+                
+                // 判斷當前四個面板的綜合狀態
+                for(let i=0; i<4; i++) {
+                    if(cbs[i] && mins[i]) {
+                        if(!cbs[i].checked && !mins[i].checked) open = true;
+                        if(!cbs[i].checked && mins[i].checked) min = true;
+                    }
+                }
+                
+                // 狀態機：全開 -> 縮小 -> 關閉 -> 全開
+                let nMin = open;
+                let nClose = !open && min;
+                
+                for(let i=0; i<4; i++) {
+                    if(cbs[i]) cbs[i].checked = nClose;
+                    if(mins[i]) mins[i].checked = nMin;
+                }
             }
         }, true);
         
@@ -116,11 +143,12 @@ def render_b2_top10_glass_card():
         c21, d21 = get_col(st.session_state.get('df_blk2_1')); c22, d22 = get_col(st.session_state.get('df_blk2_2')); c23, d23 = get_col(st.session_state.get('df_blk2_3')); c24, d24 = get_col(st.session_state.get('df_blk2_4'))
         d1, d2, d3, d4 = get_t10(st.session_state.get('df_blk2_1'), c21), get_t10(st.session_state.get('df_blk2_2'), c22), get_t10(st.session_state.get('df_blk2_3'), c23), get_t10(st.session_state.get('df_blk2_4'), c24)
         
+        # 💡 高度修復：margin-bottom 從 6px 降為 5px 節省空間
         def m_html(df, c):
             if df.empty or not c: return "<p style='font-size:13.5px;text-align:center;color:#94A3B8;margin-top:40px;'>無資料</p>"
-            return "<ul style='padding:0;margin:0;list-style:none;'>" + "".join([f"<li style='display:flex;align-items:center;justify-content:space-between;margin-bottom:6px;font-size:13.5px;'><div style='display:flex;width:48%;overflow:hidden;'><b style='color:#FFF;width:22px;flex-shrink:0;'>{i+1}.</b><span style='white-space:nowrap;overflow:hidden;text-overflow:ellipsis;'>{r['股票代號']}{r['股票名稱']}</span></div><div style='width:27%;color:#FFD700;font-size:11px;text-align:right;flex-shrink:0;'>{'🚨轉賣' if '轉賣反轉' in (cs:=str(r.get('今日短動態','')).split('(')[0]) else '🆕卡位' if '卡位' in cs else '🔥加碼' if '加碼' in cs else '🔥強攻' if '強延續' in cs else '🚨倒貨' if '倒貨' in cs else '📉調節' if '調節' in cs else '🔄持平' if '持平' in cs else '⚠️趨緩' if '趨緩' in cs else '⚪觀察' if not cs or cs=='nan' else cs[:3]}</div><div style='width:25%;color:#FF4C4C;font-weight:bold;text-align:right;flex-shrink:0;'>{float(r.get(c,0)):.1f}%</div></li>" for i, r in enumerate(df.to_dict('records'))]) + "</ul>"
+            return "<ul style='padding:0;margin:0;list-style:none;'>" + "".join([f"<li style='display:flex;align-items:center;justify-content:space-between;margin-bottom:5px;font-size:13.5px;'><div style='display:flex;width:48%;overflow:hidden;'><b style='color:#FFF;width:22px;flex-shrink:0;'>{i+1}.</b><span style='white-space:nowrap;overflow:hidden;text-overflow:ellipsis;'>{r['股票代號']}{r['股票名稱']}</span></div><div style='width:27%;color:#FFD700;font-size:11px;text-align:right;flex-shrink:0;'>{'🚨轉賣' if '轉賣反轉' in (cs:=str(r.get('今日短動態','')).split('(')[0]) else '🆕卡位' if '卡位' in cs else '🔥加碼' if '加碼' in cs else '🔥強攻' if '強延續' in cs else '🚨倒貨' if '倒貨' in cs else '📉調節' if '調節' in cs else '🔄持平' if '持平' in cs else '⚠️趨緩' if '趨緩' in cs else '⚪觀察' if not cs or cs=='nan' else cs[:3]}</div><div style='width:25%;color:#FF4C4C;font-weight:bold;text-align:right;flex-shrink:0;'>{float(r.get(c,0)):.1f}%</div></li>" for i, r in enumerate(df.to_dict('records'))]) + "</ul>"
 
-        # 💡 使用純字串定義 CSS，徹底避免 f-string 雙大括號解析崩潰
+        # 💡 高度修復：carousel-wrapper-b2 高度提升至 330px 確保第 10 名不被裁切
         css = """
         <style>
         #close-b2-card:checked ~ #b2-card { display: none !important; }
@@ -140,7 +168,7 @@ def render_b2_top10_glass_card():
         .action-btn-b2:hover { color: #FF4C4C; }
         .panel-title-b2 { margin: 0 0 8px 0; font-size: 12.5px; font-weight: bold; color: #FF4C4C; display: flex; justify-content: space-between; align-items: flex-end; }
         .date-badge-b2 { font-size: 10px; color: #94A3B8; font-weight: normal; }
-        .carousel-wrapper-b2 { position: relative; max-height: 285px; height: 285px; overflow: hidden; transition: all 0.3s ease; opacity: 1; }
+        .carousel-wrapper-b2 { position: relative; max-height: 330px; height: 330px; overflow: hidden; transition: all 0.3s ease; opacity: 1; }
         .carousel-item-b2 { position: absolute; top: 0; left: 0; width: 100%; opacity: 0; animation: fadeSwitchB2 20s infinite; }
         .carousel-item-b2:nth-child(1) { animation-delay: 0s; }
         .carousel-item-b2:nth-child(2) { animation-delay: 5s; }
@@ -176,8 +204,10 @@ def render_top10_glass_card():
         def fmt_d(d): return d[-4:] if (d and d != "00000000") else "未知"
         dfd, dit, dfw, diw = fmt_d(st.session_state['b3_data']['fo_day'][1]), fmt_d(st.session_state['b3_data']['it_day'][1]), fmt_d(st.session_state['b3_data']['fo_wk'][1]), fmt_d(st.session_state['b3_data']['it_wk'][1])
         
-        def m_html(df, c, u): return "<p style='font-size:13.5px;text-align:center;color:#94A3B8;margin-top:40px;'>無資料</p>" if df.empty else "<ul style='padding:0;margin:0;list-style:none;'>" + "".join([f"<li style='display:flex;justify-content:space-between;align-items:center;margin-bottom:6px;font-size:13.5px;'><div style='display:flex;width:55%;overflow:hidden;'><b style='color:#FFF;width:22px;flex-shrink:0;'>{i+1}.</b><span style='white-space:nowrap;overflow:hidden;text-overflow:ellipsis;'>{r['股票代號']}{r['股票名稱']}</span></div><div style='width:45%;text-align:right;white-space:nowrap;'><span style='color:#FFD700;font-size:11px;margin-right:4px;'>{r.get('狀態動態','')}</span><span style='color:#00D2FF;font-weight:bold;'>{r.get(c,0)}{u}</span></div></li>" for i, r in enumerate(df.to_dict('records'))]) + "</ul>"
+        # 💡 margin-bottom 從 6px 降為 5px 
+        def m_html(df, c, u): return "<p style='font-size:13.5px;text-align:center;color:#94A3B8;margin-top:40px;'>無資料</p>" if df.empty else "<ul style='padding:0;margin:0;list-style:none;'>" + "".join([f"<li style='display:flex;justify-content:space-between;align-items:center;margin-bottom:5px;font-size:13.5px;'><div style='display:flex;width:55%;overflow:hidden;'><b style='color:#FFF;width:22px;flex-shrink:0;'>{i+1}.</b><span style='white-space:nowrap;overflow:hidden;text-overflow:ellipsis;'>{r['股票代號']}{r['股票名稱']}</span></div><div style='width:45%;text-align:right;white-space:nowrap;'><span style='color:#FFD700;font-size:11px;margin-right:4px;'>{r.get('狀態動態','')}</span><span style='color:#00D2FF;font-weight:bold;'>{r.get(c,0)}{u}</span></div></li>" for i, r in enumerate(df.to_dict('records'))]) + "</ul>"
 
+        # 💡 carousel-wrapper 高度提升至 330px
         css = """
         <style>
         #close-b3-card:checked ~ #b3-card { display: none !important; }
@@ -198,7 +228,7 @@ def render_top10_glass_card():
         .close-btn:hover { color: #FF4C4C; }
         .panel-title { margin: 0 0 8px 0; font-size: 12.5px; font-weight: bold; color: #00D2FF; display: flex; justify-content: space-between; align-items: flex-end; }
         .date-badge { font-size: 10px; color: #94A3B8; font-weight: normal; }
-        .carousel-wrapper { position: relative; max-height: 285px; height: 285px; overflow: hidden; transition: all 0.3s ease; opacity: 1; }
+        .carousel-wrapper { position: relative; max-height: 330px; height: 330px; overflow: hidden; transition: all 0.3s ease; opacity: 1; }
         .carousel-item { position: absolute; top: 0; left: 0; width: 100%; opacity: 0; animation: fadeSwitch 20s infinite; }
         .carousel-item:nth-child(1) { animation-delay: 0s; }
         .carousel-item:nth-child(2) { animation-delay: 5s; }
@@ -234,8 +264,10 @@ def render_b4_top10_glass_card():
         dsq = st.session_state['b4_squeeze_radar']['date'][-4:] if len(st.session_state['b4_squeeze_radar']['date']) >= 4 else "未知"
         drk = st.session_state['b4_risk_radar']['date'][-4:] if len(st.session_state['b4_risk_radar']['date']) >= 4 else "未知"
         
-        def m_html(df, st_idx, th): return "<p style='font-size:13.5px;text-align:center;color:#94A3B8;margin-top:40px;'>尚無目標</p>" if (s:=df.iloc[st_idx:st_idx+10]).empty else "<ul style='padding:0;margin:0;list-style:none;'>" + "".join([f"<li style='display:flex;align-items:center;justify-content:space-between;margin-bottom:6px;font-size:13.5px;'><div style='display:flex;width:55%;overflow:hidden;'><b style='color:#FFF;width:22px;flex-shrink:0;'>{st_idx+i+1}.</b><span style='white-space:nowrap;overflow:hidden;text-overflow:ellipsis;'>{r['代號']}{r['名稱']}</span></div><div style='width:25%;color:#FFD700;font-size:11px;text-align:left;flex-shrink:0;'>{(r.get('軋空評估' if th=='sq' else '套牢評估', ''))[:7]}</div><div style='width:20%;color:{'#FF4C4C' if th=='sq' else '#00e676'};font-weight:bold;text-align:right;flex-shrink:0;'>{float(r.get('漲跌幅',0)):.1f}%</div></li>" for i, r in enumerate(s.to_dict('records'))]) + "</ul>"
+        # 💡 margin-bottom 從 6px 降為 5px 
+        def m_html(df, st_idx, th): return "<p style='font-size:13.5px;text-align:center;color:#94A3B8;margin-top:40px;'>尚無目標</p>" if (s:=df.iloc[st_idx:st_idx+10]).empty else "<ul style='padding:0;margin:0;list-style:none;'>" + "".join([f"<li style='display:flex;align-items:center;justify-content:space-between;margin-bottom:5px;font-size:13.5px;'><div style='display:flex;width:55%;overflow:hidden;'><b style='color:#FFF;width:22px;flex-shrink:0;'>{st_idx+i+1}.</b><span style='white-space:nowrap;overflow:hidden;text-overflow:ellipsis;'>{r['代號']}{r['名稱']}</span></div><div style='width:25%;color:#FFD700;font-size:11px;text-align:left;flex-shrink:0;'>{(r.get('軋空評估' if th=='sq' else '套牢評估', ''))[:7]}</div><div style='width:20%;color:{'#FF4C4C' if th=='sq' else '#00e676'};font-weight:bold;text-align:right;flex-shrink:0;'>{float(r.get('漲跌幅',0)):.1f}%</div></li>" for i, r in enumerate(s.to_dict('records'))]) + "</ul>"
 
+        # 💡 carousel-wrapper-b4 高度提升至 330px
         css = """
         <style>
         #close-b4-card:checked ~ #b4-card { display: none !important; }
@@ -256,7 +288,7 @@ def render_b4_top10_glass_card():
         .panel-title-b4 { margin: 0 0 8px 0; font-size: 12.5px; font-weight: bold; color: #bc13fe; display: flex; justify-content: space-between; align-items: flex-end; }
         .panel-title-b4.risk { color: #00e676; }
         .date-badge-b4 { font-size: 10px; color: #94A3B8; font-weight: normal; }
-        .carousel-wrapper-b4 { position: relative; max-height: 285px; height: 285px; overflow: hidden; transition: all 0.3s ease; opacity: 1; }
+        .carousel-wrapper-b4 { position: relative; max-height: 330px; height: 330px; overflow: hidden; transition: all 0.3s ease; opacity: 1; }
         .carousel-item-b4 { position: absolute; top: 0; left: 0; width: 100%; opacity: 0; animation: fadeSwitchB4 20s infinite; }
         .carousel-item-b4:nth-child(1) { animation-delay: 0s; }
         .carousel-item-b4:nth-child(2) { animation-delay: 5s; }
@@ -298,9 +330,11 @@ def render_b5_top10_glass_card():
         t6 = sy[(sy['6周(千)_v']>0)&(sy['6周(四)_v']>0)].sort_values('6周(千)_v', ascending=False).head(10)
         tl = sy[(sy['最新(千)_v']>0)&(sy['最新(四)_v']>0)].sort_values('最新(千)_v', ascending=False).head(10)
         
+        # 💡 margin-bottom 從 6px 降為 5px
         def u_txt(s): s=str(s); return "🚀劇增" if "🚀" in s else "🔥大增" if "🔥" in s else "📈小增" if "📈" in s else "↗️微增" if "↗️" in s else "🔄持平" if "🔄" in s else "↘️微減" if "↘️" in s else "📉小減" if "📉" in s else "⚠️大減" if "⚠️" in s else "🚨劇減" if "🚨" in s else "⚪無字"
-        def m_html(df, i6): return "<p style='font-size:13.5px;text-align:center;color:#94A3B8;margin-top:40px;'>尚無共振</p>" if df.empty else "<ul style='padding:0;margin:0;list-style:none;'>" + "".join([f"<li style='display:flex;align-items:center;justify-content:space-between;margin-bottom:6px;font-size:13.5px;'><div style='display:flex;align-items:center;flex:1;overflow:hidden;margin-right:8px;'><b style='color:#FFF;width:22px;flex-shrink:0;'>{i+1}.</b><span style='white-space:nowrap;overflow:hidden;text-overflow:ellipsis;'>{r['股票代號']}{r['股票名稱']}</span></div><div style='display:flex;justify-content:flex-end;align-items:center;color:#F59E0B;font-weight:{'bold' if i6 else 'normal'};font-size:{'13.5' if i6 else '11'}px;flex-shrink:0;'><span style='width:48px;text-align:right;'>{f'{r["6周(千)_v"]:.1f}%' if i6 else u_txt(r.get('狀態(千)'))}</span><span style='color:#94A3B8;margin:0 3px;'>/</span><span style='width:48px;text-align:right;'>{f'{r["6周(四)_v"]:.1f}%' if i6 else u_txt(r.get('狀態(四)'))}</span></div></li>" for i, r in enumerate(df.to_dict('records'))]) + "</ul>"
+        def m_html(df, i6): return "<p style='font-size:13.5px;text-align:center;color:#94A3B8;margin-top:40px;'>尚無共振</p>" if df.empty else "<ul style='padding:0;margin:0;list-style:none;'>" + "".join([f"<li style='display:flex;align-items:center;justify-content:space-between;margin-bottom:5px;font-size:13.5px;'><div style='display:flex;align-items:center;flex:1;overflow:hidden;margin-right:8px;'><b style='color:#FFF;width:22px;flex-shrink:0;'>{i+1}.</b><span style='white-space:nowrap;overflow:hidden;text-overflow:ellipsis;'>{r['股票代號']}{r['股票名稱']}</span></div><div style='display:flex;justify-content:flex-end;align-items:center;color:#F59E0B;font-weight:{'bold' if i6 else 'normal'};font-size:{'13.5' if i6 else '11'}px;flex-shrink:0;'><span style='width:48px;text-align:right;'>{f'{r["6周(千)_v"]:.1f}%' if i6 else u_txt(r.get('狀態(千)'))}</span><span style='color:#94A3B8;margin:0 3px;'>/</span><span style='width:48px;text-align:right;'>{f'{r["6周(四)_v"]:.1f}%' if i6 else u_txt(r.get('狀態(四)'))}</span></div></li>" for i, r in enumerate(df.to_dict('records'))]) + "</ul>"
 
+        # 💡 carousel-wrapper-b5 高度提升至 330px
         css = """
         <style>
         #close-b5-card:checked ~ #b5-card { display: none !important; }
@@ -320,7 +354,7 @@ def render_b5_top10_glass_card():
         .action-btn-b5:hover { color: #F59E0B; }
         .panel-title-b5 { margin: 0 0 8px 0; font-size: 12.5px; font-weight: bold; color: #F59E0B; display: flex; justify-content: space-between; align-items: flex-end; }
         .date-badge-b5 { font-size: 10px; color: #94A3B8; font-weight: normal; }
-        .carousel-wrapper-b5 { position: relative; max-height: 285px; height: 285px; overflow: hidden; transition: all 0.3s ease; opacity: 1; }
+        .carousel-wrapper-b5 { position: relative; max-height: 330px; height: 330px; overflow: hidden; transition: all 0.3s ease; opacity: 1; }
         .carousel-item-b5 { position: absolute; top: 0; left: 0; width: 100%; opacity: 0; animation: fadeSwitchB5 10s infinite; }
         .carousel-item-b5:nth-child(1) { animation-delay: 0s; }
         .carousel-item-b5:nth-child(2) { animation-delay: 5s; }
@@ -358,7 +392,7 @@ def render_course_npc():
         st.markdown(f"""{css}<div class="npc-overlay"><div class="top-actions"><label class="action-btn close" id="btn-close-list" title="關閉">✕</label></div><div class="npc-header"><div class="npc-big-image" style="background-image: url('app/static/npcnatzu.png');"></div><div class="dialogue-box"><div class="npc-name">籌碼導師</div><div class="npc-text">「冒險者，選擇你想強化的能力吧！」</div></div></div><div class="course-list">{h_items}</div></div>""", unsafe_allow_html=True)
     else:
         d = {'detail_1': {'npc': '蘿西', 'img': 'npcroxy.png', 'text': '「冒險者注意！經濟並不是永遠上升，而是不斷『🟢 復甦 → 擴張 → 過熱 → 放緩 → 衰退』的循環。現在的市場環境，究竟該積極、觀望，還是提高風險意識？讓我們從總體經濟數據中找答案吧！」', 'html': '<div class="section-title">📊 總體經濟關鍵指標解析</div><table class="pv-table"><thead><tr><th width="15%">指標</th><th width="35%">主要觀察什麼</th><th width="50%">上升通常代表對市場的影響</th></tr></thead><tbody><tr><td><b>GDP</b></td><td style="text-align:left;">經濟成長速度</td><td style="text-align:left;">經濟活動增加 🟢 景氣可能擴張</td></tr><tr><td><b>CPI</b></td><td style="text-align:left;">物價與通膨</td><td style="text-align:left;">生活成本上升 🟠 可能增加升息壓力</td></tr><tr><td><b>利率</b></td><td style="text-align:left;">資金成本</td><td style="text-align:left;">借錢成本提高 🔴 股市估值可能承壓</td></tr><tr><td><b>匯率</b></td><td style="text-align:left;">貨幣強弱</td><td style="text-align:left;">資金與出口環境變化 🟡 需搭配產業判讀</td></tr></tbody></table><div class="section-title">⚡ 景氣循環核心狀態對照</div><table class="pv-table"><thead><tr><th width="30%">景氣狀態</th><th width="40%">核心數據表現</th><th width="30%">市場含義</th></tr></thead><tbody><tr><td style="color:#4ADE80; font-weight:bold;">🟢 景氣復甦</td><td>GDP↑ / CPI→ / 利率低</td><td style="text-align:left;">景氣回升，初升段</td></tr><tr><td style="color:#4ADE80; font-weight:bold;">🟢 經濟擴張</td><td>GDP↑↑ / 企業活動↑</td><td style="text-align:left;">多頭主升段延續</td></tr><tr><td style="color:#FB923C; font-weight:bold;">🟠 景氣過熱</td><td>GDP↑ / CPI↑↑ / 利率↑</td><td style="text-align:left;">通膨升溫，注意緊縮</td></tr><tr><td style="color:#F87171; font-weight:bold;">🔴 經濟放緩</td><td>GDP↓ / 消費↓</td><td style="text-align:left;">動能減弱，防守為主</td></tr><tr><td style="color:#EF4444; font-weight:bold;">🚨 經濟衰退</td><td>GDP↓↓ / 失業↑</td><td style="text-align:left;">熊市風險，資金避險</td></tr></tbody></table>'},
-             'detail_2': {'npc': '蘿西', 'img': 'npcroxy.png', 'text': '「冒險者，歡迎來到基礎訓練營！進入市場前，熟悉『盤面術語』與『市場角色』是最基本的要求。記住，台股是『紅漲綠跌』，搞懂這些名詞，未來的籌碼分析才會事半功倍喔！」', 'html': '<div class="section-title">📖 盤面速讀與狀態判讀</div><table class="pv-table"><thead><tr><th width="25%">狀態</th><th width="40%">一眼判讀</th><th width="35%">初步理解</th></tr></thead><tbody><tr><td style="color:#4ADE80; font-weight:bold;">🟢 買盤積極</td><td>股價↑ / 成交量↑</td><td style="text-align:left;">市場買方積極</td></tr><tr><td style="color:#F87171; font-weight:bold;">🔴 賣壓增加</td><td>股價↓ / 成交量↑</td><td style="text-align:left;">市場賣方積極</td></tr><tr><td style="color:#FACC15; font-weight:bold;">🟡 市場觀望</td><td>股價→ / 成交量↓</td><td style="text-align:left;">市場交易意願降低</td></tr><tr><td style="color:#FB923C; font-weight:bold;">🟠 波動加劇</td><td>高低價差↑ / 成交量↑</td><td style="text-align:left;">多空雙方競爭激烈</td></tr></tbody></table><div class="section-title">🏷️ 盤面常見名詞</div><table class="pv-table"><thead><tr><th width="20%">名詞</th><th width="40%">一眼理解</th><th width="40%">代表什麼</th></tr></thead><tbody><tr><td><b>開盤價</b></td><td style="text-align:left;">今天第一筆成交價</td><td style="text-align:left;">市場開盤的第一個價格</td></tr><tr><td><b>收盤價</b></td><td style="text-align:left;">最後成交價格</td><td style="text-align:left;">當日市場最後結果</td></tr><tr><td style="color:#00E676; font-weight:bold;">內盤</td><td style="text-align:left;">主動賣方成交</td><td style="text-align:left;">賣方較積極</td></tr><tr><td style="color:#FF4C4C; font-weight:bold;">外盤</td><td style="text-align:left;">主 পতিত買方成交</td><td style="text-align:left;">買方較積極</td></tr></tbody></table>'},
+             'detail_2': {'npc': '蘿西', 'img': 'npcroxy.png', 'text': '「冒險者，歡迎來到基礎訓練營！進入市場前，熟悉『盤面術語』與『市場角色』是最基本的要求。記住，台股是『紅漲綠跌』，搞懂這些名詞，未來的籌碼分析才會事半功倍喔！」', 'html': '<div class="section-title">📖 盤面速讀與狀態判讀</div><table class="pv-table"><thead><tr><th width="25%">狀態</th><th width="40%">一眼判讀</th><th width="35%">初步理解</th></tr></thead><tbody><tr><td style="color:#4ADE80; font-weight:bold;">🟢 買盤積極</td><td>股價↑ / 成交量↑</td><td style="text-align:left;">市場買方積極</td></tr><tr><td style="color:#F87171; font-weight:bold;">🔴 賣壓增加</td><td>股價↓ / 成交量↑</td><td style="text-align:left;">市場賣方積極</td></tr><tr><td style="color:#FACC15; font-weight:bold;">🟡 市場觀望</td><td>股價→ / 成交量↓</td><td style="text-align:left;">市場交易意願降低</td></tr><tr><td style="color:#FB923C; font-weight:bold;">🟠 波動加劇</td><td>高低價差↑ / 成交量↑</td><td style="text-align:left;">多空雙方競爭激烈</td></tr></tbody></table><div class="section-title">🏷️ 盤面常見名詞</div><table class="pv-table"><thead><tr><th width="20%">名詞</th><th width="40%">一眼理解</th><th width="40%">代表什麼</th></tr></thead><tbody><tr><td><b>開盤價</b></td><td style="text-align:left;">今天第一筆成交價</td><td style="text-align:left;">市場開盤的第一個價格</td></tr><tr><td><b>收盤價</b></td><td style="text-align:left;">最後成交價格</td><td style="text-align:left;">當日市場最後結果</td></tr><tr><td style="color:#00E676; font-weight:bold;">內盤</td><td style="text-align:left;">主動賣方成交</td><td style="text-align:left;">賣方較積極</td></tr><tr><td style="color:#FF4C4C; font-weight:bold;">外盤</td><td style="text-align:left;">主動買方成交</td><td style="text-align:left;">買方較積極</td></tr></tbody></table>'},
              'detail_3': {'npc': '蘿西', 'img': 'npcroxy.png', 'text': '「冒險者，想找出真正能長期幫你賺錢的金雞母嗎？財報就是公司的體檢表！學會看懂基本面，才不會被虛假的包裝騙了喔！」', 'html': '<div class="section-title">📖 三大財務報表白話理解</div><table class="pv-table"><thead><tr><th width="25%">財務報表</th><th width="35%">白話理解</th><th width="40%">主要看什麼</th></tr></thead><tbody><tr><td><b>📈 綜合損益表</b></td><td style="text-align:left;">公司這段時間賺多少</td><td style="text-align:left;">營收、毛利、營業利益、淨利</td></tr><tr><td><b>🏦 資產負債表</b></td><td style="text-align:left;">公司現在有多少家底</td><td style="text-align:left;">資產、負債、股東權益</td></tr><tr><td><b>💵 現金流量表</b></td><td style="text-align:left;">錢實際怎麼流動</td><td style="text-align:left;">營業、投資、籌資現金流</td></tr></tbody></table><div class="section-title">🔍 基本面狀態一眼判讀</div><table class="pv-table"><thead><tr><th width="25%">狀態</th><th width="40%">一眼判讀</th><th width="35%">初步解讀</th></tr></thead><tbody><tr><td style="color:#4ADE80; font-weight:bold;">🟢 穩定成長</td><td>營收↑ / EPS↑ / 現金流↑</td><td style="text-align:left;">公司營運與獲利同步改善</td></tr><tr><td style="color:#4ADE80; font-weight:bold;">🟢 獲利改善</td><td>營收→ / 毛利↑ / EPS↑</td><td style="text-align:left;">公司效率或產品組合改善</td></tr><tr><td style="color:#FACC15; font-weight:bold;">🟡 成長放緩</td><td>營收↑但增速↓ / EPS→</td><td style="text-align:left;">公司仍成長，但速度減慢</td></tr><tr><td style="color:#FB923C; font-weight:bold;">🟠 虛胖成長</td><td>營收↑ / EPS↓ / 現金流↓</td><td style="text-align:left;">生意變大，但獲利品質可能下降</td></tr><tr><td style="color:#EF4444; font-weight:bold;">🚨 基本面惡化</td><td>營收↓ / EPS↓ / 現金流↓</td><td style="text-align:left;">核心營運同步轉弱</td></tr></tbody></table>'},
              'detail_4': {'npc': '羅德', 'img': 'npcroad.png', 'text': '「量價關係是市場最真實的足跡！仔細看這張表，當『量』與『價』出現背離時，就是趨勢即將反轉的危險警訊喔！」', 'html': '<table class="pv-table" style="margin-top:10px;"><thead><tr><th width="15%">趨勢</th><th width="20%">狀態</th><th width="65%">市場含義</th></tr></thead><tbody><tr><td class="trend-up">上漲</td><td>價升量縮</td><td style="text-align:left;">量價背離，下方有承接，短期回調，後續拉高</td></tr><tr><td class="trend-up">上漲</td><td>放量滯漲</td><td style="text-align:left;">趨勢高位，拋壓增大，即將見頂反轉，減倉清倉</td></tr><tr><td class="trend-up">上漲</td><td>縮量大漲</td><td style="text-align:left;">趨勢中途，縮量加速，鎖倉高控盤，延續上漲</td></tr><tr><td class="trend-up">上漲</td><td>放量大漲</td><td style="text-align:left;">價漲量增，量價齊升，多方吸籌，持續看漲</td></tr><tr><td class="trend-down">下跌</td><td>縮量小跌</td><td style="text-align:left;">主力洗盤，拋壓減弱，止跌位置，擇機進場</td></tr><tr><td class="trend-down">下跌</td><td>放量小跌</td><td style="text-align:left;">見底信號，買方增強，越跌越買，反轉新倉</td></tr><tr><td class="trend-down">下跌</td><td>縮量大跌</td><td style="text-align:left;">一致看空，無人接盤，下跌中繼，加速下跌</td></tr><tr><td class="trend-down">下跌</td><td>放量大跌</td><td style="text-align:left;">跟風砸盤，大量賣出，高位出貨，持續下跌</td></tr></tbody></table>'},
              'detail_5': {'npc': '羅德', 'img': 'npcroad.png', 'text': '「冒險者！技術指標可不是單純告訴你『買』或『賣』的魔法棒！它幫你從不同角度觀察市場的方向、動能與熱度。來看看這張儀表板吧！」', 'html': '<div class="info-box"><b>🧭 指標核心雷達：</b><br>📈 MA 看方向 ｜ ⚡ MACD 看動能 ｜ 🌡️ RSI 看熱度 ｜ 🎢 KDJ 看短線節奏 ｜ 📏 BBW 看波動</div><div class="section-title">📊 綜合總表：多指標狀態判讀</div><table class="pv-table"><thead><tr><th width="18%">市場狀態</th><th width="20%">MA 趨勢</th><th width="22%">MACD 動能</th><th width="20%">RSI／KDJ</th><th width="20%">BBW 波動</th></tr></thead><tbody><tr><td style="color:#60A5FA; font-weight:bold;">🔵 蓄力整理</td><td>均線糾結</td><td>接近 0 軸</td><td>RSI 40～60</td><td>↓↓ 極度收縮</td></tr><tr><td style="color:#4ADE80; font-weight:bold;">🚀 向上突破</td><td>突破均線</td><td>DIF > DEA</td><td>RSI > 50</td><td>↑ 開始擴張</td></tr><tr><td style="color:#4ADE80; font-weight:bold;">🟢 多頭趨勢</td><td>股價 > MA</td><td>0軸上/偏多</td><td>RSI 50～70</td><td>正常或擴張</td></tr><tr><td style="color:#FF7676; font-weight:bold;">🔥 強勢加速</td><td>多頭排列</td><td>柱體↑↑</td><td>RSI 70↑</td><td>↑↑ 快速擴張</td></tr><tr><td style="color:#FACC15; font-weight:bold;">🟡 高檔過熱</td><td>維持多頭</td><td>動能縮小</td><td>RSI > 70</td><td>高檔擴張或收斂</td></tr><tr><td style="color:#FB923C; font-weight:bold;">🟠 趨勢轉弱</td><td>跌破短均</td><td>死亡交叉</td><td>RSI 跌破50</td><td>可能收縮或轉向</td></tr><tr><td style="color:#F87171; font-weight:bold;">🔴 空頭趨勢</td><td>股價 < MA</td><td>DIF < DEA</td><td>RSI < 40</td><td>向下擴張</td></tr></tbody></table>'},
