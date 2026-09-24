@@ -55,11 +55,6 @@ os.makedirs(SCORE_HISTORY_DIR, exist_ok=True)
 os.makedirs(MARKET_HISTORY_DIR, exist_ok=True)
 os.makedirs(BLOCK_HISTORY_DIR, exist_ok=True)
 
-<<<<<<< HEAD
-# 💡 開機卡死防護：移除全域強迫同步，改為按需載入。
-# 當使用者點擊對應分頁時，該分頁會自動呼叫 sync 函式將資料寫入 session_state。
-# 這樣一來網頁就能瞬間開機，不再卡在「Your app is in the oven」。
-=======
 # ✨ 修改 ：在載入畫面之前，確保 B3 數據已經存在記憶體中供卡片/跑馬燈使用
 if 'df_blk2_1' not in st.session_state:
     sync_b2_data(DATA_DIR)
@@ -69,7 +64,6 @@ if 'b4_squeeze_radar' not in st.session_state:
     sync_b4_data(DATA_DIR)
 if 'b5_1000' not in st.session_state:
     sync_b5_data(DATA_DIR)
->>>>>>> 2a718a89fcb9ad7b5907129b182ecca3df5ccc76
 
 # 呼叫渲染視覺元件 components
 style_manager.apply_global_theme()
