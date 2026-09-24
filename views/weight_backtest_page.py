@@ -356,7 +356,7 @@ def show_weight_backtest_page(STOCK_DICT, DATA_DIR="data"):
         b0_vp_status = st.multiselect("🎯 可複選量價型態：", ["🚀 放量大漲", "🔒 縮量大漲", "✈️ 平量大漲", "📈 價升量縮", "⚠️ 放量滯漲", "⏸️ 平量滯漲", "📉 縮量小跌", "🛡️ 放量小跌", "🥀 平量價縮", "☠️ 縮量大跌", "🩸 放量大跌", "🕳️ 平量大跌"], key="filter_b0_vp_status")
         c7, c8 = st.columns(2)
         b0_explode_ratio = c7.number_input("🚀 今日成交額大於【5日均額】的倍數：", 0.0, value=0.0, step=0.5, key="filter_b0_explode_ratio")
-        b0_fund_trend = c8.multiselect("📈 資金延續狀態：", ["🔥 資金湧入 (延續性強)", "⚡ 單日點火 (需觀察)", "💧 資金退潮 (動能弱)", "⚖️ 震盪換手"], key="filter_b0_fund_trend")
+        b0_fund_trend = c8.multiselect("📈 資金延續狀態(水龍頭)：", ["🔥 資金湧入 (延續性強)", "⚡ 單日點火 (需觀察)", "💧 資金退潮 (動能弱)", "⚖️ 震盪換手"], key="filter_b0_fund_trend")
     
     # --- 模組 B1 ---
     df_b1_raw = get_df('b1_final_df')
@@ -375,7 +375,7 @@ def show_weight_backtest_page(STOCK_DICT, DATA_DIR="data"):
     b2_latest_date_str = next((c.replace("成交比%", "") for c in get_df('b2_1').columns if "成交比%" in c), "未知")
     if len(b2_latest_date_str) == 4: b2_latest_date_str = f"2026/{b2_latest_date_str[:2]}/{b2_latest_date_str[2:]}"
     with st.expander(f"🚀 B2 法人掃貨過濾 (資料基準日: {b2_latest_date_str})", expanded=False):
-        b2_top_n = st.slider("👑 排名過濾", 10, 300, 50, 10, key="filter_b2_top_n")
+        b2_top_n = st.slider("👑 買超排名過濾", 10, 300, 50, 10, key="filter_b2_top_n")
         c1, c2 = st.columns(2)
         b2_1_chk, b2_3_chk = c1.checkbox(f"外資買超佔【5日成交量】(前 {b2_top_n} 名)", key="filter_b2_1"), c1.checkbox(f"外資買超佔【5日發行數】(前 {b2_top_n} 名)", key="filter_b2_3")
         b2_2_chk, b2_4_chk = c2.checkbox(f"投信買超佔【5日成交量】(前 {b2_top_n} 名)", key="filter_b2_2"), c2.checkbox(f"投信買超佔【5日發行數】(前 {b2_top_n} 名)", key="filter_b2_4")
@@ -399,7 +399,7 @@ def show_weight_backtest_page(STOCK_DICT, DATA_DIR="data"):
     # --- 模組 B4 ---
     b4_latest_date_str = st.session_state.get('b4_squeeze_radar', {}).get('date', "未知日期")
     with st.expander(f"⚔️ B4 資券動向過濾 (資料基準日: {b4_latest_date_str})", expanded=False):
-        b4_top_n = st.slider("👑 排名過濾", 10, 300, 50, 10, key="filter_b4_top_n")
+        b4_top_n = st.slider("👑 資券排名過濾", 10, 300, 50, 10, key="filter_b4_top_n")
         c1, c2 = st.columns(2)
         b4_41_pct, b4_42_pct, b4_43_pct, b4_inc_margin_pct, b4_short_dec_amt = c1.checkbox("融資減少幅度", key="filter_b4_pct_41"), c1.checkbox("借券賣出減少幅度", key="filter_b4_pct_42"), c1.checkbox("融券增加幅度", key="filter_b4_pct_43"), c1.checkbox("融資增加幅度", key="filter_b4_pct_inc_margin"), c1.checkbox("借券減少金額", key="filter_b4_amt_short_dec")
         b4_41_vol, b4_42_vol, b4_43_vol, b4_inc_short_pct, b4_short_inc_amt = c2.checkbox("融資減少張數", key="filter_b4_vol_41"), c2.checkbox("借券賣出減少張數", key="filter_b4_vol_42"), c2.checkbox("融券增加張數", key="filter_b4_vol_43"), c2.checkbox("借券賣出增加幅度", key="filter_b4_pct_inc_short"), c2.checkbox("借券增加金額", key="filter_b4_amt_short_inc")
