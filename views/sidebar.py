@@ -11,7 +11,7 @@ from plotly.subplots import make_subplots
 from utils.data_utils import get_latest_csv, get_prev_csv
 
 # ==========================================
-# 🌟 "側邊雙視窗" 變數雷達與自動載入各區塊引擎
+# 🌟 "側邊雙視窗" 變數雷達與自動載入各區塊引擎  新增補載頁面1
 # ==========================================
 KEY_MAP = {
     'b1_final_df': ['b1_final_df', 'my_final_df'],
@@ -35,17 +35,9 @@ KEY_MAP = {
     'b7_pledge_history': ['b7_pledge_history', 'df_pledge_history', 'df_b7_pledge_history'],  
     'broker_history': ['broker_history_df'] 
 }
-#===
-def get_sidebar_df(primary_key):
-    """🌟 側邊欄專用萬能變數雷達 (記憶體優化版)"""
-    # 🚀 記憶體救星 1：全系統最肥的券商歷史大表，絕對不要去讀 session_state！直接拿快取！
-    if primary_key == 'broker_history':
-        try:
-            from views.broker_page import load_full_blood_broker_history
-            return load_full_blood_broker_history()
-        except Exception:
-            return pd.DataFrame()
 
+def get_sidebar_df(primary_key):
+    """🌟 側邊欄專用萬能變數雷達：支援新舊 Session State 鑰匙"""
     aliases = KEY_MAP.get(primary_key, [primary_key])
     for k in aliases:
         df = st.session_state.get(k)
@@ -54,79 +46,112 @@ def get_sidebar_df(primary_key):
     return pd.DataFrame()
 
 def ensure_b1_to_b5_loaded(DATA_DIR):
-    """🚀 背景自動補載機制 (已移除記憶體毒瘤)"""
-    if not DATA_DIR or not os.path.exists(DATA_DIR): return
-
+    """🚀 背景自動補載機制：當搜尋時發現數據缺失，自動觸發 B1~B5 後台同步引擎"""
+    if not DATA_DIR or not os.path.exists(DATA_DIR):
+        return
+    # B1 補載
     if get_sidebar_df('b1_final_df').empty:
-        try: from views.b1_page import sync_b1_data; sync_b1_data(DATA_DIR)
+        try:
+            from views.b1_page import sync_b1_data
+            sync_b1_data(DATA_DIR)
         except: pass
+
+    # B2 補載
     if get_sidebar_df('b2_1').empty:
-        try: from views.b2_page import sync_b2_data; sync_b2_data(DATA_DIR)
+        try:
+            from views.b2_page import sync_b2_data
+            sync_b2_data(DATA_DIR)
         except: pass
+
+    # B3 補載
     if get_sidebar_df('b3_main').empty:
-        try: from views.b3_page import sync_b3_data; sync_b3_data(DATA_DIR)
+        try:
+            from views.b3_page import sync_b3_data
+            sync_b3_data(DATA_DIR)
         except: pass
+
+    # B4 補載
     if get_sidebar_df('b4_margin_pct').empty:
-        try: from views.b4_page import sync_b4_data; sync_b4_data(DATA_DIR)
+        try:
+            from views.b4_page import sync_b4_data
+            sync_b4_data(DATA_DIR)
         except: pass
+
+    # B5 補載
     if get_sidebar_df('b5_1000').empty:
-        try: from views.b5_page import sync_b5_data; sync_b5_data(DATA_DIR)
+        try:
+            from views.b5_page import sync_b5_data
+            sync_b5_data(DATA_DIR)
         except: pass
+        
+    # B7 補載 
     if get_sidebar_df('b7_main').empty:
-        try: from views.b7_page import sync_b7_data; sync_b7_data(DATA_DIR)
+        try:
+            from views.b7_page import sync_b7_data
+            sync_b7_data(DATA_DIR)
         except: pass
+        
+    # B7 最新質押比 補載
     if get_sidebar_df('b7_pledge').empty:
-        try: from views.b7_page import sync_pledge_data; sync_pledge_data(DATA_DIR)
+        try:
+            from views.b7_page import sync_pledge_data
+            sync_pledge_data(DATA_DIR)
         except: pass
+
+    # B7 質押歷史趨勢 補載
     if get_sidebar_df('b7_pledge_history').empty:
-        try: from views.b7_page import sync_pledge_history_data; sync_pledge_history_data(DATA_DIR)
+        try:
+            from views.b7_page import sync_pledge_history_data
+            sync_pledge_history_data(DATA_DIR)
         except: pass 
-    
-    # 🛑 移除了原本把 broker_history 塞進 st.session_state 的致命邏輯
-    # 現在交由上面的 get_sidebar_df 直接去快取池拿取，不佔用任何額外記憶體！
+
+    # 券商分點歷史明細 補載
+    if get_sidebar_df('broker_history').empty:
+        try:
+            from views.broker_page import load_raw_broker_history
+            remote_csv_url = "https://raw.githubusercontent.com/goodinfo3583/tw-broker-data/main/data/broker/broker_history.csv"
+            df_broker = load_raw_broker_history(remote_csv_url)
+            if not df_broker.empty:
+                st.session_state['broker_history_df'] = df_broker
+        except: pass
 
 # ==========================================
 # 🌟 快搜各頁面與顯示工具函數區 
 # ==========================================
 def robust_search_engine(df, query):
-    """🚀 極速省記憶體版搜尋引擎 (Zero-Copy 技術)"""
     if df is None or df.empty: return pd.DataFrame()
+    df = df.loc[:, ~df.columns.duplicated()].copy()
+    
     query = str(query).strip()
     if not query: return pd.DataFrame()
 
     col_id = '股票代號' if '股票代號' in df.columns else ('代號' if '代號' in df.columns else None)
     col_name = '股票名稱' if '股票名稱' in df.columns else ('名稱' if '名稱' in df.columns else None)
 
-    # 🛑 記憶體救星 2：絕對不要在這裡直接 df.copy()！
-    # 我們改用 Pandas 視圖 (View) 與布林遮罩 (Mask) 在底層尋找，記憶體消耗是 0。
-    exact_mask = pd.Series(False, index=df.index)
-    id_series = None
-    name_series = None
-
     if col_id:
-        id_series = df[col_id].astype(str).str.replace(r'\.0$', '', regex=True).str.strip()
-        exact_mask |= (id_series == query)
+        df[col_id] = df[col_id].astype(str).str.replace(r'\.0$', '', regex=True).str.strip()
     if col_name:
-        name_series = df[col_name].astype(str).str.strip().str.lower()
-        exact_mask |= (name_series == query.lower())
+        df[col_name] = df[col_name].astype(str).str.strip()
+
+    exact_mask = pd.Series(False, index=df.index)
+    if col_id:
+        exact_mask = exact_mask | (df[col_id] == query)
+    if col_name:
+        exact_mask = exact_mask | (df[col_name].str.lower() == query.lower())
 
     exact_result = df[exact_mask]
     if not exact_result.empty:
-        # 💡 只有當確定過濾出「那 1 筆」資料時，才去 copy() 這小小的一筆資料回傳
-        return exact_result.loc[:, ~exact_result.columns.duplicated()].copy()
+        return exact_result
 
     partial_mask = pd.Series(False, index=df.index)
     if col_id:
-        partial_mask |= id_series.str.contains(query, na=False)
+        partial_mask = partial_mask | df[col_id].str.contains(query, na=False)
     if col_name:
-        partial_mask |= name_series.str.contains(query, na=False, case=False)
+        partial_mask = partial_mask | df[col_name].str.contains(query, na=False, case=False)
 
-    partial_result = df[partial_mask]
-    if not partial_result.empty:
-        return partial_result.loc[:, ~partial_result.columns.duplicated()].copy()
-        
-    return pd.DataFrame()
+    return df[partial_mask]
 
+# ==========================================
 def scan_and_display(title, session_key, query):
     st.markdown(f"<h6 style='color: #E2E8F0; margin-bottom: 5px;'>{title}</h6>", unsafe_allow_html=True)
     df = get_sidebar_df(session_key)
@@ -164,18 +189,21 @@ def generate_stock_commentary(query):
         df = get_sidebar_df(key)
         if not df.empty:
             res = robust_search_engine(df, query)
-            if not res.empty: score += 1.5
+            if not res.empty:
+                score += 1.5
 
     df_b3 = get_sidebar_df('b3_main')
     if not df_b3.empty:
         res = robust_search_engine(df_b3, query)
-        if not res.empty: score += len(res) * 1.5
+        if not res.empty:
+            score += len(res) * 1.5
 
     for key in ['b4_margin_pct', 'b4_short_pct', 'b4_margin_plus_pct', 'b4_margin_vol', 'b4_short_vol', 'b4_margin_plus_vol']:
         df = get_sidebar_df(key)
         if not df.empty:
             res = robust_search_engine(df, query)
-            if not res.empty: score += 0.5
+            if not res.empty:
+                score += 0.5
 
     def check_big_holder(key):
         df = get_sidebar_df(key)
@@ -190,27 +218,35 @@ def generate_stock_commentary(query):
     b5_trend_400 = check_big_holder('b5_400')
     if "增" in b5_trend_400: score += 2
     elif "減" in b5_trend_400: 
-        score -= 2; warns.append("400張大戶減碼")
+        score -= 2
+        warns.append("400張大戶減碼")
 
     b5_trend_1000 = check_big_holder('b5_1000')
     if "增" in b5_trend_1000: score += 2
     elif "減" in b5_trend_1000: 
-        score -= 2; warns.append("千張超級大戶減碼")
+        score -= 2
+        warns.append("千張超級大戶減碼")
 
     has_warning = len(warns) > 0
     warn_str = "、".join(warns)
     high_score = score >= 4
     
-    if has_warning and high_score: return f"⚔️ 【激烈換手】偵測到法人大戶分歧 ({warn_str})，但籌碼動能獲 {score} 分評估！倒貨正被吃下，需嚴設停損。"
-    if has_warning and not high_score: return f"🚨 【風險警示】大戶正在進行倒貨調節 ({warn_str})，且無強大買盤承接。建議暫避風頭。"
-    if "大減" in b5_trend_400 or "大減" in b5_trend_1000: return "⚠️ 【大戶撤退】大戶出現明顯『大減』跡象，主力籌碼渙散，建議先行觀望。"
+    if has_warning and high_score:
+        return f"⚔️ 【激烈換手】偵測到法人大戶分歧 ({warn_str})，但籌碼動能獲 {score} 分評估！倒貨正被吃下，需嚴設停損。"
+    if has_warning and not high_score:
+        return f"🚨 【風險警示】大戶正在進行倒貨調節 ({warn_str})，且無強大買盤承接。建議暫避風頭。"
+    if "大減" in b5_trend_400 or "大減" in b5_trend_1000:
+        return "⚠️ 【大戶撤退】大戶出現明顯『大減』跡象，主力籌碼渙散，建議先行觀望。"
     if score >= 6:
         base_comment = f"🔥 【強勢噴發】籌碼極度優異 (積分: {score})！法人與大戶同步共振做多，具波段上攻潛力。"
         if "大增" in b5_trend_400 or "大增" in b5_trend_1000: base_comment += "大股東籌碼大幅集中，是極佳防守標的。"
         return base_comment
-    elif score >= 3: return f"📈 【偏多佈局】主力籌碼進駐 (積分: {score})，法人與券資數據給予支撐。具備穩健的波段潛力。"
-    elif score >= 1: return f"🔄 【中性觀望】籌碼表現較為平淡 (積分: {score})，缺乏連續性。建議多看少做。"
-    else: return "❄️ 【弱勢整理】未進入任何核心法人與大戶買超榜單，籌碼流失或無主力認養。建議暫不考量。"
+    elif score >= 3: 
+        return f"📈 【偏多佈局】主力籌碼進駐 (積分: {score})，法人與券資數據給予支撐。具備穩健的波段潛力。"
+    elif score >= 1: 
+        return f"🔄 【中性觀望】籌碼表現較為平淡 (積分: {score})，缺乏連續性。建議多看少做。"
+    else: 
+        return "❄️ 【弱勢整理】未進入任何核心法人與大戶買超榜單，籌碼流失或無主力認養。建議暫不考量。"
 
 def generate_technical_signals(df_sig):
     signals = []
@@ -237,21 +273,27 @@ def generate_technical_signals(df_sig):
 
 def render_b4_panorama(view_title, keys_and_labels, query, stock_name="-"):
     st.markdown(f"<h5 style='color: #E2E8F0; margin-bottom: 5px;'>{view_title}</h5>", unsafe_allow_html=True)
+    
     for label, key in keys_and_labels:
         df = get_sidebar_df(key)
         if not df.empty:
             res = robust_search_engine(df, query)
             if not res.empty:
                 st.markdown(f"<div style='font-size:14px; font-weight:bold; color:#38BDF8; margin-top:8px; margin-bottom:4px;'>{label}</div>", unsafe_allow_html=True)
+                
                 row_data = res.iloc[[0]].copy()
                 if '股票代號' not in row_data.columns: row_data.insert(0, '股票代號', query)
                 if '股票名稱' not in row_data.columns: row_data.insert(1, '股票名稱', stock_name)
-                for c in row_data.columns: row_data[c] = row_data[c].apply(lambda x: str(x)[:-2] if str(x).endswith('.0') else x)
+                
+                for c in row_data.columns: 
+                    row_data[c] = row_data[c].apply(lambda x: str(x)[:-2] if str(x).endswith('.0') else x)
+                    
                 st.dataframe(row_data, use_container_width=True, hide_index=True)
-            else: st.markdown(f"<div style='font-size:13px; color:#94a3b8; margin-top:4px; margin-bottom:4px;'>{label}： <span style='color:#E2E8F0;'>⚪ 未進榜</span></div>", unsafe_allow_html=True)
-        else: st.markdown(f"<div style='font-size:13px; color:#94a3b8; margin-top:4px; margin-bottom:4px;'>{label}： <span style='color:#f59e0b;'>⚠️ 尚未載入</span></div>", unsafe_allow_html=True)
+            else:
+                st.markdown(f"<div style='font-size:13px; color:#94a3b8; margin-top:4px; margin-bottom:4px;'>{label}： <span style='color:#E2E8F0;'>⚪ 未進榜</span></div>", unsafe_allow_html=True)
+        else:
+            st.markdown(f"<div style='font-size:13px; color:#94a3b8; margin-top:4px; margin-bottom:4px;'>{label}： <span style='color:#f59e0b;'>⚠️ 尚未載入</span></div>", unsafe_allow_html=True)
 
-# 🚀 修正：改用滿血版引擎直接過濾
 def render_sidebar_broker_tracking(query, display_name):
     df_raw = get_sidebar_df('broker_history')
     if df_raw.empty:
@@ -263,7 +305,7 @@ def render_sidebar_broker_tracking(query, display_name):
         st.write("⚪ 未進榜 (無近期券商資料)")
         return
         
-    broker_col = next((c for c in ['broker_name', 'broker', '券商名稱', '券商', 'name'] if c in stock_raw.columns), None)
+    broker_col = next((c for c in ['broker', 'broker_name', '券商名稱', '券商', 'name'] if c in stock_raw.columns), None)
     if not broker_col: return
 
     available_dates = sorted(stock_raw['trade_date'].unique(), reverse=True)
@@ -271,21 +313,24 @@ def render_sidebar_broker_tracking(query, display_name):
     
     try:
         from utils.data_utils import calculate_chip_concentration
-        # 🚀 修正：直接傳入過濾好的 stock_raw
-        df_trend = calculate_chip_concentration(stock_raw)
+        remote_csv_url = "https://raw.githubusercontent.com/goodinfo3583/tw-broker-data/main/data/broker/broker_history.csv"
+        df_trend = calculate_chip_concentration(remote_csv_url, str(query))
         
         if not df_trend.empty:
             latest_data = df_trend.iloc[-1]
             m_col1, m_col2 = st.columns(2)
-            with m_col1: st.metric(label=f"最新集中度 ({latest_data['trade_date']})", value=f"{latest_data['concentration_%']}%")
+            with m_col1:
+                st.metric(label=f"最新集中度 ({latest_data['trade_date']})", value=f"{latest_data['concentration_%']}%")
             with m_col2:
-                net_buy_val = latest_data['net_buy'] #小數點位數顯示
-                net_str = f"+{net_buy_val:,.1f}" if net_buy_val > 0 else f"{net_buy_val:,.1f}"
+                net_buy_val = latest_data['net_buy']
+                net_str = f"+{net_buy_val:,}" if net_buy_val > 0 else f"{net_buy_val:,}"
                 st.metric(label="主體淨買賣超", value=f"{net_str} 張")
             
             with st.expander("📅 展開查看：近 60 日集中度與淨買超", expanded=False):
-                df_trend_disp = df_trend.sort_values('trade_date', ascending=False).head(60).copy()[['trade_date', 'net_buy', 'concentration_%']]
+                df_trend_disp = df_trend.sort_values('trade_date', ascending=False).head(60).copy()
+                df_trend_disp = df_trend_disp[['trade_date', 'net_buy', 'concentration_%']]
                 df_trend_disp.columns = ['交易日期', '淨買超(張)', '集中度(%)']
+                
                 def color_trend(val):
                     try:
                         v = float(val)
@@ -294,18 +339,27 @@ def render_sidebar_broker_tracking(query, display_name):
                     except: pass
                     return 'color: #94A3B8;'
                 
-                if hasattr(df_trend_disp.style, 'map'): styled_trend = df_trend_disp.style.map(color_trend, subset=['淨買超(張)', '集中度(%)']).format({'淨買超(張)': "{:,.0f}", '集中度(%)': "{:.2f}"})
-                else: styled_trend = df_trend_disp.style.applymap(color_trend, subset=['淨買超(張)', '集中度(%)']).format({'淨買超(張)': "{:,.0f}", '集中度(%)': "{:.2f}"})
+                # '集中度(%)': "{:.2f}" 讓小數點強制鎖定在第二位
+                if hasattr(df_trend_disp.style, 'map'):
+                    styled_trend = df_trend_disp.style.map(color_trend, subset=['淨買超(張)', '集中度(%)']).format({'淨買超(張)': "{:,.0f}", '集中度(%)': "{:.2f}"})
+                else:
+                    styled_trend = df_trend_disp.style.applymap(color_trend, subset=['淨買超(張)', '集中度(%)']).format({'淨買超(張)': "{:,.0f}", '集中度(%)': "{:.2f}"})
+                
                 st.dataframe(styled_trend, use_container_width=True, hide_index=True)
+            
             st.markdown("<hr style='border-color: rgba(56, 189, 248, 0.3); margin: 10px 0px;'>", unsafe_allow_html=True)
-    except Exception as e: pass 
+    except Exception as e:
+        pass 
 
     recent_dates = available_dates[:60]
     recent_raw = stock_raw[stock_raw['trade_date'].isin(recent_dates)].copy()
-    recent_raw['real_net_vol'] = recent_raw.apply(lambda x: abs(x['net_vol']) if x['side'] == 'buy' else -abs(x['net_vol']), axis=1)
+    recent_raw['real_net_vol'] = recent_raw.apply(
+        lambda x: abs(x['net_vol']) if x['side'] == 'buy' else -abs(x['net_vol']), axis=1
+    )
     
     hoard_df = recent_raw.groupby(broker_col)['real_net_vol'].sum().reset_index()
     hoard_df.columns = [broker_col, '區間淨買賣']
+    
     top_5_hoarders = hoard_df[hoard_df['區間淨買賣'] > 0].sort_values('區間淨買賣', ascending=False).head(5)
     
     if top_5_hoarders.empty:
@@ -313,6 +367,7 @@ def render_sidebar_broker_tracking(query, display_name):
         return
         
     top_5_names = top_5_hoarders[broker_col].tolist()
+    
     st.markdown("<h6 style='color: #E2E8F0; margin-top: 5px; margin-bottom: 5px;'>📈 近 60 日囤貨分點 (前 5 名)</h6>", unsafe_allow_html=True)
     styled_hoard = top_5_hoarders.copy()
     styled_hoard.columns = ['中文券商分點', '淨買超(張)']
@@ -320,27 +375,37 @@ def render_sidebar_broker_tracking(query, display_name):
     st.dataframe(styled_hoard, use_container_width=True, hide_index=True)
     
     st.markdown("<h6 style='color: #E2E8F0; margin-top: 10px; margin-bottom: 5px;'>🗺️ 囤貨分點進出矩陣 (近 15 日)</h6>", unsafe_allow_html=True)
+    
     matrix_raw = stock_raw[stock_raw[broker_col].isin(top_5_names)].copy()
-    matrix_raw['signed_vol'] = matrix_raw.apply(lambda x: abs(x['net_vol']) if x['side'] == 'buy' else -abs(x['net_vol']), axis=1)
+    matrix_raw['signed_vol'] = matrix_raw.apply(
+        lambda x: abs(x['net_vol']) if x['side'] == 'buy' else -abs(x['net_vol']), axis=1
+    )
+    
     full_pivot = matrix_raw.pivot_table(index=broker_col, columns='trade_date', values='signed_vol', aggfunc='sum')
     all_dates_sorted = sorted(full_pivot.columns, reverse=True)
     
-    display_dates = [d for d in available_dates[:15] if d in full_pivot.columns]
+    display_dates = available_dates[:15]
+    display_dates = [d for d in display_dates if d in full_pivot.columns]
     pivot_df = full_pivot[display_dates].copy()
     
     def calc_daily_streak(row_name):
         if row_name not in full_pivot.index: return "-"
         row = full_pivot.loc[row_name]
-        streak = 0; sign = None
+        streak = 0
+        sign = None
         for c in all_dates_sorted:
             val = row.get(c, 0)
-            if pd.isna(val) or abs(val) < 0.01: break
+            if pd.isna(val) or val == 0: break
             current_sign = 1 if val > 0 else -1
-            if sign is None: sign = current_sign; streak = sign
-            elif sign == current_sign: streak += sign
-            else: break
-        if streak > 0: return f"🔥 連買 {streak} 日"
-        elif streak < 0: return f"🩸 連賣 {-streak} 日"
+            if sign is None:
+                sign = current_sign
+                streak = sign
+            elif sign == current_sign:
+                streak += sign
+            else:
+                break
+        if streak > 0: return f"連買 {streak} 日"
+        elif streak < 0: return f"連賣 {-streak} 日"
         else: return "-"
 
     pivot_df['日連買動態'] = pivot_df.index.to_series().apply(calc_daily_streak)
@@ -359,17 +424,21 @@ def render_sidebar_broker_tracking(query, display_name):
         try:
             v = float(val)
             if v > 0: return 'color: #FF4B4B;'
-            elif v < -0.01: return 'color: #00E272;'
+            elif v < 0: return 'color: #00E272;'
         except: pass
         return 'color: #94A3B8;'
 
-    if hasattr(pivot_df.style, 'map'): styled_pivot = pivot_df.style.map(color_net_vol).format(lambda x: "{:,.0f}".format(x) if isinstance(x, (int, float)) else x)
-    else: styled_pivot = pivot_df.style.applymap(color_net_vol).format(lambda x: "{:,.0f}".format(x) if isinstance(x, (int, float)) else x)
+    if hasattr(pivot_df.style, 'map'):
+        styled_pivot = pivot_df.style.map(color_net_vol).format(lambda x: "{:,.0f}".format(x) if isinstance(x, (int, float)) else x)
+    else:
+        styled_pivot = pivot_df.style.applymap(color_net_vol).format(lambda x: "{:,.0f}".format(x) if isinstance(x, (int, float)) else x)
+    
     st.dataframe(styled_pivot, use_container_width=True)
 
 # ==========================================
 # 📈 側邊雙視窗 K 線圖與技術分析引擎
 # ==========================================
+# 💡 效能優化：加入 show_spinner=False，避免畫面卡頓跳動
 @st.cache_data(show_spinner=False, ttl=900)
 def fetch_yfinance_data(ticker, period="3y"):
     import yfinance as yf
@@ -384,13 +453,15 @@ def render_technical_chart(stock_id, timeframe="日線", selected_mas=[], show_r
     ticker_two = f"{stock_id}.TWO"
     
     df = fetch_yfinance_data(ticker_tw)
-    if df is None or df.empty: df = fetch_yfinance_data(ticker_two)
+    if df is None or df.empty:
+        df = fetch_yfinance_data(ticker_two)
         
     if df is None or df.empty:
         st.warning(f"⚠️ 無法取得 {stock_id} 的即時報價。")
         return
 
-    if isinstance(df.columns, pd.MultiIndex): df.columns = df.columns.get_level_values(0)
+    if isinstance(df.columns, pd.MultiIndex):
+        df.columns = df.columns.get_level_values(0)
     df = df.loc[:, ~df.columns.duplicated()]
 
     if df.index.tz is not None: df.index = df.index.tz_convert('Asia/Taipei')
@@ -398,10 +469,13 @@ def render_technical_chart(stock_id, timeframe="日線", selected_mas=[], show_r
 
     daily_df = df.copy()
             
-    if timeframe == "週線": daily_df = daily_df.resample('W-FRI').agg({'Open': 'first', 'High': 'max', 'Low': 'min', 'Close': 'last', 'Volume': 'sum'}).dropna()
-    elif timeframe == "月線": daily_df = daily_df.resample('ME').agg({'Open': 'first', 'High': 'max', 'Low': 'min', 'Close': 'last', 'Volume': 'sum'}).dropna()
+    if timeframe == "週線":
+        daily_df = daily_df.resample('W-FRI').agg({'Open': 'first', 'High': 'max', 'Low': 'min', 'Close': 'last', 'Volume': 'sum'}).dropna()
+    elif timeframe == "月線":
+        daily_df = daily_df.resample('ME').agg({'Open': 'first', 'High': 'max', 'Low': 'min', 'Close': 'last', 'Volume': 'sum'}).dropna()
 
-    for ma in [5, 10, 20, 60, 120, 240]: daily_df[f'{ma}MA'] = daily_df['Close'].rolling(window=ma).mean()
+    for ma in [5, 10, 20, 60, 120, 240]:
+        daily_df[f'{ma}MA'] = daily_df['Close'].rolling(window=ma).mean()
 
     close_series = daily_df['Close'].squeeze()
     
@@ -464,8 +538,9 @@ def render_technical_chart(stock_id, timeframe="日線", selected_mas=[], show_r
         )
 
     ma_config = {
-        '5MA': {'color': '#FFFF37'}, '10MA': {'color': '#00FFFF'}, '20MA': {'color': '#921AFF'}, 
-        '60MA': {'color': '#D0D0D0'}, '120MA': {'color': '#D200D2'}, '240MA': {'color': '#BB3D00'}
+        '5MA': {'color': '#FFFF37'}, '10MA': {'color': '#00FFFF'},
+        '20MA': {'color': '#921AFF'}, '60MA': {'color': '#D0D0D0'},
+        '120MA': {'color': '#D200D2'}, '240MA': {'color': '#BB3D00'}
     }
     for ma_name in selected_mas:
         if ma_name in daily_df.columns:
@@ -783,6 +858,7 @@ def render_options_dashboard():
     html_opt += "</table>"
     st.markdown(html_opt, unsafe_allow_html=True)
 
+# 💡 效能優化：加入 show_spinner=False，避免背景讀取時畫面跳動
 @st.cache_data(show_spinner=False, ttl=300) 
 def fetch_macro_indicators():
     data = {
@@ -877,7 +953,6 @@ def get_img_html(filename, height="28px"):
             img_b64 = base64.b64encode(f.read()).decode("utf-8")
         return f'<img src="data:image/png;base64,{img_b64}" style="height: {height}; vertical-align: text-bottom; margin-right: 8px;">'
     return "" 
-
 # =======================================================
 # 🚀 效能優化快取區塊：將 Plotly 圖表繪製獨立出來並快取
 # =======================================================
