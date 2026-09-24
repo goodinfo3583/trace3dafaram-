@@ -79,12 +79,19 @@ def render_tab_track(username, conn):
         user_track = df_track[df_track['帳號'].astype(str).str.replace(r'\.0$', '', regex=True).str.strip().str.lower() == username.strip().lower()].copy()
         if user_track.empty: return st.info("您目前沒有將任何模型標的寫入追蹤喔！")
 
-        # 🚀 極速 Pandas 向量化資料清洗與配對
-        user_track['純代號'] = user_track.get('代號', '').astype(str).str.replace(r'\.0$', '', regex=True).str.strip()
-        user_track['純代號'] = np.where(user_track['純代號'] == '', user_track.get('統一代號', '').astype(str).str.extract(r'(\d+)')[0], user_track['純代號'])
-        track_quotes = get_watchlist_quotes(user_track['純代號'].dropna().unique().tolist())
+        # 🚀 極速 Pandas 向量化資料清洗與配對 (修正 Series 防呆機制)
+        empty_str_s = pd.Series('', index=user_track.index)
+        empty_zero_s = pd.Series(0, index=user_track.index)
+
+        c_code = user_track.get('代號', empty_str_s).astype(str).str.replace(r'\.0$', '', regex=True).str.strip()
+        u_code = user_track.get('統一代號', empty_str_s).astype(str).str.extract(r'(\d+)')[0].fillna('')
+        user_track['純代號'] = np.where(c_code == '', u_code, c_code)
         
-        user_track['鎖定價'] = pd.to_numeric(user_track.get('鎖定收盤價', user_track.get('B0_成交', 0)).astype(str).str.replace(',', ''), errors='coerce').fillna(0)
+        track_quotes = get_watchlist_quotes(user_track['純代號'].replace('', np.nan).dropna().unique().tolist())
+        
+        p_raw = user_track.get('鎖定收盤價', user_track.get('B0_成交', empty_zero_s))
+        user_track['鎖定價'] = pd.to_numeric(p_raw.astype(str).str.replace(',', ''), errors='coerce').fillna(0)
+        
         user_track['最新價'] = user_track['純代號'].map(lambda x: track_quotes.get(x, {}).get('price', None)).fillna(user_track['鎖定價'])
         user_track['報酬'] = np.where(user_track['鎖定價'] > 0, ((user_track['最新價'] - user_track['鎖定價']) / user_track['鎖定價'] * 100), 0.0).round(2)
         
@@ -118,7 +125,6 @@ def render_tab_track(username, conn):
         display_df.insert(loc + 1, '區間報酬', user_track['報酬'].apply(lambda x: f"{x:.2f}%"))
         st.dataframe(display_df, use_container_width=True, hide_index=True)
     except Exception as e: st.error(f"讀取追蹤資料時發生錯誤：{e}")
-
 # ==========================================
 # 🚀 獨立渲染魔法區塊二：自訂追蹤名單 (元件瘦身版)
 # ==========================================
